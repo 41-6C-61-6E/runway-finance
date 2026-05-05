@@ -1,0 +1,45 @@
+{
+  "name": "next16-tw4-docker-starter",
+  "description": "A starter template for Next.js 16 with Tailwind CSS 4, Next-auth v5, and Docker support.",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": {
+    "name": "Ehsan Ghaffar",
+    "url": "https://ehsanghaffarii.ir"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "preview": "next start -p 3000",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx .",
+    "ci": "pnpm -s lint && pnpm -s typecheck && pnpm -s build",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "test:docker": "bash ./scripts/test-docker.sh",
+    "upgrade": "next upgrade"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@vercel/analytics": "^1.6.1",
+    "lucide-react": "^0.554.0",
+    "next": "^16.1.0",
+    "next-auth": "5.0.0-beta.30",
+    "next-themes": "^0.4.6",
+    "postcss": "^8.5.6",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tailwindcss": "^4.1.17",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "eslint": "9.39.1",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  }
+}

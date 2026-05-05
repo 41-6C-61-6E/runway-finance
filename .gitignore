@@ -1,0 +1,18 @@
+# Node
+node_modules/
+.pnpm-store/
+.next/
+.dist/
+.env.local
+.env
+.vercel/
+.DS_Store
+
+# Build outputs
+out/
+build/
+
+# Editor files
+.vscode/
+.idea/
+chat.json
