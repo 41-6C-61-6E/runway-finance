@@ -1,6 +1,14 @@
 import { DemoBadge } from "@/components/demo-badge";
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { Suspense } from 'react'
+import { signOut } from "next-auth/react";
 
-export default function Home() {
+async function HomeContent() {
+  const session = await auth()
+  if (!session) {
+    redirect('/signin')
+  }
   return (
     <div className="min-h-screen w-full relative overflow-hidden">
       {/* Animated gradient background */}
@@ -43,6 +51,21 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Sign Out Button */}
+          <div className="mt-8">
+            <form action={async () => {
+              "use server";
+              await signOut();
+            }}>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+              >
+                Sign Out
+              </button>
+            </form>
+          </div>
+
           {/* Tech Stack */}
           <div className="flex flex-wrap gap-3 justify-center items-center">
             <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
@@ -79,5 +102,13 @@ export default function Home() {
 
       <DemoBadge />
     </div>
+  );
+}
+
+export default async function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }
