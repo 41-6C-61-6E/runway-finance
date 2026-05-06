@@ -8,21 +8,15 @@ export default function BaseHeader() {
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-              <span className="text-white font-bold text-lg">N</span>
+              <span className="text-white font-bold text-lg">R</span>
             </div>
             <span className="font-bold text-xl bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-              Next
+              Runway
             </span>
           </Link>
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors text-sm font-medium"
-            >
-              Features
-            </a>
             <a
               href="#docs"
               className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors text-sm font-medium"
@@ -30,7 +24,7 @@ export default function BaseHeader() {
               Docs
             </a>
             <a
-              href="https://github.com/ehsanghaffar/nextjs-starter"
+              href="https://github.com/41-6C-61-6E/runway-finance"
               target="_blank"
               className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors text-sm font-medium"
             >

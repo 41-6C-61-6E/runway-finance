@@ -1,14 +1,30 @@
 import { DemoBadge } from "@/components/demo-badge";
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
+import { auth, signOut } from '@/lib/auth'
 import { Suspense } from 'react'
-import { signOut } from "next-auth/react";
+import { getUsers } from '@/lib/users'
+import { debugLog, debugInfo, debugWarn } from '@/lib/debug'
 
 async function HomeContent() {
+  // Log startup info
+  const debugMode = process.env.DEBUG === 'true'
+  if (debugMode) {
+    debugInfo('=== App page accessed ===')
+    const users = await getUsers()
+    debugLog(`Number of registered users: ${users.length}`)
+    if (users.length > 0) {
+      debugLog('Usernames:', users.map(u => u.username))
+    } else {
+      debugWarn('No users registered yet')
+    }
+  }
+
   const session = await auth()
-  if (!session) {
+  if (!session?.user) {
+    if (debugMode) debugLog('No session found, redirecting to /signin')
     redirect('/signin')
   }
+  if (debugMode) debugInfo('Session found, rendering main page')
   return (
     <div className="min-h-screen w-full relative overflow-hidden">
       {/* Animated gradient background */}
@@ -30,11 +46,11 @@ async function HomeContent() {
           {/* Version Badge */}
           <div className="flex flex-col items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20">
-              Next.js v16.1.0
+              Runway Finance
             </span>
             {/* Badge */}
             <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/30 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-600/20">
-              ✨ Modern Starter Template
+              Get ready for takeoff!
             </span>
           </div>
 
@@ -42,20 +58,16 @@ async function HomeContent() {
           <div className="space-y-4">
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight">
               <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                Build Amazing Apps
+                Runway Finance
               </span>
             </h1>
-            <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 font-light max-w-3xl mx-auto">
-              Next.js 16 + Docker + Tailwind CSS 4 + Auth.js 5 + TypeScript starter template to
-              kickstart your next project with modern best practices.
-            </p>
           </div>
 
-          {/* Sign Out Button */}
+          {/* Buttons */}
           <div className="mt-8">
             <form action={async () => {
               "use server";
-              await signOut();
+              await signOut({ redirectTo: '/signin' });
             }}>
               <button
                 type="submit"
@@ -66,35 +78,14 @@ async function HomeContent() {
             </form>
           </div>
 
-          {/* Tech Stack */}
-          <div className="flex flex-wrap gap-3 justify-center items-center">
-            <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
-              Next.js 16
-            </span>
-            <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
-              TypeScript
-            </span>
-            <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
-              Docker
-            </span>
-            <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
-              Tailwind CSS 4
-            </span>
-          </div>
-
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button className="inline-flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 cursor-pointer">
               <a
-                href="https://github.com/ehsanghaffar/next16-docker-tw4-starter"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Get Started →
+                Settings
               </a>
-            </button>
-            <button className="inline-flex items-center justify-center px-8 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200">
-              Learn More
             </button>
           </div>
         </div>

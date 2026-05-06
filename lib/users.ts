@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-const USERS_FILE = path.join(process.cwd(), 'users.json');
+// Use /tmp for Docker compatibility since process.cwd() may not be writable
+const USERS_FILE = process.env.USERS_FILE || path.join('/tmp', 'users.json');
 
 export interface User {
   username: string;

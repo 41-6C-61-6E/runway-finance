@@ -1,8 +1,11 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { findUser, addUser } from "./users";
+import { debugLog, debugInfo, debugWarn, debugError } from "./debug";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production',
+  trustHost: true,
   providers: [
     Credentials({
       name: 'Credentials',
@@ -11,10 +14,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const user = await findUser(credentials.username as string);
-        if (user && user.password === credentials.password) {
+        debugLog('Auth: authorize called with username:', credentials?.username)
+        if (!credentials?.username || !credentials?.password) {
+          debugWarn('Auth: missing credentials')
+          return null;
+        }
+        const username = credentials.username as string;
+        const password = credentials.password as string;
+        const user = await findUser(username);
+        if (user && user.password === password) {
+          debugInfo('Auth: successful login for user:', user.username)
           return { id: user.username, name: user.username, email: user.email };
         }
+        debugWarn('Auth: failed login attempt for username:', username)
         return null;
       }
     })
@@ -23,6 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub;
+        debugLog('Auth: session created for user:', session.user.id)
       }
       return session;
     },
