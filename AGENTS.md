@@ -4,7 +4,8 @@
 # Dev Deployment Information
 - In the current dev enviornment the app loads in a remote docker context at 10.1.1.10:3001, you can interact with it there
 - Every time a dev phase is complete or when a feature or function is added, update the README.md file and AGENTS.md file if the change includes things relevant to those files (i.e new features, functions, or processes)
-
+- Check the spec file runway-spec-v4.md if you need additional technical information about the project. 
+- After each significant change, build, run and check container logs for clean startup, and automatically debug if needed
 
 # Progress Narration
 - Before EVERY tool invocation, emit a short plain-English line describing what you are about to do and why.
@@ -64,112 +65,12 @@ runway-finance/
 └── runway-spec-v4.md       # Full development specification
 ```
 
-## Key Implementation Patterns
 
-### Database Access
-
-The database is accessed via `getDb()` function, NOT a direct `db` export:
-
-```typescript
-import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
-
-// Correct
-const result = await getDb()
-  .select()
-  .from(accounts)
-  .where(eq(accounts.userId, userId));
-
-// WRONG — db is not exported
-import { db } from '@/lib/db'; // ❌
-```
-
-### Authentication
-
-Use `auth()` directly in API routes (Next Auth v5 pattern):
-
-```typescript
-import { auth } from '@/lib/auth';
-
-export async function GET() {
-  const session = await auth(); // No headers needed in API routes
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  }
-  const userId = session.user.id;
-  // ... handler logic
-}
-```
-
-**Important**: Do NOT use `auth.api.getSession()` — this is Next Auth v4 pattern. In v5, `auth()` automatically gets the session from the request context.
-
-### SimpleFIN Integration
+## SimpleFIN Integration
 
 Resources:
 - SimpleFIN Dev Guide: https://beta-bridge.simplefin.org/info/developers
 - SimpleFIN Protocol: https://www.simplefin.org/protocol.html
-
-The SimpleFIN claim flow requires:
-1. `Content-Length: 0` header on POST request
-2. Response is plain text (access URL), NOT JSON
-
-```typescript
-// Correct claim pattern
-const res = await fetch(claimUrl, {
-  method: 'POST',
-  headers: { 'Content-Length': '0' } // Required!
-});
-const accessUrl = await res.text(); // Plain text, not JSON
-```
-
-### API Response Shapes
-
-- **Single resource**: `{ "id": "...", ... }`
-- **Collection**: `{ "data": [...], "total": 100, "limit": 50, "offset": 0 }`
-- **Result**: `{ "matched": 42 }` or `{ "updated": 12 }`
-- **Empty success**: 204 No Content
-- **Error**: `{ "error": "error_code", "message": "Human description" }`
-
-### Standard Status Codes
-
-- `200` — Success
-- `201` — Created
-- `204` — No Content (DELETE success)
-- `400` — Validation error
-- `401` — Unauthenticated
-- `403` — Forbidden
-- `404` — Not found
-- `409` — Conflict
-- `502` — Upstream error (e.g., SimpleFIN failure)
-
-### Request Validation
-
-All POST/PATCH bodies validated with Zod. Invalid body returns:
-
-```json
-{
-  "error": "validation_error",
-  "message": "Invalid request body",
-  "details": { "field": "error" }
-}
-```
-
-### Delete Confirmation
-
-All DELETE handlers require `X-Confirm-Delete: true` header:
-
-```typescript
-export async function DELETE(request: Request) {
-  if (request.headers.get('X-Confirm-Delete') !== 'true') {
-    return NextResponse.json(
-      { error: 'validation_error', message: 'Missing X-Confirm--delete header' },
-      { status: 400 }
-    );
-  }
-  // ... delete logic
-}
-```
 
 ## Database Schema
 
@@ -200,7 +101,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The app runs on `http://localhost:3001` (configured in `compose.yml`).
+The app runs at `http://10.1.1.10:3001` (configured in `compose.yml`).
 
 ## Docker
 
@@ -232,35 +133,10 @@ The project follows phased development documented in `runway-spec-v4.md`:
 - **Phase 3** — Sync service and background worker (in progress)
 - **Phase 4+** — Categories, rules, net worth, reports, UI (planned)
 
-## Common Pitfalls
-
-1. **Never import `db` directly** — Use `getDb()` function
-2. **Never use `auth.api.getSession()`** — Use `auth()` in API routes
-3. **SimpleFIN claim needs `Content-Length: 0`** — Response is plain text
-4. **Database migrations** — Apply via `pnpm db:migrate` or SQL files in `drizzle/`
-5. **Docker volumes** — PostgreSQL data persists in `pgdata` volume
-6. **Single connection per user** — Phase 1 design limits to one SimpleFIN connection
-
-## Encryption
-
-Sensitive data (SimpleFIN access URLs) encrypted with AES-256-GCM:
-
-```typescript
-import { encrypt, decrypt } from '@/lib/crypto';
-
-// Encrypt
-const payload = encrypt(plaintext);
-// Returns: { ciphertext: string, iv: string, tag: string }
-
-// Decrypt
-const plaintext = decrypt(payload);
-```
-
-The encryption key is loaded from `ENCRYPTION_KEY` environment variable at module load. Process exits if invalid.
 
 ## Design System
 
-- Dark theme only (no light mode)
+- Dark theme and light theme as set up in the initial template
 - CSS variable tokens for colors, spacing, radii
 - Monetary amounts use `font-mono`, color conveys sign (green = positive, red = negative)
 - Accent colors via CSS custom properties

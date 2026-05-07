@@ -48,10 +48,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     })
     .returning();
 
-  // TODO: Call syncConnection(id, userId) from src/services/sync.ts
-  // For now, return a placeholder response
+  // Call sync service
+  const { syncConnection } = await import('@/lib/services/sync');
+  const result = await syncConnection(id, userId);
+
   return NextResponse.json({
-    status: 'sync_initiated',
-    syncLogId: log.id,
-  });
+    status: result.status,
+    accountsSynced: result.accountsSynced,
+    transactionsFetched: result.transactionsFetched,
+    transactionsNew: result.transactionsNew,
+    transactionsUpdated: result.transactionsUpdated,
+    ...(result.status === 'error' && { error: result.errorMessage }),
+  }, { status: result.status === 'success' ? 200 : 502 });
 }

@@ -27,6 +27,7 @@ services:
       - NEXTAUTH_TRUST_HOST=true
       - DEBUG=true
       - DATABASE_URL=postgresql://postgres:[REMOVED_DB_PASSWORD]@postgres:5432/runway_finance
+      - DEV_MODE=true
     depends_on:
       - postgres
     command: ["node", "server.js"]

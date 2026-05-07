@@ -1,5 +1,4 @@
 import Link from "next/link";
-import ModeToggle from "./mode-toggle";
 
 export default function BaseHeader() {
   return (
@@ -14,28 +13,6 @@ export default function BaseHeader() {
               Runway
             </span>
           </Link>
-
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#docs"
-              className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors text-sm font-medium"
-            >
-              Docs
-            </a>
-            <a
-              href="https://github.com/41-6C-61-6E/runway-finance"
-              target="_blank"
-              className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors text-sm font-medium"
-            >
-              GitHub
-            </a>
-          </nav>
-
-          {/* Right side actions */}
-          <div className="flex items-center gap-4">
-            <ModeToggle />
-          </div>
         </div>
       </div>
     </header>

@@ -5,28 +5,6 @@
 > Base template: https://github.com/zexahq/Next-auth-starter
 
 ---
-## Instructions for Agents
-Progress Narration
-
-- Before EVERY tool invocation, emit a short plain-English line describing what you are about to do and why.
-  Example: "Reading package.json to check the current dependencies..."
-- After receiving a tool result, emit a one-line summary of what you found before proceeding.
-  Example: "Found 3 outdated packages. Now checking for breaking changes..."
-- If a step will take time (file search, multi-file edit), say so upfront.
-  Example: "Scanning all TypeScript files in src/ — this may take a moment."
-- Never silently chain tool calls. Always narrate between them.
-- During multi-step tool use, emit a short status line before each tool invocation (e.g. "Searching for X…" or "Reading file Y…").
-- Do not chain multiple tool_use blocks without interleaved text.
-
-TOOL EXECUTION PROTOCOL
-- NEVER output raw JSON function calls or "type: function" strings directly to the user.
-- All function calls must be handled via the system tool-use interface, not as text output.
-- Only provide a natural language summary after a tool has successfully executed.
-- If a tool call is required, identify the parameters internally and trigger the action without displaying the background logic.
-- If a file path or URI is invalid or inaccessible, inform the user in plain text. Do not output raw error JSON.
-- Use Markdown code blocks only when providing specific code examples or when explicitly asked to show JSON structure.
-
----
 
 ## How to Use This Document
 

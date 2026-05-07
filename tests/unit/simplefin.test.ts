@@ -20,7 +20,7 @@ describe('SimpleFIN', () => {
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockResponse),
+        text: () => Promise.resolve('https://simplefin.example.com/access/abc123'),
       });
 
       const result = await claimAccessUrl(setupToken);
@@ -68,6 +68,27 @@ describe('SimpleFIN', () => {
         expect.stringContaining('start-date=1704067200'),
         expect.any(Object)
       );
+    });
+
+    it('strips credentials from SimpleFIN access URL before fetch', async () => {
+      const startDate = new Date('2024-01-01');
+      const endDate = new Date('2024-01-31');
+      const mockAccounts = { accounts: [{ id: '1', name: 'Checking', currency: 'USD', balance: '1000', 'balance-date': Date.now() / 1000, org: { name: 'Bank' } }] };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockAccounts),
+      });
+
+      const credentialUrl = 'https://user:pass@simplefin.example.com/access/abc123';
+      const result = await fetchAccounts(credentialUrl, startDate, endDate);
+
+      expect(result.accounts).toHaveLength(1);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.not.stringContaining('user:pass@'),
+        expect.objectContaining({ headers: expect.any(Object) })
+      );
+      expect((global.fetch as any).mock.calls[0][1].headers.Authorization).toContain('Basic ');
     });
 
     it('throws SimpleFINError on network failure', async () => {
