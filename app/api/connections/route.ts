@@ -1,0 +1,120 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
+import { getDb } from '@/lib/db';
+import { simplifinConnections } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+
+  const connections = await getDb()
+    .select({
+      id: simplifinConnections.id,
+      label: simplifinConnections.label,
+      lastSyncAt: simplifinConnections.lastSyncAt,
+      lastSyncStatus: simplifinConnections.lastSyncStatus,
+      lastSyncError: simplifinConnections.lastSyncError,
+      createdAt: simplifinConnections.createdAt,
+    })
+    .from(simplifinConnections)
+    .where(eq(simplifinConnections.userId, userId))
+    .orderBy(simplifinConnections.createdAt);
+
+  return NextResponse.json(connections);
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+
+  // Check if user already has a connection (single-connection per phase 1 design)
+  const existing = await getDb()
+    .select({ id: simplifinConnections.id })
+    .from(simplifinConnections)
+    .where(eq(simplifinConnections.userId, userId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return NextResponse.json(
+      { error: 'conflict', message: 'A connection already exists for this user' },
+      { status: 409 }
+    );
+  }
+
+  let body: { setupToken: string; label?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'validation_error', message: 'Invalid request body' },
+      { status: 400 }
+    );
+  }
+
+  const parsed = CreateConnectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'validation_error', message: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { setupToken, label } = parsed.data;
+
+  // Claim access URL from SimpleFIN
+  let accessUrl: string;
+  try {
+    const { claimAccessUrl } = await import('@/lib/simplefin');
+    accessUrl = await claimAccessUrl(setupToken);
+  } catch (err) {
+    if (err instanceof Error && 'code' in err) {
+      const code = (err as { code: string }).code;
+      if (code === 'invalid_token') {
+        return NextResponse.json(
+          { error: 'invalid_token', message: 'Invalid setup token' },
+          { status: 400 }
+        );
+      }
+      if (code === 'claim_failed') {
+        return NextResponse.json(
+          { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL' },
+          { status: 502 }
+        );
+      }
+    }
+    return NextResponse.json(
+      { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL' },
+      { status: 502 }
+    );
+  }
+
+  // Encrypt the access URL
+  const { encrypt } = await import('@/lib/crypto');
+  const encrypted = encrypt(accessUrl);
+
+  // Insert connection
+  const [connection] = await getDb()
+    .insert(simplifinConnections)
+    .values({
+      userId,
+      accessUrlEncrypted: encrypted.ciphertext,
+      accessUrlIv: encrypted.iv,
+      accessUrlTag: encrypted.tag,
+      label,
+    })
+    .returning();
+
+  return NextResponse.json(connection, { status: 201 });
+}
+
+import { CreateConnectionSchema } from '@/lib/validations/connection';

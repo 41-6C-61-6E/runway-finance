@@ -12,6 +12,11 @@ node_modules/
 out/
 build/
 
+# Database
+*.db
+*.sqlite
+pgdata/
+
 # Editor files
 .vscode/
 .idea/
