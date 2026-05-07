@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterSidebar from '@/components/features/transactions/FilterSidebar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
-import NavigationSidebar from '@/components/navigation-sidebar';
+import ResizableSidebar from '@/components/resizable-sidebar';
+import ContentWrapper from '@/components/content-wrapper';
 
 type FilterState = {
   accountId: string | null;
@@ -107,9 +108,10 @@ function TransactionsContent() {
       />
 
       {/* Navigation Sidebar */}
-      <NavigationSidebar />
+      <ResizableSidebar />
 
-      <div className="relative z-10 ml-64 mt-20 px-6 lg:px-12 max-w-7xl">
+      <ContentWrapper>
+        <div className="relative z-10 mt-20 px-6 lg:px-12 max-w-7xl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold">
             <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
@@ -148,6 +150,7 @@ function TransactionsContent() {
           </div>
         </div>
       </div>
+      </ContentWrapper>
     </div>
   );
 }

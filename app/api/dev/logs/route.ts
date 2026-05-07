@@ -11,6 +11,9 @@ async function isDevMode(): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
+  // Ensure console is patched when dev mode is enabled
+  await ensureDevModePatched()
+
   // Only available in dev mode
   if (!(await isDevMode())) {
     return NextResponse.json({ error: 'dev_mode_not_enabled' }, { status: 501 })
@@ -45,5 +48,10 @@ export async function DELETE() {
   return new Response(null, { status: 204 })
 }
 
-// Patch console on every request in dev mode
-patchConsole()
+// Only patch console when dev mode is enabled
+let devModePatched = false
+export async function ensureDevModePatched() {
+  if (devModePatched || !(await isDevMode())) return
+  devModePatched = true
+  patchConsole()
+}

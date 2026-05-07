@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import NavigationSidebar from '@/components/navigation-sidebar';
+import ResizableSidebar from '@/components/resizable-sidebar';
 
 export default async function Home() {
   return (
@@ -19,10 +19,10 @@ export default async function Home() {
         />
 
         {/* Navigation Sidebar */}
-        <NavigationSidebar />
+        <ResizableSidebar />
 
         {/* Main Content */}
-        <main className="relative z-10 ml-64 flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
+        <main className="relative z-10 flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl w-full text-center space-y-8">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">

@@ -29,10 +29,15 @@ export async function POST(request: Request) {
 
   const { enabled } = await request.json()
 
+  // Detect if the connection is actually HTTPS (via x-forwarded-proto header)
+  // Only set secure flag when the connection is truly secure
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const isSecure = request.url.startsWith('https://') || forwardedProto === 'https'
+
   const response = NextResponse.json({ devMode: enabled })
   response.cookies.set(DEV_MODE_COOKIE, String(enabled), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 365, // 1 year
