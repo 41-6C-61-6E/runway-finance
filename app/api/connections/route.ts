@@ -87,13 +87,13 @@ export async function POST(request: Request) {
       }
       if (code === 'claim_failed') {
         return NextResponse.json(
-          { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL' },
+          { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL. Invalid token or already claimed.' },
           { status: 502 }
         );
       }
     }
     return NextResponse.json(
-      { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL' },
+      { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL. Invalid token or already claimed.' },
       { status: 502 }
     );
   }

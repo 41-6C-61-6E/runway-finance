@@ -2,7 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import AccountList from '@/components/features/accounts/AccountList';
-import NavigationSidebar from '@/components/navigation-sidebar';
+import ResizableSidebar from '@/components/resizable-sidebar';
+import ContentWrapper from '@/components/content-wrapper';
 
 function AccountsListWithFetch() {
   const { data: accounts = [] } = useQuery({
@@ -30,10 +31,11 @@ function AccountsListWithFetch() {
       />
 
       {/* Navigation Sidebar */}
-      <NavigationSidebar />
+      <ResizableSidebar />
 
       {/* Main Content */}
-      <main className="relative z-10 ml-64 mt-20 px-6 lg:px-12 max-w-7xl">
+      <ContentWrapper>
+        <main className="relative z-10 mt-20 px-6 lg:px-12 max-w-7xl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold">
             <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
@@ -43,6 +45,7 @@ function AccountsListWithFetch() {
         </div>
         <AccountList initialAccounts={accounts} />
       </main>
+      </ContentWrapper>
     </div>
   );
 }

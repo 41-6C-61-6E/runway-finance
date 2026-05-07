@@ -36,7 +36,7 @@ export default function DevLogPane() {
   const [height, setHeight] = useState(DEFAULT_HEIGHT)
   const [isResizing, setIsResizing] = useState(false)
   const [devModeEnabled, setDevModeEnabled] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>('Developer mode is disabled. Enable it in Settings.')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const startYRef = useRef(0)
   const startHeightRef = useRef(DEFAULT_HEIGHT)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -108,7 +108,6 @@ export default function DevLogPane() {
   // Fetch logs from API
   const fetchLogs = useCallback(async (afterId?: string) => {
     if (!devModeEnabled) {
-      setErrorMessage('Developer mode is disabled. Enable it in Settings.')
       setIsConnected(false)
       return
     }
@@ -120,8 +119,12 @@ export default function DevLogPane() {
 
       const res = await fetch(`/api/dev/logs?${params}`, { credentials: 'include' })
       if (!res.ok) {
+        if (res.status === 501) {
+          setErrorMessage('Developer mode is disabled. Enable it in Settings.')
+        } else {
+          setErrorMessage(`Failed to load logs: ${res.status}`)
+        }
         setIsConnected(false)
-        setErrorMessage(`Failed to load logs: ${res.status}`)
         return
       }
 
@@ -143,23 +146,12 @@ export default function DevLogPane() {
       setErrorMessage(null)
       setIsConnected(true)
     } catch {
-      if (!devModeEnabled) {
-        setErrorMessage('Developer mode is disabled. Enable it in Settings.')
-      } else {
-        setErrorMessage('Unable to fetch logs. Ensure developer mode is enabled and you are signed in.')
-      }
+      setErrorMessage('Unable to fetch logs. Ensure developer mode is enabled and you are signed in.')
       setIsConnected(false)
     }
-  }, [level])
+  }, [level, devModeEnabled])
 
-  // Initial fetch only when dev mode is enabled
-  useEffect(() => {
-    if (devModeEnabled) {
-      fetchLogs()
-    }
-  }, [devModeEnabled, fetchLogs])
-
-  // Poll for new logs
+  // Poll for new logs (also handles initial fetch when dev mode is enabled)
   useEffect(() => {
     if (!isOpen || !devModeEnabled) return
 
@@ -177,12 +169,6 @@ export default function DevLogPane() {
       }
     }
   }, [isOpen, lastEntryId, devModeEnabled, fetchLogs])
-
-  useEffect(() => {
-    if (devModeEnabled && isOpen) {
-      fetchLogs()
-    }
-  }, [devModeEnabled, isOpen, fetchLogs])
 
   // Auto-scroll to bottom
   useEffect(() => {

@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ResizableSidebar from '@/components/resizable-sidebar';
-import ModeToggle from '@/components/mode-toggle';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import ModeToggle from '@/components/mode-toggle';
+import { useSidebar } from '@/components/resizable-sidebar';
 
 type Connection = {
   id: string;
@@ -22,6 +23,7 @@ type Connection = {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { sidebarWidth } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
   const [loading, setLoading] = useState(false);
@@ -234,27 +236,27 @@ export default function SettingsPage() {
       <ResizableSidebar />
 
       {/* Content */}
-      <div className="relative z-10 ml-64 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl w-full space-y-8">
-          {/* Heading */}
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-              <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                Settings
-              </span>
-            </h1>
-            <p className="text-gray-400 dark:text-gray-500">
-              Manage your SimpleFIN connections and account settings
-            </p>
+      <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${sidebarWidth}px` }}>
+          <div className="max-w-2xl w-full space-y-8">
+            {/* Heading */}
+            <div className="text-center space-y-4">
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+                <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+                  Settings
+                </span>
+              </h1>
+              <p className="text-gray-400 dark:text-gray-500">
+                Manage your SimpleFIN connections and account settings
+              </p>
           </div>
 
-          {/* Theme Toggle */}
+          {/* Appearance */}
           <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white">Theme</h2>
+                <h2 className="text-xl font-semibold text-white">Appearance</h2>
                 <p className="text-sm text-gray-400 mt-1">
-                  Switch between light and dark mode for the application.
+                  Toggle between light and dark theme
                 </p>
               </div>
               <ModeToggle />
@@ -298,11 +300,11 @@ export default function SettingsPage() {
 
           {/* Existing Connections */}
           <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <h2 className="text-xl font-semibold text-white mb-4">Existing Connections</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">SimpleFIN Bridge Connection</h2>
             {connectionsLoading ? (
               <div className="text-gray-400">Loading...</div>
             ) : connections.length === 0 ? (
-              <p className="text-gray-500 text-sm">No connections yet. Add one below.</p>
+              <p className="text-gray-500 text-sm">No connection yet. Add one below.</p>
             ) : (
               <div className="space-y-3">
                 {connections.map((conn) => (
@@ -408,24 +410,21 @@ export default function SettingsPage() {
                 <ol className="text-xs text-gray-300 space-y-1.5">
                   <li className="flex gap-2">
                     <span className="text-blue-400 font-bold">1.</span>
-                    <span>Sign up for a SimpleFIN Bridge account at <a href="https://simplefin.io" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">simplefin.io</a></span>
+                    <span>Sign up for a SimpleFIN Bridge account at <a href="https://beta-bridge.simplefin.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">https://beta-bridge.simplefin.org</a></span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-blue-400 font-bold">2.</span>
-                    <span>After signing in, go to your account settings and find the "API Access" or "Developer" section</span>
+                    <span>After signing in, go My Account, Apps</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-blue-400 font-bold">3.</span>
-                    <span>Generate a new SimpleFIN API key or setup token (it will be a long base64-encoded string)</span>
+                    <span>Generate a new SimpleFIN API key or setup token by clicking New App Connection. (it will be a long base64-encoded string)</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-blue-400 font-bold">4.</span>
                     <span>Paste the token below and click "Add Connection"</span>
                   </li>
                 </ol>
-                <p className="text-xs text-gray-400 mt-3">
-                  💡 <strong>Alternative:</strong> If you're using the SimpleFIN Bridge (beta-bridge.simplefin.org), you can get a setup token from their developer portal at <a href="https://beta-bridge.simplefin.org/info/developers" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">beta-bridge.simplefin.org/info/developers</a>
-                </p>
               </div>
 
               <form onSubmit={handleAddConnection} className="space-y-4">
@@ -451,7 +450,7 @@ export default function SettingsPage() {
                     id="label"
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
-                    placeholder="e.g., My Bank"
+                    placeholder="e.g., SimpleFIN Bridge"
                     className="bg-white/10 border-white/20 text-white placeholder-gray-500"
                   />
                 </div>
