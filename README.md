@@ -1,103 +1,206 @@
-<h1 align="center">
-Next.js 16 Starter with PNPM, Tailwind v4+, and Docker
-</h1>
-<p align="center">
-A batteries-included starter for building production-ready Next.js apps with App Router, PNPM, Tailwind v4+, TypeScript, and a multi-stage Docker setup.
-</p>
+# Runway Finance
 
-<img src="public/screenshot.png" alt="Next.js 16 Starter"  style="display: block; margin: 0 auto; border-radius: 10px; max-width: 90%;" />
+Self-hosted personal finance app. Docker-native. Dark by default.
 
-## 📖 Overview
+## Overview
 
-This template gives you a minimal but opinionated foundation so you can focus on building, not configuring. It includes a clean project structure, built-in LLM-safe API example, production Dockerfile, and CI setup with pnpm caching. Deploy anywhere: Vercel, Fly.io, Render, or any container registry.
+Runway Finance is a self-hosted personal finance application that connects to your financial institutions via the SimpleFIN protocol. It provides transaction management, categorization, net worth tracking, cash flow reports, spending analysis, and FIRE (Financial Independence Retire Early) planning.
 
----
+## Features
 
-## 🚀 Features
+- **Authentication** — Single-user email/password login via Next Auth v5
+- **SimpleFIN Integration** — Connect to financial institutions via SimpleFIN Bridge protocol
+- **Transaction Sync** — Automated sync of accounts and transactions
+- **Transaction Ledger** — Filterable, searchable, bulk-editable transaction table
+- **Categorization** — Hierarchical category system with color and icon support
+- **Rules Engine** — Auto-categorization rules applied on sync and on-demand
+- **Net Worth Tracker** — Live net worth from linked accounts + manual assets
+- **Cash Flow Reports** — Income vs. expenses by period and category
+- **Spending Reports** — Donut chart drill-down by category
+- **FIRE Planning** — Financial independence number and projection calculator
+- **Data Export** — CSV / JSON / ZIP export of all user data
+- **Dashboard** — Single-page overview of all key financial widgets
+- **Settings** — Theme, currency, locale, connections, rules, categories, appearance
 
-- **Next.js 16.1.0** with App Router
-- **Next-Auth v5** complete open source authentication solution
-- **TypeScript** preconfigured
-- **PNPM** workspace-friendly setup
-- **Tailwind CSS v4+** with modern defaults
-- **LLM-safe API example** (sanitized inputs + safe output handling)
-- **Multi-stage Production Dockerfile** (tiny, fast, secure)
-- **CI workflow** with pnpm caching (GitHub Actions ready)
-- **Opinionated minimal file structure** for maximum clarity
-- **Ready for Vercel or containerized deployment**
+## Technology Stack
 
----
+| Tool | Purpose |
+|---|---|
+| Next.js 16 (App Router) | Framework + API route handlers |
+| TypeScript | Type safety throughout (strict mode) |
+| Tailwind CSS | Styling |
+| Next Auth v5 | Authentication, session management |
+| Drizzle ORM + drizzle-kit | Database schema, migrations, typed queries |
+| PostgreSQL | Primary database |
+| shadcn/ui (Radix UI) | Component library |
+| React Hook Form | Form handling |
+| Zod | Validation schemas |
+| pnpm | Package manager |
 
-## 🧩 Prerequisites
-
-Make sure you have:
+## Prerequisites
 
 - **Node.js ≥ 20**
 - **PNPM ≥ 9**
-- **Docker (optional)** for production builds
+- **Docker & Docker Compose** — for PostgreSQL and production builds
 
----
-
-## 🛠️ Installation
+## Installation
 
 ```bash
-pnpm i
+pnpm install
 ```
 
-## ▶️ Development
+## Environment Setup
+
+Copy `.env.example` to `.env.local` and configure:
+
+```bash
+cp .env.example .env.local
+```
+
+Required environment variables:
+
+- `NEXTAUTH_SECRET` — 64-character hex string (generate with `openssl rand -hex 32`)
+- `NEXTAUTH_URL` — Your app URL (e.g., `http://localhost:3001`)
+- `DATABASE_URL` — PostgreSQL connection string
+- `ENCRYPTION_KEY` — 64-character hex string for AES-256-GCM (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
+- `ALLOW_REGISTRATION` — Set to `false` after first user registers
+
+## Development
+
+### Start PostgreSQL
+
+```bash
+docker compose up postgres -d
+```
+
+### Run Database Migrations
+
+```bash
+pnpm db:migrate
+```
+
+### Start Development Server
 
 ```bash
 pnpm dev
 ```
 
-The app starts at **[http://localhost:3000](http://localhost:3000)**.
+The app starts at **[http://localhost:3001](http://localhost:3001)**.
 
----
+## Docker Deployment
 
-## 🐳 Production with Docker
-
-Build the production image:
+### Build and Run
 
 ```bash
-docker build -t next-starter .
+docker compose up --build
 ```
 
-Run the app:
+This starts both PostgreSQL and the Next.js app on port 3001.
+
+### Production Build
 
 ```bash
-docker run -p 3000:3000 next-starter
+docker build -t runway-finance .
+docker run -p 3001:3000 runway-finance
 ```
 
----
+## Project Structure
 
-## 📦 Environment Variables
+```
+runway-finance/
+├── app/                    # Next.js App Router
+│   ├── api/                # API route handlers
+│   │   ├── connections/    # SimpleFIN connection management
+│   │   ├── accounts/       # Account CRUD
+│   │   └── transactions/   # Transaction CRUD + bulk operations
+│   └── signin/             # Sign-in page
+├── components/             # React components
+├── lib/                    # Core libraries
+│   ├── auth.ts             # Next Auth configuration
+│   ├── crypto.ts           # AES-256-GCM encryption
+│   ├── db.ts               # Database connection
+│   ├── simplefin.ts        # SimpleFIN HTTP client
+│   └── users.ts            # User management
+├── drizzle/                # Database migrations
+├── tests/                  # Unit and integration tests
+├── compose.yml             # Docker Compose configuration
+├── Dockerfile              # Multi-stage production build
+└── runway-spec-v4.md       # Development specification
+```
 
-Create `.env.local`:
+## API Endpoints
+
+### Connections
+
+- `POST /api/connections` — Create a SimpleFIN connection (requires `setupToken`)
+- `GET /api/connections` — List all connections
+- `DELETE /api/connections/:id` — Delete a connection (requires `X-Confirm-Delete: true` header)
+- `POST /api/connections/:id/sync` — Trigger manual sync
+- `GET /api/connections/:id/sync-logs` — View sync history
+
+### Accounts
+
+- `GET /api/accounts` — List accounts (with `includeHidden` and `type` query params)
+- `GET /api/accounts/:id` — Get account details
+- `PATCH /api/accounts/:id` — Update account (name, isHidden, etc.)
+
+### Transactions
+
+- `GET /api/transactions` — List transactions with filtering, pagination, sorting
+- `GET /api/transactions/:id` — Get transaction details
+- `PATCH /api/transactions/:id` — Update transaction
+- `PATCH /api/transactions` — Bulk patch multiple transactions
+
+All API routes require authentication via Next Auth session.
+
+## Database
+
+The app uses PostgreSQL with Drizzle ORM. Tables include:
+
+- `user`, `session`, `account`, `verification` — Next Auth tables
+- `user_settings` — User preferences
+- `simplefin_connections` — SimpleFIN bridge connections (encrypted access URLs)
+- `accounts` — Financial accounts
+- `transactions` — Transaction records
+- `categories` — Transaction categories
+- `sync_logs` — Sync operation logs
+- `category_rules` — Auto-categorization rules
+- `manual_assets` — Manual asset tracking
+- `net_worth_snapshots` — Net worth history
+- `fire_scenarios` — FIRE planning scenarios
+
+## Testing
 
 ```bash
-# Example
-NEXT_PUBLIC_SITE_NAME="Next.js Starter"
+pnpm test              # Run Vitest unit tests
+pnpm test:docker       # Run tests in Docker environment
 ```
 
----
+## Security
 
-## 📤 Deployment
+- All sensitive data (SimpleFIN access URLs) encrypted with AES-256-GCM
+- Delete operations require `X-Confirm-Delete: true` header
+- Single-user authentication with registration lock after first user
+- Input sanitization on all free-text fields
 
-### **Vercel**
+## Development Phases
 
-You can deploy immediately:
+The project is organized into development phases documented in `runway-spec-v4.md`:
 
-```bash
-vercel deploy
-```
+- **Phase 0** — Repository setup, dependencies, authentication
+- **Phase 1** — Database schema, encryption service, SimpleFIN client
+- **Phase 2** — Connection, account, and transaction API routes
+- **Phase 3** — Sync service and background worker
+- **Phase 4** — Categories and rules engine
+- **Phase 5** — Net worth tracking
+- **Phase 6** — Reports and FIRE planning
+- **Phase 7** — User interface
+- **Phase 8** — Settings, export, security hardening
+- **Phase 9** — Testing and final validation
 
-### **Container Registry**
+## License
 
-Push to any registry (GHCR, DockerHub, AWS ECR, etc.):
-
-```bash
-docker push <registry>/<namespace>/<name>
-```
+See [LICENCE](LICENCE) for details.
 
 ---
 
