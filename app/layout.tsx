@@ -1,12 +1,11 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { ThemeProvider } from "next-themes";
+import { ReactQueryProvider } from "@/lib/query-client";
+import ClientLayout from "@/app/client-layout";
 import "../styles/globals.css";
-import BaseHeader from "@/components/base-header";
-import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
-  title: "Next.js 16 Starter - Docker + TypeScript + Tailwind CSS",
+  title: "Runway: Get ready for takeoff!",
   description:
     "A modern, production-ready starter template for Next.js projects with Docker, TypeScript, and Tailwind CSS 4.",
 };
@@ -19,11 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-white dark:bg-gray-950" suppressHydrationWarning>
-        <ThemeProvider defaultTheme="dark">
-          <BaseHeader />
-          <main>{children}</main>
-        </ThemeProvider>
-         <Analytics/>
+        <ReactQueryProvider>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </ReactQueryProvider>
       </body>
     </html>
   );

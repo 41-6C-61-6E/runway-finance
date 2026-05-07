@@ -68,12 +68,29 @@ export async function fetchAccounts(
   startDate: Date,
   endDate: Date,
 ): Promise<SimpleFINResponse> {
-  const url = new URL(`${accessUrl}/accounts`);
+  const parsed = new URL(accessUrl);
+  const credentials = parsed.username || parsed.password ? `${parsed.username}:${parsed.password}` : null;
+
+  // Remove credentials from the endpoint URL before constructing the request URL
+  parsed.username = '';
+  parsed.password = '';
+
+  const basePath = parsed.pathname.replace(/\/$/, '');
+  const accountsPath = `${basePath}/accounts`;
+  const url = new URL(`${parsed.origin}${accountsPath}`);
   url.searchParams.set('start-date', String(Math.floor(startDate.getTime() / 1000)));
   url.searchParams.set('end-date', String(Math.floor(endDate.getTime() / 1000)));
+
+  const headers: Record<string, string> = {};
+  if (credentials) {
+    headers['Authorization'] = `Basic ${Buffer.from(credentials).toString('base64')}`;
+  }
+
+  const fetchUrl = url.toString();
+
   let res: Response;
   try {
-    res = await fetchWithTimeout(url.toString());
+    res = await fetchWithTimeout(fetchUrl, { headers });
   } catch (err) {
     throw new SimpleFINError(`Network error fetching accounts: ${String(err)}`, 'fetch_failed');
   }

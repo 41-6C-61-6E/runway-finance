@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   cacheComponents: true,
-  // Ensure Turbopack resolves the correct root when multiple lockfiles exist
   turbopack: {
     root: "./",
   },
