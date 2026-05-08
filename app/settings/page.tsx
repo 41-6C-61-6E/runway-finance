@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import ModeToggle from '@/components/mode-toggle';
-import { useSidebar } from '@/components/resizable-sidebar';
+import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
+import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 
 type Connection = {
   id: string;
@@ -19,6 +20,18 @@ type Connection = {
   lastSyncError: string | null;
   createdAt: string;
   accessUrlEncrypted?: string;
+};
+
+type Account = {
+  id: string;
+  name: string;
+  type: string;
+  balance: string;
+  currency: string;
+  institution: string | null;
+  isHidden: boolean;
+  isExcludedFromNetWorth: boolean;
+  balanceDate: string | null;
 };
 
 export default function SettingsPage() {
@@ -43,6 +56,14 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingLabel, setSavingLabel] = useState(false);
 
+  // Account Management state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountFilter, setAccountFilter] = useState<'all' | 'hidden' | 'excluded'>('all');
+  const [togglingAccount, setTogglingAccount] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+
   // Fetch connections
   const fetchConnections = useCallback(async () => {
     try {
@@ -56,13 +77,67 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // Fetch accounts for account management
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/accounts?includeHidden=true', { credentials: 'include' });
+      const data = await res.json();
+      setAccounts(Array.isArray(data) ? data : []);
+    } catch {
+      setAccounts([]);
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, []);
+
+  const handleToggleAccount = useCallback(
+    (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setTogglingAccount(accountId);
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) return;
+
+      try {
+        await fetch(`/api/accounts/${accountId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ [field]: !account[field] }),
+        });
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === accountId ? { ...a, [field]: !a[field] } : a))
+        );
+      } catch {
+        // Ignore errors
+      } finally {
+        setTogglingAccount(null);
+      }
+    },
+    [accounts]
+  );
+
+  const handleOpenAccountDrawer = useCallback((account: Account) => {
+    setSelectedAccount(account);
+    setAccountDrawerOpen(true);
+  }, []);
+
+  const handleCloseAccountDrawer = useCallback(() => {
+    setAccountDrawerOpen(false);
+  }, []);
+
+  const handleAccountDrawerSuccess = useCallback(() => {
+    setAccountDrawerOpen(false);
+    fetchAccounts();
+  }, [fetchAccounts]);
+
   useEffect(() => {
     fetchConnections();
+    fetchAccounts();
     fetch('/api/dev-mode', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => setDevMode(data.devMode))
       .catch(() => setDevMode(null));
-  }, [fetchConnections]);
+  }, [fetchConnections, fetchAccounts]);
 
   const handleToggleDevMode = async () => {
     setDevModeLoading(true);
@@ -236,18 +311,18 @@ export default function SettingsPage() {
       <ResizableSidebar />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${sidebarWidth}px` }}>
-          <div className="max-w-2xl w-full space-y-8">
-            {/* Heading */}
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-                <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                  Settings
-                </span>
-              </h1>
-              <p className="text-gray-400 dark:text-gray-500">
-                Manage your SimpleFIN connections and account settings
-              </p>
+      <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
+        <div className="max-w-2xl w-full space-y-8">
+          {/* Heading */}
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+              <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+                Settings
+              </span>
+            </h1>
+            <p className="text-gray-400 dark:text-gray-500">
+              Manage your SimpleFIN connections and account settings
+            </p>
           </div>
 
           {/* Appearance */}
@@ -397,6 +472,152 @@ export default function SettingsPage() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Account Management */}
+          <div className="p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
+            <h2 className="text-xl font-semibold text-white mb-4">Account Management</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Manage hidden accounts and net worth exclusions.
+            </p>
+
+            {/* Filter tabs */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex rounded-lg bg-white/5 border border-white/10 overflow-hidden">
+                {(['all', 'hidden', 'excluded'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setAccountFilter(filter)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      accountFilter === filter
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {accountsLoading ? (
+              <div className="text-gray-400 text-sm">Loading...</div>
+            ) : accounts.length === 0 ? (
+              <p className="text-gray-500 text-sm">No accounts yet. Connect a financial institution first.</p>
+            ) : (() => {
+                const filteredAccounts = accounts.filter((a) => {
+                  if (accountFilter === 'hidden') return a.isHidden;
+                  if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
+                  return true;
+                });
+                const hasHiddenOrExcluded = accounts.some((a) => a.isHidden || a.isExcludedFromNetWorth);
+
+                if (filteredAccounts.length === 0 && accountFilter !== 'all') {
+                  return (
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-lg text-center">
+                      <p className="text-gray-400 text-sm">No accounts match the filter.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {filteredAccounts.map((account) => {
+                      const num = parseFloat(account.balance);
+                      const isPositive = num >= 0;
+                      const formatted = new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: account.currency || 'USD',
+                        minimumFractionDigits: 2,
+                      }).format(Math.abs(num));
+
+                      return (
+                        <div
+                          key={account.id}
+                          className={`p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-white/10 transition-colors ${
+                            account.isHidden ? 'opacity-60' : ''
+                          } ${account.isExcludedFromNetWorth ? 'opacity-60' : ''}`}
+                          onClick={() => handleOpenAccountDrawer(account)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                                account.type === 'checking' ? 'bg-blue-500/20 text-blue-400' :
+                                account.type === 'savings' ? 'bg-green-500/20 text-green-400' :
+                                account.type === 'credit' ? 'bg-purple-500/20 text-purple-400' :
+                                account.type === 'investment' ? 'bg-amber-500/20 text-amber-400' :
+                                account.type === 'loan' ? 'bg-orange-500/20 text-orange-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {account.type}
+                              </span>
+                              {account.isHidden && (
+                                <span className="px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">Hidden</span>
+                              )}
+                              {account.isExcludedFromNetWorth && (
+                                <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">Excluded</span>
+                              )}
+                            </div>
+                            <div className="text-white font-medium mt-1 truncate">{account.name}</div>
+                            {account.institution && (
+                              <div className="text-xs text-gray-500 mt-0.5">{account.institution}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="text-right">
+                              <div className={`font-mono text-sm ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {formatted}
+                              </div>
+                              <div className="text-xs text-gray-500">{account.currency}</div>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={handleToggleAccount(account.id, 'isHidden')}
+                                  disabled={togglingAccount === account.id}
+                                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                                    account.isHidden ? 'bg-blue-600' : 'bg-gray-600'
+                                  } disabled:opacity-50`}
+                                  title={account.isHidden ? 'Show account' : 'Hide account'}
+                                >
+                                  <span
+                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                      account.isHidden ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                  />
+                                </button>
+                                <span className="text-xs text-gray-400 whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                  disabled={togglingAccount === account.id}
+                                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                                    account.isExcludedFromNetWorth ? 'bg-blue-600' : 'bg-gray-600'
+                                  } disabled:opacity-50`}
+                                  title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                                >
+                                  <span
+                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                      account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                  />
+                                </button>
+                                <span className="text-xs text-gray-400 whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {hasHiddenOrExcluded && (
+                      <p className="text-xs text-gray-500 pt-1">
+                        Some accounts are hidden or excluded. Use the tabs above to filter.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
 
           {/* Add Connection Form */}
@@ -570,6 +791,14 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Account Detail Drawer */}
+      <AccountDetailDrawer
+        account={selectedAccount}
+        open={accountDrawerOpen}
+        onClose={handleCloseAccountDrawer}
+        onSuccess={handleAccountDrawerSuccess}
+      />
     </div>
   );
 }

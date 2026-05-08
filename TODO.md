@@ -3,12 +3,12 @@
 
 
 BUGS:
-
+- 
 
 
 
 CHANGES:
-- move the light / dark mode toggle in the top right into the settings area [fixed]
+- Make the red and green account values in the accounts-sidebar the same light text as everyhting else. 
 
 
 NEW FEATUES:

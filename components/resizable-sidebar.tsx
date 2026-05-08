@@ -2,42 +2,24 @@
 
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { Home, Wallet, Receipt, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, Receipt, Settings } from 'lucide-react'
+import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
-const MIN_WIDTH = 180
-const MAX_WIDTH = 500
-const DEFAULT_WIDTH = 256
-const COLLAPSED_WIDTH = 64
+// Export hooks for backward compatibility
+export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/accounts', label: 'Accounts', icon: Wallet },
   { href: '/transactions', label: 'Transactions', icon: Receipt },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-// Context for sidebar state
-export const SidebarContext = createContext<{
-  collapsed: boolean
-  sidebarWidth: number
-}>({
-  collapsed: false,
-  sidebarWidth: DEFAULT_WIDTH,
-})
-
-export function useSidebar() {
-  return useContext(SidebarContext)
-}
-
 export default function ResizableSidebar() {
   const pathname = usePathname()
-  const [width, setWidth] = useState(DEFAULT_WIDTH)
+  const { sidebarWidth, isHovering, handleNavResizeDown, handleMouseEnter, handleMouseLeave } = useSidebar()
   const [isResizing, setIsResizing] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
-  const startXRef = useRef(0)
-  const startWidthRef = useRef(DEFAULT_WIDTH)
   const { data: session } = useSession()
   const [appStatus, setAppStatus] = useState<{
     connected: boolean
@@ -46,9 +28,6 @@ export default function ResizableSidebar() {
     accounts: number
     transactions: number
   } | null>(null)
-
-  const sidebarWidth = collapsed ? COLLAPSED_WIDTH : width
-
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -89,67 +68,19 @@ export default function ResizableSidebar() {
     return `${days}d ago`
   }
 
-  const handleCollapseToggle = useCallback(() => {
-    setCollapsed((prev) => !prev)
-  }, [])
-
   const isActive = (href: string) => pathname === href
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-    startXRef.current = e.clientX
-    startWidthRef.current = width
-  }, [width])
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return
-    const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + (e.clientX - startXRef.current)))
-    setWidth(newWidth)
-  }, [isResizing])
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false)
-  }, [])
-
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    } else {
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-  }, [isResizing, handleMouseMove, handleMouseUp])
-
   return (
-    <SidebarContext.Provider value={{ collapsed, sidebarWidth }}>
+    <>
       <aside
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className="fixed left-0 top-0 z-20 h-screen bg-black/20 backdrop-blur-md border-r border-white/10 flex flex-col justify-between transition-all duration-200"
         style={{ width: `${sidebarWidth}px` }}
       >
         <div className="space-y-6">
-          {/* Collapse Toggle */}
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={handleCollapseToggle}
-              className="inline-flex items-center justify-center rounded-lg p-2 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-            </button>
-          </div>
-
           {/* Navigation Links */}
-          <nav className="space-y-2 px-2">
+          <nav className="space-y-2 px-2 pt-4">
             {navItems.map((item) => {
               const Icon = item.icon
               const isActiveItem = isActive(item.href)
@@ -158,7 +89,7 @@ export default function ResizableSidebar() {
                   key={item.href}
                   href={item.href}
                   className={`flex items-center gap-3 rounded-lg transition-colors ${
-                    collapsed
+                    sidebarWidth === COLLAPSED_WIDTH
                       ? 'justify-center px-2 py-2'
                       : `px-3 py-2 text-sm font-medium ${
                           isActiveItem
@@ -166,16 +97,16 @@ export default function ResizableSidebar() {
                             : 'text-gray-300 hover:text-white hover:bg-white/10'
                         }`
                   } ${
-                    isActiveItem && !collapsed
+                    isActiveItem && sidebarWidth === COLLAPSED_WIDTH
                       ? 'text-white bg-white/10'
-                      : isActiveItem && collapsed
+                      : isActiveItem && sidebarWidth !== COLLAPSED_WIDTH
                       ? 'text-white bg-white/10'
                       : 'text-gray-300 hover:text-white hover:bg-white/10'
                   }`}
                   title={item.label}
                 >
                   <Icon className="h-5 w-5 flex-shrink-0" />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {sidebarWidth !== COLLAPSED_WIDTH && <span className="truncate">{item.label}</span>}
                 </a>
               )
             })}
@@ -183,7 +114,7 @@ export default function ResizableSidebar() {
         </div>
 
         {/* App Status */}
-        {session?.user && !collapsed && (
+        {session?.user && sidebarWidth !== COLLAPSED_WIDTH && (
           <div className="space-y-4 p-6">
             <div className="px-3 py-2 bg-white/5 rounded-lg border border-white/10 space-y-2">
               <div className="text-xs text-gray-500 font-medium">App Status</div>
@@ -223,7 +154,7 @@ export default function ResizableSidebar() {
       </aside>
 
       {/* Resize Handle */}
-      {!collapsed && (
+      {sidebarWidth !== COLLAPSED_WIDTH && (
         <div
           className="fixed top-0 z-30 cursor-col-resize"
           style={{
@@ -233,11 +164,15 @@ export default function ResizableSidebar() {
             marginLeft: '-3px',
             background: isResizing ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
           }}
-          onMouseDown={handleMouseDown}
+          onMouseDown={(e) => {
+            setIsResizing(true);
+            handleNavResizeDown(e);
+          }}
+          onMouseUp={() => setIsResizing(false)}
         >
           <div className="w-1 h-full mx-auto bg-white/10 hover:bg-blue-500/50 transition-colors" />
         </div>
       )}
-    </SidebarContext.Provider>
+    </>
   )
 }

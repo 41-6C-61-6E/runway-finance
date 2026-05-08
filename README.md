@@ -65,6 +65,11 @@ Required environment variables:
 - `ENCRYPTION_KEY` — 64-character hex string for AES-256-GCM (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
 - `ALLOW_REGISTRATION` — Set to `false` after first user registers
 
+### Optional Environment Variables
+
+- `SYNC_CRON_SCHEDULE` — Cron expression for automatic SimpleFIN sync (default: `0 */6 * * *`, every 6 hours). Set to empty string to disable.
+- `DEBUG` — Set to `true` to enable debug logging (including sync cron logs)
+
 ## Development
 
 ### Start PostgreSQL
