@@ -66,14 +66,13 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   const formatAmount = (amount: string) => {
     const num = parseFloat(amount);
-    const isPositive = num >= 0;
     return {
       text: new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
         minimumFractionDigits: 2,
       }).format(Math.abs(num)),
-      color: isPositive ? 'text-emerald-400' : 'text-red-400',
+      color: 'text-gray-400',
     };
   };
 

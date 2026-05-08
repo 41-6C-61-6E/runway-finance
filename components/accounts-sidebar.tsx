@@ -57,7 +57,7 @@ const formatCurrency = (balance: string, currency: string) => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(Math.abs(num)),
-    color: isPositive ? 'text-emerald-400' : 'text-grey-300',
+    color: 'text-gray-400',
     sign: isPositive ? '' : '-',
   };
 };

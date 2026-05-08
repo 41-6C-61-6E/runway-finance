@@ -11,6 +11,7 @@ export default function SignInPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [pin, setPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +46,7 @@ export default function SignInPage() {
             username,
             password,
             email,
+            pin,
           }),
         });
 
@@ -155,6 +157,25 @@ export default function SignInPage() {
                   placeholder="Email"
                   required={!isLogin}
                 />
+              </div>
+            )}
+
+            {!isLogin && (
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <FaLock className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  id="pin"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  className="w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Registration PIN"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Enter the registration PIN provided by your administrator
+                </p>
               </div>
             )}
 

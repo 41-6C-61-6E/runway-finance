@@ -64,6 +64,7 @@ Required environment variables:
 - `DATABASE_URL` — PostgreSQL connection string
 - `ENCRYPTION_KEY` — 64-character hex string for AES-256-GCM (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
 - `ALLOW_REGISTRATION` — Set to `false` after first user registers
+- `REGISTRATION_PIN` — Set to require a PIN for new account creation (leave empty to disable)
 
 ### Optional Environment Variables
 

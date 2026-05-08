@@ -41,17 +41,17 @@ function getHierarchy(accountType: string) {
 // ── Helpers ─────────────────────────────────────────────────────────────
 const formatCurrency = (balance: string, currency: string) => {
   const num = parseFloat(balance);
-  const isPositive = num >= 0;
-  return {
-    text: new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      minimumFractionDigits: 2,
-    }).format(Math.abs(num)),
-    color: isPositive ? 'text-emerald-400' : 'text-red-400',
-    sign: isPositive ? '' : '-',
+    return {
+      text: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+        minimumFractionDigits: 2,
+      }).format(Math.abs(num)),
+      color: 'text-gray-400',
+      sign: '',
+    };
   };
-};
+
 
 // ── Account Row (single account line) ────────────────────────────────────
 function AccountRow({
@@ -255,7 +255,7 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
       {/* Total Net Worth Header */}
       <div className="mb-8">
         <div className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Total Net Worth</div>
-        <div className={`font-mono text-4xl font-bold ${totalNetWorth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className="font-mono text-4xl font-bold text-gray-400">
           {formatCurrency(String(totalNetWorth), 'USD').text}
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
                   </svg>
                   <span className="text-gray-300 font-semibold">{group}</span>
                 </div>
-                <div className={`font-mono text-lg font-semibold ${groupTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="font-mono text-lg font-semibold text-gray-400">
                   {formatCurrency(String(groupTotal), 'USD').text}
                 </div>
               </button>
@@ -319,7 +319,7 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
                               <span className="text-gray-400 text-sm font-medium">{subGroup}</span>
                               <span className="text-gray-600 text-xs">({accs.length})</span>
                             </div>
-                            <div className={`font-mono text-sm font-semibold tabular-nums ${subTotal >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                            <div className="font-mono text-sm font-semibold tabular-nums text-gray-400">
                               {formatCurrency(String(subTotal), 'USD').text}
                             </div>
                           </button>

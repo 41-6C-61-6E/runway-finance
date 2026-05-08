@@ -7,6 +7,7 @@
 import cron from 'node-cron';
 import { debugInfo, debugWarn } from '@/lib/debug';
 import { syncAllConnections } from '@/lib/services/sync-all';
+import { patchConsole } from '@/lib/dev-logs';
 
 const LOG_TAG = '[runway-sync]';
 const DEFAULT_SCHEDULE = '0 */6 * * *';
@@ -27,9 +28,17 @@ export function register(): void {
 
   debugInfo(`${LOG_TAG} Cron registered: ${schedule}`);
 
+  // Patch console to capture dev logs when dev mode is enabled
+  if (process.env.DEV_MODE === 'true') {
+    patchConsole();
+    debugInfo(`${LOG_TAG} Dev mode enabled — console logging captured.`);
+  }
+
   // Allow graceful shutdown
-  process.on('SIGTERM', () => {
-    task.stop();
-    debugInfo(`${LOG_TAG} Cron stopped.`);
-  });
+  if (typeof process !== 'undefined' && typeof process.on === 'function') {
+    process.on('SIGTERM', () => {
+      task.stop();
+      debugInfo(`${LOG_TAG} Cron stopped.`);
+    });
+  }
 }

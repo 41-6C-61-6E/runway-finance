@@ -233,6 +233,92 @@ export const netWorthSnapshots = pgTable(
   (t) => [unique().on(t.userId, t.snapshotDate)]
 );
 
+// ── Account Snapshots ────────────────────────────────────────────────────────
+// Track individual account balances over time for historical analysis and reporting
+export const accountSnapshots = pgTable(
+  'account_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    balance: numeric('balance', { precision: 20, scale: 4 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.accountId, t.snapshotDate)]
+);
+
+// ── Monthly Cash Flow Summary ────────────────────────────────────────────────
+// Pre-aggregated monthly income/expense data for dashboard reporting
+export const monthlyCashFlow = pgTable(
+  'monthly_cash_flow',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
+    totalIncome: numeric('total_income', { precision: 20, scale: 4 }).notNull().default('0'),
+    totalExpenses: numeric('total_expenses', { precision: 20, scale: 4 }).notNull().default('0'),
+    netCashFlow: numeric('net_cash_flow', { precision: 20, scale: 4 }).notNull().default('0'),
+    transactionCount: integer('transaction_count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.yearMonth)]
+);
+
+// ── Category Spending Summary ────────────────────────────────────────────────
+// Monthly spending breakdown by category for reporting and budgeting
+export const categorySpendingSummary = pgTable(
+  'category_spending_summary',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
+    amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
+    transactionCount: integer('transaction_count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
+);
+
+// ── Budgets ──────────────────────────────────────────────────────────────────
+// User-defined budgets for categories and time periods
+export const budgets = pgTable('budgets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  categoryId: uuid('category_id')
+    .notNull()
+    .references(() => categories.id, { onDelete: 'cascade' }),
+  yearMonth: text('year_month'), // Format: 'YYYY-MM', null = recurring monthly
+  amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
+  isRecurring: boolean('is_recurring').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Financial Goals ──────────────────────────────────────────────────────────
+// Savings goals with target amounts and progress tracking
+export const financialGoals = pgTable('financial_goals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  type: text('type').notNull(), // 'savings'|'payoff'|'investment'|'other'
+  targetAmount: numeric('target_amount', { precision: 20, scale: 4 }).notNull(),
+  currentAmount: numeric('current_amount', { precision: 20, scale: 4 }).notNull().default('0'),
+  targetDate: date('target_date'),
+  category: text('category'), // Optional categorization
+  priority: integer('priority').notNull().default(0), // 0=low, 1=medium, 2=high
+  status: text('status').notNull().default('active'), // 'active'|'completed'|'paused'
+  linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── FIRE Scenarios ───────────────────────────────────────────────────────────
 export const fireScenarios = pgTable('fire_scenarios', {
   id: uuid('id').primaryKey().defaultRandom(),

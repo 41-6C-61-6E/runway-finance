@@ -8,6 +8,13 @@
       "when": 1778110761750,
       "tag": "0000_wet_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778110761751,
+      "tag": "0001_account_snapshots_and_metrics",
+      "breakpoints": true
     }
   ]
 }

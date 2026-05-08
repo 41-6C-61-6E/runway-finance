@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
   // Encrypt the access URL
   const { encrypt } = await import('@/lib/crypto');
-  const encrypted = encrypt(accessUrl);
+  const encrypted = await encrypt(accessUrl);
 
   // Insert connection
   const [connection] = await getDb()
