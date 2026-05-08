@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections, accounts, transactions, syncLogs } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categories } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 
@@ -12,6 +12,241 @@ export type SyncResult = {
   transactionsUpdated: number;
   errorMessage?: string;
 };
+
+// Helper: Create or update a net worth snapshot for a user on a given date
+export async function createNetWorthSnapshot(userId: string, snapshotDate: string) {
+  const userAccounts = await getDb()
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  let totalAssets = 0;
+  let totalLiabilities = 0;
+  const breakdown: Record<string, { count: number; value: number }> = {};
+
+  for (const acc of userAccounts) {
+    if (acc.isExcludedFromNetWorth) {
+      continue;
+    }
+
+    const balance = parseFloat(acc.balance.toString());
+    const accountType = acc.type.toLowerCase();
+
+    // Categorize assets vs liabilities
+    if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(accountType)) {
+      totalAssets += balance;
+    } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
+      totalLiabilities += Math.abs(balance);
+    }
+
+    // Build breakdown
+    if (!breakdown[accountType]) {
+      breakdown[accountType] = { count: 0, value: 0 };
+    }
+    breakdown[accountType].count++;
+    breakdown[accountType].value += balance;
+  }
+
+  const netWorth = totalAssets - totalLiabilities;
+
+  // Upsert snapshot (replace if already exists for this date)
+  await getDb()
+    .insert(netWorthSnapshots)
+    .values({
+      userId,
+      snapshotDate,
+      totalAssets: String(totalAssets),
+      totalLiabilities: String(totalLiabilities),
+      netWorth: String(netWorth),
+      breakdown,
+    })
+    .onConflictDoUpdate({
+      target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
+      set: {
+        totalAssets: String(totalAssets),
+        totalLiabilities: String(totalLiabilities),
+        netWorth: String(netWorth),
+        breakdown,
+      },
+    });
+}
+
+// Helper: Create account snapshots for all accounts on a given date
+export async function createAccountSnapshots(userId: string, snapshotDate: string) {
+  const userAccounts = await getDb()
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  for (const acc of userAccounts) {
+    await getDb()
+      .insert(accountSnapshots)
+      .values({
+        userId,
+        accountId: acc.id,
+        snapshotDate,
+        balance: acc.balance.toString(),
+      })
+      .onConflictDoUpdate({
+        target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
+        set: {
+          balance: acc.balance.toString(),
+        },
+      });
+  }
+}
+
+// Helper: Generate or update monthly cash flow summaries for all months with new transactions
+export async function updateMonthlyCashFlowSummaries(userId: string) {
+  // Get all user accounts and their transactions
+  const userAccounts = await getDb()
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  if (userAccounts.length === 0) {
+    return;
+  }
+
+  // Get all transactions for these accounts
+  const txByAccountId = await Promise.all(
+    userAccounts.map((acc) =>
+      getDb()
+        .select()
+        .from(transactions)
+        .where(eq(transactions.accountId, acc.id))
+    )
+  );
+
+  const allTransactions = txByAccountId.flat();
+
+  // Group transactions by year-month and calculate totals
+  const monthlyData: Record<string, { income: number; expenses: number; count: number }> = {};
+
+  for (const tx of allTransactions) {
+    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    const amount = parseFloat(tx.amount.toString());
+
+    if (!monthlyData[yearMonth]) {
+      monthlyData[yearMonth] = { income: 0, expenses: 0, count: 0 };
+    }
+
+    monthlyData[yearMonth].count++;
+    if (amount > 0) {
+      monthlyData[yearMonth].income += amount;
+    } else {
+      monthlyData[yearMonth].expenses += Math.abs(amount);
+    }
+  }
+
+  // Upsert all monthly summaries
+  for (const [yearMonth, data] of Object.entries(monthlyData)) {
+    const netCashFlow = data.income - data.expenses;
+
+    await getDb()
+      .insert(monthlyCashFlow)
+      .values({
+        userId,
+        yearMonth,
+        totalIncome: String(data.income),
+        totalExpenses: String(data.expenses),
+        netCashFlow: String(netCashFlow),
+        transactionCount: data.count,
+      })
+      .onConflictDoUpdate({
+        target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
+        set: {
+          totalIncome: String(data.income),
+          totalExpenses: String(data.expenses),
+          netCashFlow: String(netCashFlow),
+          transactionCount: data.count,
+          updatedAt: new Date(),
+        },
+      });
+  }
+}
+
+// Helper: Generate or update category spending summaries for all months with transactions
+export async function updateCategorySpendingSummaries(userId: string) {
+  // Get all user accounts
+  const userAccounts = await getDb()
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  if (userAccounts.length === 0) {
+    return;
+  }
+
+  // Get all transactions for these accounts
+  const txByAccountId = await Promise.all(
+    userAccounts.map((acc) =>
+      getDb()
+        .select()
+        .from(transactions)
+        .where(eq(transactions.accountId, acc.id))
+    )
+  );
+
+  const allTransactions = txByAccountId.flat();
+
+  // Group by category and month (expenses only)
+  const categoryByMonth: Record<
+    string,
+    Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
+  > = {};
+
+  for (const tx of allTransactions) {
+    // Skip income transactions and transactions without categories
+    if (!tx.categoryId || parseFloat(tx.amount.toString()) >= 0) {
+      continue;
+    }
+
+    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    const catId = tx.categoryId.toString();
+
+    if (!categoryByMonth[yearMonth]) {
+      categoryByMonth[yearMonth] = {};
+    }
+
+    if (!categoryByMonth[yearMonth][catId]) {
+      categoryByMonth[yearMonth][catId] = {
+        amount: 0,
+        count: 0,
+        categoryId: catId,
+        yearMonth,
+      };
+    }
+
+    categoryByMonth[yearMonth][catId].amount += Math.abs(parseFloat(tx.amount.toString()));
+    categoryByMonth[yearMonth][catId].count++;
+  }
+
+  // Upsert all category summaries
+  for (const monthData of Object.values(categoryByMonth)) {
+    for (const catData of Object.values(monthData)) {
+      await getDb()
+        .insert(categorySpendingSummary)
+        .values({
+          userId,
+          categoryId: catData.categoryId as any,
+          yearMonth: catData.yearMonth,
+          amount: String(catData.amount),
+          transactionCount: catData.count,
+        })
+        .onConflictDoUpdate({
+          target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
+          set: {
+            amount: String(catData.amount),
+            transactionCount: catData.count,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  }
+}
 
 export async function syncConnection(connectionId: string, userId: string): Promise<SyncResult> {
   // 1. INSERT sync_log row: status='running', startedAt=now()
@@ -41,7 +276,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     }
 
     // 3. Decrypt access URL
-    const accessUrl = decrypt({
+    const accessUrl = await decrypt({
       ciphertext: connection.accessUrlEncrypted,
       iv: connection.accessUrlIv,
       tag: connection.accessUrlTag,
@@ -168,6 +403,17 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       })
       .where(eq(syncLogs.id, log.id));
 
+    // 10. Create net worth snapshot for today
+    const today = new Date().toISOString().split('T')[0];
+    await createNetWorthSnapshot(userId, today);
+
+    // 11. Create account snapshots for all accounts
+    await createAccountSnapshots(userId, today);
+
+    // 12. Update monthly cash flow and category spending summaries for reporting
+    await updateMonthlyCashFlowSummaries(userId);
+    await updateCategorySpendingSummaries(userId);
+
     return {
       status: 'success',
       accountsSynced,
@@ -179,7 +425,13 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       transactionsUpdated,
     };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
+    let errorMessage = err instanceof Error ? err.message : String(err);
+
+    // Provide helpful guidance for decryption errors
+    if (errorMessage.includes('Decryption failed')) {
+      errorMessage =
+        'SimpleFIN connection key mismatch. Please delete and reconnect using a new SimpleFIN Bridge API key.';
+    }
 
     await getDb()
       .update(syncLogs)

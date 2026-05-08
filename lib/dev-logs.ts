@@ -80,30 +80,13 @@ export function clearLogs() {
 }
 
 // Patch console methods to capture logs
-// Only captures logs with meaningful content (length > 20 chars) to avoid noise
+// Captures all console output by default. Skip patterns filter out only
+// obvious Next.js build/dev noise (not runtime application logs).
 let _patched = false
-let _lastLogTime = 0
-const THROTTLE_MS = 500
-const MIN_LOG_LENGTH = 20
+// Only skip obvious Next.js build/dev server noise — not runtime messages
 const SKIP_PATTERNS = [
-  '[DEBUG',
-  '[INFO',
-  '[WARN',
-  'Auth:',
-  'Auth -',
-  'next-auth',
-  'next_auth',
-  'session created',
-  'session deleted',
-  'session updated',
-  'Auth: ',
-  'nextjs',
-  'Turbopack',
-  'next build',
-  'next dev',
   'Creating an optimized',
   'Running TypeScript',
-  'Compiled successfully',
   'Ready in',
 ]
 
@@ -119,18 +102,13 @@ export function patchConsole() {
   }
 
   function shouldCapture(message: string): boolean {
-    if (message.length < MIN_LOG_LENGTH) return false
     return !SKIP_PATTERNS.some((p) => message.includes(p))
   }
 
   console.log = (...args) => {
     const message = args.map((a) => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')
     if (shouldCapture(message)) {
-      const now = Date.now()
-      if (now - _lastLogTime > THROTTLE_MS) {
-        addLog('info', message)
-        _lastLogTime = now
-      }
+      addLog('info', message)
     }
     originalConsole.log(...args)
   }

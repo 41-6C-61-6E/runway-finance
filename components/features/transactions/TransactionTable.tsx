@@ -1,6 +1,37 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  flexRender,
+  ColumnDef,
+  SortingState,
+  VisibilityState,
+  ColumnOrderState,
+} from '@tanstack/react-table';
+import {
+  DndContext,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Settings2,
+} from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -21,12 +52,87 @@ interface TransactionTableProps {
   onSelectAll: (ids: string[]) => void;
 }
 
+const ALL_COLUMNS: string[] = [
+  'select',
+  'date',
+  'description',
+  'account',
+  'category',
+  'amount',
+];
+
+const COLUMN_LABELS: Record<string, string> = {
+  select: 'Select',
+  date: 'Date',
+  description: 'Description',
+  account: 'Account',
+  category: 'Category',
+  amount: 'Amount',
+};
+
+function SortableHeader({
+  column,
+  title,
+}: {
+  column: any;
+  title: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: column.id,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const getSortIcon = () => {
+    if (!column.getCanSort()) return <ChevronsUpDown className="ml-1 h-3 w-3" />;
+    if (column.getIsSorted() === 'asc') return <ChevronUp className="ml-1 h-3 w-3" />;
+    if (column.getIsSorted() === 'desc') return <ChevronDown className="ml-1 h-3 w-3" />;
+    return <ChevronsUpDown className="ml-1 h-3 w-3" />;
+  };
+
+  return (
+    <th
+      className="px-3 py-3 text-left text-gray-400 font-medium whitespace-nowrap"
+      style={style}
+    >
+      <div className="flex items-center gap-1">
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </div>
+        <button
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="flex items-center gap-1 hover:text-white transition-colors"
+        >
+          {title}
+          {getSortIcon()}
+        </button>
+      </div>
+    </th>
+  );
+}
+
 export default function TransactionTable({ filters, onSelectAll }: TransactionTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(ALL_COLUMNS);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    select: true,
+    account: true,
+    category: true,
+  });
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
   const limit = 50;
 
   const fetchTransactions = useCallback(async () => {
@@ -35,6 +141,11 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
       const params = new URLSearchParams();
       params.set('limit', String(limit));
       params.set('offset', String(page * limit));
+      if (sorting.length > 0) {
+        const sort = sorting[0];
+        params.set('sortBy', sort.id);
+        params.set('sortOrder', sort.desc ? 'desc' : 'asc');
+      }
       for (const [key, value] of Object.entries(filters)) {
         if (value) params.set(key, value);
       }
@@ -45,7 +156,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
     } finally {
       setLoading(false);
     }
-  }, [filters, page]);
+  }, [filters, page, sorting]);
 
   useEffect(() => {
     fetchTransactions();
@@ -74,139 +185,316 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
 
   const formatAmount = (amount: string) => {
     const num = parseFloat(amount);
-    const isPositive = num >= 0;
     return {
       text: new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
         minimumFractionDigits: 2,
       }).format(Math.abs(num)),
-      color: isPositive ? 'text-emerald-400' : 'text-red-400',
+      color: 'text-gray-400',
     };
   };
 
   const totalPages = Math.ceil(total / limit);
 
-  return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
-      {loading ? (
-        <div className="p-12 text-center text-gray-400">Loading transactions...</div>
-      ) : transactions.length === 0 ? (
-        <div className="p-12 text-center">
-          <p className="text-gray-400 text-lg mb-4">No transactions found.</p>
-          <a
-            href="/settings"
-            className="inline-block px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
-          >
-            Connect a Financial Institution
-          </a>
-        </div>
-      ) : (
-        <>
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left w-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === transactions.length && transactions.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-gray-400 font-medium">Date</th>
-                  <th className="px-4 py-3 text-left text-gray-400 font-medium">Description</th>
-                  <th className="px-4 py-3 text-left text-gray-400 font-medium hidden lg:table-cell">Account</th>
-                  <th className="px-4 py-3 text-left text-gray-400 font-medium">Category</th>
-                  <th className="px-4 py-3 text-right text-gray-400 font-medium">Amount</th>
-                  <th className="px-4 py-3 text-center text-gray-400 font-medium w-16">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tx) => {
-                  const { text, color } = formatAmount(tx.amount);
-                  return (
-                    <tr
-                      key={tx.id}
-                      className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${
-                        tx.pending ? 'text-gray-400 italic' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(tx.id)}
-                          onChange={() => toggleSelect(tx.id)}
-                          className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
-                        {new Date(tx.date).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-white max-w-xs truncate">
-                        {tx.payee || tx.description}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">{tx.accountName || '—'}</td>
-                      <td className="px-4 py-3">
-                        {tx.categoryName ? (
-                          <span
-                            className="px-2 py-0.5 text-xs rounded-full font-medium"
-                            style={{
-                              backgroundColor: `${tx.categoryColor}33`,
-                              color: tx.categoryColor || '#6366f1',
-                            }}
-                          >
-                            {tx.categoryName}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">Uncategorized</span>
-                        )}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-mono font-medium ${color}`}>{text}</td>
-                      <td className="px-4 py-3 text-center">
-                        {tx.pending ? (
-                          <span className="text-xs text-amber-400">⏳</span>
-                        ) : tx.reviewed ? (
-                          <span className="text-xs text-emerald-400">✓</span>
-                        ) : (
-                          <span className="text-xs text-gray-500">○</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+  const columns = useMemo<ColumnDef<Transaction>[]>(
+    () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={table.getIsAllRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+            className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
+          />
+        ),
+        size: 40,
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'date',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Date" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-gray-300 whitespace-nowrap">
+            {new Date(row.getValue('date')).toLocaleDateString()}
+          </span>
+        ),
+        size: 100,
+      },
+      {
+        accessorKey: 'description',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Description" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-white max-w-xs truncate block">
+            {row.original.payee || row.original.description}
+          </span>
+        ),
+        size: 200,
+      },
+      {
+        accessorKey: 'accountName',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Account" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-gray-400">{row.getValue('accountName') || '—'}</span>
+        ),
+        size: 120,
+      },
+      {
+        accessorKey: 'categoryName',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Category" />
+        ),
+        cell: ({ row }) => {
+          const category = row.original.categoryName;
+          const color = row.original.categoryColor;
+          return category ? (
+            <span
+              className="px-2 py-0.5 text-xs rounded-full font-medium inline-block"
+              style={{
+                backgroundColor: `${color}33`,
+                color: color || '#6366f1',
+              }}
+            >
+              {category}
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">
+              Uncategorized
+            </span>
+          );
+        },
+        size: 120,
+      },
+      {
+        accessorKey: 'amount',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Amount" />
+        ),
+        cell: ({ row }) => {
+          const { text, color } = formatAmount(row.getValue('amount'));
+          return (
+            <span className={`text-right font-mono font-medium ${color} block pr-4`}>
+              {text}
+            </span>
+          );
+        },
+        size: 100,
+        meta: { className: 'text-right' },
+      },
+    ],
+    []
+  );
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
-              <span className="text-sm text-gray-400">
-                {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
-              </span>
-              <div className="flex gap-2">
+  const table = useReactTable({
+    data: transactions,
+    columns,
+    state: {
+      sorting,
+      columnOrder,
+      columnVisibility,
+    },
+    onSortingChange: setSorting,
+    onColumnOrderChange: setColumnOrder,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: totalPages,
+    enableSortingRemoval: false,
+    columnResizeMode: 'onChange',
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((prev) => {
+        const oldIndex = prev.indexOf(active.id as string);
+        const newIndex = prev.indexOf(over.id as string);
+        return arrayMove(prev, oldIndex, newIndex);
+      });
+    }
+  }, []);
+
+  const toggleColumn = (columnId: string) => {
+    const col = table.getColumn(columnId);
+    if (col) {
+      col.toggleVisibility(!col.getIsVisible());
+    }
+  };
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center text-gray-400">Loading transactions...</div>
+        ) : transactions.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-gray-400 text-lg mb-4">No transactions found.</p>
+            <a
+              href="/settings"
+              className="inline-block px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+            >
+              Connect a Financial Institution
+            </a>
+          </div>
+        ) : (
+          <>
+            {/* Column config toolbar */}
+            <div className="flex items-center justify-end px-3 py-2 border-b border-white/5">
+              <div className="relative">
                 <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="px-3 py-1 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  onClick={() => setShowColumnMenu(!showColumnMenu)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 >
-                  Previous
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Columns
                 </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="px-3 py-1 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+                {showColumnMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl z-50 py-1">
+                    <div className="px-3 py-2 text-xs text-gray-500 border-b border-white/5">
+                      Drag to reorder · Click to toggle
+                    </div>
+                    {ALL_COLUMNS.map((colId) => {
+                      const col = table.getColumn(colId);
+                      const isVisible = col?.getIsVisible() ?? true;
+                      return (
+                        <button
+                          key={colId}
+                          onClick={() => toggleColumn(colId)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/5 transition-colors"
+                        >
+                          {isVisible ? (
+                            <EyeOff className="h-3 w-3 text-gray-500" />
+                          ) : (
+                            <Eye className="h-3 w-3 text-gray-600" />
+                          )}
+                          <span className={isVisible ? '' : 'opacity-50'}>
+                            {COLUMN_LABELS[colId]}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </>
-      )}
-    </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id} className="border-b border-white/10">
+                      {headerGroup.headers.map((header) => {
+                        const colId = header.id;
+                        const isVisible = header.column.getIsVisible();
+                        if (!isVisible) return null;
+                        return (
+                          <th
+                            key={header.id}
+                            className="relative px-3 py-3 text-left text-gray-400 font-medium whitespace-nowrap"
+                            style={{ width: header.getSize(), minWidth: header.getSize() }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <div className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0">
+                                <GripVertical className="h-3.5 w-3.5" />
+                              </div>
+                              <button
+                                onClick={() => header.column.toggleSorting(header.column.getIsSorted() === 'asc')}
+                                className="flex items-center gap-1 hover:text-white transition-colors"
+                              >
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                              </button>
+                            </div>
+                            {/* Resize handle */}
+                            <div
+                              {...{
+                                onMouseDown: header.getResizeHandler(),
+                                className: 'absolute top-0 right-0 w-1 h-full cursor-col-resize touch-none bg-white/10 hover:bg-white/30 transition-colors opacity-0 hover:opacity-100',
+                              }}
+                            />
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer h-10 ${
+                        row.original.pending ? 'text-gray-400 italic' : ''
+                      }`}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-3 py-0 overflow-hidden"
+                          style={{ width: cell.column.getSize(), minWidth: cell.column.getSize() }}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
+                <span className="text-sm text-gray-400">
+                  {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="px-3 py-1 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="px-3 py-1 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </DndContext>
   );
 }

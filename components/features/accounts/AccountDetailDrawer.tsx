@@ -55,14 +55,13 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
   const formatBalance = (balance: string, currency: string) => {
     const num = parseFloat(balance);
-    const isPositive = num >= 0;
     return {
       text: new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: currency || 'USD',
         minimumFractionDigits: 2,
       }).format(Math.abs(num)),
-      color: isPositive ? 'text-emerald-400' : 'text-red-400',
+      color: 'text-gray-400',
     };
   };
 

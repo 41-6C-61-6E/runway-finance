@@ -313,17 +313,6 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
         <div className="max-w-2xl w-full space-y-8">
-          {/* Heading */}
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-              <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                Settings
-              </span>
-            </h1>
-            <p className="text-gray-400 dark:text-gray-500">
-              Manage your SimpleFIN connections and account settings
-            </p>
-          </div>
 
           {/* Appearance */}
           <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
@@ -565,7 +554,7 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <div className={`font-mono text-sm ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                              <div className={`font-mono text-sm text-gray-400`}>
                                 {formatted}
                               </div>
                               <div className="text-xs text-gray-500">{account.currency}</div>

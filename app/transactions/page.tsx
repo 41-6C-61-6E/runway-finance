@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
-import FilterSidebar from '@/components/features/transactions/FilterSidebar';
+import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
 import ResizableSidebar from '@/components/resizable-sidebar';
 import AccountsSidebar from '@/components/accounts-sidebar';
@@ -44,7 +44,7 @@ function TransactionsContent() {
     order: searchParams.get('order') ?? 'desc',
   });
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Update URL when filters change
@@ -123,43 +123,22 @@ function TransactionsContent() {
         style={{ marginLeft: `${COLLAPSED_WIDTH + accountsWidth}px` }}
       >
         <ContentWrapper>
-          <div className="mt-20 px-6 lg:px-12 max-w-7xl">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-4xl font-bold">
-                <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                  Transactions
-                </span>
-              </h1>
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors"
-              >
-                {sidebarOpen ? 'Hide Filters' : 'Show Filters'}
-              </button>
-            </div>
+          <div className="mt-20 px-0 sm:px-1 lg:px-3 max-w-[1920px]">
+  
+            <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
 
-            <div className="flex gap-6">
-              {/* Filter Sidebar */}
-              {sidebarOpen && (
-                <div className="w-64 flex-shrink-0">
-                  <FilterSidebar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
-                </div>
-              )}
-
-              {/* Main Content */}
-              <div className="flex-1 min-w-0">
-                {selectedIds.size > 0 && (
-                  <BulkActionsToolbar
-                    count={selectedIds.size}
-                    onSelectAll={handleSelectAll}
-                    onClear={handleBulkActionComplete}
-                  />
-                )}
-                <TransactionTable
-                  filters={filters}
+            <div className="min-w-0">
+              {selectedIds.size > 0 && (
+                <BulkActionsToolbar
+                  count={selectedIds.size}
                   onSelectAll={handleSelectAll}
+                  onClear={handleBulkActionComplete}
                 />
-              </div>
+              )}
+              <TransactionTable
+                filters={filters}
+                onSelectAll={handleSelectAll}
+              />
             </div>
           </div>
         </ContentWrapper>

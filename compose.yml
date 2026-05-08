@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: runway-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -12,6 +13,7 @@ services:
       - "5432:5432"
 
   next16-app:
+    container_name: runway-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,10 +27,10 @@ services:
       - GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
-      - DEBUG=true
       - DATABASE_URL=postgresql://postgres:postgresdev@postgres:5432/runway_finance
-      - DEV_MODE=true
       - SYNC_CRON_SCHEDULE=0 */6 * * *
+      - ENCRYPTION_KEY=15c164990b3bcfd12b7e734fada058bf9e6fbeb25583e1f5972e80e72eec5685 ##must be 64 char hex
+      - REGISTRATION_PIN=05091987
     depends_on:
       - postgres
     command: ["node", "server.js"]
