@@ -3,12 +3,12 @@
 
 
 BUGS:
-- 
+- l
 
 
 
 CHANGES:
-- 
+- more app logs
 
 
 NEW FEATUES:
