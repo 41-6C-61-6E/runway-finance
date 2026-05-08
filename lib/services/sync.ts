@@ -1,5 +1,6 @@
 import { getDb } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categories } from '@/lib/db/schema';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { eq, and } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
@@ -71,7 +72,7 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
     });
 }
 
-// Helper: Create account snapshots for all accounts on a given date
+// Helper: Create account snapshots for all accounts on a given date (real, non-synthetic)
 export async function createAccountSnapshots(userId: string, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
@@ -86,11 +87,13 @@ export async function createAccountSnapshots(userId: string, snapshotDate: strin
         accountId: acc.id,
         snapshotDate,
         balance: acc.balance.toString(),
+        isSynthetic: false,
       })
       .onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
         set: {
           balance: acc.balance.toString(),
+          isSynthetic: false,
         },
       });
   }
@@ -295,6 +298,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     let transactionsNew = 0;
     let transactionsUpdated = 0;
 
+    // Map to track externalId -> accountId for backfilling
+    const externalIdToAccountId = new Map<string, string>();
+
     // 6. Upsert accounts
     for (const sfAccount of data.accounts) {
       const balanceNum = parseFloat(sfAccount.balance);
@@ -326,6 +332,8 @@ export async function syncConnection(connectionId: string, userId: string): Prom
         })
         .returning();
 
+      // Track accountId for backfilling
+      externalIdToAccountId.set(sfAccount.id, upserted.id);
       accountsSynced++;
 
       // 7. Upsert transactions
@@ -407,10 +415,39 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     const today = new Date().toISOString().split('T')[0];
     await createNetWorthSnapshot(userId, today);
 
-    // 11. Create account snapshots for all accounts
+    // 11. Create account snapshots for all accounts (real, non-synthetic)
     await createAccountSnapshots(userId, today);
 
-    // 12. Update monthly cash flow and category spending summaries for reporting
+    // 12. Backfill historical synthetic snapshots for each synced account
+    for (const sfAccount of data.accounts) {
+      const accountId = externalIdToAccountId.get(sfAccount.id);
+      if (!accountId) continue;
+
+      // Find the earliest transaction date for this account
+      const earliestTx = await getEarliestTransactionDate(accountId);
+      if (!earliestTx) continue;
+
+      const toDate = new Date(now);
+      toDate.setDate(toDate.getDate() - 1); // Backfill up to yesterday
+      const toDateStr = toDate.toISOString().split('T')[0];
+
+      // Only backfill if there's a meaningful gap
+      if (earliestTx < toDateStr) {
+        const result = await generateHistoricalAccountSnapshots(
+          accountId,
+          userId,
+          earliestTx,
+          toDateStr
+        );
+        if (result.syntheticCount > 0) {
+          console.log(
+            `[sync] Backfilled ${result.syntheticCount} synthetic snapshots for account ${sfAccount.id}`
+          );
+        }
+      }
+    }
+
+    // 13. Update monthly cash flow and category spending summaries for reporting
     await updateMonthlyCashFlowSummaries(userId);
     await updateCategorySpendingSummaries(userId);
 

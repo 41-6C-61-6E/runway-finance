@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, netWorthSnapshots } from '@/lib/db/schema';
-import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
+import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -62,21 +62,56 @@ export async function GET(request: Request) {
       .from(accounts)
       .where(eq(accounts.userId, userId));
 
-    // Build net worth snapshots query
-    const whereConditions = [
-      eq(netWorthSnapshots.userId, userId),
-      gte(netWorthSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
-      lte(netWorthSnapshots.snapshotDate, endDate.toISOString().split('T')[0]),
-    ];
+    // Primary path: aggregate from account_snapshots (includes both real and synthetic)
+    const accountSnapshotsInRange = await getDb()
+      .select({
+        snapshotDate: accountSnapshots.snapshotDate,
+        accountId: accountSnapshots.accountId,
+        balance: accountSnapshots.balance,
+        isSynthetic: accountSnapshots.isSynthetic,
+      })
+      .from(accountSnapshots)
+      .where(
+        and(
+          eq(accountSnapshots.userId, userId),
+          gte(accountSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
+          lte(accountSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
+        )
+      )
+      .orderBy(accountSnapshots.snapshotDate);
 
-    const snapshots = await getDb()
-      .select()
-      .from(netWorthSnapshots)
-      .where(and(...whereConditions))
-      .orderBy(netWorthSnapshots.snapshotDate);
+    // Group balances by date
+    const balancesByDate = new Map<string, { assets: number; liabilities: number }>();
+    for (const snap of accountSnapshotsInRange) {
+      const dateStr = String(snap.snapshotDate);
+      const account = userAccounts.find((a) => a.id === snap.accountId);
+      if (!account) continue;
 
-    // If no snapshots, generate from current account balances
-    if (snapshots.length === 0) {
+      const balance = parseFloat(snap.balance.toString());
+      const entry = balancesByDate.get(dateStr) ?? { assets: 0, liabilities: 0 };
+
+      const accountType = account.type.toLowerCase();
+      if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(accountType)) {
+        entry.assets += balance;
+      } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
+        entry.liabilities += Math.abs(balance);
+      }
+
+      balancesByDate.set(dateStr, entry);
+    }
+
+    // Build formatted data
+    const formattedData = Array.from(balancesByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, { assets, liabilities }]) => ({
+        date,
+        netWorth: assets - liabilities,
+        totalAssets: assets,
+        totalLiabilities: liabilities,
+      }));
+
+    if (formattedData.length === 0) {
+      // Fallback: use current account balances
       let totalAssets = 0;
       let totalLiabilities = 0;
 
@@ -87,11 +122,9 @@ export async function GET(request: Request) {
 
         const balance = parseFloat(acc.balance.toString());
         
-        // Assets: checking, savings, investment, other, brokerage, retirement, real estate
         if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(acc.type.toLowerCase())) {
           totalAssets += balance;
         } 
-        // Liabilities: credit, loan, mortgage
         else if (['credit', 'loan', 'mortgage'].includes(acc.type.toLowerCase())) {
           totalLiabilities += Math.abs(balance);
         }
@@ -122,20 +155,13 @@ export async function GET(request: Request) {
       });
     }
 
-    // Calculate summary stats
-    const current = snapshots[snapshots.length - 1];
-    const previous = snapshots.length > 1 ? snapshots[0] : current;
-    const currentNetWorth = parseFloat(current.netWorth.toString());
-    const previousNetWorth = parseFloat(previous.netWorth.toString());
+    // Calculate summary stats from aggregated data
+    const current = formattedData[formattedData.length - 1];
+    const previous = formattedData.length > 1 ? formattedData[0] : current;
+    const currentNetWorth = current.netWorth;
+    const previousNetWorth = previous.netWorth;
     const change = currentNetWorth - previousNetWorth;
     const percentChange = previousNetWorth !== 0 ? (change / previousNetWorth) * 100 : 0;
-
-    const formattedData = snapshots.map((snap) => ({
-      date: snap.snapshotDate,
-      netWorth: parseFloat(snap.netWorth.toString()),
-      totalAssets: parseFloat(snap.totalAssets.toString()),
-      totalLiabilities: parseFloat(snap.totalLiabilities.toString()),
-    }));
 
     const includedCount = userAccounts.filter((a) => !a.isExcludedFromNetWorth).length;
 

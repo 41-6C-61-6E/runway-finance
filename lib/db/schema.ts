@@ -245,6 +245,7 @@ export const accountSnapshots = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
     snapshotDate: date('snapshot_date').notNull(),
     balance: numeric('balance', { precision: 20, scale: 4 }).notNull(),
+    isSynthetic: boolean('is_synthetic').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.userId, t.accountId, t.snapshotDate)]
