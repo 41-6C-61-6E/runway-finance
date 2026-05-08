@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AccountDetailDrawer from './AccountDetailDrawer';
 
 type Account = {
@@ -15,10 +15,130 @@ type Account = {
   balanceDate: string | null;
 };
 
-export default function AccountList({ initialAccounts }: { initialAccounts: Account[] }) {
+// ── Type hierarchy mapping ──────────────────────────────────────────────
+const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: string }> = {
+  checking:   { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
+  savings:    { group: 'Banking',       subGroup: 'Savings',          icon: '🏦' },
+  other:      { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
+  credit:     { group: 'Credit',        subGroup: 'Credit Cards',     icon: '💳' },
+  investment: { group: 'Investments',   subGroup: 'Brokerage',        icon: '📈' },
+  brokerage:  { group: 'Investments',   subGroup: 'Brokerage',        icon: '📈' },
+  retirement: { group: 'Investments',   subGroup: 'Retirement',       icon: '📈' },
+  otherAsset: { group: 'Investments',   subGroup: 'Other Assets',     icon: '📈' },
+  hsa:        { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
+  health:     { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
+  loan:       { group: 'Loans',         subGroup: 'Loans',            icon: '📋' },
+  mortgage:   { group: 'Loans',         subGroup: 'Mortgages',        icon: '📋' },
+  otherLiability: { group: 'Liabilities', subGroup: 'Liabilities',    icon: '⚠️' },
+};
+
+const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities'];
+
+function getHierarchy(accountType: string) {
+  return TYPE_HIERARCHY[accountType] ?? { group: 'Other', subGroup: 'Other', icon: '📁' };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+const formatCurrency = (balance: string, currency: string) => {
+  const num = parseFloat(balance);
+  const isPositive = num >= 0;
+  return {
+    text: new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+      minimumFractionDigits: 2,
+    }).format(Math.abs(num)),
+    color: isPositive ? 'text-emerald-400' : 'text-red-400',
+    sign: isPositive ? '' : '-',
+  };
+};
+
+// ── Account Row (single account line) ────────────────────────────────────
+function AccountRow({
+  account,
+  onToggleHidden,
+  onOpenDrawer,
+}: {
+  account: Account;
+  onToggleHidden: (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => (e: React.MouseEvent) => void;
+  onOpenDrawer: (account: Account) => void;
+}) {
+  const fmt = formatCurrency(account.balance, account.currency);
+
+  return (
+    <div
+      className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group/account"
+      onClick={() => onOpenDrawer(account)}
+    >
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className="w-1.5 h-1.5 rounded-full bg-gray-600 flex-shrink-0" />
+        <span className="text-sm text-gray-200 truncate">{account.name}</span>
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-1 opacity-0 group-hover/account:opacity-100 transition-opacity">
+          <button
+            onClick={onToggleHidden(account.id, 'isHidden')}
+            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
+            title={account.isHidden ? 'Show account' : 'Hide account'}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {account.isHidden ? (
+                <path d="M13.875 18.825A10.05 10.05 0 1012 19c-1.048 0-2.044-.147-2.998-.414M6 12l6 6m0 0l6-6m-6 6V7" />
+              ) : (
+                <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              )}
+            </svg>
+          </button>
+          <button
+            onClick={onToggleHidden(account.id, 'isExcludedFromNetWorth')}
+            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
+            title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {account.isExcludedFromNetWorth ? (
+                <path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              ) : (
+                <path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              )}
+            </svg>
+          </button>
+        </div>
+        <span className={`font-mono text-sm font-semibold tabular-nums ${fmt.color}`}>
+          {fmt.sign}{fmt.text}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────
+export default function AccountList({ initialAccounts, showHidden = false }: { initialAccounts: Account[]; showHidden?: boolean }) {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+
+  useEffect(() => {
+    setAccounts(initialAccounts);
+  }, [initialAccounts]);
+
+  // Filter out hidden/excluded accounts unless showHidden is true
+  const visibleAccounts = showHidden
+    ? accounts
+    : accounts.filter((a) => !a.isHidden && !a.isExcludedFromNetWorth);
+
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedSubGroups, setExpandedSubGroups] = useState<Record<string, boolean>>({});
+
+  // Toggle group expansion
+  const toggleGroup = useCallback((group: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  }, []);
+
+  // Toggle sub-group expansion
+  const toggleSubGroup = useCallback((group: string, subGroup: string) => {
+    const key = `${group}::${subGroup}`;
+    setExpandedSubGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   const handleToggleHidden = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
@@ -56,136 +176,187 @@ export default function AccountList({ initialAccounts }: { initialAccounts: Acco
     window.location.reload();
   }, []);
 
-  useEffect(() => {
-    setAccounts(initialAccounts);
-  }, [initialAccounts]);
+  // ── Hierarchical grouping ─────────────────────────────────────────────
+  const hierarchy = useMemo(() => {
+    const map = new Map<string, Map<string, Account[]>>();
 
-  // Group by institution
-  const grouped = accounts.reduce<Record<string, Account[]>>((acc, account) => {
-    const inst = account.institution || 'Unknown Institution';
-    if (!acc[inst]) acc[inst] = [];
-    acc[inst].push(account);
-    return acc;
-  }, {});
+    for (const acc of visibleAccounts) {
+      const { group, subGroup } = getHierarchy(acc.type);
+      if (!map.has(group)) map.set(group, new Map());
+      const subMap = map.get(group)!;
+      if (!subMap.has(subGroup)) subMap.set(subGroup, []);
+      subMap.get(subGroup)!.push(acc);
+    }
 
-  const formatBalance = (balance: string, currency: string) => {
-    const num = parseFloat(balance);
-    const isPositive = num >= 0;
-    return {
-      text: new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'USD',
-        minimumFractionDigits: 2,
-      }).format(Math.abs(num)),
-      color: isPositive ? 'text-emerald-400' : 'text-red-400',
-    };
-  };
+    return map;
+  }, [visibleAccounts]);
 
-  const typeBadge: Record<string, string> = {
-    checking: 'bg-blue-500/20 text-blue-400',
-    savings: 'bg-green-500/20 text-green-400',
-    credit: 'bg-purple-500/20 text-purple-400',
-    investment: 'bg-amber-500/20 text-amber-400',
-    loan: 'bg-orange-500/20 text-orange-400',
-    other: 'bg-gray-500/20 text-gray-400',
-  };
+  // Total net worth
+  const totalNetWorth = useMemo(() => {
+    return visibleAccounts.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+  }, [visibleAccounts]);
 
+  // Group totals
+  const getGroupTotal = useCallback(
+    (group: string) => {
+      const subMap = hierarchy.get(group);
+      if (!subMap) return 0;
+      let total = 0;
+      for (const accs of subMap.values()) {
+        for (const a of accs) total += parseFloat(a.balance);
+      }
+      return total;
+    },
+    [hierarchy]
+  );
+
+  // Sub-group totals
+  const getSubGroupTotal = useCallback(
+    (group: string, subGroup: string) => {
+      const accs = hierarchy.get(group)?.get(subGroup);
+      if (!accs) return 0;
+      return accs.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    },
+    [hierarchy]
+  );
+
+  const isGroupExpanded = (group: string) => expandedGroups[group] ?? true;
+  const isSubGroupExpanded = (group: string, subGroup: string) =>
+    expandedSubGroups[`${group}::${subGroup}`] ?? true;
+
+  // Sort groups by defined order, then alphabetically
+  const sortedGroups = Array.from(hierarchy.keys()).sort((a, b) => {
+    const ai = GROUP_ORDER.indexOf(a);
+    const bi = GROUP_ORDER.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  // ── Empty state ───────────────────────────────────────────────────────
+  if (accounts.length === 0) {
+    return (
+      <div className="p-12 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 text-center">
+        <p className="text-gray-400 text-lg mb-4">No accounts linked yet.</p>
+        <a
+          href="/settings"
+          className="inline-block px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+        >
+          Connect a Financial Institution
+        </a>
+      </div>
+    );
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen w-full relative overflow-hidden">
-      {/* Background */}
-      <div
-        className="absolute inset-0 z-0 opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `
-            radial-gradient(ellipse at 20% 30%, rgba(59, 130, 246, 0.5) 0%, transparent 60%),
-            radial-gradient(ellipse at 80% 70%, rgba(168, 85, 247, 0.4) 0%, transparent 70%),
-            radial-gradient(ellipse at 60% 20%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse at 40% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 65%)
-          `,
-        }}
-      />
+    <div className="w-full max-w-3xl mx-auto">
+      {/* Total Net Worth Header */}
+      <div className="mb-8">
+        <div className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Total Net Worth</div>
+        <div className={`font-mono text-4xl font-bold ${totalNetWorth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {formatCurrency(String(totalNetWorth), 'USD').text}
+        </div>
+      </div>
 
-      <div className="relative z-10 ml-64 mt-20 px-6 lg:px-12 max-w-6xl">
-        <h1 className="text-4xl font-bold mb-8">
-          <span className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-            Accounts
-          </span>
-        </h1>
+      {/* Hierarchical Groups */}
+      <div className="space-y-2">
+        {sortedGroups.map((group) => {
+          const groupTotal = getGroupTotal(group);
+          const subGroups = Array.from(hierarchy.get(group)?.entries() || []);
+          const expanded = isGroupExpanded(group);
 
-        {accounts.length === 0 ? (
-          <div className="p-12 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 text-center">
-            <p className="text-gray-400 text-lg mb-4">No accounts linked yet.</p>
-            <a
-              href="/settings"
-              className="inline-block px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
-            >
-              Connect a Financial Institution
-            </a>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {Object.entries(grouped).map(([institution, instAccounts]) => (
-              <div key={institution} className="space-y-3">
-                <h2 className="text-lg font-semibold text-gray-300 px-1">{institution}</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {instAccounts.map((account) => {
-                    const { text, color } = formatBalance(account.balance, account.currency);
-                    return (
-                      <div
-                        key={account.id}
-                        onClick={() => handleOpenDrawer(account)}
-                        className="p-5 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:border-white/20 cursor-pointer transition-all group relative"
-                      >
-                        {/* Hover toggles */}
-                        <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          return (
+            <div key={group} className="rounded-xl overflow-hidden">
+              {/* Group Header */}
+              <button
+                onClick={() => toggleGroup(group)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-white/5 hover:bg-white/10 transition-colors rounded-xl"
+              >
+                <div className="flex items-center gap-2">
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span className="text-gray-300 font-semibold">{group}</span>
+                </div>
+                <div className={`font-mono text-lg font-semibold ${groupTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {formatCurrency(String(groupTotal), 'USD').text}
+                </div>
+              </button>
+
+              {/* Sub-groups / Accounts */}
+              {expanded && (
+                <div className="px-4 pb-2 space-y-1">
+                  {subGroups.map(([subGroup, accs]) => {
+                    const subTotal = getSubGroupTotal(group, subGroup);
+
+                    // If sub-group has multiple accounts, show it as a collapsible header
+                    if (accs.length > 1) {
+                      const subExpanded = isSubGroupExpanded(group, subGroup);
+                      return (
+                        <div key={subGroup} className="ml-3">
                           <button
-                            onClick={handleToggleHidden(account.id, 'isHidden')}
-                            className="p-1.5 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-colors"
-                            title={account.isHidden ? 'Show account' : 'Hide account'}
+                            onClick={() => toggleSubGroup(group, subGroup)}
+                            className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 group/sub"
                           >
-                            {account.isHidden ? (
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            <div className="flex items-center gap-2">
+                              <svg
+                                className={`w-3 h-3 text-gray-500 transition-transform ${subExpanded ? 'rotate-0' : '-rotate-90'}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path d="M19 9l-7 7-7-7" />
                               </svg>
-                            ) : (
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path d="M13.875 18.825A10.079 10.079 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                              </svg>
-                            )}
+                              <span className="text-gray-400 text-sm font-medium">{subGroup}</span>
+                              <span className="text-gray-600 text-xs">({accs.length})</span>
+                            </div>
+                            <div className={`font-mono text-sm font-semibold tabular-nums ${subTotal >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                              {formatCurrency(String(subTotal), 'USD').text}
+                            </div>
                           </button>
-                          <button
-                            onClick={handleToggleHidden(account.id, 'isExcludedFromNetWorth')}
-                            className="p-1.5 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-colors"
-                            title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${typeBadge[account.type] || typeBadge.other}`}>
-                            {account.type}
-                          </span>
-                          {account.isHidden && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">Hidden</span>
+                          {subExpanded && (
+                            <div className="ml-5 space-y-0">
+                              {accs.map((acc) => (
+                                <AccountRow
+                                  key={acc.id}
+                                  account={acc}
+                                  onToggleHidden={handleToggleHidden}
+                                  onOpenDrawer={handleOpenDrawer}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
-                        <div className="text-white font-medium text-lg">{account.name}</div>
-                        <div className={`font-mono text-xl mt-1 ${color}`}>{text}</div>
-                        <div className="text-xs text-gray-500 mt-1">{account.currency}</div>
-                      </div>
+                      );
+                    }
+
+                    // Single account — render inline
+                    return (
+                      <AccountRow
+                        key={accs[0].id}
+                        account={accs[0]}
+                        onToggleHidden={handleToggleHidden}
+                        onOpenDrawer={handleOpenDrawer}
+                      />
                     );
                   })}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
 
+      {/* Detail Drawer */}
       {selectedAccount && (
         <AccountDetailDrawer
           account={selectedAccount}

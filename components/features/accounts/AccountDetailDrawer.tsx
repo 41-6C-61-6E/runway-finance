@@ -16,13 +16,15 @@ type Account = {
 };
 
 interface AccountDetailDrawerProps {
-  account: Account;
+  account: Account | null;
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export default function AccountDetailDrawer({ account, open, onClose, onSuccess }: AccountDetailDrawerProps) {
+  if (!account) return null;
+
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
   const [isHidden, setIsHidden] = useState(account.isHidden);

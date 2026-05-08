@@ -28,6 +28,7 @@ services:
       - DEBUG=true
       - DATABASE_URL=postgresql://postgres:postgresdev@postgres:5432/runway_finance
       - DEV_MODE=true
+      - SYNC_CRON_SCHEDULE=0 */6 * * *
     depends_on:
       - postgres
     command: ["node", "server.js"]
