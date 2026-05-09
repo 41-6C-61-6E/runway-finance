@@ -90,7 +90,7 @@ export default function SignInPage() {
               {isLogin ? 'Sign In' : 'Create Account'}
             </h1>
             <p className="mt-2 text-gray-600 dark:text-gray-300">
-              {isLogin ? 'Welcome back! Please enter your details' : 'Join us today'}
+              {isLogin ? 'Welcome back! Please enter your details' : 'To the Moon!'}
             </p>
           </div>
 

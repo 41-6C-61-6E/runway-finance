@@ -40,6 +40,7 @@ type Transaction = {
   payee: string | null;
   amount: string;
   pending: boolean;
+  postedDate: string | null;
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
@@ -226,11 +227,25 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
         header: ({ column }) => (
           <SortableHeader column={column} title="Date" />
         ),
-        cell: ({ row }) => (
-          <span className="text-gray-300 whitespace-nowrap">
-            {new Date(row.getValue('date')).toLocaleDateString()}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const tx = row.original;
+          const isPending = tx.pending;
+          return (
+            <div className="whitespace-nowrap">
+              <span className="text-gray-300">
+                {new Date(row.getValue('date')).toLocaleDateString()}
+              </span>
+              {isPending && (
+                <span className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-amber-400 bg-amber-400/10 rounded-full">
+                  <svg className="h-2.5 w-2.5 animate-pulse" fill="currentColor" viewBox="0 0 8 8">
+                    <circle cx="4" cy="4" r="3" />
+                  </svg>
+                  Pending
+                </span>
+              )}
+            </div>
+          );
+        },
         size: 100,
       },
       {
@@ -238,11 +253,17 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
         header: ({ column }) => (
           <SortableHeader column={column} title="Description" />
         ),
-        cell: ({ row }) => (
-          <span className="text-white max-w-xs truncate block">
-            {row.original.payee || row.original.description}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const tx = row.original;
+          const isPending = tx.pending;
+          return (
+            <div>
+              <span className={`max-w-xs truncate block ${isPending ? 'text-gray-300' : 'text-white'}`}>
+                {tx.payee || tx.description}
+              </span>
+            </div>
+          );
+        },
         size: 200,
       },
       {
@@ -407,7 +428,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+              <table className="min-w-full text-sm border-collapse">
                 <thead>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id} className="border-b border-white/10">
@@ -418,7 +439,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                         return (
                           <th
                             key={header.id}
-                            className="relative px-3 py-3 text-left text-gray-400 font-medium whitespace-nowrap"
+                            className="relative px-3 py-3 text-left text-gray-400 font-medium"
                             style={{ width: header.getSize(), minWidth: header.getSize() }}
                           >
                             <div className="flex items-center gap-1">
@@ -436,7 +457,8 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                             <div
                               {...{
                                 onMouseDown: header.getResizeHandler(),
-                                className: 'absolute top-0 right-0 w-1 h-full cursor-col-resize touch-none bg-white/10 hover:bg-white/30 transition-colors opacity-0 hover:opacity-100',
+                                onTouchStart: header.getResizeHandler(),
+                                className: 'absolute top-0 right-0 w-2 h-full cursor-col-resize touch-none bg-blue-500/30 hover:bg-blue-500/60 transition-colors opacity-0 hover:opacity-100 group-hover:opacity-50',
                               }}
                             />
                           </th>
@@ -446,13 +468,15 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                   ))}
                 </thead>
                 <tbody>
-                  {table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer h-10 ${
-                        row.original.pending ? 'text-gray-400 italic' : ''
-                      }`}
-                    >
+                  {table.getRowModel().rows.map((row) => {
+                    const isPending = row.original.pending;
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer h-10 group ${
+                          isPending ? 'bg-amber-400/[0.03]' : ''
+                        }`}
+                      >
                       {row.getVisibleCells().map((cell) => (
                         <td
                           key={cell.id}
@@ -463,7 +487,8 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                         </td>
                       ))}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

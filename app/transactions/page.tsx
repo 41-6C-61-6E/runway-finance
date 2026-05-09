@@ -2,14 +2,10 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
-import ResizableSidebar from '@/components/resizable-sidebar';
-import AccountsSidebar from '@/components/accounts-sidebar';
 import ContentWrapper from '@/components/content-wrapper';
-import { SidebarProvider } from '@/components/sidebar-context';
 
 type FilterState = {
   accountId: string | null;
@@ -28,7 +24,6 @@ type FilterState = {
 function TransactionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { sidebarWidth, accountsWidth } = useSidebar();
 
   const [filters, setFilters] = useState<FilterState>({
     accountId: searchParams.get('accountId') ?? null,
@@ -111,17 +106,8 @@ function TransactionsContent() {
         }}
       />
 
-      {/* Navigation Sidebar - fixed, overlays content */}
-      <ResizableSidebar />
-
-      {/* Accounts Sidebar - fixed, overlays content */}
-      <AccountsSidebar />
-
-      {/* Main Content - offset by both sidebar widths */}
-      <div
-        className="relative z-10"
-        style={{ marginLeft: `${COLLAPSED_WIDTH + accountsWidth}px` }}
-      >
+      {/* Main Content */}
+      <div className="relative z-10">
         <ContentWrapper>
           <div className="mt-20 px-0 sm:px-1 lg:px-3 max-w-[1920px]">
   
@@ -150,9 +136,7 @@ function TransactionsContent() {
 export default function TransactionsPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <SidebarProvider>
-        <TransactionsContent />
-      </SidebarProvider>
+      <TransactionsContent />
     </Suspense>
   );
 }

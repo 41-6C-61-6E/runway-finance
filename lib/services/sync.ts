@@ -286,9 +286,11 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     });
 
     // 4. Compute date range
+    // Always fetch 14 days back to catch pending transactions (typically clear within 2-5 days).
+    // On first sync (no lastSyncAt), use 90 days for historical data.
     const now = new Date();
     const startDate = connection.lastSyncAt
-      ? new Date(connection.lastSyncAt.getTime() - 24 * 60 * 60 * 1000)
+      ? new Date(connection.lastSyncAt.getTime() - 14 * 24 * 60 * 60 * 1000)
       : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     // 5. Fetch accounts + transactions from SimpleFIN
@@ -342,12 +344,19 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           const amountNum = parseFloat(sfTx.amount);
           const accountId = upserted.id;
 
+          // Use sfTx.date (expected transaction date) when available; fall back to now for pending
+          const dateMs = sfTx.date > 0 ? sfTx.date * 1000 : now.getTime();
+          const txDate = new Date(dateMs).toISOString().split('T')[0];
+          const txPostedDate = sfTx.posted > 0
+            ? new Date(sfTx.posted * 1000).toISOString().split('T')[0]
+            : null;
+
           const txData = {
             userId,
             accountId,
             externalId: sfTx.id,
-            date: new Date(sfTx.posted * 1000).toISOString().split('T')[0],
-            postedDate: new Date(sfTx.posted * 1000).toISOString().split('T')[0],
+            date: txDate,
+            postedDate: txPostedDate,
             amount: String(amountNum),
             description: sfTx.description,
             payee: sfTx.payee ?? null,
@@ -364,7 +373,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
                 amount: String(amountNum),
                 pending: sfTx.pending ?? false,
                 description: sfTx.description,
-                postedDate: new Date(sfTx.posted * 1000).toISOString().split('T')[0],
+                postedDate: txPostedDate,
                 updatedAt: now,
               },
             });

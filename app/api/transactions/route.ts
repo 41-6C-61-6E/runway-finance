@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and, or, sql, gt, gte, lte, asc, desc } from 'drizzle-orm';
+import { eq, and, or, sql, gt, gte, lte, asc, desc, inArray, not } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 
 export async function GET(request: Request) {
@@ -44,6 +44,19 @@ export async function GET(request: Request) {
 
   // Build where clause
   const whereConditions = [eq(transactions.userId, userId)];
+
+  // Filter out hidden accounts unless explicitly filtering by accountId
+  if (!filters.accountId) {
+    const hiddenAccountIds = await getDb()
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, true)));
+    
+    if (hiddenAccountIds.length > 0) {
+      const hiddenIds = hiddenAccountIds.map((a) => a.id);
+      whereConditions.push(not(inArray(transactions.accountId, hiddenIds)));
+    }
+  }
 
   if (filters.accountId) {
     whereConditions.push(eq(transactions.accountId, filters.accountId));
