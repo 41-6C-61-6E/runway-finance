@@ -2,29 +2,38 @@
 
 import { usePathname } from 'next/navigation';
 import AccountsSidebar from '@/components/accounts-sidebar';
+import ResizableSidebar from '@/components/resizable-sidebar';
 import { useSidebar, SidebarProvider } from '@/components/sidebar-context';
 import { ReactNode } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const isAuthPage = pathname === '/signin';
   const isSettingsPage = pathname === '/settings';
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
 
   return (
     <SidebarProvider>
-      <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
-        {children}
-      </AuthenticatedLayoutContent>
+      <>
+        <ResizableSidebar />
+        {!isSettingsPage && <AccountsSidebar />}
+        <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
+          {children}
+        </AuthenticatedLayoutContent>
+      </>
     </SidebarProvider>
   );
 }
 
 function AuthenticatedLayoutContent({ children, isSettingsPage }: { children: ReactNode; isSettingsPage: boolean }) {
-  const { sidebarWidth, accountsWidth } = useSidebar();
+  const { accountsWidth } = useSidebar();
 
   return (
     <>
-      {!isSettingsPage && <AccountsSidebar />}
-      <div style={{ marginLeft: isSettingsPage ? `${sidebarWidth}px` : `${sidebarWidth + accountsWidth}px` }}>
+      <div style={{ marginLeft: isSettingsPage ? '64px' : `${64 + accountsWidth}px` }}>
         {children}
       </div>
     </>

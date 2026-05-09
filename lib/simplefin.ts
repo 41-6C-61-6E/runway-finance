@@ -7,6 +7,7 @@ export class SimpleFINError extends Error {
 
 export type SimpleFINTransaction = {
   id: string;
+  date: number;
   posted: number;
   amount: string;
   description: string;

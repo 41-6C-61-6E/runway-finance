@@ -58,3 +58,33 @@ export async function findUser(username: string): Promise<User | undefined> {
     client.release();
   }
 }
+
+export async function updatePassword(username: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  const pool = getPool();
+  if (!pool) return { success: false, error: 'Database not available' };
+
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      'SELECT password_hash FROM users WHERE username = $1',
+      [username]
+    );
+    const user = rows[0];
+    if (!user) return { success: false, error: 'User not found' };
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) return { success: false, error: 'Current password is incorrect' };
+
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    await client.query(
+      'UPDATE users SET password_hash = $1 WHERE username = $2',
+      [password_hash, username]
+    );
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to update password' };
+  } finally {
+    client.release();
+  }
+}

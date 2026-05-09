@@ -4,8 +4,9 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { Home, Receipt, Settings } from 'lucide-react'
+import { Home, Receipt, Settings, Key } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
+import ChangePasswordDrawer from '@/components/change-password-drawer'
 
 // Export hooks for backward compatibility
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
@@ -21,6 +22,7 @@ export default function ResizableSidebar() {
   const { sidebarWidth, isHovering, handleNavResizeDown, handleMouseEnter, handleMouseLeave } = useSidebar()
   const [isResizing, setIsResizing] = useState(false)
   const { data: session } = useSession()
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [appStatus, setAppStatus] = useState<{
     connected: boolean
     lastSyncAt: string | null
@@ -148,6 +150,14 @@ export default function ResizableSidebar() {
               <div className="text-xs text-gray-500">Signed in as</div>
               <div className="text-sm text-white truncate">{session.user.email}</div>
             </div>
+            <button
+              type="button"
+              onClick={() => setChangePasswordOpen(true)}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              <Key className="h-4 w-4" />
+              Change Password
+            </button>
             <SignOutForm />
           </div>
         )}
@@ -173,6 +183,9 @@ export default function ResizableSidebar() {
           <div className="w-1 h-full mx-auto bg-white/10 hover:bg-blue-500/50 transition-colors" />
         </div>
       )}
+
+      {/* Change Password Drawer */}
+      <ChangePasswordDrawer open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </>
   )
 }

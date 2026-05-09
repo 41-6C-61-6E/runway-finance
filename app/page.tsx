@@ -1,15 +1,9 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
-import ResizableSidebar from '@/components/resizable-sidebar';
-import AccountsSidebar from '@/components/accounts-sidebar';
-import { SidebarProvider } from '@/components/sidebar-context';
 import { NetWorthChart } from '@/components/net-worth-chart';
 
 function DashboardContent() {
-  const { sidebarWidth, accountsWidth } = useSidebar();
-
   return (
     <div className="min-h-screen w-full relative overflow-hidden">
       {/* Animated gradient background */}
@@ -25,30 +19,14 @@ function DashboardContent() {
         }}
       />
 
-      {/* Navigation Sidebar - fixed, overlays content */}
-      <ResizableSidebar />
-
-      {/* Accounts Sidebar - fixed, overlays content */}
-      <AccountsSidebar />
-
-      {/* Main Content - offset by both sidebar widths */}
-      <main
-        className="relative z-10 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-8"
-        style={{ 
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: `${COLLAPSED_WIDTH + accountsWidth}px`,
-          width: `calc(100vw - ${COLLAPSED_WIDTH + accountsWidth}px)`,
-        }}
-      >
+      {/* Main Content */}
+      <div className="relative z-10 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-7xl mx-auto h-full" style={{ maxWidth: '100%' }}>
           <Suspense fallback={<div className="text-slate-400">Loading chart...</div>}>
             <NetWorthChart />
           </Suspense>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -56,9 +34,7 @@ function DashboardContent() {
 export default function Home() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <SidebarProvider>
-        <DashboardContent />
-      </SidebarProvider>
+      <DashboardContent />
     </Suspense>
   );
 }
