@@ -6,9 +6,12 @@ import { AuthenticatedLayout } from "@/components/authenticated-layout";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Get ready for takeoff!",
+  title: "To the Moon!",
   description:
     "For your money.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

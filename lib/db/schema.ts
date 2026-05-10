@@ -73,6 +73,7 @@ export const userSettings = pgTable('user_settings', {
   accentColor: text('accent_color').notNull().default('indigo'),
   compactMode: boolean('compact_mode').notNull().default(false),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
+  privacyMode: boolean('privacy_mode').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -103,7 +103,7 @@ function AccountRow({
             </svg>
           </button>
         </div>
-        <span className={`font-mono text-sm font-semibold tabular-nums ${fmt.color}`}>
+        <span className={`font-mono text-sm font-semibold tabular-nums ${fmt.color} financial-value`}>
           {fmt.sign}{fmt.text}
         </span>
       </div>

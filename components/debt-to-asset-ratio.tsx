@@ -84,7 +84,7 @@ export function DebtToAssetRatio() {
 
       <div className="space-y-4">
         <div className="flex items-center gap-4">
-          <div className="text-5xl font-bold text-white">
+          <div className="text-5xl font-bold text-white financial-value">
             {Math.round(data.ratio * 100)}%
           </div>
           <div className={`text-xl font-semibold ${getRatingColor(data.rating)}`}>
@@ -114,13 +114,13 @@ export function DebtToAssetRatio() {
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
           <div>
             <p className="text-xs text-slate-400 mb-1">Total Assets</p>
-            <p className="text-lg font-semibold text-gray-400">
+            <p className="text-lg font-semibold text-gray-400 financial-value">
               ${(data.totalAssets / 1000000).toFixed(2)}M
             </p>
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">Total Liabilities</p>
-            <p className="text-lg font-semibold text-gray-400">
+            <p className="text-lg font-semibold text-gray-400 financial-value">
               ${(data.totalLiabilities / 1000000).toFixed(2)}M
             </p>
           </div>

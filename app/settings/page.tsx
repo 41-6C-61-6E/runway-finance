@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 
 type Connection = {
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [devModeLoading, setDevModeLoading] = useState(false);
+  const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -137,6 +139,7 @@ export default function SettingsPage() {
       .then((res) => res.json())
       .then((data) => setDevMode(data.devMode))
       .catch(() => setDevMode(null));
+    // Privacy mode is managed by PrivacyModeProvider context
   }, [fetchConnections, fetchAccounts]);
 
   const handleToggleDevMode = async () => {
@@ -155,6 +158,10 @@ export default function SettingsPage() {
     } finally {
       setDevModeLoading(false);
     }
+  };
+
+  const handleTogglePrivacyMode = async () => {
+    await togglePrivacyMode();
   };
 
   const handleAddConnection = async (e: React.FormEvent) => {
@@ -314,52 +321,70 @@ export default function SettingsPage() {
       <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
         <div className="max-w-2xl w-full space-y-8">
 
-          {/* Appearance */}
+          {/* Combined Settings */}
           <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Appearance</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Toggle between light and dark theme
-                </p>
+            <h2 className="text-xl font-semibold text-white mb-6">Settings</h2>
+            
+            <div className="space-y-6">
+              {/* Theme */}
+              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+                <div>
+                  <h3 className="text-base font-medium text-white">Theme</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Toggle between light and dark theme
+                  </p>
+                </div>
+                <ModeToggle />
               </div>
-              <ModeToggle />
-            </div>
-          </div>
 
-          {/* Dev Mode Toggle */}
-          <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Developer Mode</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Enable verbose application logs and debugging tools
-                </p>
-              </div>
-              <button
-                onClick={handleToggleDevMode}
-                disabled={devModeLoading}
-                className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${
-                  devMode ? 'bg-blue-600' : 'bg-gray-600'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
-                    devMode ? 'translate-x-7' : 'translate-x-0'
-                  }`}
+              {/* Privacy Mode */}
+              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+                <div>
+                  <h3 className="text-base font-medium text-white">Privacy Mode</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Blur financial data when showing the app to others
+                  </p>
+                </div>
+                <Switch
+                  checked={privacyMode ?? false}
+                  onCheckedChange={handleTogglePrivacyMode}
+                  disabled={privacyModeLoading}
                 />
-              </button>
+              </div>
+
+              {/* Dev Mode */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-medium text-white">Developer Mode</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Enable verbose application logs and debugging tools
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleDevMode}
+                  disabled={devModeLoading}
+                  className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${
+                    devMode ? 'bg-blue-600' : 'bg-gray-600'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
+                      devMode ? 'translate-x-7' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              {devMode === true && (
+                <p className="text-xs text-blue-400 pt-2">
+                  Dev mode is active. Logs will appear in the bottom pane.
+                </p>
+              )}
+              {devMode === false && (
+                <p className="text-xs text-gray-500 pt-2">
+                  Dev mode is disabled. Logs are hidden.
+                </p>
+              )}
             </div>
-            {devMode === true && (
-              <p className="mt-3 text-xs text-blue-400">
-                Dev mode is active. Logs will appear in the bottom pane.
-              </p>
-            )}
-            {devMode === false && (
-              <p className="mt-3 text-xs text-gray-500">
-                Dev mode is disabled. Logs are hidden.
-              </p>
-            )}
           </div>
 
           {/* Existing Connections */}
@@ -554,7 +579,7 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <div className={`font-mono text-sm text-gray-400`}>
+                              <div className={`font-mono text-sm text-gray-400 blur-number`}>
                                 {formatted}
                               </div>
                               <div className="text-xs text-gray-500">{account.currency}</div>

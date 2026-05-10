@@ -25,7 +25,7 @@ services:
       - NEXTAUTH_SECRET=[REMOVED_NEXTAUTH_SECRET]
       - GOOGLE_CLIENT_ID=[REMOVED_GOOGLE_CLIENT_ID]
       - GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
-      - NODE_ENV=production
+      #- NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
       - DATABASE_URL=postgresql://postgres:[REMOVED_DB_PASSWORD]@postgres:5432/runway_finance
       - SYNC_CRON_SCHEDULE=0 */6 * * *

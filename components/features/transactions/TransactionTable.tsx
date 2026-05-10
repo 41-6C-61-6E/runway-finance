@@ -10,26 +10,13 @@ import {
   ColumnDef,
   SortingState,
   VisibilityState,
-  ColumnOrderState,
 } from '@tanstack/react-table';
-import {
-  DndContext,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import { arrayMove, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
   Eye,
   EyeOff,
-  GripVertical,
   Settings2,
 } from 'lucide-react';
 
@@ -78,44 +65,24 @@ function SortableHeader({
   column: any;
   title: string;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: column.id,
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const getSortIcon = () => {
-    if (!column.getCanSort()) return <ChevronsUpDown className="ml-1 h-3 w-3" />;
-    if (column.getIsSorted() === 'asc') return <ChevronUp className="ml-1 h-3 w-3" />;
-    if (column.getIsSorted() === 'desc') return <ChevronDown className="ml-1 h-3 w-3" />;
-    return <ChevronsUpDown className="ml-1 h-3 w-3" />;
-  };
+  const style: React.CSSProperties = {};
 
   return (
     <th
-      className="px-3 py-3 text-left text-gray-400 font-medium whitespace-nowrap"
+      className="px-3 py-2 text-left text-gray-400 font-medium whitespace-nowrap"
       style={style}
     >
-      <div className="flex items-center gap-1">
-        <div
-          ref={setNodeRef}
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0"
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </div>
-        <button
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="flex items-center gap-1 hover:text-white transition-colors"
-        >
-          {title}
-          {getSortIcon()}
-        </button>
-      </div>
+      <button
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="flex items-center gap-1 hover:text-white transition-colors"
+      >
+        {title}
+        {column.getCanSort() && (
+          column.getIsSorted() === 'asc' ? <ChevronUp className="ml-1 h-3 w-3" /> :
+          column.getIsSorted() === 'desc' ? <ChevronDown className="ml-1 h-3 w-3" /> :
+          <ChevronsUpDown className="ml-1 h-3 w-3" />
+        )}
+      </button>
     </th>
   );
 }
@@ -127,7 +94,6 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(ALL_COLUMNS);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     select: true,
     account: true,
@@ -257,8 +223,8 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
           const tx = row.original;
           const isPending = tx.pending;
           return (
-            <div>
-              <span className={`max-w-xs truncate block ${isPending ? 'text-gray-300' : 'text-white'}`}>
+            <div className="truncate max-w-[250px]">
+              <span className={`${isPending ? 'text-gray-300' : 'text-white'}`}>
                 {tx.payee || tx.description}
               </span>
             </div>
@@ -272,7 +238,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
           <SortableHeader column={column} title="Account" />
         ),
         cell: ({ row }) => (
-          <span className="text-gray-400">{row.getValue('accountName') || '—'}</span>
+          <span className="text-gray-400 truncate block max-w-[150px]">{row.getValue('accountName') || '—'}</span>
         ),
         size: 120,
       },
@@ -310,7 +276,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
         cell: ({ row }) => {
           const { text, color } = formatAmount(row.getValue('amount'));
           return (
-            <span className={`text-right font-mono font-medium ${color} block pr-4`}>
+            <span className={`text-right font-mono font-medium ${color} block pr-4 financial-value`}>
               {text}
             </span>
           );
@@ -327,11 +293,9 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
     columns,
     state: {
       sorting,
-      columnOrder,
       columnVisibility,
     },
     onSortingChange: setSorting,
-    onColumnOrderChange: setColumnOrder,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -339,39 +303,10 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
     manualPagination: true,
     pageCount: totalPages,
     enableSortingRemoval: false,
-    columnResizeMode: 'onChange',
   });
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor)
-  );
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (active && over && active.id !== over.id) {
-      setColumnOrder((prev) => {
-        const oldIndex = prev.indexOf(active.id as string);
-        const newIndex = prev.indexOf(over.id as string);
-        return arrayMove(prev, oldIndex, newIndex);
-      });
-    }
-  }, []);
-
-  const toggleColumn = (columnId: string) => {
-    const col = table.getColumn(columnId);
-    if (col) {
-      col.toggleVisibility(!col.getIsVisible());
-    }
-  };
-
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-gray-400">Loading transactions...</div>
         ) : transactions.length === 0 ? (
@@ -399,7 +334,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                 {showColumnMenu && (
                   <div className="absolute right-0 top-full mt-1 w-48 bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl z-50 py-1">
                     <div className="px-3 py-2 text-xs text-gray-500 border-b border-white/5">
-                      Drag to reorder · Click to toggle
+                      Click columns to toggle visibility
                     </div>
                     {ALL_COLUMNS.map((colId) => {
                       const col = table.getColumn(colId);
@@ -407,7 +342,10 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                       return (
                         <button
                           key={colId}
-                          onClick={() => toggleColumn(colId)}
+                          onClick={() => {
+                            const col = table.getColumn(colId);
+                            if (col) col.toggleVisibility(!col.getIsVisible());
+                          }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/5 transition-colors"
                         >
                           {isVisible ? (
@@ -439,28 +377,15 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                         return (
                           <th
                             key={header.id}
-                            className="relative px-3 py-3 text-left text-gray-400 font-medium"
+                            className="px-3 py-2 text-left text-gray-400 font-medium"
                             style={{ width: header.getSize(), minWidth: header.getSize() }}
                           >
-                            <div className="flex items-center gap-1">
-                              <div className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0">
-                                <GripVertical className="h-3.5 w-3.5" />
-                              </div>
-                              <button
-                                onClick={() => header.column.toggleSorting(header.column.getIsSorted() === 'asc')}
-                                className="flex items-center gap-1 hover:text-white transition-colors"
-                              >
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                              </button>
-                            </div>
-                            {/* Resize handle */}
-                            <div
-                              {...{
-                                onMouseDown: header.getResizeHandler(),
-                                onTouchStart: header.getResizeHandler(),
-                                className: 'absolute top-0 right-0 w-2 h-full cursor-col-resize touch-none bg-blue-500/30 hover:bg-blue-500/60 transition-colors opacity-0 hover:opacity-100 group-hover:opacity-50',
-                              }}
-                            />
+                            <button
+                              onClick={() => header.column.toggleSorting(header.column.getIsSorted() === 'asc')}
+                              className="flex items-center gap-1 hover:text-white transition-colors"
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </button>
                           </th>
                         );
                       })}
@@ -473,14 +398,14 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                     return (
                       <tr
                         key={row.id}
-                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer h-10 group ${
+                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group ${
                           isPending ? 'bg-amber-400/[0.03]' : ''
                         }`}
                       >
                       {row.getVisibleCells().map((cell) => (
                         <td
                           key={cell.id}
-                          className="px-3 py-0 overflow-hidden"
+                          className="px-3 py-1 overflow-hidden"
                           style={{ width: cell.column.getSize(), minWidth: cell.column.getSize() }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -520,6 +445,5 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
           </>
         )}
       </div>
-    </DndContext>
   );
 }

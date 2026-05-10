@@ -100,7 +100,7 @@ function AccountRow({
             {account.isExcludedFromNetWorth ? <Ban className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
           </button>
         </div>
-        <span className={`font-mono text-sm font-semibold tabular-nums ${fmt.color}`}>
+        <span className={`font-mono text-sm font-semibold tabular-nums blur-number ${fmt.color}`}>
           {fmt.sign}{fmt.text}
         </span>
       </div>
@@ -305,7 +305,7 @@ export default function AccountsSidebar() {
         {/* Net Worth Header */}
         <div className="p-3 border-b border-white/5">
           <div className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Net Worth</div>
-          <div className={`font-mono text-lg font-bold truncate ${fmt.color}`}>
+          <div className={`font-mono text-lg font-bold truncate blur-number ${fmt.color}`}>
             {fmt.text}
           </div>
         </div>
@@ -334,7 +334,7 @@ export default function AccountsSidebar() {
                     <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider flex-1 truncate">
                       {group}
                     </span>
-                    <span className={`font-mono text-sm font-semibold ${groupFmt.color}`}>
+                    <span className={`font-mono text-sm font-semibold blur-number ${groupFmt.color}`}>
                       {groupFmt.sign}{groupFmt.text}
                     </span>
                   </button>
@@ -358,7 +358,7 @@ export default function AccountsSidebar() {
                             <ChevronRight className="w-2.5 h-2.5 text-gray-600 flex-shrink-0" />
                           )}
                           <span className="text-sm text-gray-500 flex-1 truncate">{subGroup}</span>
-                          <span className={`font-mono text-sm ${subGroupFmt.color}`}>
+                          <span className={`font-mono text-sm blur-number ${subGroupFmt.color}`}>
                             {subGroupFmt.sign}{subGroupFmt.text}
                           </span>
                         </button>

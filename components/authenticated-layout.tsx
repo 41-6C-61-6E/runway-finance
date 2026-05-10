@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import AccountsSidebar from '@/components/accounts-sidebar';
 import ResizableSidebar from '@/components/resizable-sidebar';
 import { useSidebar, SidebarProvider } from '@/components/sidebar-context';
+import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { ReactNode } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -17,13 +18,15 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <>
-        <ResizableSidebar />
-        {!isSettingsPage && <AccountsSidebar />}
-        <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
-          {children}
-        </AuthenticatedLayoutContent>
-      </>
+      <PrivacyModeProvider>
+        <>
+          <ResizableSidebar />
+          {!isSettingsPage && <AccountsSidebar />}
+          <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
+            {children}
+          </AuthenticatedLayoutContent>
+        </>
+      </PrivacyModeProvider>
     </SidebarProvider>
   );
 }

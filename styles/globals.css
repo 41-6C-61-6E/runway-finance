@@ -139,3 +139,25 @@ body,
   --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
 }
+
+
+
+/* ── Privacy Mode ─────────────────────────────────────────────────────────── */
+.privacy-mode-active .financial-value {
+  filter: blur(18px);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.privacy-mode-active .blur-number {
+  filter: blur(18px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Chart containers get a wrapper blur instead of ::after */
+.privacy-mode-active .financial-chart {
+  filter: blur(18px);
+  user-select: none;
+  -webkit-user-select: none;
+}
