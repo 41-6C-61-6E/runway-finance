@@ -15,6 +15,20 @@
       "when": 1778110761751,
       "tag": "0001_account_snapshots_and_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778110761752,
+      "tag": "0002_add_is_synthetic_to_account_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778110761753,
+      "tag": "0003_add_privacy_mode",
+      "breakpoints": true
     }
   ]
 }

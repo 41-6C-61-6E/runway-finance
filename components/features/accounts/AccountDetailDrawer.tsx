@@ -78,7 +78,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           {/* Balance display */}
           <div className="p-4 bg-white/5 rounded-xl border border-white/10">
             <div className="text-sm text-gray-400">Current Balance</div>
-            <div className={`font-mono text-2xl font-bold mt-1 ${color}`}>{text}</div>
+            <div className={`font-mono text-2xl font-bold mt-1 ${color} financial-value`}>{text}</div>
             <div className="text-xs text-gray-500 mt-1">{account.currency}</div>
           </div>
 

@@ -25,7 +25,7 @@ services:
       - NEXTAUTH_SECRET=super-secret-key-for-dev-only-change-in-production
       - GOOGLE_CLIENT_ID=172398384702-vu31bbe5ojj8sdmppagk0quf4bl7ipa9.apps.googleusercontent.com
       - GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
-      - NODE_ENV=production
+      #- NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
       - DATABASE_URL=postgresql://postgres:postgresdev@postgres:5432/runway_finance
       - SYNC_CRON_SCHEDULE=0 */6 * * *

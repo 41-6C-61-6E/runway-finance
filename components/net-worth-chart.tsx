@@ -93,20 +93,20 @@ export function NetWorthChart() {
           <div className="flex-1">
             <h2 className="text-sm font-medium text-slate-400 mb-2">Your net worth</h2>
             <div className="flex items-baseline gap-2">
-              <div className="text-4xl font-bold text-white">
+              <div className="text-4xl font-bold text-white blur-number">
                 {summary ? formatCurrency(summary.current) : '$0'}
               </div>
             </div>
             {summary && (
               <div className="flex items-center gap-1 mt-3">
                 <span
-                  className={`text-sm font-semibold text-gray-400`}
+                  className={`text-sm font-semibold text-gray-400 blur-number`}
                 >
                   {isPositiveChange ? '+' : ''}
                   {formatCurrency(summary.change)}
                 </span>
                 <span
-                  className={`text-xs text-gray-400`}
+                  className={`text-xs text-gray-400 blur-number`}
                 >
                   ({formatPercent(summary.percentChange)})
                 </span>
@@ -172,7 +172,8 @@ export function NetWorthChart() {
         </div>
       ) : (
         <div className="h-80 w-full overflow-hidden">
-          <ResponsiveContainer width="100%" height="100%">
+            <div className="financial-chart h-full">
+              <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 40 }}>
               <CartesianGrid 
                 strokeDasharray="3 3" 
@@ -226,6 +227,7 @@ export function NetWorthChart() {
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
 
@@ -237,13 +239,13 @@ export function NetWorthChart() {
               <>
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Total Assets</p>
-                  <p className="text-lg font-semibold text-gray-400">
+                  <p className="text-lg font-semibold text-gray-400 blur-number">
                     {formatCurrency(summary.current + summary.change)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Avg. Change</p>
-                  <p className="text-lg font-semibold text-gray-400">
+                  <p className="text-lg font-semibold text-gray-400 blur-number">
                     {formatCurrency(summary.change / Math.max(data.length, 1))}
                   </p>
                 </div>
