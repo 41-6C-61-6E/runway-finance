@@ -32,11 +32,12 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 }
 
 function AuthenticatedLayoutContent({ children, isSettingsPage }: { children: ReactNode; isSettingsPage: boolean }) {
-  const { accountsWidth } = useSidebar();
+  const { accountsWidth, accountsCollapsed } = useSidebar();
+  const marginLeft = isSettingsPage ? '64px' : accountsCollapsed ? '64px' : `${64 + accountsWidth}px`;
 
   return (
     <>
-      <div style={{ marginLeft: isSettingsPage ? '64px' : `${64 + accountsWidth}px` }}>
+      <div style={{ marginLeft }}>
         {children}
       </div>
     </>

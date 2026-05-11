@@ -1,7 +1,7 @@
 ## TO DO LIST
 
 BUGS:
-- Import transactions all have same date
+- 
 
 CHANGES:
 - Interface flattening
@@ -28,7 +28,7 @@ FOR THE FRONTIER MODELS:
     - Silver - API
     - Other Asset - Manual
 
-- Help me plan a categories and rules engine. Hierarchical categories with system defaults, seeded per user on first login. There should be an area in the settings page to manage categories. The user can edit catogories in the transacitons area for individual transacitons. there should be a rules section in the settings area that can be used to set up
+- Help me create a categories and rules engine. Hierarchical categories with system defaults, seeded per user on first login. There should be an area in the settings page to manage categories. The user can edit catogories in the transacitons area for individual transacitons. there should be a rules section in the settings area that can be used to set up rules that categorize tranactions and during sync those rules should run. Prepopulate with an assortment of categories a typical personal finance app might have, but allow the user a ways to manage and configure new categories. On the transactions page, clicking a transaciton should open a drawer that allows the user to see and edit detailed transaciton data including the category. 
 
 - FI number and year-by-year projection using live burn rate data.
 
