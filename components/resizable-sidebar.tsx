@@ -4,14 +4,16 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { Home, Receipt, Settings, Key, LogOut } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: Home },
+  { href: '/', label: 'Net Worth', icon: ChartSpline },
+  { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp },
+  { href: '/fire', label: 'FIRE', icon: Flame },
   { href: '/transactions', label: 'Transactions', icon: Receipt },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
@@ -97,14 +99,13 @@ export default function ResizableSidebar() {
         <div className={isCollapsed ? 'flex justify-center pt-4 pb-2' : 'px-4 pt-4 pb-3'}>
           {isCollapsed ? (
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-primary" />
+              <span className="text-primary font-bold text-sm">$</span>
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-                <div className="w-3.5 h-3.5 rounded-full bg-primary" />
+                <span className="text-primary font-bold text-xs">$</span>
               </div>
-              <span className="text-sm font-semibold text-sidebar-foreground">Runway</span>
             </div>
           )}
         </div>

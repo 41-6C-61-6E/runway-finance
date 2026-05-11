@@ -106,6 +106,11 @@ export default function ManualAccountsSection() {
   const [deleteAccount, setDeleteAccount] = useState<ManualAccount | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const [editAccount, setEditAccount] = useState<ManualAccount | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editMeta, setEditMeta] = useState<Record<string, string>>({});
+  const [editLoading, setEditLoading] = useState(false);
+
   const fetchAccounts = useCallback(async () => {
     try {
       const res = await fetch('/api/manual-accounts', { credentials: 'include' });
@@ -252,6 +257,59 @@ export default function ManualAccountsSection() {
       setError('Failed to delete account');
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const openEdit = (account: ManualAccount) => {
+    setEditAccount(account);
+    setEditName(account.name);
+    const meta = account.metadata ?? {};
+    const flat: Record<string, string> = {};
+    for (const [k, v] of Object.entries(meta)) {
+      flat[k] = String(v ?? '');
+    }
+    setEditMeta(flat);
+    setError('');
+  };
+
+  const handleEdit = async () => {
+    if (!editAccount) return;
+    setEditLoading(true);
+    setError('');
+    try {
+      const metadata: Record<string, unknown> = { ...editMeta };
+      if (editAccount.type === 'metals') {
+        metadata.subType = (editMeta.subType || 'gold');
+        metadata.amountOz = parseFloat(editMeta.amountOz || '0');
+      }
+      if (editAccount.type === 'realestate') {
+        metadata.propertyId = editMeta.propertyId || '';
+      }
+      if (editAccount.type === 'crypto') {
+        metadata.xpub = editMeta.xpub || '';
+      }
+      if (editAccount.type === 'otherAsset') {
+        metadata.description = editMeta.description || '';
+      }
+
+      const res = await fetch(`/api/manual-accounts/${editAccount.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editName, metadata }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to update account');
+      }
+
+      setEditAccount(null);
+      await fetchAccounts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -443,6 +501,12 @@ export default function ManualAccountsSection() {
                       </button>
                     )}
                     <button
+                      onClick={() => openEdit(account)}
+                      className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
                       onClick={() => setDeleteAccount(account)}
                       className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
                     >
@@ -558,6 +622,109 @@ export default function ManualAccountsSection() {
               className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
             >
               {adjustLoading ? 'Saving...' : 'Save'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null); setError(''); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Asset</DialogTitle>
+            <DialogDescription>Update the details for {editAccount?.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Asset name"
+                required
+              />
+            </div>
+
+            {editAccount?.type === 'realestate' && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
+                <Input
+                  value={editMeta.propertyId || ''}
+                  onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
+                  placeholder="e.g., 446533"
+                />
+              </div>
+            )}
+
+            {editAccount?.type === 'vehicle' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Make</label>
+                  <Input
+                    value={editMeta.make || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, make: e.target.value }))}
+                    placeholder="e.g., Toyota"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Model</label>
+                  <Input
+                    value={editMeta.model || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, model: e.target.value }))}
+                    placeholder="e.g., Camry"
+                  />
+                </div>
+              </>
+            )}
+
+            {editAccount?.type === 'crypto' && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Bitcoin xpub / Address</label>
+                <Input
+                  value={editMeta.xpub || ''}
+                  onChange={(e) => setEditMeta((m) => ({ ...m, xpub: e.target.value }))}
+                  placeholder="e.g., wpkh(xpub...)"
+                />
+              </div>
+            )}
+
+            {editAccount?.type === 'metals' && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Amount (oz)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editMeta.amountOz || ''}
+                  onChange={(e) => setEditMeta((m) => ({ ...m, amountOz: e.target.value }))}
+                  placeholder="e.g., 10.5"
+                />
+              </div>
+            )}
+
+            {editAccount?.type === 'otherAsset' && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                <Input
+                  value={editMeta.description || ''}
+                  onChange={(e) => setEditMeta((m) => ({ ...m, description: e.target.value }))}
+                  placeholder="e.g., Art collection"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setEditAccount(null)}
+              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleEdit}
+              disabled={editLoading || !editName.trim()}
+              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {editLoading ? 'Saving...' : 'Save'}
             </button>
           </DialogFooter>
         </DialogContent>

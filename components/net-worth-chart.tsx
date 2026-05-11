@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ResponsiveLine } from '@nivo/line';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
@@ -37,6 +37,30 @@ const timeframeOptions: { label: string; value: TimeFrame }[] = [
   { label: 'All', value: 'all' },
 ];
 
+const nivoTheme = {
+  background: 'transparent',
+  text: { fill: 'var(--color-foreground)', fontSize: 11 },
+  axis: {
+    domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
+    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)' } },
+  },
+  grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3' } },
+  crosshair: { line: { stroke: 'var(--color-ring)', strokeWidth: 1 } },
+  tooltip: {
+    container: {
+      background: 'var(--color-card)',
+      border: '1px solid var(--color-border)',
+      borderRadius: '0.5rem',
+      boxShadow: '0 4px 12px var(--color-border)',
+      color: 'var(--color-foreground)',
+      fontSize: '12px',
+    },
+  },
+  legends: {
+    text: { fill: 'var(--color-muted-foreground)', fontSize: 11 },
+  },
+};
+
 export function NetWorthChart() {
   const [timeframe, setTimeframe] = useState<TimeFrame>('1y');
   const [includeExcluded, setIncludeExcluded] = useState(false);
@@ -71,16 +95,19 @@ export function NetWorthChart() {
     fetchData();
   }, [timeframe, includeExcluded]);
 
-  const chartData = data.map((point) => ({
-    date: new Date(point.date).toLocaleDateString('en-US', { 
-      month: 'short',
-      day: 'numeric',
-      year: '2-digit'
-    }),
-    'Net Worth': point.netWorth,
-    'Total Assets': point.totalAssets,
-    'Total Liabilities': point.totalLiabilities,
-  }));
+  const nivoData = data.length > 0
+    ? [{
+        id: 'Net Worth',
+        data: data.map((point) => ({
+          x: new Date(point.date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: '2-digit',
+          }),
+          y: point.netWorth,
+        })),
+      }]
+    : [];
 
   const isPositiveChange = summary ? summary.change >= 0 : false;
 
@@ -171,52 +198,40 @@ export function NetWorthChart() {
       ) : (
         <div className="h-72 px-2 pb-2">
           <div className="financial-chart h-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="var(--color-border)" 
-                  vertical={false}
-                />
-                <XAxis 
-                  dataKey="date"
-                  stroke="var(--color-muted-foreground)"
-                  style={{ fontSize: '11px' }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis 
-                  stroke="var(--color-muted-foreground)"
-                  style={{ fontSize: '11px' }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => {
-                    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-                    return `$${value}`;
-                  }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--color-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 4px 12px var(--color-border)',
-                  }}
-                  labelStyle={{ color: 'var(--color-foreground)' }}
-                  formatter={(value: number) => [formatCurrency(value), '']}
-                  cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1.5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Net Worth"
-                  stroke="var(--color-primary)"
-                  strokeWidth={2.5}
-                  dot={false}
-                  isAnimationActive={true}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <ResponsiveLine
+              data={nivoData}
+              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+              xScale={{ type: 'point' }}
+              yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+              curve="monotoneX"
+              enableArea={true}
+              areaOpacity={0.15}
+              colors={['var(--color-primary)']}
+              lineWidth={2.5}
+              enablePoints={false}
+              enableGridX={false}
+              axisBottom={{
+                tickSize: 0,
+                tickPadding: 8,
+              }}
+              axisLeft={{
+                tickSize: 0,
+                tickPadding: 8,
+                format: (v) => {
+                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                  return `$${v}`;
+                },
+              }}
+              theme={nivoTheme}
+              useMesh={true}
+              tooltip={({ point }) => (
+                <div>
+                  <strong>{String(point.data.xFormatted)}</strong><br />
+                  {formatCurrency(Number(point.data.y))}
+                </div>
+              )}
+            />
           </div>
         </div>
       )}
