@@ -10,7 +10,7 @@ import { Analytics } from '@vercel/analytics/next';
 export default function ClientLayout({ children }: { children: ReactNode }) {
   return (
     <ReactQueryProvider>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="dark" attribute="data-theme">
         <SessionProvider>
           <Suspense fallback={null}>
             <main>{children}</main>

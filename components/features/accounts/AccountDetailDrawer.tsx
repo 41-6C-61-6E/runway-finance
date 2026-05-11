@@ -14,6 +14,7 @@ type Account = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 interface AccountDetailDrawerProps {
@@ -105,6 +106,11 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                 <option value="credit">Credit Card</option>
                 <option value="investment">Investment</option>
                 <option value="loan">Loan</option>
+                <option value="realestate">Real Estate</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="crypto">Bitcoin / Crypto</option>
+                <option value="metals">Metals</option>
+                <option value="otherAsset">Other Asset</option>
                 <option value="other">Other</option>
               </select>
             </div>
@@ -122,6 +128,19 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                 </div>
               </div>
             </div>
+
+            {/* Metadata display for manual accounts */}
+            {account.metadata && Object.keys(account.metadata).length > 0 && (
+              <div className="p-3 bg-muted/30 border border-border rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">Asset Details</div>
+                {Object.entries(account.metadata).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                    <span className="text-foreground font-mono text-xs">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Toggles */}
             <div className="space-y-3 pt-1">

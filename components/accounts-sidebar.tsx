@@ -27,7 +27,7 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
   brokerage:  { group: 'Investments',   subGroup: 'Brokerage' },
   retirement: { group: 'Investments',   subGroup: 'Retirement' },
   529:        { group: 'Investments',   subGroup: '529 Account' },
-  otherAsset: { group: 'Investments',   subGroup: 'Other Assets' },
+  otherAsset: { group: 'Assets',        subGroup: 'Other Assets' },
   vehicle:    { group: 'Assets',        subGroup: 'Vehicles' },
   crypto:     { group: 'Assets',        subGroup: 'Crypto Currency' },
   metals:     { group: 'Assets',        subGroup: 'Metals' },
@@ -39,7 +39,7 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities' },
 };
 
-const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities'];
+const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities', 'Assets'];
 
 function getHierarchy(accountType: string) {
   return TYPE_HIERARCHY[accountType] ?? { group: 'Other', subGroup: 'Other' };
