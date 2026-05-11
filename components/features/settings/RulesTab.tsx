@@ -75,6 +75,7 @@ export default function RulesTab() {
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSystemRules, setShowSystemRules] = useState(true);
   const [systemToggling, setSystemToggling] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -89,9 +90,13 @@ export default function RulesTab() {
     [systemRules]
   );
   const filteredRules = useMemo(() => {
-    if (!searchQuery.trim()) return rules;
+    let result = rules;
+    if (!showSystemRules) {
+      result = result.filter((r) => !r.isSystem);
+    }
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase();
-    return rules.filter((r) => {
+    return result.filter((r) => {
       const cat = r.setCategoryId ? getCategoryName(r.setCategoryId) : null;
       const catName = cat ? cat.name.toLowerCase() : '';
       return (
@@ -100,7 +105,7 @@ export default function RulesTab() {
         catName.includes(q)
       );
     });
-  }, [rules, searchQuery, categories]);
+  }, [rules, searchQuery, categories, showSystemRules]);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -383,16 +388,23 @@ export default function RulesTab() {
             placeholder="Search rules by name, keyword, or category..."
           />
         </div>
-        {systemRules.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">System Rules</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">Show System</span>
+            <Switch
+              checked={showSystemRules}
+              onCheckedChange={setShowSystemRules}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">Enable System</span>
             <Switch
               checked={systemRulesAllActive}
               onCheckedChange={handleToggleSystemRules}
               disabled={systemToggling}
             />
           </div>
-        )}
+        </div>
       </div>
 
       {filteredRules.length === 0 && (

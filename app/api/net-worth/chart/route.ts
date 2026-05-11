@@ -91,7 +91,7 @@ export async function GET(request: Request) {
       const entry = balancesByDate.get(dateStr) ?? { assets: 0, liabilities: 0 };
 
       const accountType = account.type.toLowerCase();
-      if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(accountType)) {
+      if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
         entry.assets += balance;
       } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
         entry.liabilities += Math.abs(balance);
@@ -122,7 +122,7 @@ export async function GET(request: Request) {
 
         const balance = parseFloat(acc.balance.toString());
         
-        if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(acc.type.toLowerCase())) {
+        if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(acc.type.toLowerCase())) {
           totalAssets += balance;
         } 
         else if (['credit', 'loan', 'mortgage'].includes(acc.type.toLowerCase())) {

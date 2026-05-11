@@ -13,6 +13,7 @@ import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDra
 import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
 import AccentPicker from '@/components/features/settings/AccentPicker';
+import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
 
 type Connection = {
   id: string;
@@ -577,6 +578,7 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+
         </>
       )}
 
@@ -587,6 +589,7 @@ export default function SettingsPage() {
       )}
 
       {activeTab === 'accounts' && (
+        <>
         <div className="p-5 bg-card border border-border rounded-xl">
           <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
           <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
@@ -725,6 +728,11 @@ export default function SettingsPage() {
               );
             })()}
         </div>
+
+          <div className="mt-6">
+            <ManualAccountsSection />
+          </div>
+        </>
       )}
 
       {activeTab === 'rules' && (

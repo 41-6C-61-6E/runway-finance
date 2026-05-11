@@ -35,7 +35,7 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
     const accountType = acc.type.toLowerCase();
 
     // Categorize assets vs liabilities
-    if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate'].includes(accountType)) {
+    if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
       totalAssets += balance;
     } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
       totalLiabilities += Math.abs(balance);

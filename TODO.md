@@ -10,7 +10,6 @@ CHANGES:
 
 NEW FEATUES:
 - Add debt to Asset ratio and asset breakdown graphics to net worth page
-- semantic versioning system
 - account values over time
 - Account summary widget at top of accounts area
 - spending summary by month

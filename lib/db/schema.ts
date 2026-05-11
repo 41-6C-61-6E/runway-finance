@@ -105,7 +105,8 @@ export const accounts = pgTable(
     currency: text('currency').notNull().default('USD'),
     balance: numeric('balance', { precision: 20, scale: 4 }).notNull().default('0'),
     balanceDate: timestamp('balance_date', { withTimezone: true }),
-    type: text('type').notNull(), // 'checking'|'savings'|'credit'|'investment'|'loan'|'other'
+    type: text('type').notNull(), // 'checking'|'savings'|'credit'|'investment'|'loan'|'other'|'realestate'|'vehicle'|'crypto'|'metals'|'otherAsset'
+    metadata: jsonb('metadata'), // Type-specific config: {propertyId, xpub, amountOz, subType, etc.}
     institution: text('institution'),
     isHidden: boolean('is_hidden').notNull().default(false),
     isExcludedFromNetWorth: boolean('is_excluded_from_net_worth').notNull().default(false),
@@ -190,33 +191,6 @@ export const categoryRules = pgTable('category_rules', {
   isSystem: boolean('is_system').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ── Manual Assets ────────────────────────────────────────────────────────────
-export const manualAssets = pgTable('manual_assets', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  name: text('name').notNull(),
-  assetType: text('asset_type').notNull(),
-  isLiability: boolean('is_liability').notNull().default(false),
-  value: numeric('value', { precision: 20, scale: 4 }).notNull(),
-  currency: text('currency').notNull().default('USD'),
-  institution: text('institution'),
-  notes: text('notes'),
-  isExcludedFromNetWorth: boolean('is_excluded_from_net_worth').notNull().default(false),
-  displayOrder: integer('display_order').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const manualAssetValueHistory = pgTable('manual_asset_value_history', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  assetId: uuid('asset_id')
-    .notNull()
-    .references(() => manualAssets.id, { onDelete: 'cascade' }),
-  value: numeric('value', { precision: 20, scale: 4 }).notNull(),
-  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
-  note: text('note'),
 });
 
 // ── Net Worth Snapshots ──────────────────────────────────────────────────────

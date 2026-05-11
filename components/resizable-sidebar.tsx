@@ -141,7 +141,7 @@ export default function ResizableSidebar() {
         {session?.user && (
           <div className={isCollapsed ? 'space-y-2 pb-4 flex flex-col items-center' : 'space-y-3 p-3'}>
             {!isCollapsed && appStatus && (
-              <div className="px-3 py-2.5 bg-sidebar-accent/50 rounded-lg border border-sidebar-border space-y-1.5">
+              <div className="px-3 py-2.5 rounded-lg border border-sidebar-border space-y-1.5">
                 <div className="text-xs text-sidebar-foreground/50 font-medium">Status</div>
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
@@ -174,7 +174,7 @@ export default function ResizableSidebar() {
                 <button
                   type="button"
                   onClick={() => setChangePasswordOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-sidebar-foreground/70 bg-sidebar-accent/50 hover:bg-sidebar-accent rounded-lg border border-sidebar-border transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent rounded-lg border border-sidebar-border transition-all"
                 >
                   <Key className="h-4 w-4" />
                   Change Password
