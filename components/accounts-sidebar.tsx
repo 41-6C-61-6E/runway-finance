@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Eye, EyeOff, Ban, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft, Eye, EyeOff, Ban, Plus } from 'lucide-react';
 import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 
@@ -111,7 +111,7 @@ function AccountRow({
 // ── Main Component ──
 export default function AccountsSidebar() {
   const [isResizing, setIsResizing] = useState(false);
-  const { sidebarWidth, accountsWidth, setAccountsWidth } = useSidebar();
+  const { sidebarWidth, accountsWidth, setAccountsWidth, accountsCollapsed, toggleAccountsCollapsed } = useSidebar();
   const startXRef = useRef(0);
   const startWidthRef = useRef(accountsWidth);
 
@@ -269,6 +269,20 @@ export default function AccountsSidebar() {
 
   const fmt = formatCurrency(String(totalNetWorth), 'USD');
 
+  // Collapsed state: show only expand button
+  if (accountsCollapsed) {
+    return (
+      <button
+        onClick={toggleAccountsCollapsed}
+        className="fixed top-0 z-40 flex items-center justify-center w-6 h-10 mt-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-r-md hover:bg-white/10 transition-colors text-gray-400 hover:text-white cursor-pointer"
+        style={{ left: `${sidebarWidth}px` }}
+        title="Expand accounts sidebar"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    );
+  }
+
   // Empty state
   if (accounts.length === 0) {
     return (
@@ -277,7 +291,16 @@ export default function AccountsSidebar() {
           className="fixed top-0 h-screen bg-black/20 backdrop-blur-md border-r border-white/10 flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10"
           style={{ left: `${COLLAPSED_WIDTH}px`, width: `${accountsWidth}px` }}
         >
-          <div className="text-sm text-gray-500 text-center py-8">No accounts</div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500 text-center py-8">No accounts</div>
+            <button
+              onClick={toggleAccountsCollapsed}
+              className="p-1 rounded hover:bg-white/10 transition-colors text-gray-500 hover:text-gray-300 cursor-pointer"
+              title="Collapse accounts sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
         </aside>
         <div
           className="fixed top-0 z-30 cursor-col-resize"
@@ -304,7 +327,16 @@ export default function AccountsSidebar() {
       >
         {/* Net Worth Header */}
         <div className="p-3 border-b border-white/5">
-          <div className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Net Worth</div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-medium text-gray-400 uppercase tracking-wider">Net Worth</div>
+            <button
+              onClick={toggleAccountsCollapsed}
+              className="p-1 rounded hover:bg-white/10 transition-colors text-gray-500 hover:text-gray-300 cursor-pointer"
+              title="Collapse accounts sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
           <div className={`font-mono text-lg font-bold truncate blur-number ${fmt.color}`}>
             {fmt.text}
           </div>

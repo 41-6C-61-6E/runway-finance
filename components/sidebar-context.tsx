@@ -17,6 +17,8 @@ export const SidebarContext = createContext<{
   isHovering: boolean;
   accountsWidth: number;
   setAccountsWidth: (width: number) => void;
+  accountsCollapsed: boolean;
+  toggleAccountsCollapsed: () => void;
   handleNavResizeDown: (e: React.MouseEvent) => void;
   handleMouseEnter: () => void;
   handleMouseLeave: () => void;
@@ -26,6 +28,8 @@ export const SidebarContext = createContext<{
   isHovering: false,
   accountsWidth: ACCOUNTS_DEFAULT_WIDTH,
   setAccountsWidth: () => {},
+  accountsCollapsed: false,
+  toggleAccountsCollapsed: () => {},
   handleNavResizeDown: () => {},
   handleMouseEnter: () => {},
   handleMouseLeave: () => {},
@@ -38,6 +42,7 @@ export function useSidebar() {
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
+  const [accountsCollapsed, setAccountsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [forceExpanded, setForceExpanded] = useState(false);
@@ -99,6 +104,10 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  const toggleAccountsCollapsed = useCallback(() => {
+    setAccountsCollapsed((prev) => !prev);
+  }, []);
+
   return (
     <SidebarContext.Provider
       value={{
@@ -107,6 +116,8 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
         isHovering,
         accountsWidth,
         setAccountsWidth,
+        accountsCollapsed,
+        toggleAccountsCollapsed,
         handleNavResizeDown: handleMouseDown,
         handleMouseEnter,
         handleMouseLeave,
