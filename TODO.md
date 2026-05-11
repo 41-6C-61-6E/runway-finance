@@ -4,8 +4,8 @@ BUGS:
 - 
 
 CHANGES:
-- Interface flattening
-- Move account management section in settings to its own tab
+- 
+
 
 
 NEW FEATUES:

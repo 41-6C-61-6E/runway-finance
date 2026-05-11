@@ -4,11 +4,10 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { Home, Receipt, Settings, Key } from 'lucide-react'
+import { Home, Receipt, Settings, Key, LogOut } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 
-// Export hooks for backward compatibility
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
 const navItems = [
@@ -16,6 +15,18 @@ const navItems = [
   { href: '/transactions', label: 'Transactions', icon: Receipt },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
+
+function SimpleTooltip({ children, label, show }: { children: React.ReactNode; label: string; show: boolean }) {
+  if (!show) return <>{children}</>
+  return (
+    <div className="relative group/tooltip">
+      {children}
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-foreground/10 backdrop-blur-md text-foreground text-xs font-medium rounded-md border border-border whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-150 z-50 pointer-events-none shadow-lg">
+        {label}
+      </div>
+    </div>
+  )
+}
 
 export default function ResizableSidebar() {
   const pathname = usePathname()
@@ -30,6 +41,7 @@ export default function ResizableSidebar() {
     accounts: number
     transactions: number
   } | null>(null)
+
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -71,100 +83,128 @@ export default function ResizableSidebar() {
   }
 
   const isActive = (href: string) => pathname === href
+  const isCollapsed = sidebarWidth === COLLAPSED_WIDTH
 
   return (
     <>
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="fixed left-0 top-0 z-20 h-screen bg-black/20 backdrop-blur-md border-r border-white/10 flex flex-col justify-between transition-all duration-200"
+        className="fixed left-0 top-0 z-20 h-screen backdrop-blur-md border-r flex flex-col justify-between transition-all duration-200 bg-sidebar/80 dark:bg-sidebar/80 border-sidebar-border"
         style={{ width: `${sidebarWidth}px` }}
       >
-        <div className="space-y-6">
-          {/* Navigation Links */}
-          <nav className="space-y-2 px-2 pt-4">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActiveItem = isActive(item.href)
-              return (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-lg transition-colors ${
-                    sidebarWidth === COLLAPSED_WIDTH
-                      ? 'justify-center px-2 py-2'
-                      : `px-3 py-2 text-sm font-medium ${
-                          isActiveItem
-                            ? 'text-white bg-white/10'
-                            : 'text-gray-300 hover:text-white hover:bg-white/10'
-                        }`
-                  } ${
-                    isActiveItem && sidebarWidth === COLLAPSED_WIDTH
-                      ? 'text-white bg-white/10'
-                      : isActiveItem && sidebarWidth !== COLLAPSED_WIDTH
-                      ? 'text-white bg-white/10'
-                      : 'text-gray-300 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={item.label}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  {sidebarWidth !== COLLAPSED_WIDTH && <span className="truncate">{item.label}</span>}
-                </a>
-              )
-            })}
-          </nav>
+        {/* Logo / Brand */}
+        <div className={isCollapsed ? 'flex justify-center pt-4 pb-2' : 'px-4 pt-4 pb-3'}>
+          {isCollapsed ? (
+            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+              <div className="w-4 h-4 rounded-full bg-primary" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
+                <div className="w-3.5 h-3.5 rounded-full bg-primary" />
+              </div>
+              <span className="text-sm font-semibold text-sidebar-foreground">Runway</span>
+            </div>
+          )}
         </div>
 
-        {/* App Status */}
-        {session?.user && sidebarWidth !== COLLAPSED_WIDTH && (
-          <div className="space-y-4 p-6">
-            <div className="px-3 py-2 bg-white/5 rounded-lg border border-white/10 space-y-2">
-              <div className="text-xs text-gray-500 font-medium">App Status</div>
-              {appStatus && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      appStatus.connected
-                        ? appStatus.lastSyncStatus === 'ok'
-                          ? 'bg-emerald-400'
-                          : appStatus.lastSyncStatus === 'error'
-                          ? 'bg-red-400'
-                          : 'bg-yellow-400'
-                        : 'bg-gray-600'
-                    }`} />
-                    <span className="text-xs text-gray-400">
-                      {appStatus.connected ? 'Bridge connected' : 'No bridge'}
-                    </span>
+        {/* Navigation Links */}
+        <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-1' : 'px-2 space-y-0.5'}`}>
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.href)
+            return (
+              <SimpleTooltip key={item.href} label={item.label} show={isCollapsed}>
+                <a
+                  href={item.href}
+                  className={`flex items-center rounded-lg transition-all duration-150 ${
+                    isCollapsed
+                      ? 'justify-center py-2.5'
+                      : 'px-3 py-2 gap-3'
+                  } ${
+                    active
+                      ? 'bg-primary/15 text-primary font-medium'
+                      : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                  }`}
+                  title={isCollapsed ? item.label : undefined}
+                >
+                  <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
+                  {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
+                </a>
+              </SimpleTooltip>
+            )
+          })}
+        </nav>
+
+        {/* Bottom section */}
+        {session?.user && (
+          <div className={isCollapsed ? 'space-y-2 pb-4 flex flex-col items-center' : 'space-y-3 p-3'}>
+            {!isCollapsed && appStatus && (
+              <div className="px-3 py-2.5 bg-sidebar-accent/50 rounded-lg border border-sidebar-border space-y-1.5">
+                <div className="text-xs text-sidebar-foreground/50 font-medium">Status</div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    appStatus.connected
+                      ? appStatus.lastSyncStatus === 'ok'
+                        ? 'bg-chart-1'
+                        : appStatus.lastSyncStatus === 'error'
+                        ? 'bg-destructive'
+                        : 'bg-chart-3'
+                      : 'bg-muted-foreground/50'
+                  }`} />
+                  <span className="text-xs text-sidebar-foreground/70">
+                    {appStatus.connected ? 'Connected' : 'No bridge'}
+                  </span>
+                </div>
+                {appStatus.connected && (
+                  <div className="text-xs text-sidebar-foreground/50">
+                    {formatRelativeTime(appStatus.lastSyncAt)}
                   </div>
-                  {appStatus.connected && (
-                    <div className="text-xs text-gray-500 pl-4">Last sync: {formatRelativeTime(appStatus.lastSyncAt)}</div>
-                  )}
-                  <div className="flex items-center gap-4 pl-4">
-                    <span className="text-xs text-gray-500">{appStatus.accounts} accounts</span>
-                    <span className="text-xs text-gray-500">{appStatus.transactions} transactions</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="px-3 py-2 bg-white/5 rounded-lg border border-white/10">
-              <div className="text-xs text-gray-500">Signed in as</div>
-              <div className="text-sm text-white truncate">{session.user.email}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setChangePasswordOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 shadow-md hover:shadow-lg transition-all duration-200"
-            >
-              <Key className="h-4 w-4" />
-              Change Password
-            </button>
-            <SignOutForm />
+                )}
+                <div className="flex items-center gap-3 text-xs text-sidebar-foreground/50">
+                  <span>{appStatus.accounts} accts</span>
+                  <span>{appStatus.transactions} txns</span>
+                </div>
+              </div>
+            )}
+
+            {!isCollapsed && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-sidebar-foreground/70 bg-sidebar-accent/50 hover:bg-sidebar-accent rounded-lg border border-sidebar-border transition-all"
+                >
+                  <Key className="h-4 w-4" />
+                  Change Password
+                </button>
+                <SignOutForm iconOnly={false} />
+              </>
+            )}
+
+            {isCollapsed && (
+              <div className="flex flex-col items-center gap-1">
+                <SimpleTooltip label="Change Password" show={isCollapsed}>
+                  <button
+                    type="button"
+                    onClick={() => setChangePasswordOpen(true)}
+                    className="p-2 rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  >
+                    <Key className="h-4 w-4" />
+                  </button>
+                </SimpleTooltip>
+                <SimpleTooltip label="Sign Out" show={isCollapsed}>
+                  <SignOutForm iconOnly={isCollapsed} />
+                </SimpleTooltip>
+              </div>
+            )}
           </div>
         )}
       </aside>
 
       {/* Resize Handle */}
-      {sidebarWidth !== COLLAPSED_WIDTH && (
+      {!isCollapsed && (
         <div
           className="fixed top-0 z-30 cursor-col-resize"
           style={{
@@ -172,7 +212,7 @@ export default function ResizableSidebar() {
             width: '6px',
             height: '100vh',
             marginLeft: '-3px',
-            background: isResizing ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+            background: isResizing ? 'var(--color-ring)' : 'transparent',
           }}
           onMouseDown={(e) => {
             setIsResizing(true);
@@ -180,7 +220,7 @@ export default function ResizableSidebar() {
           }}
           onMouseUp={() => setIsResizing(false)}
         >
-          <div className="w-1 h-full mx-auto bg-white/10 hover:bg-blue-500/50 transition-colors" />
+          <div className="w-1 h-full mx-auto bg-sidebar-border hover:bg-ring/50 transition-colors" />
         </div>
       )}
 

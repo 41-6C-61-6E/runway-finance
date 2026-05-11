@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Play, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 
 type Rule = {
   id: string;
   name: string;
   priority: number;
   isActive: boolean;
+  isSystem: boolean;
   conditionField: string;
   conditionOperator: string;
   conditionValue: string;
@@ -68,6 +70,96 @@ export default function RulesTab() {
   const [formSetPayee, setFormSetPayee] = useState('');
   const [formSetReviewed, setFormSetReviewed] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+  const [runningRuleId, setRunningRuleId] = useState<string | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [systemToggling, setSystemToggling] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const getCategoryName = (id: string | null) => {
+    if (!id) return null;
+    return categories.find((c) => c.id === id) ?? null;
+  };
+
+  const systemRules = useMemo(() => rules.filter((r) => r.isSystem), [rules]);
+  const systemRulesAllActive = useMemo(
+    () => systemRules.length > 0 && systemRules.every((r) => r.isActive),
+    [systemRules]
+  );
+  const filteredRules = useMemo(() => {
+    if (!searchQuery.trim()) return rules;
+    const q = searchQuery.toLowerCase();
+    return rules.filter((r) => {
+      const cat = r.setCategoryId ? getCategoryName(r.setCategoryId) : null;
+      const catName = cat ? cat.name.toLowerCase() : '';
+      return (
+        r.name.toLowerCase().includes(q) ||
+        r.conditionValue.toLowerCase().includes(q) ||
+        catName.includes(q)
+      );
+    });
+  }, [rules, searchQuery, categories]);
+
+  const showFeedback = (type: 'success' | 'error', message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleRunNow = async (ruleId: string) => {
+    setRunningRuleId(ruleId);
+    try {
+      const res = await fetch(`/api/category-rules/${ruleId}/apply`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to apply rule');
+      const data = await res.json();
+      showFeedback('success', `Rule applied: ${data.matched} of ${data.total} transactions matched.`);
+      await fetchRules();
+    } catch {
+      showFeedback('error', 'Failed to apply rule.');
+    } finally {
+      setRunningRuleId(null);
+    }
+  };
+
+  const handleRunAll = async () => {
+    setRunningAll(true);
+    try {
+      const res = await fetch('/api/category-rules/apply-all', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to apply rules');
+      const data = await res.json();
+      showFeedback('success', `All rules applied: ${data.updated} of ${data.total} transactions updated.`);
+      await fetchRules();
+    } catch {
+      showFeedback('error', 'Failed to apply all rules.');
+    } finally {
+      setRunningAll(false);
+    }
+  };
+
+  const handleResetToDefaults = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch('/api/category-rules/reset', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to reset rules');
+      setShowResetConfirm(false);
+      showFeedback('success', 'Rules reset to defaults.');
+      await fetchRules();
+    } catch {
+      showFeedback('error', 'Failed to reset rules.');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const fetchRules = useCallback(async () => {
     try {
@@ -168,9 +260,7 @@ export default function RulesTab() {
       });
       setDeleting(null);
       await fetchRules();
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const handleMove = async (ruleId: string, direction: 'up' | 'down') => {
@@ -191,9 +281,7 @@ export default function RulesTab() {
         body: JSON.stringify({ rules: updates }),
       });
       await fetchRules();
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const handleToggleActive = async (rule: Rule) => {
@@ -205,15 +293,27 @@ export default function RulesTab() {
         body: JSON.stringify({ isActive: !rule.isActive }),
       });
       await fetchRules();
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
-  const getCategoryName = (id: string | null) => {
-    if (!id) return null;
-    const cat = categories.find((c) => c.id === id);
-    return cat ?? null;
+  const handleToggleSystemRules = async () => {
+    const newActive = !systemRulesAllActive;
+    setSystemToggling(true);
+    try {
+      const res = await fetch('/api/category-rules/toggle-system', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ active: newActive }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle system rules');
+      showFeedback('success', `System rules ${newActive ? 'enabled' : 'disabled'}.`);
+      await fetchRules();
+    } catch {
+      showFeedback('error', 'Failed to toggle system rules.');
+    } finally {
+      setSystemToggling(false);
+    }
   };
 
   const formatCondition = (rule: Rule) => {
@@ -234,95 +334,150 @@ export default function RulesTab() {
   };
 
   if (loading) {
-    return <div className="text-gray-400 py-4">Loading rules...</div>;
+    return <div className="text-muted-foreground py-4">Loading rules...</div>;
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-white">Categorization Rules</h2>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add Rule
-        </button>
+        <h2 className="text-lg font-semibold text-foreground">Categorization Rules</h2>
+        <div className="flex items-center gap-2">
+          {feedback && (
+            <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
+              {feedback.message}
+            </span>
+          )}
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resetting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Reset to Defaults
+          </button>
+          <button
+            onClick={handleRunAll}
+            disabled={runningAll || rules.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-all disabled:opacity-50"
+          >
+            <Play className="h-3.5 w-3.5" />
+            {runningAll ? 'Running...' : 'Run All'}
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Rule
+          </button>
+        </div>
       </div>
 
-      {rules.length === 0 && (
+      {/* Filter Bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+            placeholder="Search rules by name, keyword, or category..."
+          />
+        </div>
+        {systemRules.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">System Rules</span>
+            <Switch
+              checked={systemRulesAllActive}
+              onCheckedChange={handleToggleSystemRules}
+              disabled={systemToggling}
+            />
+          </div>
+        )}
+      </div>
+
+      {filteredRules.length === 0 && (
         <div className="p-8 text-center">
-          <p className="text-gray-400 text-sm">No rules yet. Create rules to automatically categorize transactions during sync.</p>
+          <p className="text-muted-foreground text-sm">
+            {searchQuery ? 'No rules match your search.' : 'No rules yet. Create rules to automatically categorize transactions during sync.'}
+          </p>
         </div>
       )}
 
-      <div className="space-y-2">
-        {rules.map((rule, idx) => {
+      <div className="space-y-1.5">
+        {filteredRules.map((rule, idx) => {
           const cat = rule.setCategoryId ? getCategoryName(rule.setCategoryId) : null;
           return (
             <div
               key={rule.id}
-              className={`p-4 bg-white/5 border border-white/10 rounded-lg transition-colors group ${
+              className={`p-4 bg-card border border-border rounded-lg transition-colors group ${
                 !rule.isActive ? 'opacity-50' : ''
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-mono text-gray-500">#{rule.priority}</span>
-                    <span className="text-white text-sm font-medium">{rule.name}</span>
-                    {!rule.isActive && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-gray-500/20 text-gray-400">Disabled</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-400 font-mono mt-1">
-                    {formatCondition(rule)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
-                    <span>{formatAction(rule)}</span>
-                    {cat && (
-                      <span
-                        className="px-1.5 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: `${cat.color}33`,
-                          color: cat.color,
-                        }}
-                      >
-                        {cat.name}
-                      </span>
-                    )}
-                  </div>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-mono text-muted-foreground shrink-0">#{rule.priority}</span>
+                  <span className="text-foreground text-sm font-medium truncate">{rule.name}</span>
+                  {rule.isSystem && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">System</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
-                    onClick={() => handleToggleActive(rule)}
-                    className="p-1.5 text-gray-400 hover:text-white transition-colors"
-                    title={rule.isActive ? 'Disable' : 'Enable'}
+                    onClick={() => handleRunNow(rule.id)}
+                    disabled={runningRuleId === rule.id}
+                    className="p-1.5 text-muted-foreground hover:text-chart-2 transition-colors disabled:opacity-30"
+                    title="Apply this rule now"
                   >
-                    {rule.isActive ? <ToggleRight className="h-4 w-4 text-green-400" /> : <ToggleLeft className="h-4 w-4" />}
+                    <Play className={`h-3.5 w-3.5 ${runningRuleId === rule.id ? 'animate-pulse' : ''}`} />
                   </button>
                   <button
                     onClick={() => handleMove(rule.id, 'up')}
                     disabled={idx === 0}
-                    className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+                    className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                     title="Move up"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleMove(rule.id, 'down')}
-                    disabled={idx === rules.length - 1}
-                    className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+                    disabled={idx === filteredRules.length - 1}
+                    className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                     title="Move down"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
-                  <button onClick={() => openEdit(rule)} className="p-1.5 text-gray-400 hover:text-white transition-colors">
+                  <button onClick={() => openEdit(rule)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Edit rule">
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => setDeleting(rule)} className="p-1.5 text-gray-400 hover:text-red-400 transition-colors">
+                  <button onClick={() => setDeleting(rule)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors" title="Delete rule">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground font-mono">
+                {formatCondition(rule)}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground/70 min-w-0">
+                  <span className="truncate">{formatAction(rule)}</span>
+                  {cat && (
+                    <span
+                      className="px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: `${cat.color}33`,
+                        color: cat.color,
+                      }}
+                    >
+                      {cat.name}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground/60">Active</span>
+                  <Switch
+                    checked={rule.isActive}
+                    onCheckedChange={() => handleToggleActive(rule)}
+                  />
                 </div>
               </div>
             </div>
@@ -333,32 +488,32 @@ export default function RulesTab() {
       {/* Add/Edit Drawer */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
-          <div className="relative w-full max-w-md bg-gray-950 border-l border-white/10 p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-white mb-6">
+          <div className="absolute inset-0 bg-foreground/15" onClick={() => setDrawerOpen(false)} />
+          <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+            <h3 className="text-lg font-semibold text-foreground mb-6">
               {editingRule ? 'Edit Rule' : 'Add Rule'}
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Rule Name</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Rule Name</label>
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
                   placeholder="e.g., Amazon Purchases"
                 />
               </div>
 
-              <div className="border-t border-white/10 pt-4">
-                <h4 className="text-sm font-medium text-gray-300 mb-3">Condition</h4>
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-medium text-foreground mb-3">Condition</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Field</label>
+                    <label className="block text-xs text-muted-foreground mb-1">Field</label>
                     <select
                       value={formField}
                       onChange={(e) => setFormField(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       {FIELD_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -366,11 +521,11 @@ export default function RulesTab() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Operator</label>
+                    <label className="block text-xs text-muted-foreground mb-1">Operator</label>
                     <select
                       value={formOperator}
                       onChange={(e) => setFormOperator(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       {OPERATOR_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -380,34 +535,32 @@ export default function RulesTab() {
                 </div>
 
                 <div className="mt-3">
-                  <label className="block text-xs text-gray-500 mb-1">Value</label>
+                  <label className="block text-xs text-muted-foreground mb-1">Value</label>
                   <input
                     value={formValue}
                     onChange={(e) => setFormValue(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="e.g., AMAZON"
                   />
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-gray-300">Case Sensitive</span>
-                  <button
-                    onClick={() => setFormCaseSensitive(!formCaseSensitive)}
-                    className={`relative w-9 h-5 rounded-full transition-colors ${formCaseSensitive ? 'bg-blue-600' : 'bg-gray-600'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${formCaseSensitive ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
+                  <span className="text-xs text-foreground/80">Case Sensitive</span>
+                  <Switch
+                    checked={formCaseSensitive}
+                    onCheckedChange={setFormCaseSensitive}
+                  />
                 </div>
               </div>
 
-              <div className="border-t border-white/10 pt-4">
-                <h4 className="text-sm font-medium text-gray-300 mb-3">Action</h4>
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-medium text-foreground mb-3">Action</h4>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Set Category</label>
+                  <label className="block text-xs text-muted-foreground mb-1">Set Category</label>
                   <select
                     value={formCategoryId || ''}
                     onChange={(e) => setFormCategoryId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Don't change category</option>
                     {categories.map((cat) => (
@@ -419,23 +572,21 @@ export default function RulesTab() {
                 </div>
 
                 <div className="mt-3">
-                  <label className="block text-xs text-gray-500 mb-1">Set Payee (optional)</label>
+                  <label className="block text-xs text-muted-foreground mb-1">Set Payee (optional)</label>
                   <input
                     value={formSetPayee}
                     onChange={(e) => setFormSetPayee(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Override payee name"
                   />
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-gray-300">Mark as Reviewed</span>
-                  <button
-                    onClick={() => setFormSetReviewed(formSetReviewed === true ? null : true)}
-                    className={`relative w-9 h-5 rounded-full transition-colors ${formSetReviewed === true ? 'bg-blue-600' : 'bg-gray-600'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${formSetReviewed === true ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
+                  <span className="text-xs text-foreground/80">Mark as Reviewed</span>
+                  <Switch
+                    checked={formSetReviewed === true}
+                    onCheckedChange={(checked) => setFormSetReviewed(checked ? true : null)}
+                  />
                 </div>
               </div>
             </div>
@@ -443,14 +594,14 @@ export default function RulesTab() {
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => { setDrawerOpen(false); setEditingRule(null); }}
-                className="flex-1 px-4 py-2 text-sm text-gray-300 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !formName.trim() || !formValue.trim()}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+                className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? 'Saving...' : editingRule ? 'Update' : 'Create'}
               </button>
@@ -461,20 +612,42 @@ export default function RulesTab() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-sm">
+        <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete Rule</AlertDialogTitle>
+            <AlertDialogTitle>Delete Rule</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the rule <strong>{deleting?.name}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleting(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <button
               onClick={handleDelete}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
             >
               Delete
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Confirmation */}
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Rules to Defaults</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong className="text-destructive">permanently delete all your custom rules</strong> and restore the default system rules. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleResetToDefaults}
+              disabled={resetting}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {resetting ? 'Resetting...' : 'Reset to Defaults'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

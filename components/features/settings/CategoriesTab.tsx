@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 
 type Category = {
   id: string;
@@ -56,7 +57,6 @@ export default function CategoriesTab() {
 
   const parents = categories.filter((c) => !c.parentId);
   const children = categories.filter((c) => c.parentId);
-
   const getChildren = (parentId: string) => children.filter((c) => c.parentId === parentId);
 
   const openAdd = () => {
@@ -121,9 +121,7 @@ export default function CategoriesTab() {
       });
       setDeleting(null);
       await fetchCategories();
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const handleResetToDefaults = async () => {
@@ -135,11 +133,8 @@ export default function CategoriesTab() {
       });
       setShowResetConfirm(false);
       await fetchCategories();
-    } catch {
-      // ignore
-    } finally {
-      setResetting(false);
-    }
+    } catch {}
+    setResetting(false);
   };
 
   const toggleExpanded = (id: string) => {
@@ -151,28 +146,25 @@ export default function CategoriesTab() {
     });
   };
 
-  const getCategoryById = (id: string) => categories.find((c) => c.id === id);
-
   if (loading) {
-    return <div className="text-gray-400 py-4">Loading categories...</div>;
+    return <div className="text-muted-foreground py-4">Loading categories...</div>;
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-white">Categories</h2>
+        <h2 className="text-lg font-semibold text-foreground">Categories</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowResetConfirm(true)}
             disabled={resetting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="h-3.5 w-3.5" />
             Reset to Defaults
           </button>
           <button
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Category
@@ -180,7 +172,7 @@ export default function CategoriesTab() {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {parents.map((parent) => {
           const childList = getChildren(parent.id);
           const isExpanded = expandedParents.has(parent.id);
@@ -188,30 +180,30 @@ export default function CategoriesTab() {
             <div key={parent.id}>
               <div
                 onClick={() => openEdit(parent)}
-                className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer group"
+                className="flex items-center justify-between p-3 bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   {childList.length > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); toggleExpanded(parent.id); }} className="text-gray-400 hover:text-white flex-shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); toggleExpanded(parent.id); }} className="text-muted-foreground hover:text-foreground flex-shrink-0">
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </button>
                   )}
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                  <span className="text-white text-sm font-medium truncate">{parent.name}</span>
+                  <span className="text-foreground text-sm font-medium truncate">{parent.name}</span>
                   <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
-                    parent.isIncome ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+                    parent.isIncome ? 'bg-chart-1/20 text-chart-1' : 'bg-primary/20 text-primary'
                   }`}>
                     {parent.isIncome ? 'Income' : 'Expense'}
                   </span>
                   {parent.isSystem && (
-                    <span className="text-[10px] text-gray-500">System</span>
+                    <span className="text-[10px] text-muted-foreground">System</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-gray-400 hover:text-white transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-gray-400 hover:text-red-400 transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -222,20 +214,20 @@ export default function CategoriesTab() {
                     <div
                       key={child.id}
                       onClick={() => openEdit(child)}
-                      className="flex items-center justify-between p-2.5 bg-white/[0.03] border border-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer group"
+                      className="flex items-center justify-between p-2.5 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                        <span className="text-gray-300 text-sm truncate">{child.name}</span>
+                        <span className="text-foreground/80 text-sm truncate">{child.name}</span>
                         {child.isSystem && (
-                          <span className="text-[10px] text-gray-500">System</span>
+                          <span className="text-[10px] text-muted-foreground">System</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-gray-400 hover:text-white transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
                           <Pencil className="h-3 w-3" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-gray-400 hover:text-red-400 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -249,31 +241,31 @@ export default function CategoriesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {(editing !== undefined) && (
+      {(editing !== null) && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { setEditing(null); }} />
-          <div className="relative w-full max-w-md bg-gray-950 border-l border-white/10 p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-white mb-6">
+          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setEditing(null); }} />
+          <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+            <h3 className="text-lg font-semibold text-foreground mb-6">
               {editing ? 'Edit Category' : 'Add Category'}
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Name</label>
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
                   placeholder="Category name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Parent Group</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Parent Group</label>
                 <select
                   value={formParentId || ''}
                   onChange={(e) => setFormParentId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">None (top-level group)</option>
                   {parents.map((p) => (
@@ -283,14 +275,14 @@ export default function CategoriesTab() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Color</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Color</label>
                 <div className="flex flex-wrap gap-2">
                   {COLOR_OPTIONS.map((c) => (
                     <button
                       key={c}
                       onClick={() => setFormColor(c)}
                       className={`w-7 h-7 rounded-full border-2 transition-all ${
-                        formColor === c ? 'border-white scale-110' : 'border-transparent'
+                        formColor === c ? 'border-foreground scale-110' : 'border-transparent'
                       }`}
                       style={{ backgroundColor: c }}
                     />
@@ -299,22 +291,20 @@ export default function CategoriesTab() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-300">Income Category</span>
-                <button
-                  onClick={() => setFormIsIncome(!formIsIncome)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${formIsIncome ? 'bg-blue-600' : 'bg-gray-600'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formIsIncome ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
+                <span className="text-sm text-foreground/80">Income Category</span>
+                <Switch
+                  checked={formIsIncome}
+                  onCheckedChange={setFormIsIncome}
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Display Order</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Display Order</label>
                 <input
                   type="number"
                   value={formOrder}
                   onChange={(e) => setFormOrder(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
             </div>
@@ -322,14 +312,14 @@ export default function CategoriesTab() {
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setEditing(null)}
-                className="flex-1 px-4 py-2 text-sm text-gray-300 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !formName.trim()}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+                className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? 'Saving...' : editing ? 'Update' : 'Create'}
               </button>
@@ -340,18 +330,18 @@ export default function CategoriesTab() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-sm">
+        <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete Category</AlertDialogTitle>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>{deleting?.name}</strong>? Transactions using this category will become uncategorized.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleting(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <button
               onClick={handleDelete}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
             >
               Delete
             </button>
@@ -359,21 +349,21 @@ export default function CategoriesTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reset to Defaults Confirmation */}
+      {/* Reset Confirmation */}
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-        <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-md">
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Reset Categories to Defaults</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300">
-              This will <strong className="text-red-400">permanently delete all your custom categories</strong> and restore the default system categories. Any transactions linked to deleted categories will become uncategorized. This action cannot be undone.
+            <AlertDialogTitle>Reset Categories to Defaults</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong className="text-destructive">permanently delete all your custom categories</strong> and restore the default system categories. Any transactions linked to deleted categories will become uncategorized. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowResetConfirm(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <button
               onClick={handleResetToDefaults}
               disabled={resetting}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {resetting ? 'Resetting...' : 'Reset to Defaults'}
             </button>

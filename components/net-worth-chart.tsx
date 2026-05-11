@@ -71,7 +71,6 @@ export function NetWorthChart() {
     fetchData();
   }, [timeframe, includeExcluded]);
 
-  // Format data for chart
   const chartData = data.map((point) => ({
     date: new Date(point.date).toLocaleDateString('en-US', { 
       month: 'short',
@@ -86,44 +85,43 @@ export function NetWorthChart() {
   const isPositiveChange = summary ? summary.change >= 0 : false;
 
   return (
-    <div className="w-full overflow-hidden bg-slate-900 rounded-lg border border-slate-800 p-6 shadow-lg flex flex-col gap-6">
+    <div className="w-full bg-card border border-border rounded-xl shadow-sm">
       {/* Header Section */}
-      <div>
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex-1">
-            <h2 className="text-sm font-medium text-slate-400 mb-2">Your net worth</h2>
+      <div className="p-5 pb-3">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground mb-1">Net Worth</h2>
             <div className="flex items-baseline gap-2">
-              <div className="text-4xl font-bold text-white blur-number">
+              <div className="text-3xl font-bold text-foreground blur-number">
                 {summary ? formatCurrency(summary.current) : '$0'}
               </div>
             </div>
             {summary && (
-              <div className="flex items-center gap-1 mt-3">
-                <span
-                  className={`text-sm font-semibold text-gray-400 blur-number`}
-                >
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className={`text-sm font-semibold blur-number ${
+                  isPositiveChange ? 'text-chart-1' : 'text-destructive'
+                }`}>
                   {isPositiveChange ? '+' : ''}
                   {formatCurrency(summary.change)}
                 </span>
-                <span
-                  className={`text-xs text-gray-400 blur-number`}
-                >
+                <span className={`text-xs blur-number ${
+                  isPositiveChange ? 'text-chart-1' : 'text-destructive'
+                }`}>
                   ({formatPercent(summary.percentChange)})
                 </span>
-                <span className="text-xs text-slate-400">
-                  All-time change
+                <span className="text-xs text-muted-foreground">
+                  all time
                 </span>
               </div>
             )}
           </div>
 
-          {/* Accounts Info */}
           {summary && (
-            <div className="text-right ml-8">
-              <div className="text-2xl font-bold text-blue-400">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-primary">
                 {summary.includedAccounts}
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 of {summary.totalAccounts} accounts
               </p>
             </div>
@@ -131,15 +129,15 @@ export function NetWorthChart() {
         </div>
 
         {/* Timeframe Buttons */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {timeframeOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => setTimeframe(option.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 timeframe === option.value
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
             >
               {option.label}
@@ -150,117 +148,109 @@ export function NetWorthChart() {
 
       {/* Chart */}
       {loading ? (
-        <div className="h-80 flex items-center justify-center text-slate-400">
+        <div className="h-72 flex items-center justify-center text-muted-foreground">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-slate-700 border-t-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
+            <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin mx-auto mb-2"></div>
             Loading chart...
           </div>
         </div>
       ) : error ? (
-        <div className="h-80 flex items-center justify-center text-gray-400">
+        <div className="h-72 flex items-center justify-center text-muted-foreground">
           <div className="text-center">
-            <p className="font-semibold mb-1">Unable to load chart</p>
-            <p className="text-sm text-slate-400">{error}</p>
+            <p className="font-medium mb-0.5">Unable to load chart</p>
+            <p className="text-sm text-muted-foreground/70">{error}</p>
           </div>
         </div>
       ) : data.length === 0 ? (
-        <div className="h-80 flex items-center justify-center text-slate-400">
+        <div className="h-72 flex items-center justify-center text-muted-foreground">
           <div className="text-center">
-            <p className="font-semibold mb-1">No data available yet</p>
-            <p className="text-sm text-slate-500">Charts will appear once you sync your accounts</p>
+            <p className="font-medium mb-0.5">No data available yet</p>
+            <p className="text-xs text-muted-foreground/70">Charts will appear once you sync your accounts</p>
           </div>
         </div>
       ) : (
-        <div className="h-80 w-full overflow-hidden">
-            <div className="financial-chart h-full">
-              <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 40 }}>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="#334155" 
-                vertical={false}
-              />
-              <XAxis 
-                dataKey="date"
-                stroke="#64748b"
-                style={{ fontSize: '12px' }}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis 
-                stroke="#64748b"
-                style={{ fontSize: '12px' }}
-                tickFormatter={(value) => {
-                  if (value >= 1000000) {
-                    return `$${(value / 1000000).toFixed(1)}M`;
-                  }
-                  if (value >= 1000) {
-                    return `$${(value / 1000).toFixed(0)}K`;
-                  }
-                  return `$${value}`;
-                }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #475569',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-                }}
-                labelStyle={{ color: '#cbd5e1' }}
-                formatter={(value) => {
-                  if (typeof value === 'number') {
-                    return [formatCurrency(value), ''];
-                  }
-                  return value;
-                }}
-                cursor={{ stroke: '#3b82f6', strokeWidth: 2 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="Net Worth"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={false}
-                isAnimationActive={true}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="h-72 px-2 pb-2">
+          <div className="financial-chart h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="var(--color-border)" 
+                  vertical={false}
+                />
+                <XAxis 
+                  dataKey="date"
+                  stroke="var(--color-muted-foreground)"
+                  style={{ fontSize: '11px' }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis 
+                  stroke="var(--color-muted-foreground)"
+                  style={{ fontSize: '11px' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => {
+                    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                    return `$${value}`;
+                  }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--color-card)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 12px var(--color-border)',
+                  }}
+                  labelStyle={{ color: 'var(--color-foreground)' }}
+                  formatter={(value: number) => [formatCurrency(value), '']}
+                  cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1.5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Net Worth"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2.5}
+                  dot={false}
+                  isAnimationActive={true}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
 
       {/* Stats Footer */}
-      <div className="pt-4 border-t border-slate-800">
+      <div className="px-5 py-3 border-t border-border">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-5">
             {summary && (
               <>
                 <div>
-                  <p className="text-xs text-slate-400 mb-1">Total Assets</p>
-                  <p className="text-lg font-semibold text-gray-400 blur-number">
+                  <p className="text-xs text-muted-foreground mb-0.5">Total Assets</p>
+                  <p className="text-sm font-semibold text-foreground blur-number">
                     {formatCurrency(summary.current + summary.change)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 mb-1">Avg. Change</p>
-                  <p className="text-lg font-semibold text-gray-400 blur-number">
-                    {formatCurrency(summary.change / Math.max(data.length, 1))}
+                  <p className="text-xs text-muted-foreground mb-0.5">Avg Change</p>
+                  <p className="text-sm font-semibold text-foreground blur-number">
+                    {formatCurrency(data.length > 0 ? summary.change / data.length : 0)}
                   </p>
                 </div>
               </>
             )}
           </div>
           
-          <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-400 hover:text-slate-300 transition-colors">
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">
             <input
               type="checkbox"
               checked={includeExcluded}
               onChange={(e) => setIncludeExcluded(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-600 cursor-pointer"
+              className="w-3.5 h-3.5 rounded border-border bg-background text-primary cursor-pointer"
             />
-            Include excluded accounts
+            Include excluded
           </label>
         </div>
       </div>

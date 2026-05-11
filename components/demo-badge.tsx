@@ -5,9 +5,9 @@ export const DemoBadge = () => (
       target="_blank"
       className="group block"
     >
-      <div className="relative overflow-hidden rounded-lg bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 p-0.5 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-        <div className="rounded-md bg-white dark:bg-gray-950 px-4 py-3">
-          <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+      <div className="relative overflow-hidden rounded-lg bg-primary/10 border border-border p-0.5 shadow-sm hover:shadow-md transition-all duration-300">
+        <div className="rounded-md bg-background px-4 py-3">
+          <div className="flex items-center gap-2 font-semibold text-foreground">
             <span className="text-sm">Keep flying</span>
           </div>
         </div>

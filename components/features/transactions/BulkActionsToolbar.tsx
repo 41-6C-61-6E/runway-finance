@@ -31,27 +31,27 @@ export default function BulkActionsToolbar({ count, onSelectAll, onClear }: Bulk
   );
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-blue-600/10 border border-blue-500/20 rounded-xl mb-4">
-      <span className="text-sm text-blue-300 font-medium">{count} selected</span>
-      <div className="h-4 w-px bg-blue-500/30" />
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-xl mb-4">
+      <span className="text-sm text-primary font-medium">{count} selected</span>
+      <div className="h-4 w-px bg-border" />
       <button
         onClick={() => handleBulkPatch({ reviewed: true })}
         disabled={actionLoading !== null}
-        className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600/20 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50"
+        className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
       >
         Mark Reviewed
       </button>
       <button
         onClick={() => handleBulkPatch({ ignored: true })}
         disabled={actionLoading !== null}
-        className="px-3 py-1.5 text-xs font-medium text-white bg-gray-600/20 hover:bg-gray-600/30 rounded-lg transition-colors disabled:opacity-50"
+        className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
       >
         Mark Ignored
       </button>
       <div className="flex-1" />
       <button
         onClick={onClear}
-        className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+        className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         Clear Selection
       </button>

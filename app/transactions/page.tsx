@@ -40,13 +40,11 @@ function TransactionsContent() {
     order: searchParams.get('order') ?? 'desc',
   });
 
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
     if (filters.accountId) params.set('accountId', filters.accountId);
@@ -110,25 +108,12 @@ function TransactionsContent() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden">
-      {/* Background */}
-      <div
-        className="absolute inset-0 z-0 opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `
-            radial-gradient(ellipse at 20% 30%, rgba(59, 130, 246, 0.5) 0%, transparent 60%),
-            radial-gradient(ellipse at 80% 70%, rgba(168, 85, 247, 0.4) 0%, transparent 70%),
-            radial-gradient(ellipse at 60% 20%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse at 40% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 65%)
-          `,
-        }}
-      />
-
-      {/* Main Content */}
+    <div className="min-h-screen w-full">
       <div className="relative z-10">
         <ContentWrapper>
-          <div className="mt-20 px-0 sm:px-1 lg:px-3 max-w-[1920px]">
-  
+          <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
+            <h1 className="text-xl font-semibold text-foreground mb-4">Transactions</h1>
+
             <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
 
             <div className="min-w-0">
@@ -163,7 +148,7 @@ function TransactionsContent() {
 
 export default function TransactionsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
       <TransactionsContent />
     </Suspense>
   );

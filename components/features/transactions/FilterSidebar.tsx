@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 type FilterState = {
   accountId: string | null;
@@ -23,11 +23,9 @@ interface FilterSidebarProps {
 export default function FilterSidebar({ filters, onChange, onClearAll }: FilterSidebarProps) {
   const [datePreset, setDatePreset] = useState('custom');
   const [search, setSearch] = useState(filters.search ?? '');
-  const [debouncedSearch, setDebouncedSearch] = useState(filters.search ?? '');
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search);
       onChange('search', search || null);
     }, 300);
     return () => clearTimeout(timer);
@@ -83,25 +81,25 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
   };
 
   return (
-    <div className="p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 space-y-5">
+    <div className="p-4 bg-card border border-border rounded-xl space-y-5">
       {/* Search */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Search</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Search</label>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search transactions..."
-          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
       {/* Date Presets */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Date Range</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Date Range</label>
         <select
           value={datePreset}
           onChange={(e) => applyDatePreset(e.target.value)}
-          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="this-month">This Month</option>
           <option value="last-month">Last Month</option>
@@ -116,13 +114,13 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
               type="date"
               value={filters.startDate ?? ''}
               onChange={(e) => onChange('startDate', e.target.value || null)}
-              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <input
               type="date"
               value={filters.endDate ?? ''}
               onChange={(e) => onChange('endDate', e.target.value || null)}
-              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         )}
@@ -130,32 +128,32 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
 
       {/* Status Toggles */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Status</label>
         <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
             <input
               type="checkbox"
               checked={filters.pending === 'true'}
               onChange={() => toggleFilter('pending', 'true')}
-              className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border bg-background text-primary focus:ring-ring"
             />
             Pending
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
             <input
               type="checkbox"
               checked={filters.reviewed === 'true'}
               onChange={() => toggleFilter('reviewed', 'true')}
-              className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border bg-background text-primary focus:ring-ring"
             />
             Reviewed
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
             <input
               type="checkbox"
               checked={filters.reviewed === 'false'}
               onChange={() => toggleFilter('reviewed', 'false')}
-              className="rounded border-white/20 bg-white/10 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border bg-background text-primary focus:ring-ring"
             />
             Unreviewed
           </label>
@@ -164,21 +162,21 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
 
       {/* Amount Range */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Amount Range</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Amount Range</label>
         <div className="flex gap-2">
           <input
             type="number"
             placeholder="Min"
             value={filters.minAmount ?? ''}
             onChange={(e) => onChange('minAmount', e.target.value || null)}
-            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <input
             type="number"
             placeholder="Max"
             value={filters.maxAmount ?? ''}
             onChange={(e) => onChange('maxAmount', e.target.value || null)}
-            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       </div>
@@ -186,7 +184,7 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
       {/* Clear All */}
       <button
         onClick={onClearAll}
-        className="w-full px-3 py-2 text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+        className="w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
       >
         Clear All Filters
       </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { applyAccent } from '@/lib/utils/apply-accent';
 
 type PrivacyModeContextType = {
   privacyMode: boolean;
@@ -20,6 +21,9 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
       if (res.ok) {
         const data = await res.json();
         setPrivacyMode(data.privacyMode || false);
+        if (data.accentColor) {
+          applyAccent(data.accentColor);
+        }
       }
     } catch {
       setPrivacyMode(false);

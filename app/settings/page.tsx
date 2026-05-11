@@ -2,18 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import ResizableSidebar from '@/components/resizable-sidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
+import AccentPicker from '@/components/features/settings/AccentPicker';
 
 type Connection = {
   id: string;
@@ -47,6 +46,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [devModeLoading, setDevModeLoading] = useState(false);
+  const [accentColor, setAccentColor] = useState('violet');
+  const [accentColorLoading, setAccentColorLoading] = useState(false);
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
@@ -61,10 +62,8 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingLabel, setSavingLabel] = useState(false);
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'rules'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules'>('general');
 
-  // Account Management state
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountFilter, setAccountFilter] = useState<'all' | 'hidden' | 'excluded'>('all');
@@ -72,7 +71,6 @@ export default function SettingsPage() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
 
-  // Fetch connections
   const fetchConnections = useCallback(async () => {
     try {
       const res = await fetch('/api/connections', { credentials: 'include' });
@@ -85,7 +83,6 @@ export default function SettingsPage() {
     }
   }, []);
 
-  // Fetch accounts for account management
   const fetchAccounts = useCallback(async () => {
     try {
       const res = await fetch('/api/accounts?includeHidden=true', { credentials: 'include' });
@@ -104,7 +101,6 @@ export default function SettingsPage() {
       setTogglingAccount(accountId);
       const account = accounts.find((a) => a.id === accountId);
       if (!account) return;
-
       try {
         await fetch(`/api/accounts/${accountId}`, {
           method: 'PATCH',
@@ -112,14 +108,9 @@ export default function SettingsPage() {
           credentials: 'include',
           body: JSON.stringify({ [field]: !account[field] }),
         });
-        setAccounts((prev) =>
-          prev.map((a) => (a.id === accountId ? { ...a, [field]: !a[field] } : a))
-        );
-      } catch {
-        // Ignore errors
-      } finally {
-        setTogglingAccount(null);
-      }
+        setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: !a[field] } : a)));
+      } catch {}
+      setTogglingAccount(null);
     },
     [accounts]
   );
@@ -145,8 +136,27 @@ export default function SettingsPage() {
       .then((res) => res.json())
       .then((data) => setDevMode(data.devMode))
       .catch(() => setDevMode(null));
-    // Privacy mode is managed by PrivacyModeProvider context
+    fetch('/api/user-settings', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setAccentColor(data.accentColor ?? 'violet'))
+      .catch(() => setAccentColor('violet'));
   }, [fetchConnections, fetchAccounts]);
+
+  const handleAccentColorChange = useCallback(
+    async (color: string) => {
+      setAccentColorLoading(true);
+      try {
+        await fetch('/api/user-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ accentColor: color }),
+        });
+      } catch {}
+      setAccentColorLoading(false);
+    },
+    []
+  );
 
   const handleToggleDevMode = async () => {
     setDevModeLoading(true);
@@ -159,15 +169,8 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       setDevMode(data.devMode);
-    } catch {
-      // Ignore errors
-    } finally {
-      setDevModeLoading(false);
-    }
-  };
-
-  const handleTogglePrivacyMode = async () => {
-    await togglePrivacyMode();
+    } catch {}
+    setDevModeLoading(false);
   };
 
   const handleAddConnection = async (e: React.FormEvent) => {
@@ -175,7 +178,6 @@ export default function SettingsPage() {
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
       const res = await fetch('/api/connections', {
         method: 'POST',
@@ -186,13 +188,8 @@ export default function SettingsPage() {
           label: label.trim() || 'Primary',
         }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to add connection');
-      }
-
+      if (!res.ok) throw new Error(data.message || data.error || 'Failed to add connection');
       setSuccess('Connection added successfully!');
       setSetupToken('');
       setLabel('');
@@ -218,9 +215,7 @@ export default function SettingsPage() {
         accountsSynced: data.accountsSynced ?? 0,
         transactionsFetched: data.transactionsFetched ?? 0,
       });
-      if (res.ok) {
-        await fetchConnections();
-      }
+      if (res.ok) await fetchConnections();
     } catch {
       setSyncResult({ status: 'error', accountsSynced: 0, transactionsFetched: 0 });
     } finally {
@@ -233,7 +228,6 @@ export default function SettingsPage() {
     setDeleteLoading(true);
     setError('');
     setSuccess('');
-
     try {
       const res = await fetch(`/api/connections/${deleteConn.id}`, {
         method: 'DELETE',
@@ -299,50 +293,40 @@ export default function SettingsPage() {
         const url = new URL(decoded);
         return `${url.protocol}//${url.host.substring(0, 10)}...`;
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
     return 'Encrypted';
   };
 
   const hasConnection = connections.length > 0;
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden">
-      {/* Animated gradient background */}
-      <div
-        className="absolute inset-0 z-0 opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `
-            radial-gradient(ellipse at 20% 30%, rgba(59, 130, 246, 0.5) 0%, transparent 60%),
-            radial-gradient(ellipse at 80% 70%, rgba(168, 85, 247, 0.4) 0%, transparent 70%),
-            radial-gradient(ellipse at 60% 20%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse at 40% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 65%)
-          `,
-        }}
-      />
-
-      {/* Left Sidebar */}
-      <ResizableSidebar />
-
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
-        <div className="max-w-2xl w-full space-y-8">
+    <div className="min-h-screen w-full">
+      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
+        <div className="max-w-2xl w-full space-y-6">
+          <h1 className="text-xl font-semibold text-foreground">Settings</h1>
 
           {/* Tab Bar */}
-          <div className="flex rounded-lg bg-white/5 border border-white/10 overflow-hidden">
+          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
             <button
               onClick={() => setActiveTab('general')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'general' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                activeTab === 'general' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               General
             </button>
             <button
+              onClick={() => setActiveTab('accounts')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'accounts' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Accounts
+            </button>
+            <button
               onClick={() => setActiveTab('categories')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'categories' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                activeTab === 'categories' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               Categories
@@ -350,7 +334,7 @@ export default function SettingsPage() {
             <button
               onClick={() => setActiveTab('rules')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'rules' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                activeTab === 'rules' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               Rules
@@ -361,32 +345,38 @@ export default function SettingsPage() {
           <>
 
           {/* Combined Settings */}
-          <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <h2 className="text-xl font-semibold text-white mb-6">Settings</h2>
-            
-            <div className="space-y-6">
+          <div className="p-5 bg-card border border-border rounded-xl">
+            <div className="space-y-5">
               {/* Theme */}
-              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+              <div className="flex items-center justify-between pb-5 border-b border-border">
                 <div>
-                  <h3 className="text-base font-medium text-white">Theme</h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Toggle between light and dark theme
-                  </p>
+                  <h3 className="text-sm font-medium text-foreground">Theme</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Toggle between light and dark theme</p>
                 </div>
                 <ModeToggle />
               </div>
 
-              {/* Privacy Mode */}
-              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+              {/* Accent Color */}
+              <div className="flex items-center justify-between pb-5 border-b border-border">
                 <div>
-                  <h3 className="text-base font-medium text-white">Privacy Mode</h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Blur financial data when showing the app to others
-                  </p>
+                  <h3 className="text-sm font-medium text-foreground">Accent Color</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Choose the accent color used throughout the app</p>
+                </div>
+                <AccentPicker
+                  value={accentColor}
+                  onChange={handleAccentColorChange}
+                />
+              </div>
+
+              {/* Privacy Mode */}
+              <div className="flex items-center justify-between pb-5 border-b border-border">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Privacy Mode</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Blur financial data when showing the app to others</p>
                 </div>
                 <Switch
                   checked={privacyMode ?? false}
-                  onCheckedChange={handleTogglePrivacyMode}
+                  onCheckedChange={togglePrivacyMode}
                   disabled={privacyModeLoading}
                 />
               </div>
@@ -394,308 +384,146 @@ export default function SettingsPage() {
               {/* Dev Mode */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-medium text-white">Developer Mode</h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Enable verbose application logs and debugging tools
-                  </p>
+                  <h3 className="text-sm font-medium text-foreground">Developer Mode</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Enable verbose application logs and debugging tools</p>
                 </div>
-                <button
-                  onClick={handleToggleDevMode}
+                <Switch
+                  checked={devMode ?? false}
+                  onCheckedChange={handleToggleDevMode}
                   disabled={devModeLoading}
-                  className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${
-                    devMode ? 'bg-blue-600' : 'bg-gray-600'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
-                      devMode ? 'translate-x-7' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                />
               </div>
               {devMode === true && (
-                <p className="text-xs text-blue-400 pt-2">
-                  Dev mode is active. Logs will appear in the bottom pane.
-                </p>
+                <p className="text-xs text-primary pt-1">Dev mode is active. Logs will appear in the bottom pane.</p>
               )}
               {devMode === false && (
-                <p className="text-xs text-gray-500 pt-2">
-                  Dev mode is disabled. Logs are hidden.
-                </p>
+                <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Logs are hidden.</p>
               )}
             </div>
           </div>
 
           {/* Existing Connections */}
-          <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <h2 className="text-xl font-semibold text-white mb-4">SimpleFIN Bridge Connection</h2>
-            {connectionsLoading ? (
-              <div className="text-gray-400">Loading...</div>
-            ) : connections.length === 0 ? (
-              <p className="text-gray-500 text-sm">No connection yet. Add one below.</p>
-            ) : (
-              <div className="space-y-3">
-                {connections.map((conn) => (
-                  <div
-                    key={conn.id}
-                    className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between gap-4"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                          conn.lastSyncStatus === 'ok' ? 'bg-emerald-400' :
-                          conn.lastSyncStatus === 'error' ? 'bg-red-400' :
-                          'bg-gray-500'
-                        }`} />
-                        {editingId === conn.id ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={editLabel}
-                              onChange={(e) => setEditLabel(e.target.value)}
-                              className="h-8 w-32 bg-white/10 border-white/20 text-white text-sm"
-                              autoFocus
-                            />
-                            <button onClick={handleSaveLabel} disabled={savingLabel} className="text-xs text-blue-400 hover:text-blue-300">Save</button>
-                            <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-300">Cancel</button>
-                          </div>
-                        ) : (
-                          <span
-                            className="text-white font-medium cursor-pointer hover:text-blue-400 transition-colors"
-                            onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
-                          >
-                            {conn.label}
-                          </span>
+          {hasConnection && (
+            <div className="p-5 bg-card border border-border rounded-xl">
+              <h2 className="text-base font-semibold text-foreground mb-4">SimpleFIN Bridge Connection</h2>
+              {connectionsLoading ? (
+                <div className="text-muted-foreground text-sm">Loading...</div>
+              ) : (
+                <div className="space-y-3">
+                  {connections.map((conn) => (
+                    <div
+                      key={conn.id}
+                      className="p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            conn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
+                            conn.lastSyncStatus === 'error' ? 'bg-destructive' :
+                            'bg-muted-foreground/50'
+                          }`} />
+                          {editingId === conn.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editLabel}
+                                onChange={(e) => setEditLabel(e.target.value)}
+                                className="h-7 w-28"
+                                autoFocus
+                              />
+                              <button onClick={handleSaveLabel} disabled={savingLabel} className="text-xs text-primary hover:text-primary/80">Save</button>
+                              <button onClick={() => setEditingId(null)} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                            </div>
+                          ) : (
+                            <span
+                              className="text-foreground font-medium cursor-pointer hover:text-primary transition-colors text-sm"
+                              onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
+                            >
+                              {conn.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1 ml-4">
+                          Last sync: {formatRelativeTime(conn.lastSyncAt)}
+                        </div>
+                        {conn.lastSyncError && (
+                          <div className="text-xs text-destructive mt-1 ml-4 truncate">{conn.lastSyncError}</div>
                         )}
                       </div>
-                      <div className="text-sm text-gray-400 mt-1 ml-4.5">
-                        Last sync: {formatRelativeTime(conn.lastSyncAt)}
-                      </div>
-                      {conn.lastSyncError && (
-                        <div className="text-xs text-red-400 mt-1 ml-4.5 truncate">{conn.lastSyncError}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                        conn.lastSyncStatus === 'ok'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : conn.lastSyncStatus === 'error'
-                          ? 'bg-red-500/20 text-red-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {conn.lastSyncStatus === 'ok' ? 'Synced' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-                      </span>
-                      <button
-                        onClick={() => handleSync(conn.id)}
-                        disabled={syncingId === conn.id}
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600/20 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {syncingId === conn.id ? 'Syncing...' : 'Sync'}
-                      </button>
-                      <button
-                        onClick={() => openDetails(conn)}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors"
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
-                        className="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Sync result banner */}
-                {syncResult && (
-                  <div className={`p-3 rounded-lg border ${
-                    syncResult.status === 'success'
-                      ? 'bg-emerald-500/10 border-emerald-500/20'
-                      : 'bg-red-500/10 border-red-500/20'
-                  }`}>
-                    <p className={`text-sm font-medium ${
-                      syncResult.status === 'success' ? 'text-emerald-400' : 'text-red-400'
-                    }`}>
-                      {syncResult.status === 'success'
-                        ? `Sync complete: ${syncResult.accountsSynced} accounts, ${syncResult.transactionsFetched} transactions`
-                        : 'Sync failed'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Account Management */}
-          <div className="p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-            <h2 className="text-xl font-semibold text-white mb-4">Account Management</h2>
-            <p className="text-sm text-gray-400 mb-4">
-              Manage hidden accounts and net worth exclusions.
-            </p>
-
-            {/* Filter tabs */}
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex rounded-lg bg-white/5 border border-white/10 overflow-hidden">
-                {(['all', 'hidden', 'excluded'] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => setAccountFilter(filter)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      accountFilter === filter
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {accountsLoading ? (
-              <div className="text-gray-400 text-sm">Loading...</div>
-            ) : accounts.length === 0 ? (
-              <p className="text-gray-500 text-sm">No accounts yet. Connect a financial institution first.</p>
-            ) : (() => {
-                const filteredAccounts = accounts.filter((a) => {
-                  if (accountFilter === 'hidden') return a.isHidden;
-                  if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
-                  return true;
-                });
-                const hasHiddenOrExcluded = accounts.some((a) => a.isHidden || a.isExcludedFromNetWorth);
-
-                if (filteredAccounts.length === 0 && accountFilter !== 'all') {
-                  return (
-                    <div className="p-4 bg-white/5 border border-white/10 rounded-lg text-center">
-                      <p className="text-gray-400 text-sm">No accounts match the filter.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-2">
-                    {filteredAccounts.map((account) => {
-                      const num = parseFloat(account.balance);
-                      const isPositive = num >= 0;
-                      const formatted = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: account.currency || 'USD',
-                        minimumFractionDigits: 2,
-                      }).format(Math.abs(num));
-
-                      return (
-                        <div
-                          key={account.id}
-                          className={`p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-white/10 transition-colors ${
-                            account.isHidden ? 'opacity-60' : ''
-                          } ${account.isExcludedFromNetWorth ? 'opacity-60' : ''}`}
-                          onClick={() => handleOpenAccountDrawer(account)}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                          conn.lastSyncStatus === 'ok'
+                            ? 'bg-chart-1/20 text-chart-1'
+                            : conn.lastSyncStatus === 'error'
+                            ? 'bg-destructive/20 text-destructive'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {conn.lastSyncStatus === 'ok' ? 'Synced' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+                        </span>
+                        <button
+                          onClick={() => handleSync(conn.id)}
+                          disabled={syncingId === conn.id}
+                          className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                                account.type === 'checking' ? 'bg-blue-500/20 text-blue-400' :
-                                account.type === 'savings' ? 'bg-green-500/20 text-green-400' :
-                                account.type === 'credit' ? 'bg-purple-500/20 text-purple-400' :
-                                account.type === 'investment' ? 'bg-amber-500/20 text-amber-400' :
-                                account.type === 'loan' ? 'bg-orange-500/20 text-orange-400' :
-                                'bg-gray-500/20 text-gray-400'
-                              }`}>
-                                {account.type}
-                              </span>
-                              {account.isHidden && (
-                                <span className="px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">Hidden</span>
-                              )}
-                              {account.isExcludedFromNetWorth && (
-                                <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">Excluded</span>
-                              )}
-                            </div>
-                            <div className="text-white font-medium mt-1 truncate">{account.name}</div>
-                            {account.institution && (
-                              <div className="text-xs text-gray-500 mt-0.5">{account.institution}</div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <div className={`font-mono text-sm text-gray-400 blur-number`}>
-                                {formatted}
-                              </div>
-                              <div className="text-xs text-gray-500">{account.currency}</div>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={handleToggleAccount(account.id, 'isHidden')}
-                                  disabled={togglingAccount === account.id}
-                                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                                    account.isHidden ? 'bg-blue-600' : 'bg-gray-600'
-                                  } disabled:opacity-50`}
-                                  title={account.isHidden ? 'Show account' : 'Hide account'}
-                                >
-                                  <span
-                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                      account.isHidden ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
-                                  />
-                                </button>
-                                <span className="text-xs text-gray-400 whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                  disabled={togglingAccount === account.id}
-                                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                                    account.isExcludedFromNetWorth ? 'bg-blue-600' : 'bg-gray-600'
-                                  } disabled:opacity-50`}
-                                  title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                                >
-                                  <span
-                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                      account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
-                                  />
-                                </button>
-                                <span className="text-xs text-gray-400 whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {hasHiddenOrExcluded && (
-                      <p className="text-xs text-gray-500 pt-1">
-                        Some accounts are hidden or excluded. Use the tabs above to filter.
+                          {syncingId === conn.id ? 'Syncing...' : 'Sync'}
+                        </button>
+                        <button
+                          onClick={() => openDetails(conn)}
+                          className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
+                          className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {syncResult && (
+                    <div className={`p-3 rounded-lg border ${
+                      syncResult.status === 'success'
+                        ? 'bg-chart-1/10 border-chart-1/20'
+                        : 'bg-destructive/10 border-destructive/20'
+                    }`}>
+                      <p className={`text-xs font-medium ${
+                        syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'
+                      }`}>
+                        {syncResult.status === 'success'
+                          ? `Sync complete: ${syncResult.accountsSynced} accounts, ${syncResult.transactionsFetched} transactions`
+                          : 'Sync failed'}
                       </p>
-                    )}
-                  </div>
-                );
-              })()}
-          </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Add Connection Form */}
           {!hasConnection && (
-            <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-              <h2 className="text-xl font-semibold text-white mb-4">Add SimpleFIN Connection</h2>
-              
-              {/* Instructions */}
-              <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <h3 className="text-sm font-semibold text-blue-400 mb-2">How to get your SimpleFIN API key / setup token:</h3>
-                <ol className="text-xs text-gray-300 space-y-1.5">
+            <div className="p-5 bg-card border border-border rounded-xl">
+              <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
+
+              <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <h3 className="text-sm font-semibold text-primary mb-2">How to get your SimpleFIN API key / setup token:</h3>
+                <ol className="text-xs text-muted-foreground space-y-1.5">
                   <li className="flex gap-2">
-                    <span className="text-blue-400 font-bold">1.</span>
-                    <span>Sign up for a SimpleFIN Bridge account at <a href="https://beta-bridge.simplefin.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">https://beta-bridge.simplefin.org</a></span>
+                    <span className="text-primary font-bold">1.</span>
+                    <span>Sign up for a SimpleFIN Bridge account at <a href="https://beta-bridge.simplefin.org" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">https://beta-bridge.simplefin.org</a></span>
                   </li>
                   <li className="flex gap-2">
-                    <span className="text-blue-400 font-bold">2.</span>
+                    <span className="text-primary font-bold">2.</span>
                     <span>After signing in, go My Account, Apps</span>
                   </li>
                   <li className="flex gap-2">
-                    <span className="text-blue-400 font-bold">3.</span>
-                    <span>Generate a new SimpleFIN API key or setup token by clicking New App Connection. (it will be a long base64-encoded string)</span>
+                    <span className="text-primary font-bold">3.</span>
+                    <span>Generate a new SimpleFIN API key or setup token by clicking New App Connection.</span>
                   </li>
                   <li className="flex gap-2">
-                    <span className="text-blue-400 font-bold">4.</span>
+                    <span className="text-primary font-bold">4.</span>
                     <span>Paste the token below and click "Add Connection"</span>
                   </li>
                 </ol>
@@ -703,7 +531,7 @@ export default function SettingsPage() {
 
               <form onSubmit={handleAddConnection} className="space-y-4">
                 <div>
-                  <label htmlFor="setupToken" className="block text-sm font-medium text-gray-300 mb-1">
+                  <label htmlFor="setupToken" className="block text-sm font-medium text-foreground mb-1">
                     SimpleFIN API Key / Setup Token
                   </label>
                   <Input
@@ -711,13 +539,12 @@ export default function SettingsPage() {
                     value={setupToken}
                     onChange={(e) => setSetupToken(e.target.value)}
                     placeholder="Paste your SimpleFIN API key or setup token here..."
-                    className="bg-white/10 border-white/20 text-white placeholder-gray-500"
                     required
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="label" className="block text-sm font-medium text-gray-300 mb-1">
+                  <label htmlFor="label" className="block text-sm font-medium text-foreground mb-1">
                     Label (optional)
                   </label>
                   <Input
@@ -725,28 +552,27 @@ export default function SettingsPage() {
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
                     placeholder="e.g., SimpleFIN Bridge"
-                    className="bg-white/10 border-white/20 text-white placeholder-gray-500"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+                  className="w-full px-5 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
                 >
                   {loading ? 'Adding...' : 'Add Connection'}
                 </button>
               </form>
 
               {error && (
-                <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
-                  <p className="text-red-400 text-sm">{error}</p>
+                <div className="mt-4 p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
+                  <p className="text-destructive text-sm">{error}</p>
                 </div>
               )}
 
               {success && (
-                <div className="mt-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-                  <p className="text-green-400 text-sm">{success}</p>
+                <div className="mt-4 p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg">
+                  <p className="text-chart-1 text-sm">{success}</p>
                 </div>
               )}
             </div>
@@ -754,68 +580,207 @@ export default function SettingsPage() {
         </>
       )}
 
-
       {activeTab === 'categories' && (
-        <div className="flex-1 min-h-[500px] p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-y-auto">
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <CategoriesTab />
         </div>
       )}
 
+      {activeTab === 'accounts' && (
+        <div className="p-5 bg-card border border-border rounded-xl">
+          <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
+          <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
+
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
+              {(['all', 'hidden', 'excluded'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setAccountFilter(filter)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    accountFilter === filter
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {accountsLoading ? (
+            <div className="text-muted-foreground text-sm">Loading...</div>
+          ) : accounts.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
+          ) : (() => {
+              const filteredAccounts = accounts.filter((a) => {
+                if (accountFilter === 'hidden') return a.isHidden;
+                if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
+                return true;
+              });
+              const hasHiddenOrExcluded = accounts.some((a) => a.isHidden || a.isExcludedFromNetWorth);
+
+              if (filteredAccounts.length === 0 && accountFilter !== 'all') {
+                return (
+                  <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
+                    <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  {filteredAccounts.map((account) => {
+                    const num = parseFloat(account.balance);
+                    const formatted = new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: account.currency || 'USD',
+                      minimumFractionDigits: 2,
+                    }).format(Math.abs(num));
+
+                    return (
+                      <div
+                        key={account.id}
+                        className={`p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-muted/50 transition-colors ${
+                          account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
+                        }`}
+                        onClick={() => handleOpenAccountDrawer(account)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                              account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
+                              account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
+                              account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
+                              account.type === 'investment' ? 'bg-chart-3/20 text-chart-3' :
+                              account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {account.type}
+                            </span>
+                            {account.isHidden && (
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
+                            )}
+                            {account.isExcludedFromNetWorth && (
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
+                            )}
+                          </div>
+                          <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
+                          {account.institution && (
+                            <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="text-right">
+                            <div className={`font-mono text-sm text-muted-foreground blur-number`}>
+                              {formatted}
+                            </div>
+                            <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handleToggleAccount(account.id, 'isHidden')}
+                                disabled={togglingAccount === account.id}
+                                className={`relative w-10 h-5 rounded-full transition-colors ${
+                                  account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                                } disabled:opacity-50`}
+                                title={account.isHidden ? 'Show account' : 'Hide account'}
+                              >
+                                <span
+                                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                    account.isHidden ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                disabled={togglingAccount === account.id}
+                                className={`relative w-10 h-5 rounded-full transition-colors ${
+                                  account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
+                                } disabled:opacity-50`}
+                                title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                              >
+                                <span
+                                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                    account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {hasHiddenOrExcluded && (
+                    <p className="text-xs text-muted-foreground pt-1">Some accounts are hidden or excluded. Use the tabs above to filter.</p>
+                  )}
+                </div>
+              );
+            })()}
+        </div>
+      )}
+
       {activeTab === 'rules' && (
-        <div className="flex-1 min-h-[500px] p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-y-auto">
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <RulesTab />
         </div>
       )}
     </div>
   </div>
+
   {/* Connection Details Dialog */}
   <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
-    <DialogContent className="bg-gray-950/95 border-white/10 max-w-md">
+    <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle className="text-white">Connection Details</DialogTitle>
-        <DialogDescription>
-          View and manage your SimpleFIN connection.
-        </DialogDescription>
+        <DialogTitle>Connection Details</DialogTitle>
+        <DialogDescription>View and manage your SimpleFIN connection.</DialogDescription>
       </DialogHeader>
       {detailsConn && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-400">Label</label>
+            <label className="text-sm text-muted-foreground">Label</label>
             <Input
               value={detailsLabel}
               onChange={(e) => setDetailsLabel(e.target.value)}
-              className="mt-1 bg-white/10 border-white/20 text-white"
+              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Status</label>
+            <label className="text-sm text-muted-foreground">Status</label>
             <div className="mt-1 flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${
-                detailsConn.lastSyncStatus === 'ok' ? 'bg-emerald-400' :
-                detailsConn.lastSyncStatus === 'error' ? 'bg-red-400' :
-                'bg-gray-500'
+                detailsConn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
+                detailsConn.lastSyncStatus === 'error' ? 'bg-destructive' :
+                'bg-muted-foreground/50'
               }`} />
-              <span className="text-white text-sm">
+              <span className="text-foreground text-sm">
                 {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
               </span>
             </div>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Last Sync</label>
-            <div className="mt-1 text-white text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
+            <label className="text-sm text-muted-foreground">Last Sync</label>
+            <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Created</label>
-            <div className="mt-1 text-white text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
+            <label className="text-sm text-muted-foreground">Created</label>
+            <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Access URL</label>
-            <div className="mt-1 text-gray-400 text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
+            <label className="text-sm text-muted-foreground">Access URL</label>
+            <div className="mt-1 text-muted-foreground text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
           </div>
           {detailsConn.lastSyncError && (
             <div>
-              <label className="text-sm text-red-400">Last Error</label>
-              <div className="mt-1 text-red-400 text-sm">{detailsConn.lastSyncError}</div>
+              <label className="text-sm text-destructive">Last Error</label>
+              <div className="mt-1 text-destructive text-sm">{detailsConn.lastSyncError}</div>
             </div>
           )}
         </div>
@@ -823,7 +788,7 @@ export default function SettingsPage() {
       <DialogFooter>
         <button
           onClick={() => setDetailsConn(null)}
-          className="px-4 py-2 text-sm text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
         >
           Close
         </button>
@@ -833,60 +798,59 @@ export default function SettingsPage() {
 
   {/* Delete Confirmation */}
   <AlertDialog open={!!deleteConn} onOpenChange={(open) => !open && setDeleteConn(null)}>
-    <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-sm">
+    <AlertDialogContent className="max-w-sm">
       <AlertDialogHeader>
-        <AlertDialogTitle className="text-white">Delete Connection</AlertDialogTitle>
+        <AlertDialogTitle>Delete Connection</AlertDialogTitle>
         <AlertDialogDescription>
           Are you sure you want to delete <strong>{deleteConn?.label}</strong>?
         </AlertDialogDescription>
       </AlertDialogHeader>
 
-      {/* Data preservation choice */}
       <div className="space-y-3 py-2">
-        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors bg-white/5 border-white/10 hover:bg-white/10">
+        <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
           <input
             type="radio"
             name="deleteData"
             checked={!deleteKeepData}
             onChange={() => setDeleteKeepData(false)}
-            className="mt-0.5 accent-red-500"
+            className="mt-0.5 accent-destructive"
           />
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-white">Delete all data</span>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <span className="text-sm font-medium text-foreground">Delete all data</span>
+            <p className="text-xs text-muted-foreground mt-0.5">
               Permanently remove this connection and all linked accounts and transactions.
             </p>
           </div>
         </label>
-        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors bg-white/5 border-white/10 hover:bg-white/10">
+        <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
           <input
             type="radio"
             name="deleteData"
             checked={deleteKeepData}
             onChange={() => setDeleteKeepData(true)}
-            className="mt-0.5 accent-blue-500"
+            className="mt-0.5 accent-primary"
           />
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-white">Keep existing data</span>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Remove the bridge connection only. All accounts, transactions, and history will be preserved. If you reconnect the same accounts later, data will continue syncing without duplicates.
+            <span className="text-sm font-medium text-foreground">Keep existing data</span>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Remove the bridge connection only. All accounts, transactions, and history will be preserved.
             </p>
           </div>
         </label>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
       <AlertDialogFooter>
-        <AlertDialogCancel onClick={() => setDeleteConn(null)}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
         <button
           type="button"
           onClick={handleDelete}
           disabled={deleteLoading}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
         >
           {deleteLoading ? 'Deleting...' : deleteKeepData ? 'Remove Connection' : 'Delete All'}
         </button>

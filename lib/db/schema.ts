@@ -187,6 +187,7 @@ export const categoryRules = pgTable('category_rules', {
   setCategoryId: uuid('set_category_id').references(() => categories.id, { onDelete: 'set null' }),
   setPayee: text('set_payee'),
   setReviewed: boolean('set_reviewed'),
+  isSystem: boolean('is_system').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
