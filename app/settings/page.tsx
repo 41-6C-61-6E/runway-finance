@@ -32,6 +32,7 @@ type Account = {
   balance: string;
   currency: string;
   institution: string | null;
+  connectionId: string | null;
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const [savingLabel, setSavingLabel] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules'>('general');
+  const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -590,6 +592,27 @@ export default function SettingsPage() {
 
       {activeTab === 'accounts' && (
         <>
+          {/* Sub-tab toggle */}
+          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
+            <button
+              onClick={() => setAccountSubTab('automatic')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Automatic Accounts
+            </button>
+            <button
+              onClick={() => setAccountSubTab('manual')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                accountSubTab === 'manual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Manual Accounts
+            </button>
+          </div>
+
+          {accountSubTab === 'automatic' && (
         <div className="p-5 bg-card border border-border rounded-xl">
           <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
           <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
@@ -618,11 +641,13 @@ export default function SettingsPage() {
             <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
           ) : (() => {
               const filteredAccounts = accounts.filter((a) => {
+                // Only show automatic accounts (have a connectionId)
+                if (!a.connectionId) return false;
                 if (accountFilter === 'hidden') return a.isHidden;
                 if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
                 return true;
               });
-              const hasHiddenOrExcluded = accounts.some((a) => a.isHidden || a.isExcludedFromNetWorth);
+              const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
 
               if (filteredAccounts.length === 0 && accountFilter !== 'all') {
                 return (
@@ -728,10 +753,11 @@ export default function SettingsPage() {
               );
             })()}
         </div>
+          )}
 
-          <div className="mt-6">
+          {accountSubTab === 'manual' && (
             <ManualAccountsSection />
-          </div>
+          )}
         </>
       )}
 

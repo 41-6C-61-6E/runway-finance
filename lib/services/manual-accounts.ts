@@ -49,30 +49,42 @@ function manualExternalId(): string {
 
 export async function fetchRedfinValue(propertyId: string): Promise<number> {
   const url = `https://www.redfin.com/what-is-my-home-worth?propertyId=${encodeURIComponent(propertyId)}`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
+  } catch (err) {
+    throw new Error(`Redfin network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (!res.ok) {
-    throw new Error(`Redfin request failed: ${res.status}`);
+    const body = await res.text().catch(() => '(unreadable)');
+    throw new Error(`Redfin HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
   }
   const html = await res.text();
   const match = html.match(/\$([0-9]{1,3}(?:,[0-9]{3})*)/);
   if (!match) {
-    throw new Error('Could not parse Redfin estimate from page');
+    throw new Error(`Could not parse Redfin estimate from page (${url}): page is ${html.length} chars, no price pattern found`);
   }
   return parseFloat(match[1].replace(/,/g, ''));
 }
 
 export async function fetchBitcoinBalance(xpub: string): Promise<number> {
   const url = `https://blockchain.info/balance?active=${encodeURIComponent(xpub)}`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  let res: Response;
+  try {
+    res = await fetch(url, { next: { revalidate: 300 } });
+  } catch (err) {
+    throw new Error(`Bitcoin network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (!res.ok) {
-    throw new Error(`Bitcoin balance request failed: ${res.status}`);
+    const body = await res.text().catch(() => '(unreadable)');
+    throw new Error(`Bitcoin HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
   }
   const data = await res.json() as Record<string, { final_balance: number }>;
   const entry = data[xpub];
   if (!entry || entry.final_balance === undefined) {
-    throw new Error('Could not parse Bitcoin balance from response');
+    throw new Error(`Bitcoin response format unexpected [${url}]: keys=${Object.keys(data).join(',')}, firstKeyHasBalance=${Object.values(data)[0]?.final_balance !== undefined}`);
   }
   return entry.final_balance / 1e8;
 }
@@ -80,16 +92,30 @@ export async function fetchBitcoinBalance(xpub: string): Promise<number> {
 export async function fetchSpotPrice(type: 'gold' | 'silver'): Promise<number> {
   const metal = type === 'gold' ? 'XAU' : 'XAG';
   const url = `https://api.metals.live/v1/spot/${metal}`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  let res: Response;
+  try {
+    res = await fetch(url, { next: { revalidate: 300 } });
+  } catch (err) {
+    throw new Error(`Spot price network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (!res.ok) {
-    throw new Error(`Spot price request failed: ${res.status}`);
+    const body = await res.text().catch(() => '(unreadable)');
+    throw new Error(`Spot price HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
   }
   const data = await res.json();
   if (Array.isArray(data)) {
     const found = data.find((item: Record<string, unknown>) => item.metal === metal || item.currency === 'USD');
-    return found ? parseFloat(String((found as Record<string, unknown>).price ?? 0)) : 0;
+    if (!found) {
+      throw new Error(`Spot price array response missing ${metal} entry [${url}]: first item keys=${Object.keys(data[0] ?? {}).join(',')}`);
+    }
+    return parseFloat(String((found as Record<string, unknown>).price ?? 0));
   }
-  return parseFloat(String((data as Record<string, unknown>)[metal] ?? (data as Record<string, unknown>).price ?? 0));
+  const obj = data as Record<string, unknown>;
+  const price = obj[metal] ?? obj.price ?? obj.spotPrice;
+  if (price === undefined || price === null) {
+    throw new Error(`Spot price object response missing price field [${url}]: keys=${Object.keys(obj).join(',')}`);
+  }
+  return parseFloat(String(price));
 }
 
 export async function createManualAccount(input: CreateManualAccountInput) {
