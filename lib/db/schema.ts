@@ -99,7 +99,6 @@ export const accounts = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').notNull(),
     connectionId: uuid('connection_id')
-      .notNull()
       .references(() => simplifinConnections.id, { onDelete: 'cascade' }),
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),

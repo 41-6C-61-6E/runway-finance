@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
-import { simplifinConnections, syncLogs } from '@/lib/db/schema';
+import { simplifinConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +61,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const session = await auth();
@@ -69,9 +69,18 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
 
-  requireDeleteConfirmation(_request);
+  requireDeleteConfirmation(request);
 
   const userId = session.user.id;
+
+  // Parse optional body for keepData flag
+  let keepData = false;
+  try {
+    const body = await request.json();
+    keepData = body.keepData === true;
+  } catch {
+    // No body or invalid JSON — default to delete all (current behavior)
+  }
 
   // Find the connection
   const [connection] = await getDb()
@@ -92,6 +101,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       { error: 'forbidden', message: 'You do not own this connection' },
       { status: 403 }
     );
+  }
+
+  if (keepData) {
+    // Disconnect accounts from this connection so they survive deletion
+    await getDb()
+      .update(accounts)
+      .set({ connectionId: null })
+      .where(eq(accounts.connectionId, id));
   }
 
   // Remove dependent sync logs first because this table does not cascade on delete.

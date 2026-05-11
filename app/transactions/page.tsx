@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
+import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
 import ContentWrapper from '@/components/content-wrapper';
 
 type FilterState = {
@@ -41,6 +42,9 @@ function TransactionsContent() {
 
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Update URL when filters change
   useEffect(() => {
@@ -91,6 +95,20 @@ function TransactionsContent() {
     setSelectedIds(new Set());
   }, []);
 
+  const handleTransactionClick = useCallback((tx: any) => {
+    setSelectedTransaction(tx);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setDrawerOpen(false);
+    setSelectedTransaction(null);
+  }, []);
+
+  const handleDrawerSuccess = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   return (
     <div className="min-h-screen w-full relative overflow-hidden">
       {/* Background */}
@@ -122,9 +140,19 @@ function TransactionsContent() {
                 />
               )}
               <TransactionTable
+                key={refreshKey}
                 filters={filters}
                 onSelectAll={handleSelectAll}
+                onTransactionClick={handleTransactionClick}
               />
+              {selectedTransaction && (
+                <TransactionDetailDrawer
+                  transaction={selectedTransaction}
+                  open={drawerOpen}
+                  onClose={handleDrawerClose}
+                  onSuccess={handleDrawerSuccess}
+                />
+              )}
             </div>
           </div>
         </ContentWrapper>

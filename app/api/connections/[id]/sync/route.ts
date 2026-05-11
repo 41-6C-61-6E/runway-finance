@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { simplifinConnections, syncLogs } from '@/lib/db/schema';
+import { simplifinConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,19 +34,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       { status: 403 }
     );
   }
-
-  // Create sync log entry
-  const [log] = await getDb()
-    .insert(syncLogs)
-    .values({
-      userId,
-      connectionId: id,
-      status: 'running',
-      accountsSynced: 0,
-      transactionsFetched: 0,
-      transactionsNew: 0,
-    })
-    .returning();
 
   // Call sync service
   const { syncConnection } = await import('@/lib/services/sync');
