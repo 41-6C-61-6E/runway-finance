@@ -344,8 +344,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           const amountNum = parseFloat(sfTx.amount);
           const accountId = upserted.id;
 
-          // Use sfTx.date (expected transaction date) when available; fall back to now for pending
-          const dateMs = sfTx.date > 0 ? sfTx.date * 1000 : now.getTime();
+          // Use transacted_at (actual transaction date) when available; fall back to posted; then now for pending
+          const transactionTimestamp = sfTx.transacted_at ?? sfTx.posted;
+          const dateMs = transactionTimestamp > 0 ? transactionTimestamp * 1000 : now.getTime();
           const txDate = new Date(dateMs).toISOString().split('T')[0];
           const txPostedDate = sfTx.posted > 0
             ? new Date(sfTx.posted * 1000).toISOString().split('T')[0]
