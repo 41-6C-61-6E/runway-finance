@@ -28,7 +28,7 @@ export type SimpleFINAccount = {
 
 export type SimpleFINResponse = { accounts: SimpleFINAccount[] };
 
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 120_000;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();

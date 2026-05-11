@@ -38,6 +38,7 @@ type Transaction = {
 interface TransactionTableProps {
   filters: Record<string, string | null>;
   onSelectAll: (ids: string[]) => void;
+  onTransactionClick?: (tx: Transaction) => void;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -87,7 +88,7 @@ function SortableHeader({
   );
 }
 
-export default function TransactionTable({ filters, onSelectAll }: TransactionTableProps) {
+export default function TransactionTable({ filters, onSelectAll, onTransactionClick }: TransactionTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -152,13 +153,15 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
 
   const formatAmount = (amount: string) => {
     const num = parseFloat(amount);
+    const isPositive = num >= 0;
     return {
       text: new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
         minimumFractionDigits: 2,
-      }).format(Math.abs(num)),
-      color: 'text-gray-400',
+        signDisplay: 'exceptZero',
+      }).format(num),
+      color: isPositive ? 'text-emerald-400' : 'text-red-400',
     };
   };
 
@@ -401,6 +404,7 @@ export default function TransactionTable({ filters, onSelectAll }: TransactionTa
                         className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group ${
                           isPending ? 'bg-amber-400/[0.03]' : ''
                         }`}
+                        onClick={() => onTransactionClick?.(row.original)}
                       >
                       {row.getVisibleCells().map((cell) => (
                         <td

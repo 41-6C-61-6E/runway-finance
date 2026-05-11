@@ -20,6 +20,14 @@ type Transaction = {
   pending: boolean;
 };
 
+type Category = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  color: string;
+  isIncome: boolean;
+};
+
 interface TransactionDetailDrawerProps {
   transaction: Transaction;
   open: boolean;
@@ -31,6 +39,8 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [payee, setPayee] = useState(transaction.payee ?? '');
   const [notes, setNotes] = useState(transaction.notes ?? '');
   const [categoryId, setCategoryId] = useState(transaction.categoryId);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -38,6 +48,17 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     setNotes(transaction.notes ?? '');
     setCategoryId(transaction.categoryId);
   }, [transaction]);
+
+  useEffect(() => {
+    if (open && categories.length === 0 && !categoriesLoading) {
+      setCategoriesLoading(true);
+      fetch('/api/categories', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => setCategories(Array.isArray(data) ? data : []))
+        .catch(() => setCategories([]))
+        .finally(() => setCategoriesLoading(false));
+    }
+  }, [open, categories.length, categoriesLoading]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -78,6 +99,12 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   const { text, color } = formatAmount(transaction.amount);
 
+  const parents = categories.filter((c) => !c.parentId);
+  const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
+
+  const selectedCat = categoryId ? categories.find((c) => c.id === categoryId) : null;
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-[420px] sm:w-[500px] bg-gray-950/95 border-white/10">
@@ -109,22 +136,79 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
               <div className="text-sm text-white mt-0.5">{transaction.accountName || '—'}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">Category</div>
-              <div className="mt-0.5">
-                {transaction.categoryName ? (
-                  <span
-                    className="px-2 py-0.5 text-xs rounded-full font-medium"
-                    style={{
-                      backgroundColor: `${transaction.categoryColor}33`,
-                      color: transaction.categoryColor || '#6366f1',
-                    }}
-                  >
-                    {transaction.categoryName}
-                  </span>
+              <div className="text-sm text-gray-500">Description</div>
+              <div className="text-sm text-white mt-0.5 truncate">{transaction.description}</div>
+            </div>
+          </div>
+
+          {/* Category Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Category</label>
+            <div className="relative">
+              <button
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className="w-full flex items-center gap-2 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white hover:bg-white/15 transition-colors text-left"
+              >
+                {selectedCat ? (
+                  <>
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
+                    <span>{selectedCat.name}</span>
+                  </>
                 ) : (
-                  <span className="text-xs text-gray-500">Uncategorized</span>
+                  <span className="text-gray-400">Uncategorized</span>
                 )}
-              </div>
+                <span className="ml-auto text-gray-500">▼</span>
+              </button>
+
+              {showCategoryDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowCategoryDropdown(false)} />
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-gray-900 border border-white/10 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                    <button
+                      onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:bg-white/5 transition-colors"
+                    >
+                      None (uncategorized)
+                    </button>
+                    {parents.map((parent) => (
+                      <div key={parent.id}>
+                        <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-500 bg-white/[0.02]">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
+                          {parent.name}
+                        </div>
+                        {getChildren(parent.id).map((child) => (
+                          <button
+                            key={child.id}
+                            onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); }}
+                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
+                              categoryId === child.id
+                                ? 'text-white bg-blue-600/20'
+                                : 'text-gray-300 hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                            {child.name}
+                          </button>
+                        ))}
+                        {getChildren(parent.id).length === 0 && (
+                          <button
+                            key={parent.id}
+                            onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); }}
+                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
+                              categoryId === parent.id
+                                ? 'text-white bg-blue-600/20'
+                                : 'text-gray-300 hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                            {parent.name}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

@@ -1,0 +1,1 @@
+ALTER TABLE accounts ALTER COLUMN connection_id DROP NOT NULL;

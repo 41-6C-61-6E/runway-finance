@@ -1,7 +1,8 @@
 import { getDb } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categories } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
-import { eq, and } from 'drizzle-orm';
+import { applyRulesToTransactions } from '@/lib/services/rules-engine';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 
@@ -302,37 +303,70 @@ export async function syncConnection(connectionId: string, userId: string): Prom
 
     // Map to track externalId -> accountId for backfilling
     const externalIdToAccountId = new Map<string, string>();
+    const syncedTxData: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }[] = [];
 
     // 6. Upsert accounts
     for (const sfAccount of data.accounts) {
       const balanceNum = parseFloat(sfAccount.balance);
-      const [upserted] = await getDb()
-        .insert(accounts)
-        .values({
-          userId,
-          connectionId,
-          externalId: sfAccount.id,
-          name: sfAccount.name,
-          currency: sfAccount.currency,
-          balance: String(balanceNum),
-          balanceDate: new Date(sfAccount['balance-date'] * 1000),
-          type: inferAccountType(sfAccount),
-          institution: sfAccount.org.name,
-          isHidden: false,
-          isExcludedFromNetWorth: false,
-          displayOrder: 0,
-        })
-        .onConflictDoUpdate({
-          target: [accounts.connectionId, accounts.externalId],
-          set: {
+
+      // Check for orphaned account (from a previously deleted connection) to reconnect
+      const [orphanedAccount] = await getDb()
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.userId, userId),
+            eq(accounts.externalId, sfAccount.id),
+            isNull(accounts.connectionId)
+          )
+        )
+        .limit(1);
+
+      let upserted: typeof accounts.$inferSelect;
+
+      if (orphanedAccount) {
+        // Reconnect orphaned account to the new connection
+        [upserted] = await getDb()
+          .update(accounts)
+          .set({
+            connectionId,
             balance: String(balanceNum),
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
             name: sfAccount.name,
             institution: sfAccount.org.name,
             updatedAt: now,
-          },
-        })
-        .returning();
+          })
+          .where(eq(accounts.id, orphanedAccount.id))
+          .returning();
+      } else {
+        [upserted] = await getDb()
+          .insert(accounts)
+          .values({
+            userId,
+            connectionId,
+            externalId: sfAccount.id,
+            name: sfAccount.name,
+            currency: sfAccount.currency,
+            balance: String(balanceNum),
+            balanceDate: new Date(sfAccount['balance-date'] * 1000),
+            type: inferAccountType(sfAccount),
+            institution: sfAccount.org.name,
+            isHidden: false,
+            isExcludedFromNetWorth: false,
+            displayOrder: 0,
+          })
+          .onConflictDoUpdate({
+            target: [accounts.connectionId, accounts.externalId],
+            set: {
+              balance: String(balanceNum),
+              balanceDate: new Date(sfAccount['balance-date'] * 1000),
+              name: sfAccount.name,
+              institution: sfAccount.org.name,
+              updatedAt: now,
+            },
+          })
+          .returning();
+      }
 
       // Track accountId for backfilling
       externalIdToAccountId.set(sfAccount.id, upserted.id);
@@ -379,6 +413,15 @@ export async function syncConnection(connectionId: string, userId: string): Prom
               },
             });
 
+          syncedTxData.push({
+            externalId: sfTx.id,
+            accountId: accountId,
+            description: sfTx.description,
+            payee: sfTx.payee ?? null,
+            memo: sfTx.memo ?? null,
+            amount: String(amountNum),
+          });
+
           // Track new vs updated via pre-check
           const existing = await getDb()
             .select({ id: transactions.id })
@@ -395,7 +438,45 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       }
     }
 
-    // 8. Update connection sync status
+    // 8. Apply categorization rules to synced transactions
+    if (syncedTxData.length > 0) {
+      const syncedTxnsWithIds = await getDb()
+        .select({
+          id: transactions.id,
+          description: transactions.description,
+          payee: transactions.payee,
+          memo: transactions.memo,
+          amount: transactions.amount,
+          categoryId: transactions.categoryId,
+          externalId: transactions.externalId,
+        })
+        .from(transactions)
+        .where(
+          inArray(
+            transactions.externalId,
+            syncedTxData.map((t) => t.externalId)
+          )
+        );
+
+      const uncategorized = syncedTxnsWithIds.filter((t) => !t.categoryId);
+      if (uncategorized.length > 0) {
+        const ruleResults = await applyRulesToTransactions(uncategorized, userId);
+        for (const [txId, action] of ruleResults) {
+          const updateData: Record<string, unknown> = { updatedAt: new Date() };
+          if (action.categoryId) updateData.categoryId = action.categoryId;
+          if (action.payee) updateData.payee = action.payee;
+          if (action.reviewed !== null) updateData.reviewed = action.reviewed;
+          if (Object.keys(updateData).length > 1) {
+            await getDb()
+              .update(transactions)
+              .set(updateData)
+              .where(eq(transactions.id, txId));
+          }
+        }
+      }
+    }
+
+    // 9. Update connection sync status
     await getDb()
       .update(simplifinConnections)
       .set({
@@ -405,7 +486,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       })
       .where(eq(simplifinConnections.id, connectionId));
 
-    // 9. Update sync log
+    // 10. Update sync log
     await getDb()
       .update(syncLogs)
       .set({
@@ -421,14 +502,14 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       })
       .where(eq(syncLogs.id, log.id));
 
-    // 10. Create net worth snapshot for today
+    // 11. Create net worth snapshot for today
     const today = new Date().toISOString().split('T')[0];
     await createNetWorthSnapshot(userId, today);
 
-    // 11. Create account snapshots for all accounts (real, non-synthetic)
+    // 12. Create account snapshots for all accounts (real, non-synthetic)
     await createAccountSnapshots(userId, today);
 
-    // 12. Backfill historical synthetic snapshots for each synced account
+    // 13. Backfill historical synthetic snapshots for each synced account
     for (const sfAccount of data.accounts) {
       const accountId = externalIdToAccountId.get(sfAccount.id);
       if (!accountId) continue;
@@ -457,7 +538,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       }
     }
 
-    // 13. Update monthly cash flow and category spending summaries for reporting
+    // 14. Update monthly cash flow and category spending summaries for reporting
     await updateMonthlyCashFlowSummaries(userId);
     await updateCategorySpendingSummaries(userId);
 

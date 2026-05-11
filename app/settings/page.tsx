@@ -12,6 +12,8 @@ import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
+import CategoriesTab from '@/components/features/settings/CategoriesTab';
+import RulesTab from '@/components/features/settings/RulesTab';
 
 type Connection = {
   id: string;
@@ -53,10 +55,14 @@ export default function SettingsPage() {
   const [detailsConn, setDetailsConn] = useState<Connection | null>(null);
   const [detailsLabel, setDetailsLabel] = useState('');
   const [deleteConn, setDeleteConn] = useState<Connection | null>(null);
+  const [deleteKeepData, setDeleteKeepData] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [editLabel, setEditLabel] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingLabel, setSavingLabel] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'rules'>('general');
 
   // Account Management state
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -231,11 +237,13 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`/api/connections/${deleteConn.id}`, {
         method: 'DELETE',
-        headers: { 'X-Confirm-Delete': 'true' },
+        headers: { 'Content-Type': 'application/json', 'X-Confirm-Delete': 'true' },
         credentials: 'include',
+        body: JSON.stringify({ keepData: deleteKeepData }),
       });
       if (res.ok) {
         await fetchConnections();
+        await fetchAccounts();
         setDeleteConn(null);
       } else {
         const data = await res.json();
@@ -320,6 +328,37 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center mt-20 px-4 sm:px-6 lg:px-8" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
         <div className="max-w-2xl w-full space-y-8">
+
+          {/* Tab Bar */}
+          <div className="flex rounded-lg bg-white/5 border border-white/10 overflow-hidden">
+            <button
+              onClick={() => setActiveTab('general')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'general' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              General
+            </button>
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'categories' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Categories
+            </button>
+            <button
+              onClick={() => setActiveTab('rules')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'rules' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Rules
+            </button>
+          </div>
+
+          {activeTab === 'general' && (
+          <>
 
           {/* Combined Settings */}
           <div className="p-6 bg-white/5 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
@@ -459,7 +498,7 @@ export default function SettingsPage() {
                         Details
                       </button>
                       <button
-                        onClick={() => setDeleteConn(conn)}
+                        onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
                         className="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg transition-colors"
                       >
                         Delete
@@ -712,107 +751,156 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+        </>
+      )}
+
+
+      {activeTab === 'categories' && (
+        <div className="flex-1 min-h-[500px] p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-y-auto">
+          <CategoriesTab />
         </div>
+      )}
+
+      {activeTab === 'rules' && (
+        <div className="flex-1 min-h-[500px] p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-y-auto">
+          <RulesTab />
+        </div>
+      )}
+    </div>
+  </div>
+  {/* Connection Details Dialog */}
+  <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
+    <DialogContent className="bg-gray-950/95 border-white/10 max-w-md">
+      <DialogHeader>
+        <DialogTitle className="text-white">Connection Details</DialogTitle>
+        <DialogDescription>
+          View and manage your SimpleFIN connection.
+        </DialogDescription>
+      </DialogHeader>
+      {detailsConn && (
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-400">Label</label>
+            <Input
+              value={detailsLabel}
+              onChange={(e) => setDetailsLabel(e.target.value)}
+              className="mt-1 bg-white/10 border-white/20 text-white"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400">Status</label>
+            <div className="mt-1 flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-full ${
+                detailsConn.lastSyncStatus === 'ok' ? 'bg-emerald-400' :
+                detailsConn.lastSyncStatus === 'error' ? 'bg-red-400' :
+                'bg-gray-500'
+              }`} />
+              <span className="text-white text-sm">
+                {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+              </span>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-400">Last Sync</label>
+            <div className="mt-1 text-white text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-400">Created</label>
+            <div className="mt-1 text-white text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-400">Access URL</label>
+            <div className="mt-1 text-gray-400 text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
+          </div>
+          {detailsConn.lastSyncError && (
+            <div>
+              <label className="text-sm text-red-400">Last Error</label>
+              <div className="mt-1 text-red-400 text-sm">{detailsConn.lastSyncError}</div>
+            </div>
+          )}
+        </div>
+      )}
+      <DialogFooter>
+        <button
+          onClick={() => setDetailsConn(null)}
+          className="px-4 py-2 text-sm text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+        >
+          Close
+        </button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  {/* Delete Confirmation */}
+  <AlertDialog open={!!deleteConn} onOpenChange={(open) => !open && setDeleteConn(null)}>
+    <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-sm">
+      <AlertDialogHeader>
+        <AlertDialogTitle className="text-white">Delete Connection</AlertDialogTitle>
+        <AlertDialogDescription>
+          Are you sure you want to delete <strong>{deleteConn?.label}</strong>?
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+
+      {/* Data preservation choice */}
+      <div className="space-y-3 py-2">
+        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors bg-white/5 border-white/10 hover:bg-white/10">
+          <input
+            type="radio"
+            name="deleteData"
+            checked={!deleteKeepData}
+            onChange={() => setDeleteKeepData(false)}
+            className="mt-0.5 accent-red-500"
+          />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-white">Delete all data</span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Permanently remove this connection and all linked accounts and transactions.
+            </p>
+          </div>
+        </label>
+        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors bg-white/5 border-white/10 hover:bg-white/10">
+          <input
+            type="radio"
+            name="deleteData"
+            checked={deleteKeepData}
+            onChange={() => setDeleteKeepData(true)}
+            className="mt-0.5 accent-blue-500"
+          />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-white">Keep existing data</span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Remove the bridge connection only. All accounts, transactions, and history will be preserved. If you reconnect the same accounts later, data will continue syncing without duplicates.
+            </p>
+          </div>
+        </label>
       </div>
 
-      {/* Connection Details Dialog */}
-      <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
-        <DialogContent className="bg-gray-950/95 border-white/10 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-white">Connection Details</DialogTitle>
-            <DialogDescription>
-              View and manage your SimpleFIN connection.
-            </DialogDescription>
-          </DialogHeader>
-          {detailsConn && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-400">Label</label>
-                <Input
-                  value={detailsLabel}
-                  onChange={(e) => setDetailsLabel(e.target.value)}
-                  className="mt-1 bg-white/10 border-white/20 text-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Status</label>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full ${
-                    detailsConn.lastSyncStatus === 'ok' ? 'bg-emerald-400' :
-                    detailsConn.lastSyncStatus === 'error' ? 'bg-red-400' :
-                    'bg-gray-500'
-                  }`} />
-                  <span className="text-white text-sm">
-                    {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Last Sync</label>
-                <div className="mt-1 text-white text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Created</label>
-                <div className="mt-1 text-white text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Access URL</label>
-                <div className="mt-1 text-gray-400 text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
-              </div>
-              {detailsConn.lastSyncError && (
-                <div>
-                  <label className="text-sm text-red-400">Last Error</label>
-                  <div className="mt-1 text-red-400 text-sm">{detailsConn.lastSyncError}</div>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <button
-              onClick={() => setDetailsConn(null)}
-              className="px-4 py-2 text-sm text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              Close
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {error && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+      <AlertDialogFooter>
+        <AlertDialogCancel onClick={() => setDeleteConn(null)}>Cancel</AlertDialogCancel>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleteLoading}
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {deleteLoading ? 'Deleting...' : deleteKeepData ? 'Remove Connection' : 'Delete All'}
+        </button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConn} onOpenChange={(open) => !open && setDeleteConn(null)}>
-        <AlertDialogContent className="bg-gray-950/95 border-white/10 max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete Connection</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteConn?.label}</strong>? This will also remove all linked accounts and transactions. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {error && (
-            <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteConn(null)}>Cancel</AlertDialogCancel>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleteLoading}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-            >
-              {deleteLoading ? 'Deleting...' : 'Delete'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Account Detail Drawer */}
-      <AccountDetailDrawer
-        account={selectedAccount}
-        open={accountDrawerOpen}
-        onClose={handleCloseAccountDrawer}
-        onSuccess={handleAccountDrawerSuccess}
-      />
-    </div>
-  );
+  {/* Account Detail Drawer */}
+  <AccountDetailDrawer
+    account={selectedAccount}
+    open={accountDrawerOpen}
+    onClose={handleCloseAccountDrawer}
+    onSuccess={handleAccountDrawerSuccess}
+  />
+</div>
+);
 }

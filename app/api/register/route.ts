@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { addUser, findUser } from '@/lib/users';
 import { debugLog, debugInfo, debugWarn, debugError } from '@/lib/debug';
 import { timingSafeEqual } from 'crypto';
+import { seedUserCategories } from '@/lib/db/seed-categories';
 
 export async function POST(request: Request) {
   try {
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     }
 
     await addUser({ username, password, email });
+    await seedUserCategories(username);
     debugInfo('Register API: user created successfully:', username)
     return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
   } catch (error) {
