@@ -10,17 +10,17 @@ interface LogEntry {
 }
 
 const LEVEL_COLORS: Record<LogEntry['level'], string> = {
-  info: 'text-blue-400',
-  warn: 'text-yellow-400',
-  error: 'text-red-400',
-  debug: 'text-gray-500',
+  info: 'text-chart-4',
+  warn: 'text-chart-3',
+  error: 'text-destructive',
+  debug: 'text-muted-foreground',
 }
 
 const LEVEL_BG: Record<LogEntry['level'], string> = {
-  info: 'bg-blue-500/10',
-  warn: 'bg-yellow-500/10',
-  error: 'bg-red-500/10',
-  debug: 'bg-gray-500/10',
+  info: 'bg-chart-4/10',
+  warn: 'bg-chart-3/10',
+  error: 'bg-destructive/10',
+  debug: 'bg-muted-foreground/10',
 }
 
 const MIN_HEIGHT = 150
@@ -190,20 +190,16 @@ export default function DevLogPane() {
 
   // Determine indicator color based on log severity
   const getIndicatorColor = () => {
-    // Check for errors
     if (logs.some((log) => log.level === 'error')) {
-      return 'bg-red-500'
+      return 'bg-destructive'
     }
-    // Check for warnings
     if (logs.some((log) => log.level === 'warn')) {
-      return 'bg-yellow-500'
+      return 'bg-chart-3'
     }
-    // If connected with no errors/warnings
     if (isConnected) {
-      return 'bg-green-500'
+      return 'bg-chart-1'
     }
-    // Default gray if not connected
-    return 'bg-gray-500'
+    return 'bg-muted-foreground'
   }
 
   // If dev mode is not enabled, don't render anything
@@ -223,21 +219,21 @@ export default function DevLogPane() {
           {/* Resizable handle */}
           <div
             onMouseDown={handleMouseDown}
-            className="h-1 bg-gray-800 hover:bg-gray-700 cursor-row-resize transition-colors flex-shrink-0"
+            className="h-1 bg-muted hover:bg-accent cursor-row-resize transition-colors flex-shrink-0"
           />
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">Logs</span>
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm font-semibold text-foreground">Logs</span>
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-chart-1' : 'bg-destructive'}`} />
             </div>
             <div className="flex items-center gap-2">
               {/* Level filter */}
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value as 'all' | LogEntry['level'])}
-                className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="px-2 py-1 text-xs bg-muted border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="all">All</option>
                 <option value="debug">Debug</option>
@@ -249,7 +245,7 @@ export default function DevLogPane() {
               {/* Clear button */}
               <button
                 onClick={handleClear}
-                className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-gray-300 transition-colors"
+                className="px-2 py-1 text-xs bg-muted hover:bg-accent border border-border rounded text-foreground transition-colors"
               >
                 Clear
               </button>
@@ -257,7 +253,7 @@ export default function DevLogPane() {
               {/* Close button */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-gray-300 transition-colors"
+                className="px-2 py-1 text-xs bg-muted hover:bg-accent border border-border rounded text-foreground transition-colors"
               >
                 Hide
               </button>
@@ -266,7 +262,7 @@ export default function DevLogPane() {
 
           {/* Error message */}
           {errorMessage && (
-            <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-200 flex-shrink-0">
+            <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-xs text-destructive flex-shrink-0">
               {errorMessage}
             </div>
           )}
@@ -277,20 +273,20 @@ export default function DevLogPane() {
             className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1"
           >
             {logs.length === 0 ? (
-              <div className="text-gray-600 italic">No logs yet...</div>
+              <div className="text-muted-foreground italic">No logs yet...</div>
             ) : (
               logs.map((log) => (
                 <div
                   key={log.id}
                   className={`flex gap-3 py-1 px-2 rounded ${LEVEL_BG[log.level]}`}
                 >
-                  <span className="text-gray-500 shrink-0">
+                  <span className="text-muted-foreground shrink-0">
                     {new Date(log.timestamp).toLocaleTimeString()}
                   </span>
                   <span className={`shrink-0 font-semibold w-12 ${LEVEL_COLORS[log.level]}`}>
                     {log.level.toUpperCase()}
                   </span>
-                  <span className="text-gray-300 break-all">{log.message}</span>
+                  <span className="text-foreground break-all">{log.message}</span>
                 </div>
               ))
             )}
@@ -302,7 +298,7 @@ export default function DevLogPane() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 px-3 py-2 text-xs font-semibold text-gray-400 hover:text-gray-300 rounded-lg transition-colors shadow-lg z-40 backdrop-blur-md bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 flex items-center gap-2"
+          className="fixed bottom-6 right-6 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors shadow-lg z-40 backdrop-blur-md bg-background/80 hover:bg-muted border border-border hover:border-border flex items-center gap-2"
         >
           <span className={`w-2 h-2 rounded-full ${getIndicatorColor()}`} />
           Logs

@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="bg-white dark:bg-gray-950" suppressHydrationWarning>
+      <body className="bg-background text-foreground" suppressHydrationWarning>
         <ReactQueryProvider>
           <ClientLayout>
             <AuthenticatedLayout>{children}</AuthenticatedLayout>

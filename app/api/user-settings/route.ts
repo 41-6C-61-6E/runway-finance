@@ -2,6 +2,7 @@ import { auth } from 'auth';
 import { getDb } from '@/lib/db';
 import { userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { ACCENT_NAMES } from '@/lib/utils/apply-accent';
 
 export async function GET() {
   const session = await auth();
@@ -28,11 +29,13 @@ export async function GET() {
 
     return Response.json({
       privacyMode: created?.privacyMode ?? false,
+      accentColor: created?.accentColor ?? 'violet',
     });
   }
 
   return Response.json({
     privacyMode: settings[0].privacyMode,
+    accentColor: settings[0].accentColor ?? 'violet',
   });
 }
 
@@ -44,9 +47,14 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const privacyMode = body.privacyMode;
+  const accentColor = body.accentColor;
 
-  if (typeof privacyMode !== 'boolean') {
+  if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
+  }
+
+  if (accentColor !== undefined && !ACCENT_NAMES.includes(accentColor) && !/^#[0-9A-Fa-f]{6}$/.test(accentColor)) {
+    return Response.json({ error: 'Invalid accentColor value' }, { status: 400 });
   }
 
   const db = getDb();
@@ -63,21 +71,29 @@ export async function PATCH(request: Request) {
       .values({
         userId: session.user.id,
         privacyMode,
+        accentColor: accentColor ?? 'violet',
       })
       .returning();
 
     return Response.json({
       privacyMode: created?.privacyMode,
+      accentColor: created?.accentColor,
     });
   }
 
+  const updates: Record<string, any> = {};
+  if (privacyMode !== undefined) updates.privacyMode = privacyMode;
+  if (accentColor !== undefined) updates.accentColor = accentColor;
+  updates.updatedAt = new Date();
+
   const [updated] = await db
     .update(userSettings)
-    .set({ privacyMode, updatedAt: new Date() })
+    .set(updates)
     .where(eq(userSettings.userId, session.user.id))
     .returning();
 
   return Response.json({
     privacyMode: updated.privacyMode,
+    accentColor: updated.accentColor,
   });
 }

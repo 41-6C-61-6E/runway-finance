@@ -42,6 +42,7 @@ export async function GET() {
 
   const data = rules.map((r) => ({
     ...r.rule,
+    isSystem: r.rule.isSystem,
     categoryName: r.category?.name ?? null,
     categoryColor: r.category?.color ?? null,
   }));

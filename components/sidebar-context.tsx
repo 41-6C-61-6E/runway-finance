@@ -9,7 +9,7 @@ const COLLAPSED_WIDTH = 64;
 
 const ACCOUNTS_MIN_WIDTH = 192;
 const ACCOUNTS_MAX_WIDTH = 512;
-const ACCOUNTS_DEFAULT_WIDTH = 320;
+const ACCOUNTS_DEFAULT_WIDTH = 256;
 
 export const SidebarContext = createContext<{
   collapsed: boolean;

@@ -47,7 +47,7 @@ const formatCurrency = (balance: string, currency: string) => {
         currency: currency || 'USD',
         minimumFractionDigits: 2,
       }).format(Math.abs(num)),
-      color: 'text-gray-400',
+      color: 'text-muted-foreground',
       sign: '',
     };
   };
@@ -67,18 +67,18 @@ function AccountRow({
 
   return (
     <div
-      className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group/account"
+      className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-muted cursor-pointer transition-colors group/account"
       onClick={() => onOpenDrawer(account)}
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <div className="w-1.5 h-1.5 rounded-full bg-gray-600 flex-shrink-0" />
-        <span className="text-sm text-gray-200 truncate">{account.name}</span>
+        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
+        <span className="text-sm text-foreground truncate">{account.name}</span>
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="flex items-center gap-1 opacity-0 group-hover/account:opacity-100 transition-opacity">
           <button
             onClick={onToggleHidden(account.id, 'isHidden')}
-            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title={account.isHidden ? 'Show account' : 'Hide account'}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -91,7 +91,7 @@ function AccountRow({
           </button>
           <button
             onClick={onToggleHidden(account.id, 'isExcludedFromNetWorth')}
-            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -237,11 +237,11 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
   // ── Empty state ───────────────────────────────────────────────────────
   if (accounts.length === 0) {
     return (
-      <div className="p-12 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 text-center">
-        <p className="text-gray-400 text-lg mb-4">No accounts linked yet.</p>
+      <div className="p-12 bg-muted rounded-xl border border-border text-center">
+        <p className="text-muted-foreground text-lg mb-4">No accounts linked yet.</p>
         <a
           href="/settings"
-          className="inline-block px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+          className="inline-block px-6 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
         >
           Connect a Financial Institution
         </a>
@@ -254,8 +254,8 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
     <div className="w-full max-w-3xl mx-auto">
       {/* Total Net Worth Header */}
       <div className="mb-8">
-        <div className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Total Net Worth</div>
-        <div className="font-mono text-4xl font-bold text-gray-400">
+        <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Net Worth</div>
+        <div className="font-mono text-4xl font-bold text-foreground">
           {formatCurrency(String(totalNetWorth), 'USD').text}
         </div>
       </div>
@@ -272,11 +272,11 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
               {/* Group Header */}
               <button
                 onClick={() => toggleGroup(group)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-white/5 hover:bg-white/10 transition-colors rounded-xl"
+                className="w-full flex items-center justify-between px-4 py-3 bg-muted hover:bg-muted/80 transition-colors rounded-xl"
               >
                 <div className="flex items-center gap-2">
                   <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`}
+                    className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -284,9 +284,9 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
                   >
                     <path d="M19 9l-7 7-7-7" />
                   </svg>
-                  <span className="text-gray-300 font-semibold">{group}</span>
+                  <span className="text-foreground font-semibold">{group}</span>
                 </div>
-                <div className="font-mono text-lg font-semibold text-gray-400">
+                <div className="font-mono text-lg font-semibold text-muted-foreground">
                   {formatCurrency(String(groupTotal), 'USD').text}
                 </div>
               </button>
@@ -304,11 +304,11 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
                         <div key={subGroup} className="ml-3">
                           <button
                             onClick={() => toggleSubGroup(group, subGroup)}
-                            className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 group/sub"
+                            className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-muted group/sub"
                           >
                             <div className="flex items-center gap-2">
                               <svg
-                                className={`w-3 h-3 text-gray-500 transition-transform ${subExpanded ? 'rotate-0' : '-rotate-90'}`}
+                                className={`w-3 h-3 text-muted-foreground transition-transform ${subExpanded ? 'rotate-0' : '-rotate-90'}`}
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -316,10 +316,10 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
                               >
                                 <path d="M19 9l-7 7-7-7" />
                               </svg>
-                              <span className="text-gray-400 text-sm font-medium">{subGroup}</span>
-                              <span className="text-gray-600 text-xs">({accs.length})</span>
+                              <span className="text-muted-foreground text-sm font-medium">{subGroup}</span>
+                              <span className="text-muted-foreground/60 text-xs">({accs.length})</span>
                             </div>
-                            <div className="font-mono text-sm font-semibold tabular-nums text-gray-400">
+                            <div className="font-mono text-sm font-semibold tabular-nums text-muted-foreground">
                               {formatCurrency(String(subTotal), 'USD').text}
                             </div>
                           </button>

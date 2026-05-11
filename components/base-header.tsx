@@ -2,14 +2,14 @@ import Link from "next/link";
 
 export default function BaseHeader() {
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-gray-950/80 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-background/80 border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-              <span className="text-white font-bold text-lg">R</span>
+            <div className="h-7 w-7 rounded-lg bg-primary/20 flex items-center justify-center group-hover:shadow-md transition-shadow">
+              <div className="w-3.5 h-3.5 rounded-full bg-primary" />
             </div>
-            <span className="font-bold text-xl bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+            <span className="font-semibold text-base text-foreground">
               Runway
             </span>
           </Link>

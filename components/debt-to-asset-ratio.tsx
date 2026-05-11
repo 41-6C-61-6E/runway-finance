@@ -38,11 +38,11 @@ export function DebtToAssetRatio() {
 
   if (loading) {
     return (
-      <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 shadow-lg">
-        <h3 className="text-lg font-semibold text-white mb-4">Debt to Asset Ratio</h3>
-        <div className="animate-pulse space-y-4">
-          <div className="h-12 bg-slate-800 rounded w-24"></div>
-          <div className="h-8 bg-slate-800 rounded"></div>
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Debt to Asset Ratio</h3>
+        <div className="animate-pulse space-y-3">
+          <div className="h-10 bg-muted rounded w-24"></div>
+          <div className="h-6 bg-muted rounded"></div>
         </div>
       </div>
     );
@@ -50,57 +50,58 @@ export function DebtToAssetRatio() {
 
   if (error || !data) {
     return (
-      <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 shadow-lg">
-        <h3 className="text-lg font-semibold text-white mb-4">Debt to Asset Ratio</h3>
-        <p className="text-sm text-slate-400">{error || 'No data available'}</p>
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Debt to Asset Ratio</h3>
+        <p className="text-sm text-muted-foreground">{error || 'No data available'}</p>
       </div>
     );
   }
 
-  const getRatingColor = (rating: string) => {
-    return 'text-gray-400';
-  };
-
   const getProgressColor = (rating: string) => {
     switch (rating.toLowerCase()) {
-      case 'excellent':
-        return 'bg-emerald-500';
-      case 'good':
-        return 'bg-blue-500';
-      case 'fair':
-        return 'bg-yellow-500';
-      case 'poor':
-        return 'bg-orange-500';
-      case 'critical':
-        return 'bg-rose-500';
-      default:
-        return 'bg-slate-500';
+      case 'excellent': return 'bg-chart-1';
+      case 'good': return 'bg-chart-4';
+      case 'fair': return 'bg-chart-3';
+      case 'poor': return 'bg-chart-5';
+      case 'critical': return 'bg-destructive';
+      default: return 'bg-muted-foreground';
+    }
+  };
+
+  const getRatingHue = (rating: string) => {
+    switch (rating.toLowerCase()) {
+      case 'excellent': return 'text-chart-1';
+      case 'good': return 'text-chart-4';
+      case 'fair': return 'text-chart-3';
+      case 'poor': return 'text-chart-5';
+      case 'critical': return 'text-destructive';
+      default: return 'text-muted-foreground';
     }
   };
 
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 shadow-lg">
-      <h3 className="text-lg font-semibold text-white mb-6">Debt to Asset Ratio</h3>
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-foreground mb-4">Debt to Asset Ratio</h3>
 
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="text-5xl font-bold text-white financial-value">
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="text-4xl font-bold text-foreground financial-value">
             {Math.round(data.ratio * 100)}%
           </div>
-          <div className={`text-xl font-semibold ${getRatingColor(data.rating)}`}>
+          <div className={`text-base font-semibold ${getRatingHue(data.rating)}`}>
             {data.rating}
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="space-y-2">
-          <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+        <div className="space-y-1.5">
+          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full ${getProgressColor(data.rating)} transition-all duration-500`}
+              className={`h-full ${getProgressColor(data.rating)} transition-all duration-500 rounded-full`}
               style={{ width: `${Math.min(data.ratio * 100, 100)}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>0%</span>
             <span>50%</span>
             <span>100%</span>
@@ -108,19 +109,19 @@ export function DebtToAssetRatio() {
         </div>
 
         {/* Message */}
-        <p className="text-sm text-slate-300 mt-4">{data.message}</p>
+        <p className="text-sm text-muted-foreground">{data.message}</p>
 
         {/* Quick stats */}
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border">
           <div>
-            <p className="text-xs text-slate-400 mb-1">Total Assets</p>
-            <p className="text-lg font-semibold text-gray-400 financial-value">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Assets</p>
+            <p className="text-sm font-semibold text-foreground financial-value">
               ${(data.totalAssets / 1000000).toFixed(2)}M
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">Total Liabilities</p>
-            <p className="text-lg font-semibold text-gray-400 financial-value">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Liabilities</p>
+            <p className="text-sm font-semibold text-foreground financial-value">
               ${(data.totalLiabilities / 1000000).toFixed(2)}M
             </p>
           </div>

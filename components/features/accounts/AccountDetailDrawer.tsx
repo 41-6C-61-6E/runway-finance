@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 
 type Account = {
   id: string;
@@ -61,44 +62,43 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         currency: currency || 'USD',
         minimumFractionDigits: 2,
       }).format(Math.abs(num)),
-      color: 'text-gray-400',
     };
   };
 
-  const { text, color } = formatBalance(account.balance, account.currency);
+  const { text } = formatBalance(account.balance, account.currency);
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px] bg-gray-950/95 border-white/10">
+      <SheetContent side="right" className="w-[420px] sm:w-[500px]">
         <SheetHeader className="mb-6">
-          <SheetTitle className="text-white">Account Details</SheetTitle>
+          <SheetTitle>Account Details</SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Balance display */}
-          <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-            <div className="text-sm text-gray-400">Current Balance</div>
-            <div className={`font-mono text-2xl font-bold mt-1 ${color} financial-value`}>{text}</div>
-            <div className="text-xs text-gray-500 mt-1">{account.currency}</div>
+          <div className="p-4 bg-card border border-border rounded-xl">
+            <div className="text-xs text-muted-foreground">Current Balance</div>
+            <div className={`font-mono text-2xl font-bold mt-1 text-foreground financial-value`}>{text}</div>
+            <div className="text-xs text-muted-foreground mt-1">{account.currency}</div>
           </div>
 
           {/* Editable fields */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Type</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Type</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="checking">Checking</option>
                 <option value="savings">Savings</option>
@@ -110,42 +110,34 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
             </div>
 
             {/* Info fields (read-only) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-sm text-gray-500">Institution</div>
-                <div className="text-sm text-white mt-0.5">{account.institution || '—'}</div>
+                <div className="text-xs text-muted-foreground">Institution</div>
+                <div className="text-sm text-foreground mt-0.5">{account.institution || '—'}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-500">Balance Date</div>
-                <div className="text-sm text-white mt-0.5">
+                <div className="text-xs text-muted-foreground">Balance Date</div>
+                <div className="text-sm text-foreground mt-0.5">
                   {account.balanceDate ? new Date(account.balanceDate).toLocaleDateString() : '—'}
                 </div>
               </div>
             </div>
 
             {/* Toggles */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-300">Hide from list</span>
-                <button
-                  onClick={() => setIsHidden(!isHidden)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${isHidden ? 'bg-blue-600' : 'bg-gray-600'}`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isHidden ? 'translate-x-5' : 'translate-x-0'}`}
-                  />
-                </button>
+                <span className="text-sm text-foreground/80">Hide from list</span>
+                <Switch
+                  checked={isHidden}
+                  onCheckedChange={setIsHidden}
+                />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-300">Exclude from net worth</span>
-                <button
-                  onClick={() => setIsExcludedFromNetWorth(!isExcludedFromNetWorth)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${isExcludedFromNetWorth ? 'bg-blue-600' : 'bg-gray-600'}`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'}`}
-                  />
-                </button>
+                <span className="text-sm text-foreground/80">Exclude from net worth</span>
+                <Switch
+                  checked={isExcludedFromNetWorth}
+                  onCheckedChange={setIsExcludedFromNetWorth}
+                />
               </div>
             </div>
           </div>
@@ -154,7 +146,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+            className="w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving ? 'Saving...' : 'Save Changes'}
           </button>

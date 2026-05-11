@@ -49,7 +49,7 @@ export async function applyRulesToTransactions(
   return results;
 }
 
-function evaluateCondition(
+export function evaluateCondition(
   rule: typeof categoryRules.$inferSelect,
   tx: TransactionData
 ): boolean {

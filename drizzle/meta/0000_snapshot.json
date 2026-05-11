@@ -416,6 +416,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "is_system": {
+          "name": "is_system",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},

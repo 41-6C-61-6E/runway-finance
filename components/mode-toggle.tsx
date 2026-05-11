@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { DynamicIcon } from "lucide-react/dynamic";
+import { Sun, Moon } from "lucide-react";
 
 export default function ModeToggle() {
   const { theme, setTheme } = useTheme();
@@ -14,13 +14,14 @@ export default function ModeToggle() {
     <button
       aria-label="Toggle Dark Mode"
       type="button"
-      className="inline-flex items-center justify-center rounded-lg p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      className="inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border"
       onClick={handleToggle}
     >
-      <DynamicIcon
-        name={theme === "dark" ? "sun" : "moon"}
-        className="h-5 w-5 rotate-0 scale-100 transition-all"
-      />
+      {theme === "dark" ? (
+        <Sun className="h-4 w-4 transition-all" />
+      ) : (
+        <Moon className="h-4 w-4 transition-all" />
+      )}
     </button>
   );
 }
