@@ -4,6 +4,7 @@ import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 export async function GET() {
   const session = await auth();
@@ -26,6 +27,7 @@ export async function GET() {
     .where(eq(simplifinConnections.userId, userId))
     .orderBy(simplifinConnections.createdAt);
 
+  logger.info('Connections fetched', { count: connections.length });
   return NextResponse.json(connections);
 }
 
@@ -55,6 +57,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
+    logger.warn('Connection create invalid request body');
     return NextResponse.json(
       { error: 'validation_error', message: 'Invalid request body' },
       { status: 400 }
@@ -63,6 +66,7 @@ export async function POST(request: Request) {
 
   const parsed = CreateConnectionSchema.safeParse(body);
   if (!parsed.success) {
+    logger.warn('Connection create validation failed', { errors: parsed.error.flatten().fieldErrors });
     return NextResponse.json(
       { error: 'validation_error', message: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
       { status: 400 }
@@ -80,18 +84,21 @@ export async function POST(request: Request) {
     if (err instanceof Error && 'code' in err) {
       const code = (err as { code: string }).code;
       if (code === 'invalid_token') {
+        logger.warn('Connection claim invalid token');
         return NextResponse.json(
           { error: 'invalid_token', message: 'Invalid setup token' },
           { status: 400 }
         );
       }
       if (code === 'claim_failed') {
+        logger.warn('Connection claim failed');
         return NextResponse.json(
           { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL. Invalid token or already claimed.' },
           { status: 502 }
         );
       }
     }
+    logger.warn('Connection claim failed (fallback)');
     return NextResponse.json(
       { error: 'claim_failed', message: 'Failed to claim SimpleFIN access URL. Invalid token or already claimed.' },
       { status: 502 }
@@ -114,6 +121,7 @@ export async function POST(request: Request) {
     })
     .returning();
 
+  logger.info('Connection created', { connectionId: connection.id, label: connection.label });
   return NextResponse.json(connection, { status: 201 });
 }
 

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const includeHidden = searchParams.get('includeHidden') === 'true';
   const typeFilter = searchParams.get('type');
+
+  logger.info('Fetching accounts', { includeHidden, type: typeFilter });
 
   const whereConditions = [eq(accounts.userId, userId)];
 
@@ -34,5 +37,6 @@ export async function GET(request: Request) {
     .where(and(...whereConditions))
     .orderBy(asc(accounts.displayOrder));
 
+  logger.info('Accounts fetched', { count: result.length });
   return NextResponse.json(result);
 }

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const ToggleSystemSchema = z.object({
   active: z.boolean(),
@@ -39,5 +40,6 @@ export async function POST(request: Request) {
     .set({ isActive: active, updatedAt: new Date() })
     .where(and(eq(categoryRules.userId, userId), eq(categoryRules.isSystem, true)));
 
+  logger.info('POST /api/category-rules/toggle-system', { userId, active, updated: result.rowCount ?? 0 });
   return NextResponse.json({ success: true, active, updated: result.rowCount ?? 0 });
 }

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { syncManualAccount } from '@/lib/services/manual-accounts';
+import { logger } from '@/lib/logger';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -25,6 +26,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const result = await syncManualAccount(id, userId);
+
+  logger.info('POST /api/manual-accounts/[id]/sync', { userId, id, accountType: account.type, status: result.status });
 
   if (result.status === 'error') {
     return NextResponse.json(result, { status: 500 });

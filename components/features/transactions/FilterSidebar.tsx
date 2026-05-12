@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 
 type FilterState = {
   accountId: string | null;
+  accountIds: string | null;
+  accountTypes: string | null;
   categoryId: string | null;
+  categoryIds: string | null;
   search: string | null;
   startDate: string | null;
   endDate: string | null;
@@ -20,9 +23,21 @@ interface FilterSidebarProps {
   onClearAll: () => void;
 }
 
+const ACCOUNT_TYPES = [
+  { value: 'checking', label: 'Checking' },
+  { value: 'savings', label: 'Savings' },
+  { value: 'credit', label: 'Credit' },
+  { value: 'loan', label: 'Loan' },
+  { value: 'investment', label: 'Investment' },
+  { value: 'mortgage', label: 'Mortgage' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function FilterSidebar({ filters, onChange, onClearAll }: FilterSidebarProps) {
   const [datePreset, setDatePreset] = useState('custom');
   const [search, setSearch] = useState(filters.search ?? '');
+  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string; institution: string | null }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; parentId: string | null; name: string; color: string; isIncome: boolean }[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -30,6 +45,20 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
     }, 300);
     return () => clearTimeout(timer);
   }, [search, onChange]);
+
+  useEffect(() => {
+    fetch('/api/accounts?includeHidden=true', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setAccounts([]));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/categories', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => setCategories([]));
+  }, []);
 
   const applyDatePreset = (preset: string) => {
     setDatePreset(preset);
@@ -80,6 +109,34 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
     onChange(key, current === value ? null : value);
   };
 
+  const parents = categories.filter((c) => !c.parentId);
+  const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
+
+  const selectedAccountIds = (filters.accountIds ?? '').split(',').filter(Boolean);
+  const selectedCategoryIds = (filters.categoryIds ?? '').split(',').filter(Boolean);
+  const selectedAccountTypes = (filters.accountTypes ?? '').split(',').filter(Boolean);
+
+  const toggleAccountId = (id: string) => {
+    const next = selectedAccountIds.includes(id)
+      ? selectedAccountIds.filter((v) => v !== id)
+      : [...selectedAccountIds, id];
+    onChange('accountIds', next.length > 0 ? next.join(',') : null);
+  };
+
+  const toggleCategoryId = (id: string) => {
+    const next = selectedCategoryIds.includes(id)
+      ? selectedCategoryIds.filter((v) => v !== id)
+      : [...selectedCategoryIds, id];
+    onChange('categoryIds', next.length > 0 ? next.join(',') : null);
+  };
+
+  const toggleAccountType = (value: string) => {
+    const next = selectedAccountTypes.includes(value)
+      ? selectedAccountTypes.filter((v) => v !== value)
+      : [...selectedAccountTypes, value];
+    onChange('accountTypes', next.length > 0 ? next.join(',') : null);
+  };
+
   return (
     <div className="p-4 bg-card border border-border rounded-xl space-y-5">
       {/* Search */}
@@ -124,6 +181,97 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
             />
           </div>
         )}
+      </div>
+
+      {/* Account Types */}
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Account Type</label>
+        <div className="space-y-1.5">
+          {ACCOUNT_TYPES.map((t) => (
+            <label key={t.value} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedAccountTypes.includes(t.value)}
+                onChange={() => toggleAccountType(t.value)}
+                className="rounded border-border bg-background text-primary focus:ring-ring"
+              />
+              {t.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Accounts */}
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Accounts</label>
+        <div className="space-y-1.5 max-h-40 overflow-y-auto">
+          {accounts.map((a) => (
+            <label key={a.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedAccountIds.includes(a.id)}
+                onChange={() => toggleAccountId(a.id)}
+                className="rounded border-border bg-background text-primary focus:ring-ring"
+              />
+              {a.name}
+            </label>
+          ))}
+          {accounts.length === 0 && (
+            <p className="text-xs text-muted-foreground">No accounts</p>
+          )}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Categories</label>
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectedCategoryIds.includes('uncategorized')}
+              onChange={() => toggleCategoryId('uncategorized')}
+              className="rounded border-border bg-background text-primary focus:ring-ring"
+            />
+            Uncategorized
+          </label>
+          {parents.map((parent) => {
+            const children = getChildren(parent.id);
+            if (children.length > 0) {
+              return (
+                <div key={parent.id}>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-1">
+                    {parent.name}
+                  </div>
+                  {children.map((child) => (
+                    <label key={child.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer ml-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategoryIds.includes(child.id)}
+                        onChange={() => toggleCategoryId(child.id)}
+                        className="rounded border-border bg-background text-primary focus:ring-ring"
+                      />
+                      <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: child.color }} />
+                      {child.name}
+                    </label>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <label key={parent.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedCategoryIds.includes(parent.id)}
+                  onChange={() => toggleCategoryId(parent.id)}
+                  className="rounded border-border bg-background text-primary focus:ring-ring"
+                />
+                <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                {parent.name}
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       {/* Status Toggles */}

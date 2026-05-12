@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, ChevronLeft, Eye, EyeOff, Ban, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft, Pencil } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 
@@ -41,6 +42,15 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
 
 const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities', 'Assets'];
 
+const SUB_GROUP_TO_TYPES: Record<string, string[]> = {};
+const GROUP_TO_TYPES: Record<string, string[]> = {};
+for (const [type, { group, subGroup }] of Object.entries(TYPE_HIERARCHY)) {
+  if (!SUB_GROUP_TO_TYPES[subGroup]) SUB_GROUP_TO_TYPES[subGroup] = [];
+  SUB_GROUP_TO_TYPES[subGroup].push(type);
+  if (!GROUP_TO_TYPES[group]) GROUP_TO_TYPES[group] = [];
+  GROUP_TO_TYPES[group].push(type);
+}
+
 function getHierarchy(accountType: string) {
   return TYPE_HIERARCHY[accountType] ?? { group: 'Other', subGroup: 'Other' };
 }
@@ -61,42 +71,31 @@ const formatCurrency = (balance: string, currency: string) => {
 
 function AccountRow({
   account,
-  onToggleHidden,
   onOpenDrawer,
 }: {
   account: Account;
-  onToggleHidden: (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => (e: React.MouseEvent) => void;
   onOpenDrawer: (account: Account) => void;
 }) {
+  const router = useRouter();
   const fmt = formatCurrency(account.balance, account.currency);
 
   return (
     <div
-      className="flex items-center justify-between py-0.5 pl-7 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
-      onClick={() => onOpenDrawer(account)}
+      className="flex items-center justify-between py-1 pl-7 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
+      onClick={() => router.push(`/transactions?accountId=${account.id}`)}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <div className="w-1 h-1 rounded-full bg-muted-foreground/30 flex-shrink-0" />
-        <span className="text-sm text-muted-foreground truncate">{account.name}</span>
+        <span className="text-[15px] text-muted-foreground truncate">{account.name}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        <div className="flex items-center gap-0.5 opacity-0 group-hover/account:opacity-100 transition-opacity">
-          <button
-            onClick={onToggleHidden(account.id, 'isHidden')}
-            className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors"
-            title={account.isHidden ? 'Show account' : 'Hide account'}
-          >
-            {account.isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={onToggleHidden(account.id, 'isExcludedFromNetWorth')}
-            className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors"
-            title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-          >
-            {account.isExcludedFromNetWorth ? <Ban className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-          </button>
-        </div>
-        <span className={`font-mono text-xs font-semibold tabular-nums blur-number text-muted-foreground`}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenDrawer(account); }}
+          className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors opacity-0 group-hover/account:opacity-100"
+          title="Edit account"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <span className={`font-mono text-[13px] font-semibold tabular-nums blur-number text-muted-foreground`}>
           {fmt.sign}{fmt.text}
         </span>
       </div>
@@ -105,6 +104,7 @@ function AccountRow({
 }
 
 export default function AccountsSidebar() {
+  const router = useRouter();
   const [isResizing, setIsResizing] = useState(false);
   const { sidebarWidth, accountsWidth, setAccountsWidth, accountsCollapsed, toggleAccountsCollapsed } = useSidebar();
   const navCollapsedWidth = 64;
@@ -177,24 +177,6 @@ export default function AccountsSidebar() {
     const key = `${group}::${subGroup}`;
     setExpandedSubGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
-
-  const handleToggleHidden = useCallback(
-    (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      const account = accounts.find((a) => a.id === accountId);
-      if (!account) return;
-
-      await fetch(`/api/accounts/${accountId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ [field]: !account[field] }),
-      });
-
-      refetch();
-    },
-    [accounts, refetch]
-  );
 
   const handleOpenDrawer = useCallback((account: Account) => {
     setSelectedAccount(account);
@@ -330,7 +312,7 @@ export default function AccountsSidebar() {
 
         {/* Hierarchical Account List */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-1.5 space-y-0.5">
+          <div className="p-1.5 space-y-1">
             {sortedGroups.map((group) => {
               const subMap = hierarchy.get(group)!;
               const groupTotal = getGroupTotal(group);
@@ -340,22 +322,29 @@ export default function AccountsSidebar() {
               return (
                 <div key={group}>
                   {/* Group Header */}
-                  <button
-                    onClick={() => toggleGroup(group)}
-                    className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-muted/50 transition-colors text-left"
-                  >
-                    {groupExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
-                    )}
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">
-                      {group}
-                    </span>
-                    <span className={`font-mono text-xs font-semibold blur-number text-muted-foreground`}>
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                    <button
+                      onClick={() => toggleGroup(group)}
+                      className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                    >
+                      {groupExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground/50" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => router.push(`/transactions?accountTypes=${GROUP_TO_TYPES[group]?.join(',')}`)}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
+                    >
+                      <span className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                        {group}
+                      </span>
+                    </button>
+                    <span className={`font-mono text-[13px] font-semibold blur-number text-muted-foreground`}>
                       {groupFmt.sign}{groupFmt.text}
                     </span>
-                  </button>
+                  </div>
 
                   {/* Sub-groups */}
                   {groupExpanded && Array.from(subMap.entries()).map(([subGroup, accs]) => {
@@ -365,27 +354,33 @@ export default function AccountsSidebar() {
 
                     return (
                       <div key={`${group}::${subGroup}`}>
-                        <button
-                          onClick={() => toggleSubGroup(group, subGroup)}
-                          className="w-full flex items-center gap-1.5 px-3 py-0.5 rounded-md hover:bg-muted/30 transition-colors text-left"
-                        >
-                          {subGroupExpanded ? (
-                            <ChevronDown className="w-2.5 h-2.5 text-muted-foreground/30 flex-shrink-0" />
-                          ) : (
-                            <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30 flex-shrink-0" />
-                          )}
-                          <span className="text-xs text-muted-foreground/70 flex-1 truncate">{subGroup}</span>
-                          <span className={`font-mono text-xs blur-number text-muted-foreground/70`}>
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-muted/30 transition-colors">
+                          <button
+                            onClick={() => toggleSubGroup(group, subGroup)}
+                            className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                          >
+                            {subGroupExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => router.push(`/transactions?accountTypes=${SUB_GROUP_TO_TYPES[subGroup]?.join(',')}`)}
+                            className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
+                          >
+                            <span className="text-[13px] font-semibold text-muted-foreground/70 truncate">{subGroup}</span>
+                          </button>
+                          <span className={`font-mono text-[13px] blur-number text-muted-foreground/70`}>
                             {subGroupFmt.sign}{subGroupFmt.text}
                           </span>
-                        </button>
+                        </div>
 
                         {/* Accounts */}
                         {subGroupExpanded && accs.map((account) => (
                           <AccountRow
                             key={account.id}
                             account={account}
-                            onToggleHidden={handleToggleHidden}
                             onOpenDrawer={handleOpenDrawer}
                           />
                         ))}

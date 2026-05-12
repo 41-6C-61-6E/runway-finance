@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { getLogs, clearLogs, patchConsole } from '@/lib/dev-logs'
+import { getLogs, clearLogs, patchConsole, enableDevLogging } from '@/lib/dev-logs'
+import { setDevMode } from '@/lib/logger'
 
 const DEV_MODE_COOKIE = 'runway_dev_mode'
 
@@ -11,10 +12,8 @@ async function isDevMode(): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
-  // Ensure console is patched when dev mode is enabled
   await ensureDevModePatched()
 
-  // Only available in dev mode
   if (!(await isDevMode())) {
     return NextResponse.json({ error: 'dev_mode_not_enabled' }, { status: 501 })
   }
@@ -48,10 +47,11 @@ export async function DELETE() {
   return new Response(null, { status: 204 })
 }
 
-// Only patch console when dev mode is enabled
 let devModePatched = false
 export async function ensureDevModePatched() {
   if (devModePatched || !(await isDevMode())) return
   devModePatched = true
+  setDevMode(true)
+  enableDevLogging()
   patchConsole()
 }

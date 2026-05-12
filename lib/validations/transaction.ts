@@ -2,9 +2,12 @@ import { z } from 'zod';
 
 export const TransactionFilterSchema = z.object({
   accountId: z.string().uuid().optional(),
+  accountIds: z.string().optional(),
+  accountTypes: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   categoryId: z.union([z.string().uuid(), z.literal('uncategorized')]).optional(),
+  categoryIds: z.string().optional(),
   search: z.string().max(200).optional(),
   pending: z.coerce.boolean().optional(),
   reviewed: z.coerce.boolean().optional(),

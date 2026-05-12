@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -177,7 +178,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error('Error fetching net worth chart data:', error);
+    logger.error('Error fetching net worth chart data', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch net worth data' },
       { status: 500 }

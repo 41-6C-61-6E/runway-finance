@@ -7,6 +7,7 @@ interface LogEntry {
   timestamp: string
   level: 'info' | 'warn' | 'error' | 'debug'
   message: string
+  metadata?: Record<string, unknown>
 }
 
 const LEVEL_COLORS: Record<LogEntry['level'], string> = {
@@ -37,10 +38,23 @@ export default function DevLogPane() {
   const [isResizing, setIsResizing] = useState(false)
   const [devModeEnabled, setDevModeEnabled] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const startYRef = useRef(0)
   const startHeightRef = useRef(DEFAULT_HEIGHT)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedLogs((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
 
   // Check if dev mode is enabled
   const checkDevMode = useCallback(async () => {
@@ -213,7 +227,7 @@ export default function DevLogPane() {
       {/* Full log panel when open */}
       {isOpen && (
         <div
-          className="fixed bottom-0 left-0 right-0 flex flex-col bg-gray-950 border-t border-gray-800 shadow-2xl z-40"
+          className="flex flex-col bg-gray-950 border-t border-gray-800 shadow-2xl flex-shrink-0"
           style={{ height: `${height}px` }}
         >
           {/* Resizable handle */}
@@ -275,20 +289,36 @@ export default function DevLogPane() {
             {logs.length === 0 ? (
               <div className="text-muted-foreground italic">No logs yet...</div>
             ) : (
-              logs.map((log) => (
-                <div
-                  key={log.id}
-                  className={`flex gap-3 py-1 px-2 rounded ${LEVEL_BG[log.level]}`}
-                >
-                  <span className="text-muted-foreground shrink-0">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>
-                  <span className={`shrink-0 font-semibold w-12 ${LEVEL_COLORS[log.level]}`}>
-                    {log.level.toUpperCase()}
-                  </span>
-                  <span className="text-foreground break-all">{log.message}</span>
-                </div>
-              ))
+              logs.map((log) => {
+                const isExpanded = expandedLogs.has(log.id)
+                const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0
+                return (
+                  <div key={log.id}>
+                    <button
+                      onClick={() => hasMetadata && toggleExpand(log.id)}
+                      className={`w-full flex gap-3 py-1 px-2 rounded text-left select-text ${LEVEL_BG[log.level]} ${hasMetadata ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+                    >
+                      <span className="text-muted-foreground shrink-0">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className={`shrink-0 font-semibold w-12 ${LEVEL_COLORS[log.level]}`}>
+                        {log.level.toUpperCase()}
+                      </span>
+                      <span className="text-foreground break-all flex-1 min-w-0">{log.message}</span>
+                      {hasMetadata && (
+                        <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
+                          {isExpanded ? '[-]' : '[+]'}
+                        </span>
+                      )}
+                    </button>
+                    {isExpanded && hasMetadata && (
+                      <pre className="ml-14 mr-4 mb-1 px-3 py-2 rounded bg-gray-900 text-[10px] text-chart-4 overflow-x-auto">
+                        {JSON.stringify(log.metadata, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </div>

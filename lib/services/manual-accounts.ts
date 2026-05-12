@@ -2,11 +2,15 @@ import { getDb } from '@/lib/db';
 import { accounts, transactions, accountSnapshots, netWorthSnapshots } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { logger } from '@/lib/logger';
+import { ensureSystemCategories } from '@/lib/db/seed-categories';
 
-export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset';
+const LOG_TAG = '[manual-accounts]';
+
+export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage';
 
 export const MANUAL_ACCOUNT_TYPES: AssetSubType[] = [
-  'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset',
+  'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset', 'mortgage',
 ];
 
 export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
@@ -16,6 +20,7 @@ export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
   gold: 'metals',
   silver: 'metals',
   otherAsset: 'otherAsset',
+  mortgage: 'mortgage',
 };
 
 export interface CreateManualAccountInput {
@@ -49,73 +54,171 @@ function manualExternalId(): string {
 
 export async function fetchRedfinValue(propertyId: string): Promise<number> {
   const url = `https://www.redfin.com/what-is-my-home-worth?propertyId=${encodeURIComponent(propertyId)}`;
+  const curlCmd = `curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' '${url}'`;
+  logger.info(`${LOG_TAG} Redfin API call`, { propertyId, url });
+  logger.debug(`${LOG_TAG} Redfin curl: ${curlCmd}`);
   let res: Response;
   try {
     res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
     });
   } catch (err) {
-    throw new Error(`Redfin network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Redfin network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Redfin HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
+    throw new Error(`Redfin HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
   }
   const html = await res.text();
   const match = html.match(/\$([0-9]{1,3}(?:,[0-9]{3})*)/);
   if (!match) {
-    throw new Error(`Could not parse Redfin estimate from page (${url}): page is ${html.length} chars, no price pattern found`);
+    throw new Error(`Redfin parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  page length: ${html.length} chars, no price pattern found`);
   }
   return parseFloat(match[1].replace(/,/g, ''));
 }
 
-export async function fetchBitcoinBalance(xpub: string): Promise<number> {
-  const url = `https://blockchain.info/balance?active=${encodeURIComponent(xpub)}`;
+const TREZOR_HOSTS = ['btc2.trezor.io', 'btc1.trezor.io', 'btc3.trezor.io'];
+
+async function fetchBtcPrice(): Promise<number> {
+  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD';
+  const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
+  logger.info(`${LOG_TAG} BTC price API call`, { url });
+  logger.debug(`${LOG_TAG} BTC price curl: ${curlCmd}`);
   let res: Response;
   try {
-    res = await fetch(url, { next: { revalidate: 300 } });
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    });
   } catch (err) {
-    throw new Error(`Bitcoin network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`BTC price network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Bitcoin HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
+    throw new Error(`BTC price HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
   }
-  const data = await res.json() as Record<string, { final_balance: number }>;
-  const entry = data[xpub];
-  if (!entry || entry.final_balance === undefined) {
-    throw new Error(`Bitcoin response format unexpected [${url}]: keys=${Object.keys(data).join(',')}, firstKeyHasBalance=${Object.values(data)[0]?.final_balance !== undefined}`);
+  const data = await res.json() as {
+    chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> };
+  };
+  const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  if (price === undefined || price === null) {
+    throw new Error(`BTC price parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${JSON.stringify(data).slice(0, 500)}`);
   }
-  return entry.final_balance / 1e8;
+  logger.info(`${LOG_TAG} BTC price: $${price}/BTC`);
+  return price;
+}
+
+export async function fetchBitcoinBalance(xpub: string): Promise<number> {
+  const hasDescriptor = xpub.includes('(');
+  const xpubFormats = hasDescriptor
+    ? [xpub]
+    : [xpub, `wpkh(${xpub})`];
+
+  let lastError: string | null = null;
+  let btcAmount: number | null = null;
+
+  for (const fmt of xpubFormats) {
+    for (const host of TREZOR_HOSTS) {
+      const url = `https://${host}/api/v2/xpub/${encodeURIComponent(fmt)}?details=basic`;
+      const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
+      logger.info(`${LOG_TAG} Bitcoin API call`, { host, xpub: fmt, url });
+      logger.debug(`${LOG_TAG} Bitcoin curl: ${curlCmd}`);
+
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(15000),
+        });
+      } catch (err) {
+        lastError = `network error\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`;
+        logger.warn(`${LOG_TAG} Bitcoin host ${host} failed for ${fmt}`, { error: lastError });
+        continue;
+      }
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '(unreadable)');
+        lastError = `HTTP ${res.status}\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`;
+        logger.warn(`${LOG_TAG} Bitcoin host ${host} returned ${res.status} for ${fmt}, trying next host`);
+        continue;
+      }
+
+      const rawJson = await res.text();
+      logger.info(`${LOG_TAG} Bitcoin raw response [${host}/${fmt}]: ${rawJson.slice(0, 500)}`);
+
+      let data: { balance?: string; unconfirmedBalance?: string };
+      try {
+        data = JSON.parse(rawJson);
+      } catch {
+        lastError = `parse error (invalid JSON)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${rawJson.slice(0, 300)}`;
+        continue;
+      }
+
+      const confirmed = BigInt(data.balance ?? '0');
+      const unconfirmed = BigInt(data.unconfirmedBalance ?? '0');
+      const totalSats = Number(confirmed + unconfirmed);
+
+      logger.info(`${LOG_TAG} Bitcoin parsed [${host}/${fmt}]: balance=${data.balance}, unconfirmed=${data.unconfirmedBalance}, totalSats=${totalSats}`);
+
+      if (isNaN(totalSats)) {
+        lastError = `parse error (NaN)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  raw balance: ${data.balance}, unconfirmed: ${data.unconfirmedBalance}`;
+        continue;
+      }
+
+      const btc = totalSats / 1e8;
+
+      if (btc === 0 && fmt !== xpubFormats[xpubFormats.length - 1]) {
+        logger.info(`${LOG_TAG} BTC returned 0 for ${fmt} on ${host}, will retry with next format`);
+        lastError = `got 0 BTC for ${fmt} on ${host}`;
+        break;
+      }
+
+      btcAmount = btc;
+      break;
+    }
+    if (btcAmount !== null) break;
+  }
+
+  if (btcAmount === null) {
+    throw new Error(`Bitcoin fetch failed (${xpubFormats.length} formats x ${TREZOR_HOSTS.length} hosts)\n  last: ${lastError}`);
+  }
+
+  logger.info(`${LOG_TAG} BTC wallet balance: ${btcAmount} BTC`);
+
+  const btcPrice = await fetchBtcPrice();
+  const usdValue = btcAmount * btcPrice;
+
+  logger.info(`${LOG_TAG} BTC value: ${btcAmount} BTC x $${btcPrice} = $${usdValue}`);
+
+  return usdValue;
 }
 
 export async function fetchSpotPrice(type: 'gold' | 'silver'): Promise<number> {
-  const metal = type === 'gold' ? 'XAU' : 'XAG';
-  const url = `https://api.metals.live/v1/spot/${metal}`;
+  const ticker = type === 'gold' ? 'GC=F' : 'SI=F';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
+  const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
+  logger.info(`${LOG_TAG} Spot price API call`, { ticker, url });
+  logger.debug(`${LOG_TAG} Spot price curl: ${curlCmd}`);
   let res: Response;
   try {
-    res = await fetch(url, { next: { revalidate: 300 } });
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
   } catch (err) {
-    throw new Error(`Spot price network error [${url}]: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Spot price network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Spot price HTTP ${res.status} [${url}]: ${body.slice(0, 300)}`);
+    throw new Error(`Spot price HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
   }
-  const data = await res.json();
-  if (Array.isArray(data)) {
-    const found = data.find((item: Record<string, unknown>) => item.metal === metal || item.currency === 'USD');
-    if (!found) {
-      throw new Error(`Spot price array response missing ${metal} entry [${url}]: first item keys=${Object.keys(data[0] ?? {}).join(',')}`);
-    }
-    return parseFloat(String((found as Record<string, unknown>).price ?? 0));
-  }
-  const obj = data as Record<string, unknown>;
-  const price = obj[metal] ?? obj.price ?? obj.spotPrice;
+  const data = await res.json() as {
+    chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> };
+  };
+  const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
   if (price === undefined || price === null) {
-    throw new Error(`Spot price object response missing price field [${url}]: keys=${Object.keys(obj).join(',')}`);
+    throw new Error(`Spot price parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${JSON.stringify(data).slice(0, 500)}`);
   }
-  return parseFloat(String(price));
+  return price;
 }
 
 export async function createManualAccount(input: CreateManualAccountInput) {
@@ -154,8 +257,11 @@ export async function createManualAccount(input: CreateManualAccountInput) {
       payee: null,
       memo: null,
       pending: false,
+      categoryId: await ensureSystemCategories(input.userId),
     });
   }
+
+  logger.info(`${LOG_TAG} Account created`, { accountId: account.id, name: account.name, type: input.type, initialValue });
 
   return account;
 }
@@ -206,7 +312,7 @@ export async function syncManualAccount(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Sync failed';
-    console.error(`[manual-accounts] Sync failed for account ${accountId} (${account.type}):`, msg);
+    logger.error(`${LOG_TAG} Sync failed`, { accountId, type: account.type, error: msg });
     return {
       status: 'error',
       newBalance: oldBalance,
@@ -217,6 +323,7 @@ export async function syncManualAccount(
   }
 
   const delta = newValue - oldBalance;
+  logger.info(`${LOG_TAG} Sync comparison for ${accountId} (${account.type}): oldBalance=${oldBalance}, newValue=${newValue}, delta=${delta}`);
 
   await db.update(accounts).set({
     balance: String(newValue),
@@ -240,17 +347,21 @@ export async function syncManualAccount(
       payee: null,
       memo: null,
       pending: false,
+      categoryId: await ensureSystemCategories(userId),
     });
   }
 
   await createAccountSnapshotsForUser(userId);
   await updateNetWorthSnapshot(userId);
 
+  const changed = Math.abs(delta) > 0.0001;
+  logger.info(`${LOG_TAG} Account synced`, { accountId, type: account.type, oldBalance, newValue, changed });
+
   return {
     status: 'success',
     newBalance: newValue,
     oldBalance,
-    changed: Math.abs(delta) > 0.0001,
+    changed,
   };
 }
 
@@ -283,7 +394,7 @@ export async function adjustManualAccountValue(
       finalNewValue = amountOz * spotPrice;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Spot price fetch failed';
-      console.error(`[manual-accounts] Adjust failed for metals account ${accountId}:`, msg);
+      logger.error(`${LOG_TAG} Adjust failed for metals account`, { accountId, error: msg });
       return { status: 'error', newBalance: oldBalance, oldBalance, changed: false, errorMessage: msg };
     }
 
@@ -314,17 +425,21 @@ export async function adjustManualAccountValue(
       payee: null,
       memo: null,
       pending: false,
+      categoryId: await ensureSystemCategories(userId),
     });
   }
 
   await createAccountSnapshotsForUser(userId);
   await updateNetWorthSnapshot(userId);
 
+  const changed = Math.abs(delta) > 0.0001;
+  logger.info(`${LOG_TAG} Account value adjusted`, { accountId, type: account.type, oldBalance, newValue: finalNewValue, changed, note });
+
   return {
     status: 'success',
     newBalance: newValue,
     oldBalance,
-    changed: Math.abs(delta) > 0.0001,
+    changed,
   };
 }
 
@@ -348,10 +463,12 @@ export async function deleteManualAccount(
       isHidden: true,
       updatedAt: new Date(),
     }).where(eq(accounts.id, accountId));
+    logger.info(`${LOG_TAG} Account hidden (data kept)`, { accountId, name: account.name, type: account.type });
   } else {
     await db.delete(accounts).where(eq(accounts.id, accountId));
     await createAccountSnapshotsForUser(userId);
     await updateNetWorthSnapshot(userId);
+    logger.info(`${LOG_TAG} Account deleted`, { accountId, name: account.name, type: account.type });
   }
 }
 

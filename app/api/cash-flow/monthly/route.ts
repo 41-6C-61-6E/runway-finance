@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { monthlyCashFlow } from '@/lib/db/schema';
 import { eq, desc, and, gte, sql } from 'drizzle-orm';
 
@@ -36,9 +37,10 @@ export async function GET(request: Request) {
       netCashFlow: parseFloat(row.netCashFlow.toString()),
     }));
 
+    logger.info('GET /api/cash-flow/monthly', { months, count: data.length });
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching monthly cash flow:', error);
+    logger.error('Error fetching monthly cash flow', { error });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch monthly cash flow data' },
       { status: 500 }

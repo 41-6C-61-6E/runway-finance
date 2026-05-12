@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { deleteManualAccount } from '@/lib/services/manual-accounts';
+import { logger } from '@/lib/logger';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -21,9 +22,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .limit(1);
 
   if (!account) {
+    logger.warn('GET /api/manual-accounts/[id] - not found', { userId, id });
     return NextResponse.json({ error: 'not_found', message: 'Account not found' }, { status: 404 });
   }
 
+  logger.info('GET /api/manual-accounts/[id]', { userId, id, type: account.type, name: account.name });
   return NextResponse.json(account);
 }
 
@@ -70,6 +73,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(accounts.id, id))
     .returning();
 
+  logger.info('PATCH /api/manual-accounts/[id]', { userId, id, fieldsChanged: Object.keys(updateData) });
   return NextResponse.json(updated);
 }
 
@@ -91,5 +95,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   await deleteManualAccount(id, userId, false);
 
+  logger.info('DELETE /api/manual-accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });
 }

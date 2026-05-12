@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, createContext, useContext, type ReactNode } from 'react';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 512;
@@ -42,7 +42,10 @@ export function useSidebar() {
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
-  const [accountsCollapsed, setAccountsCollapsed] = useState(false);
+  const [accountsCollapsed, setAccountsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
+    return false;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [forceExpanded, setForceExpanded] = useState(false);

@@ -26,6 +26,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:indexes": "tsx lib/db/seed-indexes.ts",
+    "generate-pwa-icons": "node scripts/generate-pwa-icons.mjs",
     "upgrade": "next upgrade"
   },
   "dependencies": {

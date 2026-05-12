@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ResponsiveLine } from '@nivo/line';
+import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
 
 interface ChartPoint {
   date: string;
@@ -11,42 +16,36 @@ interface ChartPoint {
   totalLiabilities: number;
 }
 
-const nivoTheme = {
-  background: 'transparent',
-  text: { fill: 'var(--color-foreground)', fontSize: 11 },
-  axis: {
-    domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
-    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)' } },
-  },
-  grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3' } },
-  crosshair: { line: { stroke: 'var(--color-ring)', strokeWidth: 1 } },
-  tooltip: {
-    container: {
-      background: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '0.5rem',
-      boxShadow: '0 4px 12px var(--color-border)',
-      color: 'var(--color-foreground)',
-      fontSize: '12px',
-    },
-  },
-  legends: {
-    text: { fill: 'var(--color-muted-foreground)', fontSize: 11 },
-  },
-};
+function getMonthRange(point: ChartPoint): { startDate: string; endDate: string } {
+  const d = new Date(point.date);
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().split('T')[0],
+    endDate: end.toISOString().split('T')[0],
+  };
+}
 
 export function AccountValuesChart() {
+  const router = useRouter();
+  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
+  const [includeExcluded, setIncludeExcluded] = useState(true);
   const [data, setData] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set(['Net Worth', 'Total Assets', 'Total Liabilities']));
+  const [activeSeries, setActiveSeries] = useState<Set<string>>(
+    new Set(['Net Worth', 'Total Assets', 'Total Liabilities'])
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/net-worth/chart?timeframe=1y&includeExcluded=true');
+        const url = new URL('/api/net-worth/chart', window.location.origin);
+        url.searchParams.set('timeframe', timeframe);
+        url.searchParams.set('includeExcluded', includeExcluded.toString());
+        const res = await fetch(url.toString());
         if (!res.ok) throw new Error('Failed to fetch chart data');
         const json = await res.json();
         setData(json.data || []);
@@ -57,43 +56,46 @@ export function AccountValuesChart() {
       }
     };
     fetchData();
-  }, []);
+  }, [timeframe, includeExcluded]);
 
   const allSeries = useMemo(() => {
     if (data.length === 0) return [];
+    const fmt = (d: ChartPoint) =>
+      new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
     return [
       {
         id: 'Net Worth',
-        data: data.map((p) => ({
-          x: new Date(p.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          y: p.netWorth,
-        })),
+        data: data.map((p) => ({ x: fmt(p), y: p.netWorth })),
       },
       {
         id: 'Total Assets',
-        data: data.map((p) => ({
-          x: new Date(p.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          y: p.totalAssets,
-        })),
+        data: data.map((p) => ({ x: fmt(p), y: p.totalAssets })),
       },
       {
         id: 'Total Liabilities',
-        data: data.map((p) => ({
-          x: new Date(p.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          y: p.totalLiabilities,
-        })),
+        data: data.map((p) => ({ x: fmt(p), y: p.totalLiabilities })),
       },
     ];
   }, [data]);
 
   const visibleData = allSeries.filter((s) => activeSeries.has(s.id));
 
+  const handleSliceClick = useCallback(
+    (point: ChartPoint) => {
+      const { startDate, endDate } = getMonthRange(point);
+      router.push(`/transactions?startDate=${startDate}&endDate=${endDate}`);
+    },
+    [router]
+  );
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Account Values Over Time</h3>
-        <div className="animate-pulse">
-          <div className="h-[300px] bg-muted rounded"></div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-foreground">Account Values Over Time</h3>
+        </div>
+        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -103,7 +105,7 @@ export function AccountValuesChart() {
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground mb-3">Account Values Over Time</h3>
-        <p className="text-sm text-muted-foreground">{error}</p>
+        <ChartEmptyState variant="error" error={error} />
       </div>
     );
   }
@@ -112,11 +114,8 @@ export function AccountValuesChart() {
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground mb-3">Account Values Over Time</h3>
-        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <p className="font-medium mb-0.5">No data available yet</p>
-            <p className="text-xs text-muted-foreground/70">Historical data will appear once you sync your accounts</p>
-          </div>
+        <div className="h-[300px]">
+          <ChartEmptyState variant="nodata" description="Historical data will appear once you sync your accounts" />
         </div>
       </div>
     );
@@ -124,7 +123,13 @@ export function AccountValuesChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Account Values Over Time</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-foreground">Account Values Over Time</h3>
+        <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
+      </div>
+      <div className="mb-3">
+        <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+      </div>
       <div className="h-[300px]">
         <ResponsiveLine
           data={visibleData}
@@ -136,14 +141,11 @@ export function AccountValuesChart() {
           lineWidth={2}
           enablePoints={false}
           enableGridX={false}
-          axisBottom={{
-            tickSize: 0,
-            tickPadding: 8,
-          }}
+          axisBottom={{ tickSize: 0, tickPadding: 8 }}
           axisLeft={{
             tickSize: 0,
             tickPadding: 8,
-            format: (v) => {
+            format: (v: number) => {
               if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
               if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
               return `$${v}`;
@@ -153,15 +155,28 @@ export function AccountValuesChart() {
           useMesh={true}
           enableSlices="x"
           sliceTooltip={({ slice }) => (
-            <div>
-              <strong>{slice.points[0]?.data.xFormatted}</strong>
+            <ChartTooltip>
+              <TooltipHeader>{String(slice.points[0]?.data.xFormatted)}</TooltipHeader>
               {slice.points.map((point) => (
-                <div key={point.id} style={{ color: point.color }}>
-                  {point.seriesId}: {formatCurrency(Number(point.data.y))}
-                </div>
+                <TooltipRow
+                  key={point.id}
+                  label={String(point.seriesId)}
+                  value={formatCurrency(Number(point.data.y))}
+                  color={point.color}
+                />
               ))}
-            </div>
+            </ChartTooltip>
           )}
+          onClick={(raw) => {
+            const p = raw as unknown as { data: { xFormatted: string } };
+            const pt = data.find((d) => {
+              const label = new Date(d.date).toLocaleDateString('en-US', {
+                month: 'short', year: '2-digit',
+              });
+              return label === String(p.data.xFormatted);
+            });
+            if (pt) handleSliceClick(pt);
+          }}
           legends={[
             {
               anchor: 'top-right',
@@ -185,12 +200,7 @@ export function AccountValuesChart() {
                   return next;
                 });
               },
-              effects: [
-                {
-                  on: 'hover',
-                  style: { itemOpacity: 1 },
-                },
-              ],
+              effects: [{ on: 'hover', style: { itemOpacity: 1 } }],
             },
           ]}
         />

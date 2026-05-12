@@ -1,8 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ResponsiveLine } from '@nivo/line';
+import { ResponsiveBar } from '@nivo/bar';
 import { formatCurrency } from '@/lib/utils/format';
+import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 
 interface FireScenario {
   currentAge: number;
@@ -14,30 +19,6 @@ interface FireScenario {
   inflationRate: number;
   safeWithdrawalRate: number;
 }
-
-const nivoTheme = {
-  background: 'transparent',
-  text: { fill: 'var(--color-foreground)', fontSize: 11 },
-  axis: {
-    domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
-    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)' } },
-  },
-  grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3' } },
-  crosshair: { line: { stroke: 'var(--color-ring)', strokeWidth: 1 } },
-  tooltip: {
-    container: {
-      background: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '0.5rem',
-      boxShadow: '0 4px 12px var(--color-border)',
-      color: 'var(--color-foreground)',
-      fontSize: '12px',
-    },
-  },
-  legends: {
-    text: { fill: 'var(--color-muted-foreground)', fontSize: 11 },
-  },
-};
 
 function calculatePortfolioValue(
   currentInvestableAssets: number,
@@ -51,7 +32,14 @@ function calculatePortfolioValue(
     annualContributions * ((Math.pow(1 + realRate, years) - 1) / realRate);
 }
 
+const typeOptions = [
+  { value: 'line' as ChartType, label: 'Line' },
+  { value: 'bar' as ChartType, label: 'Bar' },
+];
+
 export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
+  const [chartType, setChartType] = useState<ChartType>('line');
+
   const fireNumber = scenario.safeWithdrawalRate > 0
     ? scenario.targetAnnualExpenses / scenario.safeWithdrawalRate
     : 0;
@@ -87,10 +75,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
 
   const allData = [
     ...series,
-    {
-      id: 'FIRE Number',
-      data: fireLine,
-    },
+    { id: 'FIRE Number', data: fireLine },
   ];
 
   const minY = 0;
@@ -100,72 +85,117 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
     1000,
   );
 
+  if (numYears < 2 || (scenario.currentInvestableAssets === 0 && scenario.annualContributions === 0)) {
+    return (
+      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Portfolio Projection</h3>
+        <div className="h-[400px]">
+          <ChartEmptyState variant="insufficient" description="Enter your current assets and contributions to see projections" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Portfolio Projection</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-foreground">Portfolio Projection</h3>
+        <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
+      </div>
       <div className="h-[400px]">
-        <ResponsiveLine
-          data={allData}
-          margin={{ top: 10, right: 120, left: 65, bottom: 40 }}
-          xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: minY, max: maxY * 1.1 }}
-          curve="monotoneX"
-          colors={['var(--color-chart-3)', 'var(--color-primary)', 'var(--color-chart-1)', 'var(--color-destructive)']}
-          lineWidth={2}
-          enablePoints={false}
-          enableGridX={true}
-          axisBottom={{
-            tickSize: 0,
-            tickPadding: 8,
-            legend: 'Age',
-            legendPosition: 'middle',
-            legendOffset: 30,
-          }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 8,
-            format: (v: number) => {
-              if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-              if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-              return `$${v}`;
-            },
-          }}
-          theme={nivoTheme}
-          useMesh={true}
-          enableSlices="x"
-          sliceTooltip={({ slice }) => (
-            <div>
-              <strong>Age {slice.points[0]?.data.xFormatted}</strong>
-              {slice.points.map((point) => (
-                <div key={point.id} style={{ color: point.color }}>
-                  {point.seriesId}: {formatCurrency(Number(point.data.y))}
-                </div>
-              ))}
-            </div>
-          )}
-          legends={[
-            {
-              anchor: 'top-right',
-              direction: 'column',
-              justify: false,
-              translateX: 120,
-              translateY: 0,
-              itemsSpacing: 0,
-              itemDirection: 'left-to-right',
-              itemWidth: 100,
-              itemHeight: 20,
-              itemOpacity: 0.75,
-              symbolSize: 12,
-              symbolShape: 'circle',
-              effects: [
-                {
-                  on: 'hover',
-                  style: { itemOpacity: 1 },
-                },
-              ],
-            },
-          ]}
-        />
+        {chartType === 'bar' ? (
+          <ResponsiveBar
+            data={series[1].data.map((d) => ({ age: d.x, value: d.y }))}
+            keys={['value']}
+            indexBy="age"
+            margin={{ top: 10, right: 10, left: 65, bottom: 40 }}
+            padding={0.3}
+            borderRadius={2}
+            colors={['var(--color-chart-1)']}
+            axisLeft={{
+              tickSize: 0, tickPadding: 8,
+              format: (v: number) => {
+                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                return `$${v}`;
+              },
+            }}
+            axisBottom={{
+              tickSize: 0, tickPadding: 8,
+              legend: 'Age',
+              legendPosition: 'middle',
+              legendOffset: 30,
+            }}
+            enableGridY={true}
+            enableGridX={false}
+            theme={nivoTheme}
+            tooltip={({ indexValue, value }) => (
+              <ChartTooltip>
+                <TooltipHeader>Age {indexValue}</TooltipHeader>
+                <TooltipRow label="Moderate" value={formatCurrency(value)} />
+              </ChartTooltip>
+            )}
+          />
+        ) : (
+          <ResponsiveLine
+            data={allData}
+            margin={{ top: 10, right: 120, left: 65, bottom: 40 }}
+            xScale={{ type: 'point' }}
+            yScale={{ type: 'linear', min: minY, max: maxY * 1.1 }}
+            curve="monotoneX"
+            colors={['var(--color-chart-3)', 'var(--color-primary)', 'var(--color-chart-1)', 'var(--color-destructive)']}
+            lineWidth={2}
+            enablePoints={false}
+            enableGridX={true}
+            axisBottom={{
+              tickSize: 0, tickPadding: 8,
+              legend: 'Age',
+              legendPosition: 'middle',
+              legendOffset: 30,
+            }}
+            axisLeft={{
+              tickSize: 0, tickPadding: 8,
+              format: (v: number) => {
+                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                return `$${v}`;
+              },
+            }}
+            theme={nivoTheme}
+            useMesh={true}
+            enableSlices="x"
+            sliceTooltip={({ slice }) => (
+              <ChartTooltip>
+                <TooltipHeader>Age {String(slice.points[0]?.data.xFormatted)}</TooltipHeader>
+                {slice.points.map((point) => (
+                  <TooltipRow
+                    key={point.id}
+                    label={String(point.seriesId)}
+                    value={formatCurrency(Number(point.data.y))}
+                    color={point.color}
+                  />
+                ))}
+              </ChartTooltip>
+            )}
+            legends={[
+              {
+                anchor: 'top-right',
+                direction: 'column',
+                justify: false,
+                translateX: 120,
+                translateY: 0,
+                itemsSpacing: 0,
+                itemDirection: 'left-to-right',
+                itemWidth: 100,
+                itemHeight: 20,
+                itemOpacity: 0.75,
+                symbolSize: 12,
+                symbolShape: 'circle',
+                effects: [{ on: 'hover', style: { itemOpacity: 1 } }],
+              },
+            ]}
+          />
+        )}
       </div>
     </div>
   );

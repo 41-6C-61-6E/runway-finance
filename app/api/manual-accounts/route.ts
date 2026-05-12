@@ -4,8 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import { createManualAccount, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
-
-
+import { logger } from '@/lib/logger';
 
 export async function GET() {
   const session = await auth();
@@ -26,6 +25,7 @@ export async function GET() {
     )
     .orderBy(asc(accounts.displayOrder), asc(accounts.name));
 
+  logger.info('GET /api/manual-accounts', { userId, count: result.length });
   return NextResponse.json(result);
 }
 
@@ -67,8 +67,10 @@ export async function POST(request: Request) {
       initialValue: body.initialValue,
       currency: body.currency,
     });
+    logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
     return NextResponse.json(account, { status: 201 });
   } catch (err) {
+    logger.error('POST /api/manual-accounts - error', { userId, name: body.name, error: err instanceof Error ? err.message : 'Failed to create account' });
     return NextResponse.json({ error: 'internal_error', message: err instanceof Error ? err.message : 'Failed to create account' }, { status: 500 });
   }
 }

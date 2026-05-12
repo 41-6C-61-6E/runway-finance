@@ -5,6 +5,13 @@ import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
+import { logger } from '@/lib/logger';
+
+const LOG_TAG = '[sync]';
+
+function ms(start: number): number {
+  return Date.now() - start;
+}
 
 export type SyncResult = {
   status: 'success' | 'error';
@@ -15,7 +22,6 @@ export type SyncResult = {
   errorMessage?: string;
 };
 
-// Helper: Create or update a net worth snapshot for a user on a given date
 export async function createNetWorthSnapshot(userId: string, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
@@ -34,14 +40,12 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
     const balance = parseFloat(acc.balance.toString());
     const accountType = acc.type.toLowerCase();
 
-    // Categorize assets vs liabilities
     if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
       totalAssets += balance;
     } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
       totalLiabilities += Math.abs(balance);
     }
 
-    // Build breakdown
     if (!breakdown[accountType]) {
       breakdown[accountType] = { count: 0, value: 0 };
     }
@@ -51,7 +55,6 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
 
   const netWorth = totalAssets - totalLiabilities;
 
-  // Upsert snapshot (replace if already exists for this date)
   await getDb()
     .insert(netWorthSnapshots)
     .values({
@@ -73,7 +76,6 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
     });
 }
 
-// Helper: Create account snapshots for all accounts on a given date (real, non-synthetic)
 export async function createAccountSnapshots(userId: string, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
@@ -100,9 +102,7 @@ export async function createAccountSnapshots(userId: string, snapshotDate: strin
   }
 }
 
-// Helper: Generate or update monthly cash flow summaries for all months with new transactions
 export async function updateMonthlyCashFlowSummaries(userId: string) {
-  // Get all user accounts and their transactions
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -112,22 +112,40 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
     return;
   }
 
-  // Get all transactions for these accounts
-  const txByAccountId = await Promise.all(
-    userAccounts.map((acc) =>
-      getDb()
-        .select()
-        .from(transactions)
-        .where(eq(transactions.accountId, acc.id))
-    )
-  );
+  const allCategories = await getDb()
+    .select()
+    .from(categories)
+    .where(eq(categories.userId, userId));
 
-  const allTransactions = txByAccountId.flat();
+  const catById = new Map<string, typeof categories.$inferSelect>();
+  for (const cat of allCategories) {
+    catById.set(cat.id.toString(), cat);
+  }
 
-  // Group transactions by year-month and calculate totals
+  const allTransactions = await getDb()
+    .select()
+    .from(transactions)
+    .where(
+      inArray(
+        transactions.accountId,
+        userAccounts.map((a) => a.id)
+      )
+    );
+
   const monthlyData: Record<string, { income: number; expenses: number; count: number }> = {};
 
   for (const tx of allTransactions) {
+    if (tx.ignored) continue;
+
+    const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
+
+    let excluded = category?.excludeFromReports ?? false;
+    if (!excluded && category?.parentId) {
+      const parent = catById.get(category.parentId.toString());
+      if (parent?.excludeFromReports) excluded = true;
+    }
+    if (excluded) continue;
+
     const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const amount = parseFloat(tx.amount.toString());
@@ -137,14 +155,13 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
     }
 
     monthlyData[yearMonth].count++;
-    if (amount > 0) {
+    if (amount > 0 && (!category || category.isIncome)) {
       monthlyData[yearMonth].income += amount;
-    } else {
+    } else if (amount < 0 && (!category || !category.isIncome)) {
       monthlyData[yearMonth].expenses += Math.abs(amount);
     }
   }
 
-  // Upsert all monthly summaries
   for (const [yearMonth, data] of Object.entries(monthlyData)) {
     const netCashFlow = data.income - data.expenses;
 
@@ -171,9 +188,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
   }
 }
 
-// Helper: Generate or update category spending summaries for all months with transactions
 export async function updateCategorySpendingSummaries(userId: string) {
-  // Get all user accounts
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -183,29 +198,42 @@ export async function updateCategorySpendingSummaries(userId: string) {
     return;
   }
 
-  // Get all transactions for these accounts
-  const txByAccountId = await Promise.all(
-    userAccounts.map((acc) =>
-      getDb()
-        .select()
-        .from(transactions)
-        .where(eq(transactions.accountId, acc.id))
-    )
-  );
+  const allCategories = await getDb()
+    .select()
+    .from(categories)
+    .where(eq(categories.userId, userId));
 
-  const allTransactions = txByAccountId.flat();
+  const catById = new Map<string, typeof categories.$inferSelect>();
+  for (const cat of allCategories) {
+    catById.set(cat.id.toString(), cat);
+  }
 
-  // Group by category and month (expenses only)
+  const allTransactions = await getDb()
+    .select()
+    .from(transactions)
+    .where(
+      inArray(
+        transactions.accountId,
+        userAccounts.map((a) => a.id)
+      )
+    );
+
   const categoryByMonth: Record<
     string,
     Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
   > = {};
 
   for (const tx of allTransactions) {
-    // Skip income transactions and transactions without categories
-    if (!tx.categoryId || parseFloat(tx.amount.toString()) >= 0) {
-      continue;
+    if (!tx.categoryId || parseFloat(tx.amount.toString()) >= 0 || tx.ignored) continue;
+
+    const category = catById.get(tx.categoryId.toString());
+
+    let excluded = category?.excludeFromReports ?? false;
+    if (!excluded && category?.parentId) {
+      const parent = catById.get(category.parentId.toString());
+      if (parent?.excludeFromReports) excluded = true;
     }
+    if (excluded) continue;
 
     const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -228,7 +256,6 @@ export async function updateCategorySpendingSummaries(userId: string) {
     categoryByMonth[yearMonth][catId].count++;
   }
 
-  // Upsert all category summaries
   for (const monthData of Object.values(categoryByMonth)) {
     for (const catData of Object.values(monthData)) {
       await getDb()
@@ -253,7 +280,10 @@ export async function updateCategorySpendingSummaries(userId: string) {
 }
 
 export async function syncConnection(connectionId: string, userId: string): Promise<SyncResult> {
-  // 1. INSERT sync_log row: status='running', startedAt=now()
+  const startedAt = Date.now();
+
+  logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
+
   const [log] = await getDb()
     .insert(syncLogs)
     .values({
@@ -268,7 +298,6 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     .returning();
 
   try {
-    // 2. SELECT connection WHERE id AND userId
     const [connection] = await getDb()
       .select()
       .from(simplifinConnections)
@@ -279,37 +308,42 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       throw new Error('Connection not found or unauthorized');
     }
 
-    // 3. Decrypt access URL
     const accessUrl = await decrypt({
       ciphertext: connection.accessUrlEncrypted,
       iv: connection.accessUrlIv,
       tag: connection.accessUrlTag,
     });
 
-    // 4. Compute date range
-    // Always fetch 14 days back to catch pending transactions (typically clear within 2-5 days).
-    // On first sync (no lastSyncAt), use 90 days for historical data.
     const now = new Date();
     const startDate = connection.lastSyncAt
       ? new Date(connection.lastSyncAt.getTime() - 14 * 24 * 60 * 60 * 1000)
       : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-    // 5. Fetch accounts + transactions from SimpleFIN
+    logger.debug(`${LOG_TAG} Fetching SimpleFIN data`, {
+      connectionId,
+      dateRange: { from: startDate.toISOString(), to: now.toISOString() },
+      firstSync: !connection.lastSyncAt,
+    });
+
     const data = await fetchAccounts(accessUrl, startDate, now);
 
     let accountsSynced = 0;
     let transactionsNew = 0;
     let transactionsUpdated = 0;
 
-    // Map to track externalId -> accountId for backfilling
     const externalIdToAccountId = new Map<string, string>();
     const syncedTxData: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }[] = [];
 
-    // 6. Upsert accounts
+    logger.info(`${LOG_TAG} SimpleFIN data fetched`, {
+      connectionId,
+      accountsInResponse: data.accounts.length,
+      totalTransactions: data.accounts.reduce((s, a) => s + (a.transactions?.length ?? 0), 0),
+      durationMs: ms(startedAt),
+    });
+
     for (const sfAccount of data.accounts) {
       const balanceNum = parseFloat(sfAccount.balance);
 
-      // Check for orphaned account (from a previously deleted connection) to reconnect
       const [orphanedAccount] = await getDb()
         .select({ id: accounts.id })
         .from(accounts)
@@ -325,7 +359,6 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       let upserted: typeof accounts.$inferSelect;
 
       if (orphanedAccount) {
-        // Reconnect orphaned account to the new connection
         [upserted] = await getDb()
           .update(accounts)
           .set({
@@ -368,17 +401,14 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           .returning();
       }
 
-      // Track accountId for backfilling
       externalIdToAccountId.set(sfAccount.id, upserted.id);
       accountsSynced++;
 
-      // 7. Upsert transactions
       if (sfAccount.transactions) {
         for (const sfTx of sfAccount.transactions) {
           const amountNum = parseFloat(sfTx.amount);
           const accountId = upserted.id;
 
-          // Use transacted_at (actual transaction date) when available; fall back to posted; then now for pending
           const transactionTimestamp = sfTx.transacted_at ?? sfTx.posted;
           const dateMs = transactionTimestamp > 0 ? transactionTimestamp * 1000 : now.getTime();
           const txDate = new Date(dateMs).toISOString().split('T')[0];
@@ -422,7 +452,6 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             amount: String(amountNum),
           });
 
-          // Track new vs updated via pre-check
           const existing = await getDb()
             .select({ id: transactions.id })
             .from(transactions)
@@ -438,7 +467,14 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       }
     }
 
-    // 8. Apply categorization rules to synced transactions
+    logger.info(`${LOG_TAG} Accounts and transactions processed`, {
+      connectionId,
+      accountsSynced,
+      transactionsNew,
+      transactionsUpdated,
+      durationMs: ms(startedAt),
+    });
+
     if (syncedTxData.length > 0) {
       const syncedTxnsWithIds = await getDb()
         .select({
@@ -461,6 +497,12 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       const uncategorized = syncedTxnsWithIds.filter((t) => !t.categoryId);
       if (uncategorized.length > 0) {
         const ruleResults = await applyRulesToTransactions(uncategorized, userId);
+        logger.info(`${LOG_TAG} Categorization rules applied`, {
+          connectionId,
+          uncategorizedBefore: uncategorized.length,
+          matchedByRules: ruleResults.size,
+          durationMs: ms(startedAt),
+        });
         for (const [txId, action] of ruleResults) {
           const updateData: Record<string, unknown> = { updatedAt: new Date() };
           if (action.categoryId) updateData.categoryId = action.categoryId;
@@ -473,10 +515,11 @@ export async function syncConnection(connectionId: string, userId: string): Prom
               .where(eq(transactions.id, txId));
           }
         }
+      } else {
+        logger.debug(`${LOG_TAG} No uncategorized transactions to apply rules to`, { connectionId });
       }
     }
 
-    // 9. Update connection sync status
     await getDb()
       .update(simplifinConnections)
       .set({
@@ -486,43 +529,41 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       })
       .where(eq(simplifinConnections.id, connectionId));
 
-    // 10. Update sync log
+    const transactionsFetched = data.accounts.reduce(
+      (sum, a) => sum + (a.transactions?.length ?? 0),
+      0
+    );
+
     await getDb()
       .update(syncLogs)
       .set({
         status: 'success',
         completedAt: now,
         accountsSynced,
-        transactionsFetched: data.accounts.reduce(
-          (sum, a) => sum + (a.transactions?.length ?? 0),
-          0
-        ),
+        transactionsFetched,
         transactionsNew,
         durationMs: Date.now() - log.startedAt.getTime(),
       })
       .where(eq(syncLogs.id, log.id));
 
-    // 11. Create net worth snapshot for today
     const today = new Date().toISOString().split('T')[0];
     await createNetWorthSnapshot(userId, today);
+    logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
-    // 12. Create account snapshots for all accounts (real, non-synthetic)
     await createAccountSnapshots(userId, today);
+    logger.debug(`${LOG_TAG} Account snapshots created`, { userId, date: today, durationMs: ms(startedAt) });
 
-    // 13. Backfill historical synthetic snapshots for each synced account
     for (const sfAccount of data.accounts) {
       const accountId = externalIdToAccountId.get(sfAccount.id);
       if (!accountId) continue;
 
-      // Find the earliest transaction date for this account
       const earliestTx = await getEarliestTransactionDate(accountId);
       if (!earliestTx) continue;
 
       const toDate = new Date(now);
-      toDate.setDate(toDate.getDate() - 1); // Backfill up to yesterday
+      toDate.setDate(toDate.getDate() - 1);
       const toDateStr = toDate.toISOString().split('T')[0];
 
-      // Only backfill if there's a meaningful gap
       if (earliestTx < toDateStr) {
         const result = await generateHistoricalAccountSnapshots(
           accountId,
@@ -531,31 +572,39 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           toDateStr
         );
         if (result.syntheticCount > 0) {
-          console.log(
-            `[sync] Backfilled ${result.syntheticCount} synthetic snapshots for account ${sfAccount.id}`
-          );
+          logger.info(`${LOG_TAG} Backfilled synthetic snapshots`, {
+            accountId,
+            externalId: sfAccount.id,
+            syntheticCount: result.syntheticCount,
+            range: { from: earliestTx, to: toDateStr },
+          });
         }
       }
     }
 
-    // 14. Update monthly cash flow and category spending summaries for reporting
     await updateMonthlyCashFlowSummaries(userId);
     await updateCategorySpendingSummaries(userId);
+
+    const totalDurationMs = Date.now() - startedAt;
+    logger.info(`${LOG_TAG} Sync completed successfully`, {
+      connectionId,
+      accountsSynced,
+      transactionsFetched,
+      transactionsNew,
+      transactionsUpdated,
+      totalDurationMs,
+    });
 
     return {
       status: 'success',
       accountsSynced,
-      transactionsFetched: data.accounts.reduce(
-        (sum, a) => sum + (a.transactions?.length ?? 0),
-        0
-      ),
+      transactionsFetched,
       transactionsNew,
       transactionsUpdated,
     };
   } catch (err) {
     let errorMessage = err instanceof Error ? err.message : String(err);
 
-    // Provide helpful guidance for decryption errors
     if (errorMessage.includes('Decryption failed')) {
       errorMessage =
         'SimpleFIN connection key mismatch. Please delete and reconnect using a new SimpleFIN Bridge API key.';
@@ -579,7 +628,11 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       })
       .where(eq(simplifinConnections.id, connectionId));
 
-    console.error('[sync] syncConnection failed:', err);
+    logger.error(`${LOG_TAG} Sync failed`, {
+      connectionId,
+      error: errorMessage,
+      durationMs: ms(startedAt),
+    });
 
     return {
       status: 'error',

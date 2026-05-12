@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 
@@ -12,9 +12,11 @@ export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from
 
 const navItems = [
   { href: '/', label: 'Net Worth', icon: ChartSpline },
-  { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp },
-  { href: '/fire', label: 'FIRE', icon: Flame },
   { href: '/transactions', label: 'Transactions', icon: Receipt },
+  { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp },
+  { href: '/budgets', label: 'Budgets', icon: Wallet },
+  { href: '/real-estate', label: 'Real Estate', icon: Home },
+  { href: '/fire', label: 'FIRE', icon: Flame },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

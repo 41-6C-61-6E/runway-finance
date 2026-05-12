@@ -106,6 +106,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                 <option value="credit">Credit Card</option>
                 <option value="investment">Investment</option>
                 <option value="loan">Loan</option>
+                <option value="mortgage">Mortgage</option>
                 <option value="realestate">Real Estate</option>
                 <option value="vehicle">Vehicle</option>
                 <option value="crypto">Bitcoin / Crypto</option>

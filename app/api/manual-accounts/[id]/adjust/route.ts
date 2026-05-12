@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { adjustManualAccountValue } from '@/lib/services/manual-accounts';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -40,6 +41,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     result = await adjustManualAccountValue(id, userId, body.value, body.note);
   }
+
+  logger.info('POST /api/manual-accounts/[id]/adjust', { userId, id, value: body.value, amountOz: body.amountOz, note: body.note, status: result.status });
 
   if (result.status === 'error') {
     return NextResponse.json(result, { status: 500 });

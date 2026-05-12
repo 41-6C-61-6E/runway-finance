@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 import { cookies } from 'next/headers'
 
 const DEV_MODE_COOKIE = 'runway_dev_mode'
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
   // Only set secure flag when the connection is truly secure
   const forwardedProto = request.headers.get('x-forwarded-proto')
   const isSecure = request.url.startsWith('https://') || forwardedProto === 'https'
+
+  logger.info('POST /api/dev-mode', { enabled })
 
   const response = NextResponse.json({ devMode: enabled })
   response.cookies.set(DEV_MODE_COOKIE, String(enabled), {

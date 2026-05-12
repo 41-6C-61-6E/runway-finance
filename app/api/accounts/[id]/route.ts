@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -87,8 +88,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.isExcludedFromNetWorth !== undefined) updateData.isExcludedFromNetWorth = body.isExcludedFromNetWorth;
   if (body.displayOrder !== undefined) updateData.displayOrder = body.displayOrder;
   if (body.type !== undefined) updateData.type = body.type;
+  if (body.balance !== undefined) updateData.balance = String(body.balance);
+  if (body.metadata !== undefined) updateData.metadata = body.metadata;
+
+  const changedFields = Object.keys(updateData);
+  logger.info('Updating account', { accountId: id, changedFields });
 
   if (Object.keys(updateData).length === 0) {
+    logger.warn('No valid fields to update for account', { accountId: id });
     return NextResponse.json(
       { error: 'validation_error', message: 'No valid fields to update' },
       { status: 400 }

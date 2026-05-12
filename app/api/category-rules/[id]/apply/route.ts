@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules, transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { evaluateCondition } from '@/lib/services/rules-engine';
+import { logger } from '@/lib/logger';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -57,6 +58,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  logger.info('POST /api/category-rules/[id]/apply', { userId, ruleId: id, matched: matchedIds.length, total: allTxns.length });
   return NextResponse.json({
     matched: matchedIds.length,
     total: allTxns.length,

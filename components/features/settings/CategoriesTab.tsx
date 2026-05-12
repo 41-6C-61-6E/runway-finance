@@ -28,6 +28,7 @@ export default function CategoriesTab() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
@@ -60,7 +61,7 @@ export default function CategoriesTab() {
   const getChildren = (parentId: string) => children.filter((c) => c.parentId === parentId);
 
   const openAdd = () => {
-    setEditing(null);
+    setIsAdding(true);
     setFormName('');
     setFormParentId(null);
     setFormColor('#6366f1');
@@ -105,6 +106,7 @@ export default function CategoriesTab() {
         });
       }
 
+      setIsAdding(false);
       setEditing(null);
       await fetchCategories();
     } finally {
@@ -241,9 +243,9 @@ export default function CategoriesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {(editing !== null) && (
+      {(isAdding || editing !== null) && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setEditing(null); }} />
+          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setIsAdding(false); setEditing(null); }} />
           <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
             <h3 className="text-lg font-semibold text-foreground mb-6">
               {editing ? 'Edit Category' : 'Add Category'}
@@ -311,7 +313,7 @@ export default function CategoriesTab() {
 
             <div className="flex gap-3 mt-8">
               <button
-                onClick={() => setEditing(null)}
+                onClick={() => { setIsAdding(false); setEditing(null); }}
                 className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
               >
                 Cancel

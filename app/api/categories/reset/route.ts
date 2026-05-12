@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categories } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_CATEGORIES } from '@/lib/db/seed-categories';
+import { logger } from '@/lib/logger';
 
 export async function POST() {
   const session = await auth();
@@ -50,5 +51,6 @@ export async function POST() {
     }
   }
 
+  logger.info('POST /api/categories/reset', { userId });
   return NextResponse.json({ success: true, message: 'Categories reset to defaults' });
 }

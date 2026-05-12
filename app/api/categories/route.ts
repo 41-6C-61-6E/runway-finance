@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categories } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const CreateCategorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -27,6 +28,7 @@ export async function GET() {
     .where(eq(categories.userId, userId))
     .orderBy(asc(categories.displayOrder));
 
+  logger.info('GET /api/categories', { userId, count: cats.length });
   return NextResponse.json(cats);
 }
 
@@ -68,5 +70,6 @@ export async function POST(request: Request) {
     })
     .returning();
 
+  logger.info('POST /api/categories - created', { userId, name, isIncome });
   return NextResponse.json(cat, { status: 201 });
 }
