@@ -20,17 +20,21 @@ services:
       target: runner
     ports:
       - "3001:3000"
+    env_file:
+      - .env
     environment:
-      - NEXTAUTH_URL=https://money.flyingbits.xyz 
-      - NEXTAUTH_SECRET=super-secret-key-for-dev-only-change-in-production
-      - GOOGLE_CLIENT_ID=172398384702-vu31bbe5ojj8sdmppagk0quf4bl7ipa9.apps.googleusercontent.com
-      - GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - REGISTRATION_PIN=${REGISTRATION_PIN}
+
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
-      - DATABASE_URL=postgresql://postgres:postgresdev@postgres:5432/runway_finance
       - SYNC_CRON_SCHEDULE=0 */6 * * *
-      - ENCRYPTION_KEY=15c164990b3bcfd12b7e734fada058bf9e6fbeb25583e1f5972e80e72eec5685 ##must be 64 char hex
-      - REGISTRATION_PIN=05091987
+
     depends_on:
       - postgres
     command: ["node", "server.js"]
