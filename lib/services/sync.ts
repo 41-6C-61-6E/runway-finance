@@ -365,7 +365,6 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             connectionId,
             balance: String(balanceNum),
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
-            name: sfAccount.name,
             institution: sfAccount.org.name,
             updatedAt: now,
           })
@@ -393,7 +392,6 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             set: {
               balance: String(balanceNum),
               balanceDate: new Date(sfAccount['balance-date'] * 1000),
-              name: sfAccount.name,
               institution: sfAccount.org.name,
               updatedAt: now,
             },
