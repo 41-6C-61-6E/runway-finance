@@ -1,12 +1,19 @@
 import { getDb } from '@/lib/db';
-import { categories } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { categories, transactions } from '@/lib/db/schema';
+import { eq, and, sql, isNull } from 'drizzle-orm';
+
+type ChildCategoryDef = {
+  name: string;
+  color: string;
+  excludeFromReports?: boolean;
+};
 
 type CategoryDef = {
   name: string;
   color: string;
   isIncome: boolean;
-  children?: { name: string; color: string }[];
+  excludeFromReports?: boolean;
+  children?: ChildCategoryDef[];
 };
 
 export const DEFAULT_CATEGORIES: CategoryDef[] = [
@@ -185,6 +192,15 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
       { name: 'Tax Preparation', color: '#a8a29e' },
     ],
   },
+  {
+    name: 'Transfers & Adjustments',
+    color: '#6b7280',
+    isIncome: false,
+    excludeFromReports: true,
+    children: [
+      { name: 'Balance Adjustments', color: '#6b7280', excludeFromReports: true },
+    ],
+  },
 ];
 
 const CATEGORY_COLORS = [
@@ -215,6 +231,7 @@ export async function seedUserCategories(userId: string) {
         color: group.color,
         isIncome: group.isIncome,
         isSystem: true,
+        excludeFromReports: group.excludeFromReports ?? false,
         displayOrder: order++,
       })
       .returning();
@@ -228,9 +245,69 @@ export async function seedUserCategories(userId: string) {
           color: child.color,
           isIncome: group.isIncome,
           isSystem: true,
+          excludeFromReports: child.excludeFromReports ?? false,
           displayOrder: order++,
         });
       }
     }
   }
+}
+
+export async function ensureSystemCategories(userId: string) {
+  const db = getDb();
+
+  const existing = await db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.userId, userId), eq(categories.name, 'Transfers & Adjustments')))
+    .limit(1);
+
+  if (existing.length > 0) return existing[0].id;
+
+  const [last] = await db
+    .select({ maxOrder: sql<number>`max(${categories.displayOrder})` })
+    .from(categories)
+    .where(eq(categories.userId, userId));
+  let order = (last?.maxOrder ?? 0) + 1;
+
+  const [parent] = await db
+    .insert(categories)
+    .values({
+      userId,
+      name: 'Transfers & Adjustments',
+      color: '#6b7280',
+      isIncome: false,
+      isSystem: true,
+      excludeFromReports: true,
+      displayOrder: order++,
+    })
+    .returning();
+
+  const [child] = await db
+    .insert(categories)
+    .values({
+      userId,
+      parentId: parent.id,
+      name: 'Balance Adjustments',
+      color: '#6b7280',
+      isIncome: false,
+      isSystem: true,
+      excludeFromReports: true,
+      displayOrder: order++,
+    })
+    .returning();
+
+  // Migrate existing adj-* transactions to Balance Adjustments
+  await db
+    .update(transactions)
+    .set({ categoryId: child.id })
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        sql`${transactions.externalId} LIKE 'adj-%'`,
+        isNull(transactions.categoryId)
+      )
+    );
+
+  return child.id;
 }

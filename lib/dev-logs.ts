@@ -1,5 +1,5 @@
 // In-memory log store for dev_mode
-// Only active when DEV_MODE=true
+// Only active when dev-logging is enabled (via enableDevLogging())
 
 interface LogEntry {
   id: string
@@ -9,8 +9,22 @@ interface LogEntry {
   metadata?: Record<string, unknown>
 }
 
+let _enabled = false;
+
+export function enableDevLogging() {
+  _enabled = true;
+}
+
+export function disableDevLogging() {
+  _enabled = false;
+}
+
+export function isDevLoggingEnabled(): boolean {
+  return _enabled;
+}
+
 const LOGS: LogEntry[] = []
-const MAX_LOGS = 500
+const MAX_LOGS = 2000
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024 * 1024 // 1GB
 
 function estimateLogsSize(): number {
@@ -31,7 +45,8 @@ export function addLog(
   level: LogEntry['level'],
   message: string,
   metadata?: Record<string, unknown>
-): LogEntry {
+): LogEntry | null {
+  if (!_enabled) return null;
   const entry: LogEntry = {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),

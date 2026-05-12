@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
+import { logger } from '@/lib/logger';
 
 export async function POST() {
   const session = await auth();
@@ -46,6 +47,7 @@ export async function POST() {
     }
   }
 
+  logger.info('POST /api/category-rules/apply-all', { userId, updated: ruleResults.size, total: allTxns.length });
   return NextResponse.json({
     updated: ruleResults.size,
     total: allTxns.length,

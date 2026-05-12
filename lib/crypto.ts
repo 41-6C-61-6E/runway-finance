@@ -1,12 +1,13 @@
 import { createDecipheriv } from 'node:crypto';
+import { logger } from '@/lib/logger';
 
 export type EncryptedPayload = { ciphertext: string; iv: string; tag: string };
 
 function getEncryptionKey(): Uint8Array {
   const key = process.env.ENCRYPTION_KEY;
   if (!key || key.length !== 64 || !/^[0-9a-f]+$/i.test(key)) {
-    console.error(
-      '[runway] FATAL: ENCRYPTION_KEY is missing or invalid. ' +
+    logger.error(
+      '[crypto] FATAL: ENCRYPTION_KEY is missing or invalid. ' +
         'Must be a 64-character hex string. ' +
         "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
     );

@@ -6,14 +6,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Check } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
+import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
 import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
+import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
+import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 
 type Connection = {
   id: string;
@@ -64,7 +68,9 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingLabel, setSavingLabel] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules'>('general');
+  const { scheme: chartScheme, updateScheme: updateChartScheme } = useChartColorScheme();
+
+  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics'>('general');
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -342,6 +348,14 @@ export default function SettingsPage() {
             >
               Rules
             </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Analytics
+            </button>
           </div>
 
           {activeTab === 'general' && (
@@ -369,6 +383,48 @@ export default function SettingsPage() {
                   value={accentColor}
                   onChange={handleAccentColorChange}
                 />
+              </div>
+
+              {/* Chart Color Scheme */}
+              <div className="pb-5 border-b border-border">
+                <div className="mb-3">
+                  <h3 className="text-sm font-medium text-foreground">Chart Color Scheme</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Choose a color palette for all charts and graphs</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {(Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[]).map((id) => {
+                    const scheme = CHART_COLOR_SCHEMES[id];
+                    const isActive = chartScheme === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        title={scheme.description}
+                        aria-label={`Select ${scheme.name} chart color scheme`}
+                        onClick={() => updateChartScheme(id)}
+                        className={`relative flex items-center gap-1.5 p-2 rounded-lg border transition-all ${
+                          isActive
+                            ? 'border-foreground bg-muted/50'
+                            : 'border-border hover:border-foreground/30 hover:bg-muted/20'
+                        }`}
+                      >
+                        <div className="flex -space-x-1">
+                          {scheme.colors.map((c, i) => (
+                            <div
+                              key={i}
+                              className="w-4 h-4 rounded-full border border-border/30"
+                              style={{ background: c }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-xs text-foreground ml-1">{scheme.name}</span>
+                        {isActive && (
+                          <Check className="w-3 h-3 text-foreground absolute top-0.5 right-0.5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Privacy Mode */}
@@ -764,6 +820,12 @@ export default function SettingsPage() {
       {activeTab === 'rules' && (
         <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <RulesTab />
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <AnalyticsTab />
         </div>
       )}
     </div>

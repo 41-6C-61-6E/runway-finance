@@ -1,6 +1,9 @@
 import { getDb } from '@/lib/db';
 import { categoryRules } from '@/lib/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
+
+const LOG_TAG = '[rules-engine]';
 
 type TransactionData = {
   id: string;
@@ -27,7 +30,10 @@ export async function applyRulesToTransactions(
     .where(and(eq(categoryRules.userId, userId), eq(categoryRules.isActive, true)))
     .orderBy(asc(categoryRules.priority));
 
-  if (rules.length === 0) return new Map();
+  if (rules.length === 0) {
+    logger.debug(`${LOG_TAG} No active rules found`, { userId });
+    return new Map();
+  }
 
   const results = new Map<string, RuleAction>();
 
@@ -35,16 +41,22 @@ export async function applyRulesToTransactions(
     for (const rule of rules) {
       const match = evaluateCondition(rule, tx);
       if (match) {
-        const action: RuleAction = {
+        results.set(tx.id, {
           categoryId: rule.setCategoryId,
           payee: rule.setPayee ?? null,
           reviewed: rule.setReviewed ?? null,
-        };
-        results.set(tx.id, action);
+        });
         break;
       }
     }
   }
+
+  logger.info(`${LOG_TAG} Rules evaluated`, {
+    userId,
+    activeRules: rules.length,
+    transactionsToCategorize: txns.length,
+    transactionsMatched: results.size,
+  });
 
   return results;
 }

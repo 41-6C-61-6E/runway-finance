@@ -1,15 +1,10 @@
 import { getDb } from '@/lib/db';
 import { simplifinConnections } from '@/lib/db/schema';
 import { syncConnection } from '@/lib/services/sync';
-import { debugInfo, debugError } from '@/lib/debug';
+import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[runway-sync]';
 
-/**
- * Sync all SimpleFIN connections sequentially.
- * Each connection is synced one at a time to avoid overwhelming SimpleFIN Bridge.
- * Per-connection errors are logged but do not stop the rest.
- */
 export async function syncAllConnections(): Promise<void> {
   const connections = await getDb()
     .select({
@@ -19,29 +14,43 @@ export async function syncAllConnections(): Promise<void> {
     .from(simplifinConnections);
 
   if (connections.length === 0) {
-    debugInfo(`${LOG_TAG} No connections found, skipping sync.`);
+    logger.info(`${LOG_TAG} No connections found, skipping sync.`);
     return;
   }
 
-  debugInfo(`${LOG_TAG} Sync started: ${connections.length} connections`);
+  const startedAt = Date.now();
+  logger.info(`${LOG_TAG} Sync started`, { connectionCount: connections.length });
 
-  for (const conn of connections) {
+  for (let i = 0; i < connections.length; i++) {
+    const conn = connections[i];
     try {
       const result = await syncConnection(conn.id, conn.userId);
       if (result.status === 'success') {
-        debugInfo(
-          `${LOG_TAG} Connection ${conn.id}: synced ${result.accountsSynced} accounts, ${result.transactionsFetched} transactions`
+        logger.info(
+          `${LOG_TAG} Connection synced (${i + 1}/${connections.length})`,
+          {
+            connectionId: conn.id,
+            accountsSynced: result.accountsSynced,
+            transactionsFetched: result.transactionsFetched,
+            transactionsNew: result.transactionsNew,
+          }
         );
       } else {
-        debugError(
-          `${LOG_TAG} Connection ${conn.id}: sync failed — ${result.errorMessage}`
+        logger.error(
+          `${LOG_TAG} Connection sync failed (${i + 1}/${connections.length})`,
+          {
+            connectionId: conn.id,
+            error: result.errorMessage,
+          }
         );
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      debugError(`${LOG_TAG} Connection ${conn.id}: unexpected error — ${errorMessage}`);
+      logger.error(`${LOG_TAG} Unexpected error on connection (${i + 1}/${connections.length})`, {
+        connectionId: conn.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
-  debugInfo(`${LOG_TAG} Sync completed.`);
+  logger.info(`${LOG_TAG} Sync completed`, { totalDurationMs: Date.now() - startedAt });
 }

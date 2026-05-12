@@ -4,6 +4,7 @@ import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,6 +59,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(simplifinConnections.id, id))
     .returning();
 
+  logger.info('Connection label updated', { connectionId: id, label: body.label.trim() });
   return NextResponse.json(updated);
 }
 
@@ -115,5 +117,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   await getDb().delete(syncLogs).where(eq(syncLogs.connectionId, id));
   await getDb().delete(simplifinConnections).where(eq(simplifinConnections.id, id));
 
+  logger.info('Connection deleted', { connectionId: id, keepData });
   return new NextResponse(null, { status: 204 });
 }

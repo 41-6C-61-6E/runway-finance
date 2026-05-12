@@ -1,6 +1,9 @@
 import { getDb } from '@/lib/db';
 import { accountSnapshots, transactions } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
+
+const LOG_TAG = '[account-history]';
 
 /**
  * Result of a single synthetic snapshot generation.
@@ -109,20 +112,15 @@ export async function generateHistoricalAccountSnapshots(
   fromDate: string,
   toDate: string
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
-  const syntheticCount = 0;
-  const skippedRealCount = 0;
+  const startedAt = Date.now();
 
-  // Normalize dates
   const from = fromDate;
   const to = toDate;
 
-  // Step 1: Find the latest real snapshot on or before `fromDate`
   const latestReal = await getLatestRealSnapshot(accountId, userId, from);
 
-  // Step 2: Get the earliest transaction date as a fallback starting point
   const earliestTxDate = await getEarliestTransactionDate(accountId);
 
-  // Determine the effective starting date and balance
   let effectiveFromDate: string;
   let runningBalance: number;
 
@@ -130,22 +128,17 @@ export async function generateHistoricalAccountSnapshots(
     effectiveFromDate = latestReal.date;
     runningBalance = parseFloat(latestReal.balance);
   } else if (earliestTxDate) {
-    // No real snapshot exists — start from the earliest transaction
     effectiveFromDate = earliestTxDate;
     runningBalance = 0;
   } else {
-    // No transactions at all — nothing to backfill
+    logger.debug(`${LOG_TAG} No data to backfill for account`, { accountId, from, to });
     return { syntheticCount: 0, skippedRealCount: 0 };
   }
 
-  // Step 3: Fetch all posted transactions in the range
-  // We need transactions from effectiveFromDate through toDate
   const txs = await getPostedTransactions(accountId, effectiveFromDate, to);
 
   if (txs.length === 0) {
-    // No transactions in range — check if we need a single snapshot at effectiveFromDate
     if (effectiveFromDate === from) {
-      // No real snapshot exists for `from`, so insert one as synthetic
       await getDb()
         .insert(accountSnapshots)
         .values({
@@ -159,22 +152,19 @@ export async function generateHistoricalAccountSnapshots(
           target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
           set: { balance: String(runningBalance), isSynthetic: true },
         });
+      logger.debug(`${LOG_TAG} Single synthetic snapshot inserted`, { accountId, date: from, balance: runningBalance });
       return { syntheticCount: 1, skippedRealCount: 0 };
     }
     return { syntheticCount: 0, skippedRealCount: 0 };
   }
 
-  // Step 4: Build a map of date -> cumulative balance
-  // We iterate through each day and apply transactions that post on that day
   const txByDate = new Map<string, number>();
   for (const tx of txs) {
     const txDate = String(tx.postedDate ?? tx.date);
     const existing = txByDate.get(txDate) ?? 0;
-    // Transactions are positive for deposits, negative for withdrawals
     txByDate.set(txDate, existing + parseFloat(tx.amount));
   }
 
-  // Step 5: Iterate through each day and generate snapshots
   let current = new Date(effectiveFromDate);
   const end = new Date(to);
   let count = 0;
@@ -183,7 +173,6 @@ export async function generateHistoricalAccountSnapshots(
   while (current <= end) {
     const dateStr = current.toISOString().split('T')[0];
 
-    // Check if a real (non-synthetic) snapshot already exists for this date
     const [realSnapshot] = await getDb()
       .select({ id: accountSnapshots.id })
       .from(accountSnapshots)
@@ -198,10 +187,6 @@ export async function generateHistoricalAccountSnapshots(
       .limit(1);
 
     if (realSnapshot) {
-      // Real snapshot exists — use it as the new running balance baseline
-      // (this keeps our synthetic calculations accurate going forward)
-      // We don't need to fetch the balance since the real one takes precedence
-      // But we should update runningBalance to the real value for accuracy
       const [realBal] = await getDb()
         .select({ balance: accountSnapshots.balance })
         .from(accountSnapshots)
@@ -219,7 +204,6 @@ export async function generateHistoricalAccountSnapshots(
       }
       skippedReal++;
     } else {
-      // No real snapshot — apply transactions for this day and insert synthetic
       const dailyChange = txByDate.get(dateStr) ?? 0;
       runningBalance += dailyChange;
 
@@ -239,9 +223,16 @@ export async function generateHistoricalAccountSnapshots(
       count++;
     }
 
-    // Advance to next day
     current.setDate(current.getDate() + 1);
   }
+
+  logger.debug(`${LOG_TAG} Backfill complete`, {
+    accountId,
+    range: { from: effectiveFromDate, to },
+    syntheticCount: count,
+    skippedRealCount: skippedReal,
+    durationMs: Date.now() - startedAt,
+  });
 
   return { syntheticCount: count, skippedRealCount: skippedReal };
 }

@@ -74,6 +74,8 @@ export const userSettings = pgTable('user_settings', {
   compactMode: boolean('compact_mode').notNull().default(false),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
   privacyMode: boolean('privacy_mode').notNull().default(false),
+  chartVisibility: jsonb('chart_visibility').default({}),
+  chartColorScheme: text('chart_color_scheme').notNull().default('forest'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -270,8 +272,13 @@ export const budgets = pgTable('budgets', {
     .notNull()
     .references(() => categories.id, { onDelete: 'cascade' }),
   yearMonth: text('year_month'), // Format: 'YYYY-MM', null = recurring monthly
+  periodType: text('period_type').notNull().default('monthly'), // 'monthly' | 'quarterly' | 'yearly'
+  periodKey: text('period_key'), // null for recurring, or 'YYYY-MM', 'YYYY-Qn', 'YYYY'
   amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
   isRecurring: boolean('is_recurring').notNull().default(true),
+  fundingAccountId: uuid('funding_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  rollover: boolean('rollover').notNull().default(false),
+  notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -291,6 +298,31 @@ export const financialGoals = pgTable('financial_goals', {
   priority: integer('priority').notNull().default(0), // 0=low, 1=medium, 2=high
   status: text('status').notNull().default('active'), // 'active'|'completed'|'paused'
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Retirement Projections ────────────────────────────────────────────────────
+export const retirementProjections = pgTable('retirement_projections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull().default('Primary Plan'),
+  fireScenarioId: uuid('fire_scenario_id').references(() => fireScenarios.id, { onDelete: 'set null' }),
+  retirementAge: integer('retirement_age'),
+  lifeExpectancy: integer('life_expectancy').default(95),
+  portfolioAtRetirement: numeric('portfolio_at_retirement', { precision: 20, scale: 4 }).default('0'),
+  expectedReturnRate: numeric('expected_return_rate', { precision: 6, scale: 4 }).default('0.05'),
+  inflationRate: numeric('inflation_rate', { precision: 6, scale: 4 }).default('0.03'),
+  annualWithdrawal: numeric('annual_withdrawal', { precision: 20, scale: 4 }),
+  ssStartAge: integer('ss_start_age').default(67),
+  ssAnnual: numeric('ss_annual', { precision: 20, scale: 4 }).default('0'),
+  pensionStartAge: integer('pension_start_age').default(65),
+  pensionAnnual: numeric('pension_annual', { precision: 20, scale: 4 }).default('0'),
+  partTimeIncome: numeric('part_time_income', { precision: 20, scale: 4 }).default('0'),
+  partTimeEndAge: integer('part_time_end_age'),
+  rentalIncomeAnnual: numeric('rental_income_annual', { precision: 20, scale: 4 }).default('0'),
+  healthcareAnnual: numeric('healthcare_annual', { precision: 20, scale: 4 }).default('0'),
+  legacyGoal: numeric('legacy_goal', { precision: 20, scale: 4 }).default('0'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

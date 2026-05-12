@@ -17,7 +17,7 @@ type ManualAccount = {
   balanceDate: string | null;
 };
 
-type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset';
+type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage';
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
   realestate: 'Real Estate',
@@ -26,6 +26,28 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   gold: 'Gold',
   silver: 'Silver',
   otherAsset: 'Other Asset',
+  mortgage: 'Mortgage',
+};
+
+const SYNC_FREQUENCIES = [
+  { value: 'manual', label: 'Manual only' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+] as const;
+
+const SYNC_FREQUENCY_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+};
+
+const SYNC_FREQ_COLORS: Record<string, string> = {
+  manual: 'text-muted-foreground',
+  daily: 'text-chart-1',
+  weekly: 'text-chart-3',
+  monthly: 'text-chart-4',
 };
 
 const ASSET_TYPE_ICONS: Record<string, string> = {
@@ -35,6 +57,7 @@ const ASSET_TYPE_ICONS: Record<string, string> = {
   gold: '🥇',
   silver: '🥈',
   otherAsset: '📦',
+  mortgage: '📋',
 };
 
 function getSubTypeLabel(account: ManualAccount): string {
@@ -56,6 +79,7 @@ const ACCOUNT_TYPE_MAP: Record<string, string> = {
   gold: 'metals',
   silver: 'metals',
   otherAsset: 'otherAsset',
+  mortgage: 'mortgage',
 };
 
 const formatCurrency = (balance: string, currency: string) => {
@@ -85,6 +109,7 @@ const formatRelativeTime = (date: string | null) => {
 
 export default function ManualAccountsSection() {
   const [accounts, setAccounts] = useState<ManualAccount[]>([]);
+  const [realEstateAccounts, setRealEstateAccounts] = useState<ManualAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -113,9 +138,13 @@ export default function ManualAccountsSection() {
 
   const fetchAccounts = useCallback(async () => {
     try {
-      const res = await fetch('/api/manual-accounts', { credentials: 'include' });
+      const [res, reRes] = await Promise.all([
+        fetch('/api/manual-accounts', { credentials: 'include' }),
+        fetch('/api/accounts?type=realestate&includeHidden=false', { credentials: 'include' }),
+      ]);
       const data = await res.json();
       setAccounts(Array.isArray(data) ? data : []);
+      if (reRes.ok) setRealEstateAccounts(await reRes.json());
     } catch {
       setAccounts([]);
     } finally {
@@ -144,12 +173,28 @@ export default function ManualAccountsSection() {
       }
       if (createType === 'realestate') {
         metadata.propertyId = createMeta.propertyId || '';
+        if (createMeta.linkedMortgageId) {
+          metadata.mortgageAccountIds = [createMeta.linkedMortgageId];
+        }
+      }
+      if (createType === 'mortgage') {
+        metadata.originalLoanAmount = parseFloat(createMeta.originalLoanAmount || '0');
+        metadata.interestRate = parseFloat(createMeta.interestRate || '0');
+        metadata.termMonths = parseInt(createMeta.termMonths || '360', 10);
+        metadata.monthlyPayment = parseFloat(createMeta.monthlyPayment || '0');
+        metadata.escrowAmount = parseFloat(createMeta.escrowAmount || '0');
+        if (createMeta.linkedPropertyId) {
+          metadata.linkedPropertyId = createMeta.linkedPropertyId;
+        }
       }
       if (createType === 'crypto') {
         metadata.xpub = createMeta.xpub || '';
       }
       if (createType === 'otherAsset') {
         metadata.description = createMeta.description || '';
+      }
+      if (['realestate', 'crypto', 'gold', 'silver'].includes(createType)) {
+        metadata.syncFrequency = createMeta.syncFrequency || 'manual';
       }
 
       const res = await fetch('/api/manual-accounts', {
@@ -284,12 +329,32 @@ export default function ManualAccountsSection() {
       }
       if (editAccount.type === 'realestate') {
         metadata.propertyId = editMeta.propertyId || '';
+        if (editMeta.linkedMortgageId) {
+          metadata.mortgageAccountIds = [editMeta.linkedMortgageId];
+        } else {
+          metadata.mortgageAccountIds = [];
+        }
+      }
+      if (editAccount.type === 'mortgage') {
+        metadata.originalLoanAmount = parseFloat(editMeta.originalLoanAmount || '0');
+        metadata.interestRate = parseFloat(editMeta.interestRate || '0');
+        metadata.termMonths = parseInt(editMeta.termMonths || '360', 10);
+        metadata.monthlyPayment = parseFloat(editMeta.monthlyPayment || '0');
+        metadata.escrowAmount = parseFloat(editMeta.escrowAmount || '0');
+        if (editMeta.linkedPropertyId) {
+          metadata.linkedPropertyId = editMeta.linkedPropertyId;
+        } else {
+          delete metadata.linkedPropertyId;
+        }
       }
       if (editAccount.type === 'crypto') {
         metadata.xpub = editMeta.xpub || '';
       }
       if (editAccount.type === 'otherAsset') {
         metadata.description = editMeta.description || '';
+      }
+      if (['realestate', 'crypto', 'metals'].includes(editAccount.type)) {
+        metadata.syncFrequency = editMeta.syncFrequency || 'manual';
       }
 
       const res = await fetch(`/api/manual-accounts/${editAccount.id}`, {
@@ -321,19 +386,149 @@ export default function ManualAccountsSection() {
     return ['vehicle', 'otherAsset'].includes(account.type) || account.type === 'metals';
   };
 
+  const mortgageAccounts = accounts.filter((a) => a.type === 'mortgage');
+
+  const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
+      <select
+        value={meta.syncFrequency || 'manual'}
+        onChange={(e) => setMeta({ ...meta, syncFrequency: e.target.value })}
+        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {SYNC_FREQUENCIES.map((f) => (
+          <option key={f.value} value={f.value}>{f.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const linkedMortgageField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => {
+    const alreadyLinked = new Set(
+      accounts.filter((a) => a.type === 'realestate').flatMap((re) => {
+        const m = re.metadata ?? {};
+        return (m as Record<string, unknown>).mortgageAccountIds as string[] ?? [];
+      })
+    );
+    const available = mortgageAccounts.filter((m) => !alreadyLinked.has(m.id) || meta.linkedMortgageId === m.id);
+    return (
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Linked Mortgage (optional)</label>
+        <select
+          value={meta.linkedMortgageId || ''}
+          onChange={(e) => setMeta({ ...meta, linkedMortgageId: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">None (wholly owned)</option>
+          {available.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
+  const linkedPropertyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => {
+    const alreadyLinked = new Set(
+      accounts.filter((a) => a.type === 'mortgage').flatMap((m) => {
+        const meta = m.metadata ?? {};
+        return (meta as Record<string, unknown>).linkedPropertyId ? [(meta as Record<string, unknown>).linkedPropertyId as string] : [];
+      })
+    );
+    const available = realEstateAccounts.filter((re) => !alreadyLinked.has(re.id) || meta.linkedPropertyId === re.id);
+    return (
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Linked Property (optional)</label>
+        <select
+          value={meta.linkedPropertyId || ''}
+          onChange={(e) => setMeta({ ...meta, linkedPropertyId: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">None</option>
+          {available.map((re) => (
+            <option key={re.id} value={re.id}>{re.name}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   const typeSpecificFields = () => {
     switch (createType) {
       case 'realestate':
         return (
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
-            <Input
-              value={createMeta.propertyId || ''}
-              onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
-              placeholder="e.g., 446533"
-              required
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
+              <Input
+                value={createMeta.propertyId || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
+                placeholder="e.g., 446533"
+                required
+              />
+            </div>
+            {linkedMortgageField(createMeta, setCreateMeta)}
+            {syncFrequencyField(createMeta, setCreateMeta)}
+          </>
+        );
+      case 'mortgage':
+        return (
+          <>
+            {linkedPropertyField(createMeta, setCreateMeta)}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={createMeta.originalLoanAmount || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
+                  placeholder="e.g., 300000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Interest Rate (%)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={createMeta.interestRate || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, interestRate: e.target.value }))}
+                  placeholder="e.g., 6.5"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Term (months)</label>
+                <Input
+                  type="number"
+                  value={createMeta.termMonths || '360'}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, termMonths: e.target.value }))}
+                  placeholder="e.g., 360"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={createMeta.monthlyPayment || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, monthlyPayment: e.target.value }))}
+                  placeholder="e.g., 2212"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Escrow (monthly, optional)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={createMeta.escrowAmount || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, escrowAmount: e.target.value }))}
+                placeholder="e.g., 400"
+              />
+            </div>
+          </>
         );
       case 'vehicle':
         return (
@@ -358,30 +553,36 @@ export default function ManualAccountsSection() {
         );
       case 'crypto':
         return (
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Bitcoin xpub / Address</label>
-            <Input
-              value={createMeta.xpub || ''}
-              onChange={(e) => setCreateMeta((m) => ({ ...m, xpub: e.target.value }))}
-              placeholder="e.g., wpkh(xpub...)"
-              required
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Bitcoin xpub / Address</label>
+              <Input
+                value={createMeta.xpub || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, xpub: e.target.value }))}
+                placeholder="e.g., wpkh(xpub...)"
+                required
+              />
+            </div>
+            {syncFrequencyField(createMeta, setCreateMeta)}
+          </>
         );
       case 'gold':
       case 'silver':
         return (
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Amount (oz)</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={createMeta.amountOz || ''}
-              onChange={(e) => setCreateMeta((m) => ({ ...m, amountOz: e.target.value }))}
-              placeholder="e.g., 10.5"
-              required
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Amount (oz)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={createMeta.amountOz || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, amountOz: e.target.value }))}
+                placeholder="e.g., 10.5"
+                required
+              />
+            </div>
+            {syncFrequencyField(createMeta, setCreateMeta)}
+          </>
         );
       case 'otherAsset':
         return (
@@ -404,12 +605,12 @@ export default function ManualAccountsSection() {
   return (
     <div className="p-5 bg-card border border-border rounded-xl">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-foreground">Manual Assets</h2>
+        <h2 className="text-base font-semibold text-foreground">Manual Assets & Mortgages</h2>
         <button
           onClick={() => setShowCreate(true)}
           className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
         >
-          + Add Asset
+          + Add
         </button>
       </div>
 
@@ -437,12 +638,13 @@ export default function ManualAccountsSection() {
 
       {accounts.length === 0 ? (
         <p className="text-muted-foreground text-sm py-4 text-center">
-          No manual assets yet. Add your first asset to track it alongside your bridge accounts.
+          No manual accounts yet. Add your first asset or mortgage to track it.
         </p>
       ) : (
         <div className="space-y-2">
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
+            const isLiability = account.type === 'mortgage';
             return (
               <div
                 key={account.id}
@@ -450,25 +652,32 @@ export default function ManualAccountsSection() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : 'otherAsset']}</span>
+                    <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : 'otherAsset']}</span>
                     <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                       account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
                       account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
                       account.type === 'crypto' ? 'bg-chart-2/20 text-chart-2' :
                       account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
+                      account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
                       'bg-muted text-muted-foreground'
                     }`}>
                       {getSubTypeLabel(account)}
                     </span>
+                    {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
                   </div>
                   <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Last updated: {formatRelativeTime(account.balanceDate)}
+                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                    <span>Last updated: {formatRelativeTime(account.balanceDate)}</span>
+                    {canSync(account) && account.metadata && (
+                      <span className={`text-[10px] ${SYNC_FREQ_COLORS[String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')] || 'text-muted-foreground'}`}>
+                        {SYNC_FREQUENCY_LABELS[String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')] || 'Manual'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="text-right">
-                    <div className={`font-mono text-sm font-semibold text-muted-foreground blur-number`}>
+                    <div className={`font-mono text-sm font-semibold blur-number ${isLiability ? 'text-destructive' : 'text-muted-foreground'}`}>
                       {fmt.sign}{fmt.text}
                     </div>
                     <div className="text-xs text-muted-foreground/60">{account.currency}</div>
@@ -524,18 +733,19 @@ export default function ManualAccountsSection() {
       <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Manual Asset</DialogTitle>
-            <DialogDescription>Track assets that aren't connected through SimpleFIN.</DialogDescription>
+            <DialogTitle>Add Manual Account</DialogTitle>
+            <DialogDescription>Track assets or mortgages that aren't connected through SimpleFIN.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Asset Type</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Type</label>
               <select
                 value={createType}
                 onChange={(e) => { setCreateType(e.target.value as AssetSubType); setCreateMeta({}); }}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="realestate">Real Estate</option>
+                <option value="mortgage">Mortgage</option>
                 <option value="vehicle">Vehicle</option>
                 <option value="crypto">Bitcoin</option>
                 <option value="gold">Gold</option>
@@ -548,19 +758,21 @@ export default function ManualAccountsSection() {
               <Input
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
-                placeholder="e.g., My House"
+                placeholder={createType === 'mortgage' ? "e.g., Primary Mortgage" : "e.g., My House"}
                 required
               />
             </div>
             {typeSpecificFields()}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Initial Value (optional)</label>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {createType === 'mortgage' ? 'Outstanding Balance (positive)' : 'Initial Value (optional)'}
+              </label>
               <Input
                 type="number"
                 step="0.01"
                 value={createInitialValue}
                 onChange={(e) => setCreateInitialValue(e.target.value)}
-                placeholder="e.g., 500000"
+                placeholder={createType === 'mortgage' ? "e.g., 250000" : "e.g., 500000"}
               />
             </div>
             <DialogFooter>
@@ -569,7 +781,7 @@ export default function ManualAccountsSection() {
                 disabled={createLoading}
                 className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
-                {createLoading ? 'Creating...' : 'Create Asset'}
+                {createLoading ? 'Creating...' : 'Create'}
               </button>
             </DialogFooter>
           </form>
@@ -631,7 +843,7 @@ export default function ManualAccountsSection() {
       <Dialog open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null); setError(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Asset</DialogTitle>
+            <DialogTitle>Edit Account</DialogTitle>
             <DialogDescription>Update the details for {editAccount?.name}.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -640,20 +852,78 @@ export default function ManualAccountsSection() {
               <Input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder="Asset name"
+                placeholder="Account name"
                 required
               />
             </div>
 
             {editAccount?.type === 'realestate' && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
-                <Input
-                  value={editMeta.propertyId || ''}
-                  onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
-                  placeholder="e.g., 446533"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
+                  <Input
+                    value={editMeta.propertyId || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
+                    placeholder="e.g., 446533"
+                  />
+                </div>
+                {linkedMortgageField(editMeta, (m) => setEditMeta(m))}
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+              </>
+            )}
+
+            {editAccount?.type === 'mortgage' && (
+              <>
+                {linkedPropertyField(editMeta, (m) => setEditMeta(m))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editMeta.originalLoanAmount || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Interest Rate (%)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editMeta.interestRate || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, interestRate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Term (months)</label>
+                    <Input
+                      type="number"
+                      value={editMeta.termMonths || '360'}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, termMonths: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editMeta.monthlyPayment || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, monthlyPayment: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Escrow (monthly)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editMeta.escrowAmount || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, escrowAmount: e.target.value }))}
+                  />
+                </div>
+              </>
             )}
 
             {editAccount?.type === 'vehicle' && (
@@ -678,27 +948,32 @@ export default function ManualAccountsSection() {
             )}
 
             {editAccount?.type === 'crypto' && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Bitcoin xpub / Address</label>
-                <Input
-                  value={editMeta.xpub || ''}
-                  onChange={(e) => setEditMeta((m) => ({ ...m, xpub: e.target.value }))}
-                  placeholder="e.g., wpkh(xpub...)"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Bitcoin xpub / Address</label>
+                  <Input
+                    value={editMeta.xpub || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, xpub: e.target.value }))}
+                    placeholder="e.g., wpkh(xpub...)"
+                  />
+                </div>
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+              </>
             )}
 
             {editAccount?.type === 'metals' && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Amount (oz)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editMeta.amountOz || ''}
-                  onChange={(e) => setEditMeta((m) => ({ ...m, amountOz: e.target.value }))}
-                  placeholder="e.g., 10.5"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Amount (oz)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editMeta.amountOz || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, amountOz: e.target.value }))}
+                  />
+                </div>
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+              </>
             )}
 
             {editAccount?.type === 'otherAsset' && (
@@ -734,7 +1009,7 @@ export default function ManualAccountsSection() {
       <AlertDialog open={!!deleteAccount} onOpenChange={(open) => { if (!open) setDeleteAccount(null); setError(''); }}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+            <AlertDialogTitle>Delete Account</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>{deleteAccount?.name}</strong>? All data including transactions and history will be permanently removed.
             </AlertDialogDescription>

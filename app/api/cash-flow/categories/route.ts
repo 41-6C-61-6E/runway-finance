@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { categorySpendingSummary, categories } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
@@ -28,11 +29,12 @@ export async function GET(request: Request) {
         isIncome: categories.isIncome,
       })
       .from(categorySpendingSummary)
-      .leftJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
+      .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
       .where(
         and(
           eq(categorySpendingSummary.userId, session.user.id),
-          eq(categorySpendingSummary.yearMonth, month)
+          eq(categorySpendingSummary.yearMonth, month),
+          eq(categories.excludeFromReports, false)
         )
       );
 
@@ -74,9 +76,10 @@ export async function GET(request: Request) {
       };
     });
 
+    logger.info('GET /api/cash-flow/categories', { month, count: data.length });
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching category spending:', error);
+    logger.error('Error fetching category spending', { error });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch category spending data' },
       { status: 500 }

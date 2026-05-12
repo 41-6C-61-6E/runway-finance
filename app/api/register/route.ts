@@ -1,58 +1,54 @@
 import { NextResponse } from 'next/server';
 import { addUser, findUser } from '@/lib/users';
-import { debugLog, debugInfo, debugWarn, debugError } from '@/lib/debug';
+import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
 import { seedUserCategories } from '@/lib/db/seed-categories';
 import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
 
 export async function POST(request: Request) {
   try {
-    debugLog('Register API: POST request received')
     const body = await request.json();
     const { username, password, email, pin } = body;
 
-    debugLog('Register API: received username:', username, 'email:', email)
+    logger.debug('Register API: request received', { username, email })
 
     if (!username || !password) {
-      debugWarn('Register API: missing username or password')
+      logger.warn('Register API: missing username or password')
       return NextResponse.json({ message: 'Username and password are required' }, { status: 400 });
     }
 
-    // Check ALLOW_REGISTRATION
     if (process.env.ALLOW_REGISTRATION === 'false') {
-      debugWarn('Register API: registration is disabled')
+      logger.warn('Register API: registration is disabled')
       return NextResponse.json({ message: 'Registration is currently disabled' }, { status: 403 });
     }
 
-    // Check REGISTRATION_PIN if configured
     const requiredPin = process.env.REGISTRATION_PIN;
     if (requiredPin && requiredPin.length > 0) {
       if (!pin) {
-        debugWarn('Register API: missing registration PIN')
+        logger.warn('Register API: missing registration PIN')
         return NextResponse.json({ message: 'Registration PIN is required' }, { status: 403 });
       }
       const pinBuffer = Buffer.from(pin);
       const requiredPinBuffer = Buffer.from(requiredPin);
       if (pinBuffer.length !== requiredPinBuffer.length || !timingSafeEqual(pinBuffer, requiredPinBuffer)) {
-        debugWarn('Register API: invalid registration PIN')
+        logger.warn('Register API: invalid registration PIN')
         return NextResponse.json({ message: 'Invalid registration PIN' }, { status: 403 });
       }
     }
 
-    // Check if user already exists
     const existingUser = await findUser(username);
     if (existingUser) {
-      debugWarn('Register API: user already exists:', username)
+      logger.warn('Register API: user already exists', { username })
       return NextResponse.json({ message: 'User already exists' }, { status: 409 });
     }
 
     await addUser({ username, password, email });
     await seedUserCategories(username);
     await seedUserDefaultRules(username);
-    debugInfo('Register API: user created successfully:', username)
+    logger.info('Register API: user created', { username })
     return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
   } catch (error) {
-    debugError('Register API: error:', error)
+    logger.error('Register API: error', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

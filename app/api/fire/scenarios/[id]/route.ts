@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { fireScenarios } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 
@@ -10,6 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const [scenario] = await getDb().select().from(fireScenarios).where(eq(fireScenarios.id, id));
   if (!scenario) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  logger.info('GET /api/fire/scenarios/[id]', { scenarioId: id });
   return NextResponse.json(scenario);
 }
 
@@ -35,6 +37,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.annualContributions !== undefined) updateData.annualContributions = body.annualContributions.toString();
 
   const [updated] = await getDb().update(fireScenarios).set(updateData).where(eq(fireScenarios.id, id)).returning();
+  logger.info('PATCH /api/fire/scenarios/[id]', { scenarioId: id });
   return NextResponse.json(updated);
 }
 
@@ -57,5 +60,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
   }
 
+  logger.info('DELETE /api/fire/scenarios/[id]', { scenarioId: id });
   return NextResponse.json({ success: true });
 }

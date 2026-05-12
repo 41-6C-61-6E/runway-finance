@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
+import { logger } from '@/lib/logger';
 
 export async function POST() {
   const session = await auth();
@@ -20,5 +21,6 @@ export async function POST() {
 
   await seedUserDefaultRules(userId);
 
+  logger.info('POST /api/category-rules/reset', { userId });
   return NextResponse.json({ success: true, message: 'Rules reset to defaults' });
 }

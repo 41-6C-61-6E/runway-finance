@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categories } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const UpdateCategorySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -54,6 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(categories.id, id))
     .returning();
 
+  logger.info('PATCH /api/categories/[id]', { userId, id, updatedFields: Object.keys(parsed.data) });
   return NextResponse.json(updated);
 }
 
@@ -78,5 +80,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   await getDb().delete(categories).where(eq(categories.id, id));
 
+  logger.info('DELETE /api/categories/[id]', { userId, id, name: existing.name });
   return NextResponse.json({ success: true });
 }

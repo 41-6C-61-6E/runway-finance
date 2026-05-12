@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,6 +39,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   // Call sync service
   const { syncConnection } = await import('@/lib/services/sync');
   const result = await syncConnection(id, userId);
+
+  if (result.status === 'success') {
+    logger.info('Sync completed', { connectionId: id, userId, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew, transactionsUpdated: result.transactionsUpdated });
+  } else {
+    logger.error('Sync failed', { connectionId: id, userId, error: result.errorMessage });
+  }
 
   return NextResponse.json({
     status: result.status,

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
 import { eq, and, or, sql, gt, gte, lte, asc, desc, inArray, not } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -19,9 +20,12 @@ export async function GET(request: Request) {
 
   const parsed = TransactionFilterSchema.safeParse({
     accountId: searchParams.get('accountId') ?? undefined,
+    accountIds: searchParams.get('accountIds') ?? undefined,
+    accountTypes: searchParams.get('accountTypes') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,
     categoryId: searchParams.get('categoryId') ?? undefined,
+    categoryIds: searchParams.get('categoryIds') ?? undefined,
     search: searchParams.get('search') ?? undefined,
     pending: searchParams.get('pending') ?? undefined,
     reviewed: searchParams.get('reviewed') ?? undefined,
@@ -34,6 +38,7 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
+    logger.warn('Transaction query validation failed', { errors: parsed.error.flatten().fieldErrors });
     return NextResponse.json(
       { error: 'validation_error', message: 'Invalid query parameters', details: parsed.error.flatten().fieldErrors },
       { status: 400 }
@@ -41,6 +46,8 @@ export async function GET(request: Request) {
   }
 
   const filters = parsed.data;
+
+  logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset });
 
   // Build where clause
   const whereConditions = [eq(transactions.userId, userId)];
@@ -58,8 +65,19 @@ export async function GET(request: Request) {
     }
   }
 
-  if (filters.accountId) {
+  if (filters.accountIds) {
+    const ids = filters.accountIds.split(',').map(id => id.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      whereConditions.push(inArray(transactions.accountId, ids));
+    }
+  } else if (filters.accountId) {
     whereConditions.push(eq(transactions.accountId, filters.accountId));
+  }
+  if (filters.accountTypes) {
+    const types = filters.accountTypes.split(',').map(t => t.trim()).filter(Boolean);
+    if (types.length > 0) {
+      whereConditions.push(inArray(accounts.type, types));
+    }
   }
   if (filters.startDate) {
     whereConditions.push(gte(transactions.date, filters.startDate));
@@ -81,7 +99,24 @@ export async function GET(request: Request) {
   }
 
   // Handle category filter
-  if (filters.categoryId) {
+  if (filters.categoryIds) {
+    const ids = filters.categoryIds.split(',').map(id => id.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      const uncategorizedIdx = ids.indexOf('uncategorized');
+      if (uncategorizedIdx !== -1) {
+        const otherIds = ids.filter((_, i) => i !== uncategorizedIdx);
+        if (otherIds.length > 0) {
+          whereConditions.push(
+            or(eq(transactions.categoryId, null), inArray(transactions.categoryId, otherIds))
+          );
+        } else {
+          whereConditions.push(eq(transactions.categoryId, null));
+        }
+      } else {
+        whereConditions.push(inArray(transactions.categoryId, ids));
+      }
+    }
+  } else if (filters.categoryId) {
     if (filters.categoryId === 'uncategorized') {
       whereConditions.push(eq(transactions.categoryId, null));
     } else {
@@ -136,6 +171,7 @@ export async function GET(request: Request) {
     category: row.category ?? null,
   }));
 
+  logger.info('Transactions fetched', { total, returned: data.length });
   return NextResponse.json({ data, total, limit: filters.limit, offset: filters.offset });
 }
 
@@ -154,6 +190,7 @@ export async function PATCH(request: Request) {
   try {
     body = await request.json();
   } catch {
+    logger.warn('Transaction PATCH invalid request body');
     return NextResponse.json(
       { error: 'validation_error', message: 'Invalid request body' },
       { status: 400 }
@@ -162,6 +199,7 @@ export async function PATCH(request: Request) {
 
   const parsed = BulkPatchTransactionSchema.safeParse(body);
   if (!parsed.success) {
+    logger.warn('Transaction bulk patch validation failed', { errors: parsed.error.flatten().fieldErrors });
     return NextResponse.json(
       { error: 'validation_error', message: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
       { status: 400 }
@@ -169,6 +207,11 @@ export async function PATCH(request: Request) {
   }
 
   const { ids, patch } = parsed.data;
+  const patchedFields: string[] = [];
+  if (patch.categoryId !== undefined) patchedFields.push('categoryId');
+  if (patch.reviewed !== undefined) patchedFields.push('reviewed');
+  if (patch.ignored !== undefined) patchedFields.push('ignored');
+  logger.info('Patching transactions', { idsCount: ids.length, patchedFields });
 
   const updated = await getDb()
     .update(transactions)
@@ -181,5 +224,6 @@ export async function PATCH(request: Request) {
     .where(and(eq(transactions.userId, userId), sql`${transactions.id} = ANY(${ids})`))
     .returning();
 
+  logger.info('Transactions patched', { updatedCount: updated.length });
   return NextResponse.json({ updated: updated.length });
 }

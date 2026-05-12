@@ -12,6 +12,14 @@ import {
   VisibilityState,
   RowSelectionState,
 } from '@tanstack/react-table';
+import type { RowData } from '@tanstack/react-table';
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+  }
+}
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
   ChevronUp,
   ChevronDown,
@@ -21,6 +29,7 @@ import {
   Settings2,
   Check,
   GripVertical,
+  Search,
 } from 'lucide-react';
 
 type Transaction = {
@@ -125,6 +134,13 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [openCategoryTx, setOpenCategoryTx] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [proposedRule, setProposedRule] = useState<{
+    payee: string;
+    categoryId: string;
+    categoryName: string;
+  } | null>(null);
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -191,6 +207,9 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   }, [calculateSizes]);
 
   const handleSetCategory = useCallback(async (txId: string, categoryId: string | null, categoryName?: string | null, categoryColor?: string | null) => {
+    const prevTx = transactions.find((t) => t.id === txId);
+    const wasUncategorized = prevTx && !prevTx.categoryId;
+
     const res = await fetch(`/api/transactions/${txId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -201,9 +220,36 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
       setTransactions((prev) => prev.map((t) =>
         t.id === txId ? { ...t, categoryId, categoryName: categoryName ?? null, categoryColor: categoryColor ?? null } : t
       ));
+
+      if (wasUncategorized && categoryId && (prevTx?.payee || prevTx?.description)) {
+        setProposedRule({
+          payee: prevTx.payee || prevTx.description,
+          categoryId,
+          categoryName: categoryName || '',
+        });
+      }
     }
     setOpenCategoryTx(null);
-  }, []);
+    setDropdownPos(null);
+    setCategoryFilter('');
+  }, [transactions]);
+
+  const handleCreateRule = useCallback(async () => {
+    if (!proposedRule) return;
+    await fetch('/api/category-rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: `Auto-rule: ${proposedRule.payee}`,
+        conditionField: 'payee',
+        conditionOperator: 'contains',
+        conditionValue: proposedRule.payee,
+        setCategoryId: proposedRule.categoryId,
+      }),
+    });
+    setProposedRule(null);
+  }, [proposedRule]);
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -380,6 +426,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         header: ({ column }) => (
           <SortableHeader column={column} title="Category" />
         ),
+        meta: { className: 'overflow-visible' },
         cell: ({ row }) => {
           const tx = row.original;
           const isOpen = openCategoryTx === tx.id;
@@ -387,9 +434,14 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
 
           return (
-            <div className="relative">
+            <div>
               <button
-                onClick={(e) => { e.stopPropagation(); setOpenCategoryTx(isOpen ? null : tx.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+                  setOpenCategoryTx(isOpen ? null : tx.id);
+                }}
                 className="flex items-center gap-1 max-w-full group/cat"
               >
                 {tx.categoryName ? (
@@ -410,39 +462,81 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                   </span>
                 )}
               </button>
-              {isOpen && (
+              {isOpen && dropdownPos && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setOpenCategoryTx(null)} />
-                  <div className="absolute z-50 top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    <button
-                      onClick={() => handleSetCategory(tx.id, null, null, null)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
-                    >
-                      None
-                    </button>
-                    {parents.map((parent) => (
-                      <div key={parent.id}>
-                        <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
-                          {parent.name}
-                        </div>
-                        {getChildren(parent.id).map((child) => (
-                          <button
-                            key={child.id}
-                            onClick={() => handleSetCategory(tx.id, child.id, child.name, child.color)}
-                            className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors ${
-                              tx.categoryId === child.id
-                                ? 'text-primary bg-primary/10'
-                                : 'text-foreground/80 hover:bg-muted'
-                            }`}
-                          >
-                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                            {child.name}
-                            {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
-                          </button>
-                        ))}
-                      </div>
-                    ))}
+                  <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenCategoryTx(null); setDropdownPos(null); setCategoryFilter(''); }} />
+                  <div
+                    className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
+                    style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                  >
+                    <div className="relative p-2 border-b border-border">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <input
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        placeholder="Search categories..."
+                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="flex-1 overflow-y-auto max-h-56">
+                      {(() => {
+                        const filter = categoryFilter.toLowerCase();
+                        const filteredParents = filter
+                          ? parents.filter((p) =>
+                              p.name.toLowerCase().includes(filter) ||
+                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                            )
+                          : parents;
+
+                        const noResults = filteredParents.length === 0;
+                        return (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, null, null, null); }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                            >
+                              None
+                            </button>
+                            {filteredParents.map((parent) => {
+                              const childList = filter
+                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                : getChildren(parent.id);
+                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                              return (
+                                <div key={parent.id}>
+                                  <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
+                                    {parent.name}
+                                  </div>
+                                  {childList.map((child) => (
+                                    <button
+                                      key={child.id}
+                                      onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, child.id, child.name, child.color); }}
+                                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors ${
+                                        tx.categoryId === child.id
+                                          ? 'text-primary bg-primary/10'
+                                          : 'text-foreground/80 hover:bg-muted'
+                                      }`}
+                                    >
+                                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                      {child.name}
+                                      {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                            {noResults && (
+                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                                No categories found
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </>
               )}
@@ -496,6 +590,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   });
 
   return (
+    <>
     <div className="bg-card border border-border rounded-xl overflow-hidden" ref={containerRef}>
         {loading ? (
           <div className="p-12 text-center text-muted-foreground">Loading transactions...</div>
@@ -622,7 +717,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                       {row.getVisibleCells().map((cell) => (
                         <td
                           key={cell.id}
-                          className="px-3 py-1.5 overflow-hidden truncate"
+                          className={`px-3 py-1.5 overflow-hidden truncate ${cell.column.columnDef.meta?.className || ''}`}
                           style={{ width: columnSizing[cell.column.id] || cell.column.getSize() }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -662,5 +757,43 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           </>
         )}
       </div>
+
+      {/* Proposed Rule Dialog */}
+      <AlertDialog open={!!proposedRule} onOpenChange={(open) => !open && setProposedRule(null)}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create Auto-Tag Rule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Automatically assign this category to future transactions with the same payee?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {proposedRule && (
+            <div className="space-y-3 py-2">
+              <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">When payee contains</span>
+                  <span className="text-foreground font-mono font-medium max-w-[200px] truncate ml-2">
+                    &ldquo;{proposedRule.payee}&rdquo;
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Set category to</span>
+                  <span className="text-foreground font-medium">{proposedRule.categoryName}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>No thanks</AlertDialogCancel>
+            <button
+              onClick={handleCreateRule}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Create Rule
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

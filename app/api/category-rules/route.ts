@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules, categories } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(200),
@@ -47,6 +48,7 @@ export async function GET() {
     categoryColor: r.category?.color ?? null,
   }));
 
+  logger.info('GET /api/category-rules', { userId, count: data.length });
   return NextResponse.json(data);
 }
 
@@ -91,5 +93,6 @@ export async function POST(request: Request) {
     })
     .returning();
 
+  logger.info('POST /api/category-rules - created', { userId, name: rule.name, conditionField: rule.conditionField, conditionOperator: rule.conditionOperator, conditionValue: rule.conditionValue });
   return NextResponse.json(rule, { status: 201 });
 }

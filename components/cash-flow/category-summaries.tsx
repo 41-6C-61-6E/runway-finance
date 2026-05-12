@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
+import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 
 interface CategoryData {
   categoryId: string;
@@ -35,21 +37,20 @@ function MiniSparkline({ value, prev, isIncome }: { value: number; prev: number;
   return (
     <svg width={w} height={h} className="overflow-visible">
       <line
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
+        x1={x1} y1={y1} x2={x2} y2={y2}
         stroke={lineColor}
         strokeWidth={2}
         strokeLinecap="round"
       />
       <circle cx={x1} cy={y1} r={2.5} fill={lineColor} />
       <circle cx={x2} cy={y2} r={2.5} fill={lineColor} />
+      <title>{`${formatCurrency(prev)} → ${formatCurrency(value)}`}</title>
     </svg>
   );
 }
 
 export function CategorySummaries() {
+  const router = useRouter();
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,13 +81,17 @@ export function CategorySummaries() {
     .filter((c) => !c.isIncome && c.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 
+  const handleCategoryClick = (categoryId: string) => {
+    router.push(`/transactions?categoryId=${categoryId}`);
+  };
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">Category Breakdown</h3>
         <div className="animate-pulse space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 bg-muted rounded"></div>
+            <div key={i} className="h-10 bg-muted rounded" />
           ))}
         </div>
       </div>
@@ -97,7 +102,7 @@ export function CategorySummaries() {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-3">Category Breakdown</h3>
-        <p className="text-sm text-muted-foreground">{error}</p>
+        <ChartEmptyState variant="error" error={error} />
       </div>
     );
   }
@@ -106,14 +111,13 @@ export function CategorySummaries() {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-3">Category Breakdown</h3>
-        <p className="text-sm text-muted-foreground">No category data for this month</p>
+        <ChartEmptyState variant="nodata" description="No category data for this month" />
       </div>
     );
   }
 
   function renderCategoryRow(cat: CategoryData, isIncome: boolean) {
     const isUp = cat.change >= 0;
-
     let changeColor: string;
     if (isIncome) {
       changeColor = isUp ? 'text-chart-1' : 'text-destructive';
@@ -122,7 +126,11 @@ export function CategorySummaries() {
     }
 
     return (
-      <div key={cat.categoryId} className="flex items-center justify-between py-2.5 px-5 hover:bg-muted/30 transition-colors">
+      <button
+        key={cat.categoryId}
+        onClick={() => handleCategoryClick(cat.categoryId)}
+        className="flex items-center justify-between py-2.5 px-5 hover:bg-muted/30 transition-colors w-full text-left"
+      >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <span
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -144,7 +152,7 @@ export function CategorySummaries() {
             <MiniSparkline value={cat.amount} prev={cat.previousAmount} isIncome={isIncome} />
           </div>
         </div>
-      </div>
+      </button>
     );
   }
 

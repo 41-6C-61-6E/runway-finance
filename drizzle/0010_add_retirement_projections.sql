@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS retirement_projections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'Primary Plan',
+  fire_scenario_id UUID REFERENCES fire_scenarios(id) ON DELETE SET NULL,
+  retirement_age INTEGER,
+  life_expectancy INTEGER DEFAULT 95,
+  portfolio_at_retirement NUMERIC(20,4) DEFAULT '0',
+  expected_return_rate NUMERIC(6,4) DEFAULT '0.05',
+  inflation_rate NUMERIC(6,4) DEFAULT '0.03',
+  annual_withdrawal NUMERIC(20,4),
+  ss_start_age INTEGER DEFAULT 67,
+  ss_annual NUMERIC(20,4) DEFAULT '0',
+  pension_start_age INTEGER DEFAULT 65,
+  pension_annual NUMERIC(20,4) DEFAULT '0',
+  part_time_income NUMERIC(20,4) DEFAULT '0',
+  part_time_end_age INTEGER,
+  rental_income_annual NUMERIC(20,4) DEFAULT '0',
+  healthcare_annual NUMERIC(20,4) DEFAULT '0',
+  legacy_goal NUMERIC(20,4) DEFAULT '0',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const ReorderSchema = z.object({
   rules: z.array(z.object({
@@ -42,5 +43,6 @@ export async function POST(request: Request) {
       .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, userId)));
   }
 
+  logger.info('POST /api/category-rules/reorder', { userId, ruleCount: parsed.data.rules.length });
   return NextResponse.json({ success: true });
 }

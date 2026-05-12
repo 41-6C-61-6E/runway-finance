@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { monthlyCashFlow } from '@/lib/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 
@@ -31,6 +32,7 @@ export async function GET() {
     const prevExpenses = previous ? parseFloat(previous.totalExpenses.toString()) : 0;
     const prevNet = prevIncome - prevExpenses;
 
+    logger.info('GET /api/cash-flow/summary', { currentMonth, netIncome });
     return NextResponse.json({
       totalIncome: income,
       totalExpenses: expenses,
@@ -45,7 +47,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching cash flow summary:', error);
+    logger.error('Error fetching cash flow summary', { error });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch cash flow summary' },
       { status: 500 }

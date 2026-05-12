@@ -5,6 +5,7 @@ import { transactions, accounts, categories } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { PatchTransactionSchema } from '@/lib/validations/transaction';
 import { sanitizeText } from '@/lib/utils/sanitize';
+import { logger } from '@/lib/logger';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -17,6 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const userId = session.user.id;
   const { id } = await params;
+
+  logger.info('Fetching transaction', { transactionId: id });
 
   const result = await getDb()
     .select({
@@ -35,6 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .limit(1);
 
   if (result.length === 0) {
+    logger.warn('Transaction not found', { transactionId: id });
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }
@@ -68,6 +72,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .limit(1);
 
   if (!existing) {
+    logger.warn('Transaction not found for PATCH', { transactionId: id });
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }
@@ -93,6 +98,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const { categoryId, payee, notes, reviewed, ignored } = parsed.data;
+
+  const changedFields: string[] = [];
+  if (categoryId !== undefined) changedFields.push('categoryId');
+  if (payee !== undefined) changedFields.push('payee');
+  if (notes !== undefined) changedFields.push('notes');
+  if (reviewed !== undefined) changedFields.push('reviewed');
+  if (ignored !== undefined) changedFields.push('ignored');
+  logger.info('Updating transaction', { transactionId: id, changedFields });
 
   // Sanitize text fields
   const updateData: Record<string, unknown> = { updatedAt: new Date() };

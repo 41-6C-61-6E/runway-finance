@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { fireScenarios } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 
@@ -12,6 +13,7 @@ export async function GET() {
     .from(fireScenarios)
     .where(eq(fireScenarios.userId, session.user.id))
     .orderBy(desc(fireScenarios.isDefault), desc(fireScenarios.createdAt));
+  logger.info('GET /api/fire/scenarios', { count: scenarios.length });
   return NextResponse.json(scenarios);
 }
 
@@ -43,5 +45,6 @@ export async function POST(request: Request) {
     })
     .returning();
 
+  logger.info('POST /api/fire/scenarios', { scenarioId: scenario[0].id, name: scenario[0].name });
   return NextResponse.json(scenario[0]);
 }
