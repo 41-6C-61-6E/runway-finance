@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { budgets, categorySpendingSummary, categories } from '@/lib/db/schema';
-import { eq, and, or, isNull, sql } from 'drizzle-orm';
+import { budgets, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
+import { eq, and, or, isNull } from 'drizzle-orm';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
         yearMonth: budgets.yearMonth,
         categoryName: categories.name,
         categoryColor: categories.color,
+        isIncome: categories.isIncome,
       })
       .from(budgets)
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
@@ -38,34 +39,47 @@ export async function GET(request: Request) {
         )
       );
 
-    const categoryIds = budgetRows.map((b) => b.categoryId);
-    let actualSpending: Array<{ categoryId: string; amount: string }> = [];
-    if (categoryIds.length > 0) {
-      const conditions = categoryIds.map((cid) =>
-        and(
-          eq(categorySpendingSummary.userId, session.user.id),
-          eq(categorySpendingSummary.categoryId, cid),
-          eq(categorySpendingSummary.yearMonth, month)
-        )
-      );
-      actualSpending = await db
+    const expenseIds = budgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId);
+    const incomeIds = budgetRows.filter((b) => b.isIncome).map((b) => b.categoryId);
+
+    async function fetchActuals(
+      table: typeof categorySpendingSummary | typeof categoryIncomeSummary,
+      catIds: string[],
+    ) {
+      if (catIds.length === 0) return new Map<string, number>();
+      const idCol = 'categoryId' in table ? table.categoryId : categorySpendingSummary.categoryId;
+      const rows = await db
         .select({
-          categoryId: categorySpendingSummary.categoryId,
-          amount: categorySpendingSummary.amount,
+          categoryId: idCol,
+          amount: table.amount,
         })
-        .from(categorySpendingSummary)
-        .where(and(eq(categorySpendingSummary.userId, session.user.id), ...conditions.length > 0 ? [conditions[0]] : []));
+        .from(table)
+        .where(
+          and(
+            eq(table.userId, session.user.id),
+            eq(table.yearMonth, month),
+            ...catIds.map((cid) => eq(idCol, cid))
+          )
+        );
+      const map = new Map<string, number>();
+      for (const row of rows) {
+        map.set(row.categoryId, parseFloat(row.amount.toString()));
+      }
+      return map;
     }
 
-    const actualMap = new Map<string, number>();
-    for (const row of actualSpending) {
-      actualMap.set(row.categoryId, parseFloat(row.amount.toString()));
-    }
+    const [expenseActualMap, incomeActualMap] = await Promise.all([
+      fetchActuals(categorySpendingSummary, expenseIds),
+      fetchActuals(categoryIncomeSummary, incomeIds),
+    ]);
 
     const data = budgetRows.map((row) => {
       const budgeted = parseFloat(row.amount.toString());
-      const actual = actualMap.get(row.categoryId) || 0;
-      const remaining = budgeted - actual;
+      const isIncome = row.isIncome ?? false;
+      const actual = isIncome
+        ? incomeActualMap.get(row.categoryId) || 0
+        : expenseActualMap.get(row.categoryId) || 0;
+      const remaining = isIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
 
       return {
@@ -76,6 +90,7 @@ export async function GET(request: Request) {
         actual,
         remaining,
         percentUsed,
+        type: isIncome ? 'income' : 'expense',
       };
     });
 

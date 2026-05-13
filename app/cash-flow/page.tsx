@@ -8,6 +8,7 @@ import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
 import { CategorySummaries } from '@/components/cash-flow/category-summaries';
 import { BudgetVsActual } from '@/components/cash-flow/budget-vs-actual';
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
+import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function CashFlowContent() {
@@ -67,6 +68,14 @@ function CashFlowContent() {
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading sankey...</div>}>
                 <CashFlowSankey />
+              </Suspense>
+            </div>
+          )}
+
+          {isVisible('cashFlowForecast') && (
+            <div className="mt-5">
+              <Suspense fallback={<div className="text-muted-foreground">Loading forecast...</div>}>
+                <CashFlowForecast />
               </Suspense>
             </div>
           )}

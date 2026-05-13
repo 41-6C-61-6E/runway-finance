@@ -78,6 +78,20 @@
       "when": 1747000000005,
       "tag": "0010_add_retirement_projections",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1747000000006,
+      "tag": "0011_add_forecast_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1747000000007,
+      "tag": "0012_add_category_income_summary",
+      "breakpoints": true
     }
   ]
 }

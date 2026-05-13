@@ -166,13 +166,19 @@ export default function ManualAccountsSection() {
         if (metadata.make) metadata.make = metadata.make;
         if (metadata.model) metadata.model = metadata.model;
         if (metadata.year) metadata.year = parseInt(metadata.year as string, 10);
+        if (createMeta.purchasePrice) metadata.purchasePrice = parseFloat(createMeta.purchasePrice);
+        if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
       }
       if (createType === 'gold' || createType === 'silver') {
         metadata.subType = createType;
         metadata.amountOz = parseFloat(createMeta.amountOz || '0');
+        if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
       }
       if (createType === 'realestate') {
         metadata.propertyId = createMeta.propertyId || '';
+        if (createMeta.purchasePrice) metadata.purchasePrice = parseFloat(createMeta.purchasePrice);
+        if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
+        if (createMeta.zipCode) metadata.zipCode = createMeta.zipCode;
         if (createMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [createMeta.linkedMortgageId];
         }
@@ -183,6 +189,7 @@ export default function ManualAccountsSection() {
         metadata.termMonths = parseInt(createMeta.termMonths || '360', 10);
         metadata.monthlyPayment = parseFloat(createMeta.monthlyPayment || '0');
         metadata.escrowAmount = parseFloat(createMeta.escrowAmount || '0');
+        if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
         if (createMeta.linkedPropertyId) {
           metadata.linkedPropertyId = createMeta.linkedPropertyId;
         }
@@ -467,6 +474,34 @@ export default function ManualAccountsSection() {
                 required
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={createMeta.purchasePrice || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
+                  placeholder="e.g., 350000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
+                <Input
+                  type="date"
+                  value={createMeta.purchaseDate || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
+              <Input
+                value={createMeta.zipCode || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, zipCode: e.target.value }))}
+                placeholder="e.g., 94105"
+              />
+            </div>
             {linkedMortgageField(createMeta, setCreateMeta)}
             {syncFrequencyField(createMeta, setCreateMeta)}
           </>
@@ -475,6 +510,14 @@ export default function ManualAccountsSection() {
         return (
           <>
             {linkedPropertyField(createMeta, setCreateMeta)}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Start Date (origination)</label>
+              <Input
+                type="date"
+                value={createMeta.purchaseDate || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount</label>
@@ -549,6 +592,26 @@ export default function ManualAccountsSection() {
                 placeholder="e.g., Camry"
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={createMeta.purchasePrice || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
+                  placeholder="e.g., 35000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
+                <Input
+                  type="date"
+                  value={createMeta.purchaseDate || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+                />
+              </div>
+            </div>
           </>
         );
       case 'crypto':
@@ -579,6 +642,14 @@ export default function ManualAccountsSection() {
                 onChange={(e) => setCreateMeta((m) => ({ ...m, amountOz: e.target.value }))}
                 placeholder="e.g., 10.5"
                 required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Purchase Date (for history)</label>
+              <Input
+                type="date"
+                value={createMeta.purchaseDate || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
               />
             </div>
             {syncFrequencyField(createMeta, setCreateMeta)}

@@ -10,12 +10,14 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 
 type NetWorthDataPoint = {
   date: string;
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
+  isSynthetic?: boolean;
 };
 
 interface ChartSummary {
@@ -89,14 +91,35 @@ export function NetWorthChart() {
     [router]
   );
 
-  const nivoData = data.map((point) => ({
-    date: new Date(point.date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: '2-digit',
-    }),
-    netWorth: point.netWorth,
-  }));
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: '2-digit',
+  });
+
+  // Split data into actual and estimated series for synthetic viz
+  const actualSeries = data
+    .filter((d) => !d.isSynthetic)
+    .map((d) => ({ x: fmtDate(d.date), y: d.netWorth }));
+
+  const estimatedSeries = data
+    .filter((d) => d.isSynthetic)
+    .map((d) => ({ x: fmtDate(d.date), y: d.netWorth, isSynthetic: true }));
+
+  const hasEstimated = estimatedSeries.length > 0;
+
+  // Build chart series - actual line first, then estimated overlay
+  const nivoData = [];
+  if (actualSeries.length > 0) {
+    nivoData.push({ id: 'Net Worth', data: actualSeries });
+  }
+  if (estimatedSeries.length > 0) {
+    nivoData.push({ id: 'Net Worth (Estimated)', data: estimatedSeries });
+  }
+  // Fallback if all data is synthetic
+  if (nivoData.length === 0 && data.length > 0) {
+    nivoData.push({ id: 'Net Worth (Estimated)', data: data.map((d) => ({ x: fmtDate(d.date), y: d.netWorth })) });
+  }
 
   const isPositiveChange = summary ? summary.change >= 0 : false;
 
@@ -125,15 +148,27 @@ export function NetWorthChart() {
     }
 
     if (chartType === 'bar') {
+      const barData = data.map((d) => ({
+        date: fmtDate(d.date),
+        netWorth: d.netWorth,
+        _isSynthetic: d.isSynthetic ? 'true' : 'false',
+      }));
       return (
         <ResponsiveBar
-          data={nivoData}
+          data={barData as any}
           keys={['netWorth']}
           indexBy="date"
           margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
           padding={0.3}
           borderRadius={2}
-          colors={({ value }) => (value >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)')}
+          colors={({ data: d }: any) => {
+            const value = d.netWorth as number;
+            const isSynth = d._isSynthetic === 'true';
+            if (isSynth) {
+              return value >= 0 ? 'color-mix(in srgb, var(--color-chart-1) 40%, transparent)' : 'color-mix(in srgb, var(--color-destructive) 40%, transparent)';
+            }
+            return value >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+          }}
           axisLeft={{
             tickSize: 0,
             tickPadding: 8,
@@ -151,18 +186,18 @@ export function NetWorthChart() {
           enableGridX={false}
           theme={nivoTheme}
           onClick={({ data: barData }) => {
-            const pt = data.find((d) => {
-              const label = new Date(d.date).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: '2-digit',
-              });
-              return label === barData.date;
-            });
+            const pt = data.find((d) => fmtDate(d.date) === barData.date);
             if (pt) handlePointClick(pt);
           }}
-          tooltip={({ indexValue, value }) => (
+          tooltip={({ indexValue, value, data: d }: any) => (
             <ChartTooltip>
               <TooltipHeader>{String(indexValue)}</TooltipHeader>
               <TooltipRow label="Net Worth" value={formatCurrency(value)} />
+              {d?._isSynthetic === 'true' && (
+                <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
+                  Estimated value
+                </div>
+              )}
             </ChartTooltip>
           )}
         />
@@ -171,15 +206,12 @@ export function NetWorthChart() {
 
     return (
       <ResponsiveLine
-        data={[{
-          id: 'Net Worth',
-          data: nivoData.map((d) => ({ x: d.date, y: d.netWorth })),
-        }]}
+        data={nivoData}
         margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
         xScale={{ type: 'point' }}
         yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
         curve="monotoneX"
-        enableArea={true}
+        enableArea={actualSeries.length > 0}
         areaOpacity={0.15}
         colors={['var(--color-chart-1)']}
         lineWidth={2.5}
@@ -197,20 +229,30 @@ export function NetWorthChart() {
         }}
         theme={nivoTheme}
         useMesh={true}
+        layers={[
+          'grid',
+          'axes',
+          ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
+          'lines',
+          'points',
+          'slices',
+          'crosshair',
+          'legends',
+        ] as any}
         onClick={(raw) => {
           const p = raw as unknown as { data: { xFormatted: string } };
-          const pt = data.find((d) => {
-            const label = new Date(d.date).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: '2-digit',
-            });
-            return label === String(p.data.xFormatted);
-          });
+          const pt = data.find((d) => fmtDate(d.date) === String(p.data.xFormatted));
           if (pt) handlePointClick(pt);
         }}
         tooltip={({ point }) => (
           <ChartTooltip>
             <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
             <TooltipRow label="Net Worth" value={formatCurrency(Number(point.data.y))} />
+            {String(point.seriesId).includes('(Estimated)') && (
+              <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
+                Estimated value
+              </div>
+            )}
           </ChartTooltip>
         )}
       />

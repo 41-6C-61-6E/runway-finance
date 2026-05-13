@@ -5,6 +5,7 @@ import { RealEstateSummary } from '@/components/real-estate/real-estate-summary'
 import { PropertyCards } from '@/components/real-estate/property-cards';
 import { EquityOverTimeChart } from '@/components/real-estate/equity-over-time-chart';
 import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-allocation-chart';
+import { MortgagePaydownSection } from '@/components/real-estate/mortgage-paydown-section';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function RealEstateContent() {
@@ -41,6 +42,14 @@ function RealEstateContent() {
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading properties...</div>}>
                 <PropertyCards />
+              </Suspense>
+            </div>
+          )}
+
+          {isVisible('mortgagePaydown') && (
+            <div className="mt-5">
+              <Suspense fallback={<div className="text-muted-foreground">Loading mortgage paydown...</div>}>
+                <MortgagePaydownSection />
               </Suspense>
             </div>
           )}

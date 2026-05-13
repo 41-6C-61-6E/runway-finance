@@ -44,7 +44,11 @@ export async function GET(request: Request) {
         const saleProceeds = propertyValue * 0.92 - Math.abs(totalMortgageBalance);
 
         const snapshots = await db
-          .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance })
+          .select({
+            snapshotDate: accountSnapshots.snapshotDate,
+            balance: accountSnapshots.balance,
+            isSynthetic: accountSnapshots.isSynthetic,
+          })
           .from(accountSnapshots)
           .where(
             and(
@@ -57,7 +61,7 @@ export async function GET(request: Request) {
 
         const mortgageSnapshots = linkedMortgageIds.length > 0
           ? await db
-              .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance, accountId: accountSnapshots.accountId })
+              .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance, accountId: accountSnapshots.accountId, isSynthetic: accountSnapshots.isSynthetic })
               .from(accountSnapshots)
               .where(
                 and(
@@ -82,6 +86,8 @@ export async function GET(request: Request) {
             originalLoanAmount: parseFloat(String((m.metadata as Record<string, unknown>)?.originalLoanAmount ?? '0')),
             interestRate: parseFloat(String((m.metadata as Record<string, unknown>)?.interestRate ?? '0')),
             monthlyPayment: parseFloat(String((m.metadata as Record<string, unknown>)?.monthlyPayment ?? '0')),
+            termMonths: parseInt(String((m.metadata as Record<string, unknown>)?.termMonths ?? '360'), 10),
+            metadata: (m.metadata as Record<string, unknown>) ?? {},
           })),
           equity,
           ltv,
@@ -89,10 +95,12 @@ export async function GET(request: Request) {
           snapshots: snapshots.map((s) => ({
             date: s.snapshotDate,
             value: parseFloat(s.balance.toString()),
+            isSynthetic: s.isSynthetic,
           })),
           mortgageSnapshots: mortgageSnapshots.map((s) => ({
             date: s.snapshotDate,
             value: parseFloat(s.balance.toString()),
+            isSynthetic: s.isSynthetic,
           })),
         };
       })

@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categories } from '@/lib/db/schema';
+import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { eq, and, inArray, isNull } from 'drizzle-orm';
@@ -269,6 +269,95 @@ export async function updateCategorySpendingSummaries(userId: string) {
         })
         .onConflictDoUpdate({
           target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
+          set: {
+            amount: String(catData.amount),
+            transactionCount: catData.count,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  }
+}
+
+export async function updateCategoryIncomeSummaries(userId: string) {
+  const userAccounts = await getDb()
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  if (userAccounts.length === 0) return;
+
+  const allCategories = await getDb()
+    .select()
+    .from(categories)
+    .where(eq(categories.userId, userId));
+
+  const catById = new Map<string, typeof categories.$inferSelect>();
+  for (const cat of allCategories) {
+    catById.set(cat.id.toString(), cat);
+  }
+
+  const allTransactions = await getDb()
+    .select()
+    .from(transactions)
+    .where(
+      inArray(
+        transactions.accountId,
+        userAccounts.map((a) => a.id)
+      )
+    );
+
+  const categoryByMonth: Record<
+    string,
+    Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
+  > = {};
+
+  for (const tx of allTransactions) {
+    if (!tx.categoryId || parseFloat(tx.amount.toString()) <= 0 || tx.ignored) continue;
+
+    const category = catById.get(tx.categoryId.toString());
+    if (!category || !category.isIncome) continue;
+
+    let excluded = category.excludeFromReports;
+    if (!excluded && category.parentId) {
+      const parent = catById.get(category.parentId.toString());
+      if (parent?.excludeFromReports) excluded = true;
+    }
+    if (excluded) continue;
+
+    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    const catId = tx.categoryId.toString();
+
+    if (!categoryByMonth[yearMonth]) {
+      categoryByMonth[yearMonth] = {};
+    }
+    if (!categoryByMonth[yearMonth][catId]) {
+      categoryByMonth[yearMonth][catId] = {
+        amount: 0,
+        count: 0,
+        categoryId: catId,
+        yearMonth,
+      };
+    }
+
+    categoryByMonth[yearMonth][catId].amount += parseFloat(tx.amount.toString());
+    categoryByMonth[yearMonth][catId].count++;
+  }
+
+  for (const monthData of Object.values(categoryByMonth)) {
+    for (const catData of Object.values(monthData)) {
+      await getDb()
+        .insert(categoryIncomeSummary)
+        .values({
+          userId,
+          categoryId: catData.categoryId as any,
+          yearMonth: catData.yearMonth,
+          amount: String(catData.amount),
+          transactionCount: catData.count,
+        })
+        .onConflictDoUpdate({
+          target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.yearMonth],
           set: {
             amount: String(catData.amount),
             transactionCount: catData.count,
@@ -582,6 +671,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
 
     await updateMonthlyCashFlowSummaries(userId);
     await updateCategorySpendingSummaries(userId);
+    await updateCategoryIncomeSummaries(userId);
 
     const totalDurationMs = Date.now() - startedAt;
     logger.info(`${LOG_TAG} Sync completed successfully`, {

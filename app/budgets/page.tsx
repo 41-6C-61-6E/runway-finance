@@ -5,7 +5,6 @@ import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetVsActualChart } from '@/components/budgets/budget-vs-actual-chart';
 import { BudgetTable } from '@/components/budgets/budget-table';
-import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function BudgetsContent() {
@@ -38,14 +37,6 @@ function BudgetsContent() {
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading budgets...</div>}>
                 <BudgetTable />
-              </Suspense>
-            </div>
-          )}
-
-          {isVisible('cashFlowForecast') && (
-            <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading forecast...</div>}>
-                <CashFlowForecast />
               </Suspense>
             </div>
           )}

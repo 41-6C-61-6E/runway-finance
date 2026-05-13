@@ -461,9 +461,42 @@ export default function SettingsPage() {
             </div>
           </div>
 
+        </>
+      )}
+
+      {activeTab === 'categories' && (
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <CategoriesTab />
+        </div>
+      )}
+
+      {activeTab === 'accounts' && (
+        <>
+          {/* Sub-tab toggle */}
+          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
+            <button
+              onClick={() => setAccountSubTab('automatic')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Automatic Accounts
+            </button>
+            <button
+              onClick={() => setAccountSubTab('manual')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                accountSubTab === 'manual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Manual Accounts
+            </button>
+          </div>
+
+          {accountSubTab === 'automatic' && (
+        <>
           {/* Existing Connections */}
           {hasConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl">
+            <div className="p-5 bg-card border border-border rounded-xl mb-4">
               <h2 className="text-base font-semibold text-foreground mb-4">SimpleFIN Bridge Connection</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
@@ -561,9 +594,9 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Add Connection Form */}
+          {/* Add Connection Form - shown when no bridge is connected */}
           {!hasConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl">
+            <div className="p-5 bg-card border border-border rounded-xl mb-4">
               <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
 
               <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
@@ -637,178 +670,150 @@ export default function SettingsPage() {
             </div>
           )}
 
-        </>
-      )}
+          {/* Account Management - only shown when a connection exists */}
+          {hasConnection && (
+            <div className="p-5 bg-card border border-border rounded-xl">
+              <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
+              <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
 
-      {activeTab === 'categories' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
-          <CategoriesTab />
-        </div>
-      )}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
+                  {(['all', 'hidden', 'excluded'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setAccountFilter(filter)}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                        accountFilter === filter
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-      {activeTab === 'accounts' && (
-        <>
-          {/* Sub-tab toggle */}
-          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
-            <button
-              onClick={() => setAccountSubTab('automatic')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Automatic Accounts
-            </button>
-            <button
-              onClick={() => setAccountSubTab('manual')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                accountSubTab === 'manual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Manual Accounts
-            </button>
-          </div>
+              {accountsLoading ? (
+                <div className="text-muted-foreground text-sm">Loading...</div>
+              ) : accounts.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
+              ) : (() => {
+                  const filteredAccounts = accounts.filter((a) => {
+                    // Only show automatic accounts (have a connectionId)
+                    if (!a.connectionId) return false;
+                    if (accountFilter === 'hidden') return a.isHidden;
+                    if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
+                    return true;
+                  });
+                  const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
 
-          {accountSubTab === 'automatic' && (
-        <div className="p-5 bg-card border border-border rounded-xl">
-          <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
-          <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
-
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
-              {(['all', 'hidden', 'excluded'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setAccountFilter(filter)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    accountFilter === filter
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {accountsLoading ? (
-            <div className="text-muted-foreground text-sm">Loading...</div>
-          ) : accounts.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
-          ) : (() => {
-              const filteredAccounts = accounts.filter((a) => {
-                // Only show automatic accounts (have a connectionId)
-                if (!a.connectionId) return false;
-                if (accountFilter === 'hidden') return a.isHidden;
-                if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
-                return true;
-              });
-              const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
-
-              if (filteredAccounts.length === 0 && accountFilter !== 'all') {
-                return (
-                  <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
-                    <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="space-y-2">
-                  {filteredAccounts.map((account) => {
-                    const num = parseFloat(account.balance);
-                    const formatted = new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: account.currency || 'USD',
-                      minimumFractionDigits: 2,
-                    }).format(Math.abs(num));
-
+                  if (filteredAccounts.length === 0 && accountFilter !== 'all') {
                     return (
-                      <div
-                        key={account.id}
-                        className={`p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-muted/50 transition-colors ${
-                          account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
-                        }`}
-                        onClick={() => handleOpenAccountDrawer(account)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                              account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
-                              account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
-                              account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
-                              account.type === 'investment' ? 'bg-chart-3/20 text-chart-3' :
-                              account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
-                              {account.type}
-                            </span>
-                            {account.isHidden && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
-                            )}
-                            {account.isExcludedFromNetWorth && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
-                            )}
-                          </div>
-                          <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
-                          {account.institution && (
-                            <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <div className={`font-mono text-sm text-muted-foreground blur-number`}>
-                              {formatted}
-                            </div>
-                            <div className="text-xs text-muted-foreground/60">{account.currency}</div>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={handleToggleAccount(account.id, 'isHidden')}
-                                disabled={togglingAccount === account.id}
-                                className={`relative w-10 h-5 rounded-full transition-colors ${
-                                  account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
-                                } disabled:opacity-50`}
-                                title={account.isHidden ? 'Show account' : 'Hide account'}
-                              >
-                                <span
-                                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                    account.isHidden ? 'translate-x-5' : 'translate-x-0'
-                                  }`}
-                                />
-                              </button>
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                disabled={togglingAccount === account.id}
-                                className={`relative w-10 h-5 rounded-full transition-colors ${
-                                  account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
-                                } disabled:opacity-50`}
-                                title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                              >
-                                <span
-                                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                    account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
-                                  }`}
-                                />
-                              </button>
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
+                        <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
                       </div>
                     );
-                  })}
-                  {hasHiddenOrExcluded && (
-                    <p className="text-xs text-muted-foreground pt-1">Some accounts are hidden or excluded. Use the tabs above to filter.</p>
-                  )}
-                </div>
-              );
-            })()}
-        </div>
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {filteredAccounts.map((account) => {
+                        const num = parseFloat(account.balance);
+                        const formatted = new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: account.currency || 'USD',
+                          minimumFractionDigits: 2,
+                        }).format(Math.abs(num));
+
+                        return (
+                          <div
+                            key={account.id}
+                            className={`p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-muted/50 transition-colors ${
+                              account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
+                            }`}
+                            onClick={() => handleOpenAccountDrawer(account)}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                                  account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
+                                  account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
+                                  account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
+                                  account.type === 'investment' ? 'bg-chart-3/20 text-chart-3' :
+                                  account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
+                                  'bg-muted text-muted-foreground'
+                                }`}>
+                                  {account.type}
+                                </span>
+                                {account.isHidden && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
+                                )}
+                                {account.isExcludedFromNetWorth && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
+                                )}
+                              </div>
+                              <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
+                              {account.institution && (
+                                <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <div className="text-right">
+                                <div className={`font-mono text-sm text-muted-foreground blur-number`}>
+                                  {formatted}
+                                </div>
+                                <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                              </div>
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleToggleAccount(account.id, 'isHidden')}
+                                    disabled={togglingAccount === account.id}
+                                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                                      account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    } disabled:opacity-50`}
+                                    title={account.isHidden ? 'Show account' : 'Hide account'}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                        account.isHidden ? 'translate-x-5' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </button>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                    disabled={togglingAccount === account.id}
+                                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                                      account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    } disabled:opacity-50`}
+                                    title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                        account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </button>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {hasHiddenOrExcluded && (
+                        <p className="text-xs text-muted-foreground pt-1">Some accounts are hidden or excluded. Use the tabs above to filter.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+            </div>
+          )}
+        </>
           )}
 
           {accountSubTab === 'manual' && (

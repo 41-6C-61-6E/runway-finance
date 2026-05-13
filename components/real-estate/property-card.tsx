@@ -175,16 +175,20 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
             <TrendingUp className="w-3 h-3" />
             Value History (12mo)
+            {(property.snapshots as any[]).some((s) => s.isSynthetic) && (
+              <span className="text-[9px] text-chart-3 italic">(includes estimates)</span>
+            )}
           </div>
           <div className="h-10 flex items-end gap-px">
             {latestSnapshots.map((s, i) => {
               const h = ((s.value - minSnapshot) / snapRange) * 100;
+              const isSynth = (s as any).isSynthetic;
               return (
                 <div
                   key={i}
-                  className="flex-1 rounded-sm bg-chart-3/40 hover:bg-chart-3/60 transition-colors relative group"
+                  className={`flex-1 rounded-sm transition-colors relative group ${isSynth ? 'bg-chart-3/20 border-t border-dashed border-chart-3/40' : 'bg-chart-3/40 hover:bg-chart-3/60'}`}
                   style={{ height: `${Math.max(h, 5)}%` }}
-                  title={`${s.date}: ${formatCurrency(s.value)}`}
+                  title={`${s.date}: ${formatCurrency(s.value)}${isSynth ? ' (estimated)' : ''}`}
                 />
               );
             })}

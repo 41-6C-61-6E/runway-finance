@@ -81,15 +81,15 @@ export async function GET(request: Request) {
       )
       .orderBy(accountSnapshots.snapshotDate);
 
-    // Group balances by date
-    const balancesByDate = new Map<string, { assets: number; liabilities: number }>();
+    // Group balances by date, tracking synthetic flag
+    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean }>();
     for (const snap of accountSnapshotsInRange) {
       const dateStr = String(snap.snapshotDate);
       const account = userAccounts.find((a) => a.id === snap.accountId);
       if (!account) continue;
 
       const balance = parseFloat(snap.balance.toString());
-      const entry = balancesByDate.get(dateStr) ?? { assets: 0, liabilities: 0 };
+      const entry = balancesByDate.get(dateStr) ?? { assets: 0, liabilities: 0, isSynthetic: true };
 
       const accountType = account.type.toLowerCase();
       if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
@@ -98,17 +98,23 @@ export async function GET(request: Request) {
         entry.liabilities += Math.abs(balance);
       }
 
+      // A data point is synthetic if ALL snapshots on that date are synthetic
+      if (!snap.isSynthetic) {
+        entry.isSynthetic = false;
+      }
+
       balancesByDate.set(dateStr, entry);
     }
 
     // Build formatted data
     const formattedData = Array.from(balancesByDate.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, { assets, liabilities }]) => ({
+      .map(([date, { assets, liabilities, isSynthetic }]) => ({
         date,
         netWorth: assets - liabilities,
         totalAssets: assets,
         totalLiabilities: liabilities,
+        isSynthetic,
       }));
 
     if (formattedData.length === 0) {

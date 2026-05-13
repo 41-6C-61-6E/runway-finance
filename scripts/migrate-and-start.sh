@@ -19,11 +19,10 @@ if [ $attempt -gt $max_attempts ]; then
   echo "[init] WARNING: Database failed to become ready after $max_attempts attempts, continuing anyway..."
 fi
 
-echo "[init] Attempting database migrations..."
 cd /app
 
-# Try migrations with timeout, but don't exit if they fail
-if timeout 60 npx drizzle-kit migrate 2>&1; then
+echo "[init] Running database migrations..."
+if node /app/scripts/migrate.mjs 2>&1; then
   echo "[init] Migrations completed successfully."
 else
   EXIT_CODE=$?
@@ -31,5 +30,4 @@ else
 fi
 
 echo "[init] Starting Next.js server..."
-# Dockerfile already sets USER nextjs, so we can run directly
 exec node /app/server.js

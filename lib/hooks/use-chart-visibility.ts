@@ -24,6 +24,7 @@ export const CHARTS = {
       budgetVsActual: 'Budget vs Actual',
       categorySummaries: 'Category Summaries',
       cashFlowSankey: 'Sankey Diagram',
+      cashFlowForecast: 'Cash Flow Forecast',
     },
   },
   fire: {
@@ -52,6 +53,7 @@ export const CHARTS = {
       equityOverTimeChart: 'Equity Over Time Chart',
       portfolioAllocationChart: 'Portfolio Allocation Chart',
       propertyCards: 'Property Cards',
+      mortgagePaydown: 'Mortgage Paydown Chart',
     },
   },
   budgets: {
@@ -60,7 +62,6 @@ export const CHARTS = {
       budgetSummary: 'Summary Cards',
       budgetVsActualChart: 'Budget vs Actual Chart',
       budgetTable: 'Budget Items Table',
-      cashFlowForecast: 'Cash Flow Forecast',
     },
   },
 } as const;

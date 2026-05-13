@@ -8,12 +8,14 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 
 interface ChartPoint {
   date: string;
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
+  isSynthetic?: boolean;
 }
 
 function getMonthRange(point: ChartPoint): { startDate: string; endDate: string } {
@@ -65,20 +67,22 @@ export function AccountValuesChart() {
     return [
       {
         id: 'Net Worth',
-        data: data.map((p) => ({ x: fmt(p), y: p.netWorth })),
+        data: data.map((p) => ({ x: fmt(p), y: p.netWorth, isSynthetic: p.isSynthetic })),
       },
       {
         id: 'Total Assets',
-        data: data.map((p) => ({ x: fmt(p), y: p.totalAssets })),
+        data: data.map((p) => ({ x: fmt(p), y: p.totalAssets, isSynthetic: p.isSynthetic })),
       },
       {
         id: 'Total Liabilities',
-        data: data.map((p) => ({ x: fmt(p), y: p.totalLiabilities })),
+        data: data.map((p) => ({ x: fmt(p), y: p.totalLiabilities, isSynthetic: p.isSynthetic })),
       },
     ];
   }, [data]);
 
   const visibleData = allSeries.filter((s) => activeSeries.has(s.id));
+
+  const hasEstimated = data.some((d) => d.isSynthetic);
 
   const handleSliceClick = useCallback(
     (point: ChartPoint) => {
@@ -154,6 +158,16 @@ export function AccountValuesChart() {
           theme={nivoTheme}
           useMesh={true}
           enableSlices="x"
+          layers={[
+            'grid',
+            'axes',
+            ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
+            'lines',
+            'points',
+            'slices',
+            'crosshair',
+            'legends',
+          ] as any}
           sliceTooltip={({ slice }) => (
             <ChartTooltip>
               <TooltipHeader>{String(slice.points[0]?.data.xFormatted)}</TooltipHeader>
@@ -165,6 +179,14 @@ export function AccountValuesChart() {
                   color={point.color}
                 />
               ))}
+              {data.find((d) => {
+                const fmt = new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                return fmt === String(slice.points[0]?.data.xFormatted);
+              })?.isSynthetic && (
+                <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
+                  Some values are estimated
+                </div>
+              )}
             </ChartTooltip>
           )}
           onClick={(raw) => {

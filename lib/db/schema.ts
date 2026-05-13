@@ -76,6 +76,8 @@ export const userSettings = pgTable('user_settings', {
   privacyMode: boolean('privacy_mode').notNull().default(false),
   chartVisibility: jsonb('chart_visibility').default({}),
   chartColorScheme: text('chart_color_scheme').notNull().default('forest'),
+  forecastMode: text('forecast_mode').notNull().default('hybrid'), // 'historical' | 'budget' | 'hybrid'
+  forecastLookbackMonths: integer('forecast_lookback_months').notNull().default(3),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -249,6 +251,24 @@ export const monthlyCashFlow = pgTable(
 // Monthly spending breakdown by category for reporting and budgeting
 export const categorySpendingSummary = pgTable(
   'category_spending_summary',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
+    amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
+    transactionCount: integer('transaction_count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
+);
+
+// ── Category Income Summary ──────────────────────────────────────────────────
+// Monthly income breakdown by category for reporting and budgeting
+export const categoryIncomeSummary = pgTable(
+  'category_income_summary',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').notNull(),

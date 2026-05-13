@@ -14,12 +14,19 @@ interface Summary {
 
 export function RealEstateSummary() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [hasEstimated, setHasEstimated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/real-estate', { credentials: 'include' })
       .then((res) => res.json())
-      .then((data) => setSummary(data.summary))
+      .then((data) => {
+        setSummary(data.summary);
+        const hasEst = (data.properties ?? []).some((p: { snapshots?: Array<{ isSynthetic?: boolean }> }) =>
+          (p.snapshots ?? []).some((s) => s.isSynthetic)
+        );
+        setHasEstimated(hasEst);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -47,7 +54,16 @@ export function RealEstateSummary() {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div>
+      {hasEstimated && (
+        <div className="flex items-center gap-1.5 mb-3">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
+            <span className="w-1.5 h-0.5 bg-chart-3 rounded-full" style={{ textDecorationStyle: 'dashed' }} />
+            <span className="text-[10px] text-chart-3 font-medium">Some values are estimated</span>
+          </span>
+        </div>
+      )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
@@ -60,6 +76,7 @@ export function RealEstateSummary() {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

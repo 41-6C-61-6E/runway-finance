@@ -32,6 +32,8 @@ export async function GET() {
       accentColor: created?.accentColor ?? 'violet',
       chartVisibility: created?.chartVisibility ?? {},
       chartColorScheme: created?.chartColorScheme ?? 'forest',
+      forecastMode: created?.forecastMode ?? 'hybrid',
+      forecastLookbackMonths: created?.forecastLookbackMonths ?? 3,
     });
   }
 
@@ -40,6 +42,8 @@ export async function GET() {
     accentColor: settings[0].accentColor ?? 'violet',
     chartVisibility: settings[0].chartVisibility ?? {},
     chartColorScheme: settings[0].chartColorScheme ?? 'forest',
+    forecastMode: settings[0].forecastMode ?? 'hybrid',
+    forecastLookbackMonths: settings[0].forecastLookbackMonths ?? 3,
   });
 }
 
@@ -54,6 +58,8 @@ export async function PATCH(request: Request) {
   const accentColor = body.accentColor;
   const chartVisibility = body.chartVisibility;
   const chartColorScheme = body.chartColorScheme;
+  const forecastMode = body.forecastMode;
+  const forecastLookbackMonths = body.forecastLookbackMonths;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -69,6 +75,15 @@ export async function PATCH(request: Request) {
 
   if (chartColorScheme !== undefined && typeof chartColorScheme !== 'string') {
     return Response.json({ error: 'Invalid chartColorScheme value' }, { status: 400 });
+  }
+
+  const VALID_FORECAST_MODES = ['historical', 'budget', 'hybrid'];
+  if (forecastMode !== undefined && !VALID_FORECAST_MODES.includes(forecastMode)) {
+    return Response.json({ error: 'Invalid forecastMode value' }, { status: 400 });
+  }
+
+  if (forecastLookbackMonths !== undefined && (typeof forecastLookbackMonths !== 'number' || forecastLookbackMonths < 1 || forecastLookbackMonths > 24)) {
+    return Response.json({ error: 'Invalid forecastLookbackMonths value (must be 1-24)' }, { status: 400 });
   }
 
   const db = getDb();
@@ -95,6 +110,8 @@ export async function PATCH(request: Request) {
       accentColor: created?.accentColor,
       chartVisibility: created?.chartVisibility ?? {},
       chartColorScheme: created?.chartColorScheme ?? 'forest',
+      forecastMode: created?.forecastMode ?? 'hybrid',
+      forecastLookbackMonths: created?.forecastLookbackMonths ?? 3,
     });
   }
 
@@ -103,6 +120,8 @@ export async function PATCH(request: Request) {
   if (accentColor !== undefined) updates.accentColor = accentColor;
   if (chartVisibility !== undefined) updates.chartVisibility = chartVisibility;
   if (chartColorScheme !== undefined) updates.chartColorScheme = chartColorScheme;
+  if (forecastMode !== undefined) updates.forecastMode = forecastMode;
+  if (forecastLookbackMonths !== undefined) updates.forecastLookbackMonths = forecastLookbackMonths;
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -116,5 +135,7 @@ export async function PATCH(request: Request) {
     accentColor: updated.accentColor,
     chartVisibility: updated.chartVisibility ?? {},
     chartColorScheme: updated.chartColorScheme ?? 'forest',
+    forecastMode: updated.forecastMode ?? 'hybrid',
+    forecastLookbackMonths: updated.forecastLookbackMonths ?? 3,
   });
 }
