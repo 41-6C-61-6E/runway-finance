@@ -32,6 +32,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - REGISTRATION_PIN=${REGISTRATION_PIN}
+      - FRED_API_KEY=${FRED_API_KEY}
 
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true

@@ -37,9 +37,6 @@ COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/scripts/migrate-and-start.sh ./migrate-and-start.sh
-RUN chmod +x ./migrate-and-start.sh
-
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
@@ -49,7 +46,9 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-COPY --chown=root:root scripts/migrate-and-start.sh /migrate-and-start.sh
+# Copy migration scripts
+COPY --chown=nextjs:nodejs scripts/migrate-and-start.sh /migrate-and-start.sh
+COPY --chown=nextjs:nodejs scripts/migrate.mjs /app/scripts/migrate.mjs
 RUN chmod +x /migrate-and-start.sh
 
 USER nextjs

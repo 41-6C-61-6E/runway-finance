@@ -17,6 +17,7 @@ interface BudgetData {
   actual: number;
   remaining: number;
   percentUsed: number;
+  type?: 'income' | 'expense';
 }
 
 export function BudgetVsActual() {
@@ -53,6 +54,7 @@ export function BudgetVsActual() {
       actual: d.actual,
       overBudget: d.remaining < 0 ? d.actual : 0,
       categoryId: d.categoryId,
+      type: d.type ?? 'expense',
     }));
 
   const toggleCategory = (categoryId: string) => {
@@ -134,7 +136,12 @@ export function BudgetVsActual() {
             margin={{ top: 10, right: 80, left: 80, bottom: 40 }}
             padding={0.2}
             innerPadding={2}
-            colors={['var(--color-muted-foreground)', 'var(--color-chart-3)']}
+            colors={({ id, data: row }) => {
+              const itemType = (row as unknown as Record<string, string>).type;
+              const isIncome = itemType === 'income';
+              if (id === 'budgeted') return isIncome ? 'var(--color-chart-2)' : 'var(--color-muted-foreground)';
+              return isIncome ? 'var(--color-chart-1)' : 'var(--color-chart-3)';
+            }}
             borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
             axisLeft={{
               tickSize: 0, tickPadding: 8,

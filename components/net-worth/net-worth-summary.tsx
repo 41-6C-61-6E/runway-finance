@@ -56,6 +56,7 @@ interface ChartResponse {
 export function NetWorthSummary() {
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
+  const [hasEstimated, setHasEstimated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'totals' | 'percentages'>('totals');
@@ -76,6 +77,7 @@ export function NetWorthSummary() {
         ]);
         setAccounts(accountsData);
         setChartData(chartResponse.data || []);
+        setHasEstimated((chartResponse.data ?? []).some((d: ChartPoint) => (d as any).isSynthetic));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -224,12 +226,19 @@ export function NetWorthSummary() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-muted-foreground">Summary</h2>
-          <button
-            onClick={() => setViewMode('totals')}
-            className="px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground shadow-sm"
-          >
-            Totals
-          </button>
+          <div className="flex items-center gap-2">
+            {hasEstimated && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
+                <span className="text-[10px] text-chart-3 font-medium">Includes estimates</span>
+              </span>
+            )}
+            <button
+              onClick={() => setViewMode('totals')}
+              className="px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground shadow-sm"
+            >
+              Totals
+            </button>
+          </div>
         </div>
         {pctView()}
       </div>
@@ -240,12 +249,19 @@ export function NetWorthSummary() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground">Summary</h2>
-        <button
-          onClick={() => setViewMode('percentages')}
-          className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-        >
-          Percentages
-        </button>
+        <div className="flex items-center gap-2">
+          {hasEstimated && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
+              <span className="text-[10px] text-chart-3 font-medium">Includes estimates</span>
+            </span>
+          )}
+          <button
+            onClick={() => setViewMode('percentages')}
+            className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+          >
+            Percentages
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">

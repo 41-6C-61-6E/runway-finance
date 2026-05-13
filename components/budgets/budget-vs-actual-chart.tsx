@@ -18,6 +18,7 @@ interface BudgetData {
   actual: number;
   remaining: number;
   percentUsed: number;
+  type: 'income' | 'expense';
 }
 
 export function BudgetVsActualChart() {
@@ -40,14 +41,28 @@ export function BudgetVsActualChart() {
       .finally(() => setLoading(false));
   }, [periodType, periodKey]);
 
-  const chartData = budgets
-    .filter((d) => d.budgeted > 0 || d.actual > 0)
+  const incomeItems = budgets
+    .filter((d) => d.type === 'income' && (d.budgeted > 0 || d.actual > 0))
     .map((d) => ({
       category: d.categoryName,
       budgeted: d.budgeted,
       actual: d.actual,
       categoryId: d.categoryId,
     }));
+
+  const expenseItems = budgets
+    .filter((d) => d.type === 'expense' && (d.budgeted > 0 || d.actual > 0))
+    .map((d) => ({
+      category: d.categoryName,
+      budgeted: d.budgeted,
+      actual: d.actual,
+      categoryId: d.categoryId,
+    }));
+
+  const allChartData = [
+    ...incomeItems.map((d) => ({ ...d, section: 'Income' })),
+    ...expenseItems.map((d) => ({ ...d, section: 'Expenses' })),
+  ];
 
   if (loading) {
     return (
@@ -71,7 +86,7 @@ export function BudgetVsActualChart() {
     );
   }
 
-  if (chartData.length === 0) {
+  if (allChartData.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-3">Budget vs Actual</h3>
@@ -85,17 +100,21 @@ export function BudgetVsActualChart() {
       <div className="p-5 pb-2">
         <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
       </div>
-      <div className="h-[300px] px-2 pb-2">
+      <div className="h-[350px] px-2 pb-2">
         <div className="financial-chart h-full">
           <ResponsiveBar
-            data={chartData}
+            data={allChartData}
             keys={['budgeted', 'actual']}
             indexBy="category"
             groupMode="grouped"
-            margin={{ top: 10, right: 80, left: 80, bottom: 40 }}
+            margin={{ top: 10, right: 60, left: 80, bottom: 60 }}
             padding={0.2}
             innerPadding={2}
-            colors={['var(--color-muted-foreground)', 'var(--color-chart-3)']}
+            colors={({ id, data: row }) => {
+              const isIncome = (row as unknown as Record<string, string>).section === 'Income';
+              if (id === 'budgeted') return isIncome ? 'var(--color-chart-2)' : 'var(--color-muted-foreground)';
+              return isIncome ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+            }}
             borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
             axisLeft={{
               tickSize: 0, tickPadding: 8,
@@ -120,6 +139,24 @@ export function BudgetVsActualChart() {
               </ChartTooltip>
             )}
           />
+        </div>
+      </div>
+      <div className="px-5 py-2.5 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-chart-2)' }} />
+          Income Budgeted
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-chart-1)' }} />
+          Income Actual
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-muted-foreground)' }} />
+          Expense Budgeted
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-destructive)' }} />
+          Expense Actual
         </div>
       </div>
     </div>

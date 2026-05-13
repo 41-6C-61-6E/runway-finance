@@ -23,7 +23,7 @@ interface Property {
   equity: number;
   ltv: number;
   saleProceeds: number;
-  snapshots: { date: string; value: number }[];
+  snapshots: { date: string; value: number; isSynthetic?: boolean }[];
 }
 
 interface RealEstateData {

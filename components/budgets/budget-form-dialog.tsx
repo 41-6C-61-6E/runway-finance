@@ -9,6 +9,7 @@ interface Category {
   id: string;
   name: string;
   color: string;
+  isIncome?: boolean;
 }
 
 interface Account {
@@ -167,7 +168,9 @@ export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: Budge
             >
               <option value="">Select a category</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} {cat.isIncome ? '(Income)' : '(Expense)'}
+                </option>
               ))}
             </select>
           </div>

@@ -2,11 +2,15 @@ import cron from 'node-cron';
 import { logger, setDevMode } from '@/lib/logger';
 import { syncAllConnections } from '@/lib/services/sync-all';
 import { patchConsole, enableDevLogging } from '@/lib/dev-logs';
+import { initDb } from '@/lib/db';
 
 const LOG_TAG = '[runway-sync]';
-const DEFAULT_SCHEDULE = '0 */6 * * *';
 
 export function register(): void {
+  initDb().catch((err) => {
+    logger.error('[startup] Database initialization failed', { error: err instanceof Error ? err.message : String(err) });
+  });
+
   const schedule = process.env.SYNC_CRON_SCHEDULE ?? '';
 
   if (!schedule) {

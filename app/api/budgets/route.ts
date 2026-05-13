@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { budgets, categories, categorySpendingSummary } from '@/lib/db/schema';
+import { budgets, categories, categorySpendingSummary, categoryIncomeSummary } from '@/lib/db/schema';
 import { eq, and, or, isNull, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 
@@ -111,71 +111,93 @@ export async function GET(request: Request) {
         )
       );
 
-    let actualSpending: Array<{ categoryId: string; amount: string }> = [];
     const categoryIds = budgetRows.map((b) => b.categoryId).filter(Boolean);
+    const incomeCategoryIds = budgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean);
+    const expenseCategoryIds = budgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean);
 
-    if (categoryIds.length > 0) {
+    async function fetchActuals(
+      table: typeof categorySpendingSummary | typeof categoryIncomeSummary,
+      catIds: string[],
+    ) {
+      if (catIds.length === 0) return new Map<string, number>();
+      const idCol = 'categoryId' in table ? table.categoryId : categorySpendingSummary.categoryId;
+      const yearCol = 'yearMonth' in table ? table.yearMonth : categorySpendingSummary.yearMonth;
+      const amountCol = 'amount' in table ? table.amount : categorySpendingSummary.amount;
+
+      let rows: Array<{ categoryId: string; amount: string }> = [];
+
       if (periodType === 'quarterly') {
         const [y, q] = bounds.yearMonth.split('-Q').map(Number);
         const months = [];
         for (let m = (q - 1) * 3 + 1; m <= q * 3; m++) {
           months.push(`${y}-${String(m).padStart(2, '0')}`);
         }
-        actualSpending = await db
+        const yearColName = yearCol.name;
+        const idColName = idCol.name;
+        rows = await db
           .select({
-            categoryId: categorySpendingSummary.categoryId,
-            amount: sql<string>`SUM(${categorySpendingSummary.amount})`,
+            categoryId: idCol,
+            amount: sql<string>`SUM(${amountCol})`,
           })
-          .from(categorySpendingSummary)
+          .from(table)
           .where(
             and(
-              eq(categorySpendingSummary.userId, session.user.id),
-              sql`${categorySpendingSummary.yearMonth} IN ${sql.raw(`(${months.map((m) => `'${m}'`).join(',')})`)}`,
-              sql`${categorySpendingSummary.categoryId} IN ${sql.raw(`(${categoryIds.map((c) => `'${c}'`).join(',')})`)}`,
+              eq(table.userId, session.user.id),
+              sql`${yearCol} IN ${sql.raw(`(${months.map((m) => `'${m}'`).join(',')})`)}`,
+              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
             )
           )
-          .groupBy(categorySpendingSummary.categoryId);
+          .groupBy(idCol);
       } else if (periodType === 'yearly') {
-        actualSpending = await db
+        rows = await db
           .select({
-            categoryId: categorySpendingSummary.categoryId,
-            amount: sql<string>`SUM(${categorySpendingSummary.amount})`,
+            categoryId: idCol,
+            amount: sql<string>`SUM(${amountCol})`,
           })
-          .from(categorySpendingSummary)
+          .from(table)
           .where(
             and(
-              eq(categorySpendingSummary.userId, session.user.id),
-              sql`${categorySpendingSummary.yearMonth} LIKE ${bounds.yearMonth + '%'}`,
-              sql`${categorySpendingSummary.categoryId} IN ${sql.raw(`(${categoryIds.map((c) => `'${c}'`).join(',')})`)}`,
+              eq(table.userId, session.user.id),
+              sql`${yearCol} LIKE ${bounds.yearMonth + '%'}`,
+              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
             )
           )
-          .groupBy(categorySpendingSummary.categoryId);
+          .groupBy(idCol);
       } else {
-        actualSpending = await db
+        rows = await db
           .select({
-            categoryId: categorySpendingSummary.categoryId,
-            amount: categorySpendingSummary.amount,
+            categoryId: idCol,
+            amount: amountCol,
           })
-          .from(categorySpendingSummary)
+          .from(table)
           .where(
             and(
-              eq(categorySpendingSummary.userId, session.user.id),
-              eq(categorySpendingSummary.yearMonth, bounds.yearMonth),
-              sql`${categorySpendingSummary.categoryId} IN ${sql.raw(`(${categoryIds.map((c) => `'${c}'`).join(',')})`)}`,
+              eq(table.userId, session.user.id),
+              eq(yearCol, bounds.yearMonth),
+              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
             )
           );
       }
+
+      const map = new Map<string, number>();
+      for (const row of rows) {
+        map.set(row.categoryId, parseFloat(row.amount.toString()));
+      }
+      return map;
     }
 
-    const actualMap = new Map<string, number>();
-    for (const row of actualSpending) {
-      actualMap.set(row.categoryId, parseFloat(row.amount.toString()));
-    }
+    const [expenseActualMap, incomeActualMap] = await Promise.all([
+      fetchActuals(categorySpendingSummary, expenseCategoryIds),
+      fetchActuals(categoryIncomeSummary, incomeCategoryIds),
+    ]);
 
     const data = budgetRows.map((row) => {
       const budgeted = parseFloat(row.amount.toString());
-      const actual = actualMap.get(row.categoryId) || 0;
-      const remaining = budgeted - actual;
+      const isIncome = row.isIncome ?? false;
+      const actual = isIncome
+        ? incomeActualMap.get(row.categoryId) || 0
+        : expenseActualMap.get(row.categoryId) || 0;
+      const remaining = isIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
 
       return {
@@ -192,6 +214,7 @@ export async function GET(request: Request) {
         actual,
         remaining,
         percentUsed,
+        type: isIncome ? 'income' : 'expense',
       };
     });
 

@@ -7,6 +7,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 
 interface PropertySnapshot {
   date: string;
@@ -128,11 +129,22 @@ export function EquityOverTimeChart() {
     data: series.data.filter((d) => new Date(d.x) >= cutoffDate),
   })).filter((s) => s.data.length > 0);
 
+  // Check if any snapshot data contains synthetic (estimated) values
+  const hasEstimated = properties.some((p) =>
+    p.snapshots.some((s) => (s as any).isSynthetic) ||
+    p.mortgageSnapshots.some((s) => (s as any).isSynthetic)
+  );
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
-        <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+        <div className="flex items-center gap-2">
+          {hasEstimated && (
+            <span className="text-[10px] text-muted-foreground italic">Includes estimated values</span>
+          )}
+          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+        </div>
       </div>
       <div className="h-[300px] px-2 pb-2">
         <div className="financial-chart h-full">
@@ -158,6 +170,16 @@ export function EquityOverTimeChart() {
             areaOpacity={0.06}
             colors={['var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)']}
             theme={nivoTheme}
+            layers={[
+              'grid',
+              'axes',
+              ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
+              'lines',
+              'points',
+              'slices',
+              'crosshair',
+              'legends',
+            ] as any}
             tooltip={({ point }) => (
               <ChartTooltip>
                 <TooltipHeader>{String(point.data.x)}</TooltipHeader>

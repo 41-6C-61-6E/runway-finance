@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { logger } from '@/lib/logger';
 import { ensureSystemCategories } from '@/lib/db/seed-categories';
+import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -261,6 +262,17 @@ export async function createManualAccount(input: CreateManualAccountInput) {
     });
   }
 
+  // Generate synthetic historical snapshots if purchase info is present
+  const meta = input.metadata ?? {};
+  const hasPurchaseHistory = !!meta.purchaseDate && (!!meta.purchasePrice || accountType === 'metals');
+  if (hasPurchaseHistory) {
+    try {
+      await generateAssetHistorySnapshots(account.id, input.userId, input.type, meta);
+    } catch (err) {
+      logger.warn(`${LOG_TAG} Failed to generate history snapshots for ${account.id}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   logger.info(`${LOG_TAG} Account created`, { accountId: account.id, name: account.name, type: input.type, initialValue });
 
   return account;
@@ -353,6 +365,15 @@ export async function syncManualAccount(
 
   await createAccountSnapshotsForUser(userId);
   await updateNetWorthSnapshot(userId);
+
+  // Regenerate synthetic history for real estate to keep HPI curve aligned
+  if (account.type === 'realestate' || account.type === 'metals') {
+    try {
+      await generateAssetHistorySnapshots(accountId, userId, account.type, account.metadata as Record<string, unknown> ?? {});
+    } catch (err) {
+      logger.warn(`${LOG_TAG} Failed to regenerate history for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   const changed = Math.abs(delta) > 0.0001;
   logger.info(`${LOG_TAG} Account synced`, { accountId, type: account.type, oldBalance, newValue, changed });
