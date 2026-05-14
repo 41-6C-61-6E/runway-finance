@@ -131,10 +131,11 @@ export async function GET(request: Request) {
     whereConditions.push(sql`${searchQuery} @@ ${searchVector}`);
   }
 
-  // Get total count
+  // Get total count (leftJoin accounts for accountTypes filter)
   const [totalRow] = await getDb()
     .select({ count: sql<number>`count(*)` })
     .from(transactions)
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(and(...whereConditions))
     .limit(1);
 

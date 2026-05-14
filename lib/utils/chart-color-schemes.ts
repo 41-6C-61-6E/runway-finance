@@ -91,6 +91,19 @@ export function applyChartColorScheme(id: ChartColorSchemeId) {
   scheme.colors.forEach((color, i) => {
     r.style.setProperty(`--chart-${i + 1}`, color);
   });
+  r.style.setProperty('--chart-synthetic', muteOklchColor(scheme.colors[0]));
+  r.style.setProperty('--destructive-synthetic', 'oklch(0.65 0.1 25)');
+}
+
+function muteOklchColor(color: string): string {
+  const match = color.match(/oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/);
+  if (!match) return color;
+  const l = parseFloat(match[1]);
+  const c = parseFloat(match[2]);
+  const h = parseFloat(match[3]);
+  const newL = Math.min(l + 0.15, 0.95);
+  const newC = Math.max(c * 0.5, 0.05);
+  return `oklch(${newL.toFixed(3)} ${newC.toFixed(3)} ${h.toFixed(0)})`;
 }
 
 export function resetChartColorScheme() {
@@ -98,4 +111,6 @@ export function resetChartColorScheme() {
   for (let i = 1; i <= 5; i++) {
     r.style.removeProperty(`--chart-${i}`);
   }
+  r.style.removeProperty('--chart-synthetic');
+  r.style.removeProperty('--destructive-synthetic');
 }

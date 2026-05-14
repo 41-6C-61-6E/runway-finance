@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ForecastChart } from '@/components/cash-flow/forecast-chart';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { TrendingUp, TrendingDown, BarChart3, Table2 } from 'lucide-react';
 
 type ForecastMode = 'historical' | 'budget' | 'hybrid';
@@ -61,6 +62,7 @@ const MODE_DESCRIPTIONS: Record<ForecastMode, string> = {
 };
 
 export function CashFlowForecast() {
+  const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -269,16 +271,18 @@ export function CashFlowForecast() {
       {/* Chart View */}
       {viewMode === 'chart' && chartData.length > 0 && (
         <div className="pt-3 px-2">
-          <ForecastChart data={chartData} />
+          <ForecastChart data={chartData} showProjections={isEnabled('cashFlowProjections')} />
           <div className="px-3 pb-2 flex items-center gap-4 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <span className="w-4 h-0.5 bg-foreground inline-block" />
               Actual
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 bg-foreground inline-block" style={{ background: 'none', borderTop: '1px dashed var(--color-muted-foreground)' }} />
-              Projected
-            </div>
+            {isEnabled('cashFlowProjections') && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-0.5 bg-foreground inline-block" style={{ background: 'none', borderTop: '1px dashed var(--color-muted-foreground)' }} />
+                Projected
+              </div>
+            )}
           </div>
         </div>
       )}

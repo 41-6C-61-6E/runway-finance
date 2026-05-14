@@ -1,42 +1,11 @@
-import cron from 'node-cron';
-import { logger, setDevMode } from '@/lib/logger';
-import { syncAllConnections } from '@/lib/services/sync-all';
-import { patchConsole, enableDevLogging } from '@/lib/dev-logs';
-import { initDb } from '@/lib/db';
+// Delegates Node.js-only initialization to instrumentation-node.ts.
+// Next.js 16 runs instrumentation in both Node.js and Edge runtimes,
+// so Node.js-only modules (pg, node-cron, fs, path, crypto) must be
+// imported only when NEXT_RUNTIME === 'nodejs'.
 
-const LOG_TAG = '[runway-sync]';
-
-export function register(): void {
-  initDb().catch((err) => {
-    logger.error('[startup] Database initialization failed', { error: err instanceof Error ? err.message : String(err) });
-  });
-
-  const schedule = process.env.SYNC_CRON_SCHEDULE ?? '';
-
-  if (!schedule) {
-    logger.warn(`${LOG_TAG} SYNC_CRON_SCHEDULE is not set — periodic sync is disabled.`);
-    return;
-  }
-
-  const task = cron.schedule(schedule, () => {
-    syncAllConnections().catch((err) => {
-      logger.error(`${LOG_TAG} Cron task error: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  });
-
-  logger.info(`${LOG_TAG} Cron registered: ${schedule}`);
-
-  if (process.env.DEV_MODE === 'true') {
-    setDevMode(true);
-    enableDevLogging();
-    patchConsole();
-    logger.info(`${LOG_TAG} Dev mode enabled — console logging captured.`);
-  }
-
-  if (typeof process !== 'undefined' && typeof process.on === 'function') {
-    process.on('SIGTERM', () => {
-      task.stop();
-      logger.info(`${LOG_TAG} Cron stopped.`);
-    });
+export async function register(): Promise<void> {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { registerNodeInstrumentation } = await import('./instrumentation-node');
+    await registerNodeInstrumentation();
   }
 }

@@ -9,7 +9,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 
 interface CategoryData {
@@ -49,7 +49,6 @@ export function SpendingBreakdown() {
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartType>('pie');
   const [timeframe, setTimeframe] = useState<TimeRange>('1m');
-  const [includeExcluded, setIncludeExcluded] = useState(false);
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<Set<string>>(new Set());
 
   const month = getMonthForTimeRange(timeframe);
@@ -139,7 +138,6 @@ export function SpendingBreakdown() {
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Spending Breakdown</h3>
         <div className="flex items-center gap-2">
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
           <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
         </div>
       </div>

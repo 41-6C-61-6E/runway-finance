@@ -1,7 +1,7 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export const proxy = async (req) => {
+  const { auth } = await import("@/lib/auth");
   const session = await auth();
   const { pathname } = req.nextUrl;
 
@@ -14,6 +14,7 @@ export const proxy = async (req) => {
   if (pathname.startsWith("/api/register")) {
     return NextResponse.next();
   }
+
 
   // If no session, redirect to /signin for any protected route
   if (!session) {

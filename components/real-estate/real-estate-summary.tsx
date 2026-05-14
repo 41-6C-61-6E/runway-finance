@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { Home, Banknote, Equal, Percent } from 'lucide-react';
 
 interface Summary {
@@ -13,6 +14,7 @@ interface Summary {
 }
 
 export function RealEstateSummary() {
+  const { isEnabled } = useSyntheticData();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export function RealEstateSummary() {
 
   return (
     <div>
-      {hasEstimated && (
+      {isEnabled('realEstate') && hasEstimated && (
         <div className="flex items-center gap-1.5 mb-3">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
             <span className="w-1.5 h-0.5 bg-chart-3 rounded-full" style={{ textDecorationStyle: 'dashed' }} />

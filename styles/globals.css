@@ -32,6 +32,8 @@ body,
   --chart-3: oklch(0.65 0.15 50);
   --chart-4: oklch(0.55 0.18 240);
   --chart-5: oklch(0.6 0.15 340);
+  --chart-synthetic: oklch(0.7 0.1 150);
+  --destructive-synthetic: oklch(0.65 0.12 25);
   --sidebar: oklch(0.99 0.001 60);
   --sidebar-foreground: oklch(0.18 0.01 285);
   --sidebar-primary: oklch(0.45 0.22 280);
@@ -76,6 +78,8 @@ body,
   --chart-3: oklch(0.7 0.15 50);
   --chart-4: oklch(0.6 0.18 240);
   --chart-5: oklch(0.65 0.15 340);
+  --chart-synthetic: oklch(0.55 0.1 150);
+  --destructive-synthetic: oklch(0.5 0.12 25);
   --sidebar: oklch(0.12 0.003 285);
   --sidebar-foreground: oklch(0.96 0.003 285);
   --sidebar-primary: oklch(0.62 0.2 280);
@@ -110,6 +114,8 @@ body,
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-synthetic: var(--chart-synthetic);
+  --color-destructive-synthetic: var(--destructive-synthetic);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -158,6 +164,8 @@ body,
   --chart-3: oklch(0.55 0.18 260);
   --chart-4: oklch(0.7 0.1 170);
   --chart-5: oklch(0.5 0.12 240);
+  --chart-synthetic: oklch(0.7 0.08 220);
+  --destructive-synthetic: oklch(0.65 0.12 25);
 }
 [data-chart-scheme="sunset"] {
   --chart-1: oklch(0.65 0.18 40);
@@ -165,6 +173,8 @@ body,
   --chart-3: oklch(0.7 0.15 80);
   --chart-4: oklch(0.55 0.15 350);
   --chart-5: oklch(0.6 0.12 60);
+  --chart-synthetic: oklch(0.75 0.1 40);
+  --destructive-synthetic: oklch(0.65 0.12 25);
 }
 [data-chart-scheme="nord"] {
   --chart-1: oklch(0.65 0.08 240);
@@ -172,6 +182,8 @@ body,
   --chart-3: oklch(0.6 0.12 180);
   --chart-4: oklch(0.55 0.06 280);
   --chart-5: oklch(0.7 0.08 80);
+  --chart-synthetic: oklch(0.7 0.05 240);
+  --destructive-synthetic: oklch(0.65 0.08 25);
 }
 [data-chart-scheme="synthwave"] {
   --chart-1: oklch(0.65 0.25 330);
@@ -179,6 +191,8 @@ body,
   --chart-3: oklch(0.7 0.2 60);
   --chart-4: oklch(0.6 0.25 200);
   --chart-5: oklch(0.6 0.25 10);
+  --chart-synthetic: oklch(0.75 0.15 330);
+  --destructive-synthetic: oklch(0.65 0.15 25);
 }
 [data-chart-scheme="monochrome"] {
   --chart-1: oklch(0.7 0.05 260);
@@ -186,4 +200,6 @@ body,
   --chart-3: oklch(0.5 0.1 260);
   --chart-4: oklch(0.4 0.12 260);
   --chart-5: oklch(0.3 0.14 260);
+  --chart-synthetic: oklch(0.75 0.03 260);
+  --destructive-synthetic: oklch(0.65 0.08 25);
 }

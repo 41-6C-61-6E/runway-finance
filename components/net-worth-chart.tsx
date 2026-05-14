@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsiveBar } from '@nivo/bar';
 import { useRouter } from 'next/navigation';
@@ -9,8 +9,8 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 
 type NetWorthDataPoint = {
   date: string;
@@ -51,13 +51,19 @@ function getDateRange(point: NetWorthDataPoint): { startDate: string; endDate: s
 
 export function NetWorthChart() {
   const router = useRouter();
+  const { isEnabled } = useSyntheticData();
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [chartType, setChartType] = useState<ChartType>('line');
-  const [includeExcluded, setIncludeExcluded] = useState(false);
   const [data, setData] = useState<NetWorthDataPoint[]>([]);
   const [summary, setSummary] = useState<ChartSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAssetsLiabilities, setShowAssetsLiabilities] = useState(false);
+
+  const displayData = useMemo(
+    () => (isEnabled('netWorth') ? data : data.filter((d) => !d.isSynthetic)),
+    [data, isEnabled]
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,7 +72,6 @@ export function NetWorthChart() {
         setError(null);
         const url = new URL('/api/net-worth/chart', window.location.origin);
         url.searchParams.set('timeframe', timeframe);
-        url.searchParams.set('includeExcluded', includeExcluded.toString());
 
         const response = await fetch(url.toString());
         if (!response.ok) throw new Error('Failed to fetch chart data');
@@ -81,7 +86,7 @@ export function NetWorthChart() {
       }
     };
     fetchData();
-  }, [timeframe, includeExcluded]);
+  }, [timeframe]);
 
   const handlePointClick = useCallback(
     (point: NetWorthDataPoint) => {
@@ -97,31 +102,59 @@ export function NetWorthChart() {
     year: '2-digit',
   });
 
-  // Split data into actual and estimated series for synthetic viz
-  const actualSeries = data
-    .filter((d) => !d.isSynthetic)
-    .map((d) => ({ x: fmtDate(d.date), y: d.netWorth }));
-
-  const estimatedSeries = data
-    .filter((d) => d.isSynthetic)
-    .map((d) => ({ x: fmtDate(d.date), y: d.netWorth, isSynthetic: true }));
-
-  const hasEstimated = estimatedSeries.length > 0;
-
-  // Build chart series - actual line first, then estimated overlay
-  const nivoData = [];
-  if (actualSeries.length > 0) {
-    nivoData.push({ id: 'Net Worth', data: actualSeries });
-  }
-  if (estimatedSeries.length > 0) {
-    nivoData.push({ id: 'Net Worth (Estimated)', data: estimatedSeries });
-  }
-  // Fallback if all data is synthetic
-  if (nivoData.length === 0 && data.length > 0) {
-    nivoData.push({ id: 'Net Worth (Estimated)', data: data.map((d) => ({ x: fmtDate(d.date), y: d.netWorth })) });
-  }
-
+  const chartData = displayData;
   const isPositiveChange = summary ? summary.change >= 0 : false;
+
+  const lastPoint = data.length > 0 ? data[data.length - 1] : null;
+
+  const nivoData = chartData.length > 0
+    ? [{ id: 'Net Worth', data: chartData.map((d) => ({ x: d.date, y: d.netWorth, isSynthetic: d.isSynthetic })) }]
+    : [];
+
+  const assetsLiabilitiesSeries = showAssetsLiabilities && chartData.length > 0
+    ? [
+        { id: 'Total Assets', data: chartData.map((d) => ({ x: d.date, y: d.totalAssets, isSynthetic: d.isSynthetic })) },
+        { id: 'Total Liabilities', data: chartData.map((d) => ({ x: d.date, y: d.totalLiabilities, isSynthetic: d.isSynthetic })) },
+      ]
+    : [];
+
+  const displaySeries = [...nivoData, ...assetsLiabilitiesSeries];
+
+  const maxVal = Math.max(
+    ...chartData.flatMap((d) => [d.netWorth, d.totalAssets, d.totalLiabilities]),
+    1,
+  );
+
+  const SyntheticOverlay = ({ series, xScale, yScale }: any) => {
+    const mainSeries = series[0];
+    if (!mainSeries || mainSeries.data.length < 2) return null;
+
+    const estimatedPoints: Array<{ x: number; y: number }> = [];
+
+    for (const d of mainSeries.data) {
+      const px = xScale(d.data.x);
+      const py = yScale(d.data.y);
+      if (px != null && py != null && d.data.isSynthetic) {
+        estimatedPoints.push({ x: px, y: py });
+      }
+    }
+
+    if (estimatedPoints.length < 2) return null;
+
+    const line = (pts: Array<{ x: number; y: number }>) =>
+      pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+    return (
+      <path
+        d={line(estimatedPoints)}
+        fill="none"
+        stroke="var(--color-chart-1)"
+        strokeWidth={2.5}
+        strokeDasharray="8 4"
+        opacity={0.6}
+      />
+    );
+  };
 
   const renderChart = () => {
     if (loading) {
@@ -139,16 +172,16 @@ export function NetWorthChart() {
       return <ChartEmptyState variant="error" error={error} />;
     }
 
-    if (data.length === 0) {
+    if (chartData.length === 0) {
       return <ChartEmptyState variant="nodata" description="Net worth data will appear once you sync your accounts" />;
     }
 
-    if (data.length < 2) {
+    if (chartData.length < 2) {
       return <ChartEmptyState variant="insufficient" />;
     }
 
     if (chartType === 'bar') {
-      const barData = data.map((d) => ({
+      const barData = chartData.map((d) => ({
         date: fmtDate(d.date),
         netWorth: d.netWorth,
         _isSynthetic: d.isSynthetic ? 'true' : 'false',
@@ -159,13 +192,13 @@ export function NetWorthChart() {
           keys={['netWorth']}
           indexBy="date"
           margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
-          padding={0.3}
+          padding={0.05}
           borderRadius={2}
           colors={({ data: d }: any) => {
             const value = d.netWorth as number;
             const isSynth = d._isSynthetic === 'true';
             if (isSynth) {
-              return value >= 0 ? 'color-mix(in srgb, var(--color-chart-1) 40%, transparent)' : 'color-mix(in srgb, var(--color-destructive) 40%, transparent)';
+              return value >= 0 ? 'var(--color-chart-synthetic)' : 'var(--color-destructive-synthetic)';
             }
             return value >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)';
           }}
@@ -181,12 +214,14 @@ export function NetWorthChart() {
           axisBottom={{
             tickSize: 0,
             tickPadding: 8,
+            tickValues: chartData.length > 30 ? Math.max(3, Math.min(Math.floor(chartData.length / 6), 15)) : undefined,
           }}
           enableGridY={true}
           enableGridX={false}
           theme={nivoTheme}
+          animate={chartData.length < 100}
           onClick={({ data: barData }) => {
-            const pt = data.find((d) => fmtDate(d.date) === barData.date);
+            const pt = chartData.find((d) => fmtDate(d.date) === barData.date);
             if (pt) handlePointClick(pt);
           }}
           tooltip={({ indexValue, value, data: d }: any) => (
@@ -206,18 +241,21 @@ export function NetWorthChart() {
 
     return (
       <ResponsiveLine
-        data={nivoData}
-        margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-        xScale={{ type: 'point' }}
-        yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+        data={displaySeries}
+        margin={{ top: 10, right: 60, left: 60, bottom: 30 }}
+        xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
+        yScale={{ type: 'linear', min: 0, max: maxVal * 1.1 }}
         curve="monotoneX"
-        enableArea={actualSeries.length > 0}
-        areaOpacity={0.15}
-        colors={['var(--color-chart-1)']}
-        lineWidth={2.5}
+        colors={['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-destructive)']}
         enablePoints={false}
         enableGridX={false}
-        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        enableGridY={true}
+        axisBottom={{
+          tickSize: 0,
+          tickPadding: 8,
+          tickValues: chartData.length > 30 ? Math.max(4, Math.floor(chartData.length / 10)) : undefined,
+          format: '%b %y',
+        }}
         axisLeft={{
           tickSize: 0,
           tickPadding: 8,
@@ -232,29 +270,32 @@ export function NetWorthChart() {
         layers={[
           'grid',
           'axes',
-          ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
+          'crosshair',
           'lines',
+          SyntheticOverlay,
           'points',
           'slices',
-          'crosshair',
-          'legends',
+          'mesh',
         ] as any}
         onClick={(raw) => {
-          const p = raw as unknown as { data: { xFormatted: string } };
-          const pt = data.find((d) => fmtDate(d.date) === String(p.data.xFormatted));
+          const p = raw as unknown as { data: { x: Date; xFormatted: string } };
+          const d = p.data.x;
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const pt = chartData.find((pt) => pt.date === dateStr);
           if (pt) handlePointClick(pt);
         }}
         tooltip={({ point }) => (
           <ChartTooltip>
             <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
-            <TooltipRow label="Net Worth" value={formatCurrency(Number(point.data.y))} />
-            {String(point.seriesId).includes('(Estimated)') && (
+            <TooltipRow label={String(point.seriesId)} value={formatCurrency(Number(point.data.y))} />
+            {(point.data as any).isSynthetic && (
               <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
                 Estimated value
               </div>
             )}
           </ChartTooltip>
         )}
+        animate={chartData.length < 100}
       />
     );
   };
@@ -290,8 +331,20 @@ export function NetWorthChart() {
 
         <div className="flex items-center justify-between">
           <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
         </div>
+        {showAssetsLiabilities !== undefined && (
+          <div className="mt-2">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showAssetsLiabilities}
+                onChange={(e) => setShowAssetsLiabilities(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-border accent-primary"
+              />
+              <span className="text-xs text-muted-foreground">Display Assets &amp; Liabilities</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Chart */}
@@ -310,7 +363,7 @@ export function NetWorthChart() {
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">Total Assets</p>
                   <p className="text-sm font-semibold text-foreground blur-number">
-                    {formatCurrency(summary.current + summary.change)}
+                    {lastPoint ? formatCurrency(lastPoint.totalAssets) : '$0'}
                   </p>
                 </div>
                 <div>

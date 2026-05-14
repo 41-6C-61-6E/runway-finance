@@ -17,7 +17,9 @@ import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
 import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
+import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
+import { useHiddenPages, HIDDEN_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
 type Connection = {
   id: string;
@@ -69,6 +71,8 @@ export default function SettingsPage() {
   const [savingLabel, setSavingLabel] = useState(false);
 
   const { scheme: chartScheme, updateScheme: updateChartScheme } = useChartColorScheme();
+  const { cardStyle, updateCardStyle } = useCardStyle();
+  const { isHidden, updateHidden } = useHiddenPages();
 
   const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics'>('general');
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
@@ -427,6 +431,41 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              {/* Card Style */}
+              <div className="pb-5 border-b border-border">
+                <div className="mb-3">
+                  <h3 className="text-sm font-medium text-foreground">Card Style</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Adjust the corner radius of cards throughout the app</p>
+                </div>
+                <div className="flex gap-2">
+                  {([
+                    { id: 'rounded' as const, label: 'More Round', radius: 'rounded-full' },
+                    { id: 'default' as const, label: 'Default', radius: 'rounded-md' },
+                    { id: 'square' as const, label: 'More Square', radius: 'rounded-none' },
+                  ]).map((option) => {
+                    const isActive = cardStyle === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => updateCardStyle(option.id)}
+                        className={`flex-1 flex items-center justify-center gap-2 p-2 border transition-all ${
+                          isActive
+                            ? 'border-foreground bg-muted/50'
+                            : 'border-border hover:border-foreground/30 hover:bg-muted/20'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 border-2 border-foreground/40 ${option.radius}`} />
+                        <span className="text-xs text-foreground">{option.label}</span>
+                        {isActive && (
+                          <Check className="w-3 h-3 text-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Privacy Mode */}
               <div className="flex items-center justify-between pb-5 border-b border-border">
                 <div>
@@ -458,6 +497,42 @@ export default function SettingsPage() {
               {devMode === false && (
                 <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Logs are hidden.</p>
               )}
+            </div>
+          </div>
+
+          {/* Navigation Visibility */}
+          <div className="p-5 bg-card border border-border rounded-xl">
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Navigation</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Show or hide pages in the sidebar navigation. Hidden pages can still be accessed via direct URL.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {HIDDEN_PAGE_KEYS.map((pageKey) => {
+                  const pageLabel =
+                    pageKey === 'netWorth' ? 'Net Worth' :
+                    pageKey === 'transactions' ? 'Transactions' :
+                    pageKey === 'cashFlow' ? 'Cash Flow' :
+                    pageKey === 'budgets' ? 'Budgets' :
+                    pageKey === 'realEstate' ? 'Real Estate' :
+                    pageKey === 'fire' ? 'FIRE' :
+                    pageKey === 'dataExplorer' ? 'Data Explorer' :
+                    pageKey;
+
+                  return (
+                    <div key={pageKey} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
+                      <span className="text-sm text-foreground">{pageLabel}</span>
+                      <Switch
+                        checked={!isHidden(pageKey)}
+                        onCheckedChange={(checked) => updateHidden(pageKey, !checked)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

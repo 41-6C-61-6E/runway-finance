@@ -3,8 +3,6 @@
 import { Suspense } from 'react';
 import { NetWorthChart } from '@/components/net-worth-chart';
 import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
-import { AssetAllocationChart } from '@/components/net-worth/asset-allocation-chart';
-import { AccountValuesChart } from '@/components/net-worth/account-values-chart';
 import { GoalsProgress } from '@/components/net-worth/goals-progress';
 import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -43,20 +41,6 @@ function NetWorthContent() {
             </div>
           )}
           
-          {(isVisible('assetAllocationChart') || isVisible('accountValuesChart')) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-              {isVisible('assetAllocationChart') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
-                  <AssetAllocationChart />
-                </Suspense>
-              )}
-              {isVisible('accountValuesChart') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading account values...</div>}>
-                  <AccountValuesChart />
-                </Suspense>
-              )}
-            </div>
-          )}
           
           {isVisible('goalsProgress') && (
             <div className="mt-5">

@@ -4,20 +4,22 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
+import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
-const navItems = [
-  { href: '/', label: 'Net Worth', icon: ChartSpline },
-  { href: '/transactions', label: 'Transactions', icon: Receipt },
-  { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp },
-  { href: '/budgets', label: 'Budgets', icon: Wallet },
-  { href: '/real-estate', label: 'Real Estate', icon: Home },
-  { href: '/fire', label: 'FIRE', icon: Flame },
-  { href: '/settings', label: 'Settings', icon: Settings },
+const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: HiddenPageKey }[] = [
+  { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
+  { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
+  { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow' },
+  { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
+  { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
+  { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
+  { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
+  { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
 ]
 
 function SimpleTooltip({ children, label, show }: { children: React.ReactNode; label: string; show: boolean }) {
@@ -38,6 +40,7 @@ export default function ResizableSidebar() {
   const [isResizing, setIsResizing] = useState(false)
   const { data: session } = useSession()
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const { isHidden } = useHiddenPages()
   const [appStatus, setAppStatus] = useState<{
     connected: boolean
     lastSyncAt: string | null
@@ -113,8 +116,8 @@ export default function ResizableSidebar() {
         </div>
 
         {/* Navigation Links */}
-        <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-1' : 'px-2 space-y-0.5'}`}>
-          {navItems.map((item) => {
+        <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
+          {navItems.filter((item) => !isHidden(item.pageKey)).map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
             return (
@@ -123,7 +126,7 @@ export default function ResizableSidebar() {
                   href={item.href}
                   className={`flex items-center rounded-lg transition-all duration-150 ${
                     isCollapsed
-                      ? 'justify-center py-2.5'
+                      ? 'justify-center py-2'
                       : 'px-3 py-2 gap-3'
                   } ${
                     active

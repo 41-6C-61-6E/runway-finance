@@ -1,9 +1,9 @@
 export const nivoTheme = {
   background: 'transparent',
-  text: { fill: 'var(--color-foreground)', fontSize: 10 },
+  text: { fill: 'var(--color-foreground)', fontSize: 11 },
   axis: {
     domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
-    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)', fontSize: 10 } },
+    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)', fontSize: 11 } },
   },
   grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3', strokeWidth: 1 } },
   crosshair: { line: { stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' } },

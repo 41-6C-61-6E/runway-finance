@@ -7,8 +7,9 @@ import { formatCurrency } from '@/lib/utils/format';
 import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 
 interface ChartPoint {
   date: string;
@@ -30,6 +31,7 @@ function getMonthRange(point: ChartPoint): { startDate: string; endDate: string 
 
 export function AccountValuesChart() {
   const router = useRouter();
+  const { isEnabled } = useSyntheticData();
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [includeExcluded, setIncludeExcluded] = useState(true);
   const [data, setData] = useState<ChartPoint[]>([]);
@@ -60,29 +62,36 @@ export function AccountValuesChart() {
     fetchData();
   }, [timeframe, includeExcluded]);
 
+  const displayData = useMemo(
+    () => (isEnabled('netWorth') ? data : data.filter((d) => !d.isSynthetic)),
+    [data, isEnabled]
+  );
+
   const allSeries = useMemo(() => {
-    if (data.length === 0) return [];
-    const fmt = (d: ChartPoint) =>
-      new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    if (displayData.length === 0) return [];
     return [
       {
         id: 'Net Worth',
-        data: data.map((p) => ({ x: fmt(p), y: p.netWorth, isSynthetic: p.isSynthetic })),
+        data: displayData.map((p) => ({ x: p.date, y: p.netWorth, isSynthetic: p.isSynthetic })),
       },
       {
         id: 'Total Assets',
-        data: data.map((p) => ({ x: fmt(p), y: p.totalAssets, isSynthetic: p.isSynthetic })),
+        data: displayData.map((p) => ({ x: p.date, y: p.totalAssets, isSynthetic: p.isSynthetic })),
       },
       {
         id: 'Total Liabilities',
-        data: data.map((p) => ({ x: fmt(p), y: p.totalLiabilities, isSynthetic: p.isSynthetic })),
+        data: displayData.map((p) => ({ x: p.date, y: p.totalLiabilities, isSynthetic: p.isSynthetic })),
       },
     ];
-  }, [data]);
+  }, [displayData]);
+
+  const maxVal = displayData.length > 0
+    ? Math.max(...displayData.flatMap((d) => [d.netWorth, d.totalAssets, Math.abs(d.totalLiabilities)]), 1)
+    : 1;
 
   const visibleData = allSeries.filter((s) => activeSeries.has(s.id));
 
-  const hasEstimated = data.some((d) => d.isSynthetic);
+  const hasEstimated = isEnabled('netWorth') && data.some((d) => d.isSynthetic);
 
   const handleSliceClick = useCallback(
     (point: ChartPoint) => {
@@ -129,7 +138,7 @@ export function AccountValuesChart() {
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">Account Values Over Time</h3>
-        <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
+
       </div>
       <div className="mb-3">
         <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
@@ -137,15 +146,20 @@ export function AccountValuesChart() {
       <div className="h-[300px]">
         <ResponsiveLine
           data={visibleData}
-          margin={{ top: 5, right: 120, left: 5, bottom: 5 }}
-          xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+          margin={{ top: 10, right: 120, left: 60, bottom: 30 }}
+          xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
+          yScale={{ type: 'linear', min: 0, max: maxVal * 1.1 }}
           curve="monotoneX"
           colors={['var(--color-primary)', 'var(--color-chart-1)', 'var(--color-destructive)']}
           lineWidth={2}
           enablePoints={false}
           enableGridX={false}
-          axisBottom={{ tickSize: 0, tickPadding: 8 }}
+          enableGridY={true}
+          axisBottom={{
+            tickSize: 0, tickPadding: 8,
+            tickValues: displayData.length > 30 ? Math.max(4, Math.floor(displayData.length / 10)) : undefined,
+            format: '%b %y',
+          }}
           axisLeft={{
             tickSize: 0,
             tickPadding: 8,
@@ -179,10 +193,13 @@ export function AccountValuesChart() {
                   color={point.color}
                 />
               ))}
-              {data.find((d) => {
-                const fmt = new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                return fmt === String(slice.points[0]?.data.xFormatted);
-              })?.isSynthetic && (
+              {(() => {
+                const p = slice.points[0]?.data.x as any;
+                const dateStr = p instanceof Date
+                  ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`
+                  : String(p);
+                return data.find((d) => d.date === dateStr);
+              })()?.isSynthetic && (
                 <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
                   Some values are estimated
                 </div>
@@ -190,15 +207,13 @@ export function AccountValuesChart() {
             </ChartTooltip>
           )}
           onClick={(raw) => {
-            const p = raw as unknown as { data: { xFormatted: string } };
-            const pt = data.find((d) => {
-              const label = new Date(d.date).toLocaleDateString('en-US', {
-                month: 'short', year: '2-digit',
-              });
-              return label === String(p.data.xFormatted);
-            });
+            const p = raw as unknown as { data: { x: Date; xFormatted: string } };
+            const d = p.data.x;
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const pt = data.find((pt) => pt.date === dateStr);
             if (pt) handleSliceClick(pt);
           }}
+          animate={displayData.length < 100}
           legends={[
             {
               anchor: 'top-right',

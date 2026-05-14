@@ -6,6 +6,7 @@ const nextConfig = {
     root: "./",
   },
   output: "standalone",
+  serverExternalPackages: ['pg', 'pg-pool', 'pg-hstore', 'pg-types', 'pg-int8', 'pg-connection-string', 'pgpass'],
   images: {
     remotePatterns: [],
   },

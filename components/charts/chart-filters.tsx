@@ -38,21 +38,4 @@ export function TimeRangeFilter({ value, presets = TIME_RANGE_PRESETS, onChange 
   );
 }
 
-interface IncludeExcludedFilterProps {
-  value: boolean;
-  onChange: (value: boolean) => void;
-}
 
-export function IncludeExcludedFilter({ value, onChange }: IncludeExcludedFilterProps) {
-  return (
-    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-3.5 h-3.5 rounded border-border bg-background text-primary cursor-pointer"
-      />
-      Include excluded
-    </label>
-  );
-}

@@ -9,7 +9,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 
 interface MonthlyData {
@@ -33,7 +33,6 @@ export function NetIncomeAnalysis() {
   const [allData, setAllData] = useState<MonthlyData[]>([]);
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const [includeExcluded, setIncludeExcluded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,7 +116,6 @@ export function NetIncomeAnalysis() {
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Net Income Analysis</h3>
         <div className="flex items-center gap-2">
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
           <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
         </div>
       </div>

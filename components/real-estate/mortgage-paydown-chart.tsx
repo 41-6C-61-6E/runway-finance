@@ -10,7 +10,7 @@ import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import {
   calculateAmortizationSchedule,
   calculateAmortizationWithExtraPayments,
-} from '@/lib/services/asset-estimator';
+} from '@/lib/utils/amortization';
 
 interface MortgageDetail {
   id: string;
@@ -273,7 +273,7 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
             data={chartData}
             margin={{ top: 10, right: 20, left: 80, bottom: 30 }}
             xScale={{ type: 'point' }}
-            yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+            yScale={{ type: 'linear', min: 0, max: Math.max(...chartData.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
             curve="monotoneX"
             axisLeft={{
               tickSize: 0, tickPadding: 8,
@@ -294,6 +294,7 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
             colors={['var(--color-chart-4)', 'var(--color-chart-2)']}
             lineWidth={2}
             theme={nivoTheme}
+            animate={chartData[0]?.data.length < 100}
             useMesh={true}
             layers={[
               'grid',

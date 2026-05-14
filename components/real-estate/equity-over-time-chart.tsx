@@ -8,10 +8,12 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 
 interface PropertySnapshot {
   date: string;
   value: number;
+  isSynthetic?: boolean;
 }
 
 interface PropertyData {
@@ -28,6 +30,7 @@ interface RealEstateData {
 }
 
 export function EquityOverTimeChart() {
+  const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,39 +79,54 @@ export function EquityOverTimeChart() {
     );
   }
 
+  // Build dateMap (equity values) and synthMap (synthetic status per date per property)
   const dateMap = new Map<string, Map<string, number>>();
+  const synthMap = new Map<string, Map<string, boolean>>();
+
   for (const prop of properties) {
     const totalMortgage = prop.linkedMortgages.reduce((s, m) => s + Math.abs(m.balance), 0);
-    const propertySnaps = new Map(prop.snapshots.map((s) => [s.date, s.value]));
-    const mortgageSnaps = new Map(prop.mortgageSnapshots.map((s) => [s.date, s.value]));
+    const propSnapMap = new Map(prop.snapshots.map((s) => [s.date, s]));
+    const mortSnapMap = new Map(prop.mortgageSnapshots.map((s) => [s.date, s]));
     const allDates = new Set([...prop.snapshots.map((s) => s.date), ...prop.mortgageSnapshots.map((s) => s.date)]);
 
     if (allDates.size === 0) {
-      if (!dateMap.has('today')) dateMap.set('today', new Map());
+      if (!dateMap.has('today')) {
+        dateMap.set('today', new Map());
+        synthMap.set('today', new Map());
+      }
       dateMap.get('today')!.set(prop.id, prop.value - totalMortgage);
+      synthMap.get('today')!.set(prop.id, false);
       continue;
     }
 
     for (const date of allDates) {
-      if (!dateMap.has(date)) dateMap.set(date, new Map());
-      const val = propertySnaps.get(date) ?? prop.value;
-      const mort = mortgageSnaps.get(date) ?? totalMortgage;
-      const equity = val - Math.abs(mort);
+      if (!dateMap.has(date)) {
+        dateMap.set(date, new Map());
+        synthMap.set(date, new Map());
+      }
+      const propSnap = propSnapMap.get(date);
+      const mortSnap = mortSnapMap.get(date);
+      const val = propSnap ? propSnap.value : prop.value;
+      const mort = mortSnap ? Math.abs(mortSnap.value) : totalMortgage;
+      const equity = val - mort;
       dateMap.get(date)!.set(prop.id, equity);
+      // If either property or mortgage snapshot for this date is synthetic, mark as synthetic
+      const isSynth = (propSnap?.isSynthetic ?? false) || (mortSnap?.isSynthetic ?? false);
+      synthMap.get(date)!.set(prop.id, isSynth);
     }
   }
 
   const chartData = properties.map((prop) => {
-    const data = Array.from(dateMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, props]) => ({
-        x: date,
-        y: props.get(prop.id) ?? 0,
-      }));
+    const sortedEntries = Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const data = sortedEntries.map(([date, props]) => ({
+      x: date,
+      y: props.get(prop.id) ?? 0,
+      isSynthetic: synthMap.get(date)?.get(prop.id) ?? false,
+    }));
 
     const totalMortgage = prop.linkedMortgages.reduce((s, m) => s + Math.abs(m.balance), 0);
     if (data.length === 0) {
-      data.push({ x: new Date().toISOString().split('T')[0], y: prop.value - totalMortgage });
+      data.push({ x: new Date().toISOString().split('T')[0], y: prop.value - totalMortgage, isSynthetic: false });
     }
 
     return {
@@ -124,15 +142,16 @@ export function EquityOverTimeChart() {
   else if (timeRange === '1y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
   else if (timeRange === '5y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
 
+  const showSynth = isEnabled('realEstate');
+
   const filtered = chartData.map((series) => ({
     ...series,
-    data: series.data.filter((d) => new Date(d.x) >= cutoffDate),
+    data: series.data.filter((d) => (showSynth || !d.isSynthetic) && new Date(d.x) >= cutoffDate),
   })).filter((s) => s.data.length > 0);
 
   // Check if any snapshot data contains synthetic (estimated) values
-  const hasEstimated = properties.some((p) =>
-    p.snapshots.some((s) => (s as any).isSynthetic) ||
-    p.mortgageSnapshots.some((s) => (s as any).isSynthetic)
+  const hasEstimated = showSynth && chartData.some((series) =>
+    series.data.some((d) => d.isSynthetic)
   );
 
   return (
@@ -151,8 +170,8 @@ export function EquityOverTimeChart() {
           <ResponsiveLine
             data={filtered}
             margin={{ top: 10, right: 20, left: 80, bottom: 30 }}
-            xScale={{ type: 'point' }}
-            yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+            xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
+            yScale={{ type: 'linear', min: 0, max: Math.max(...filtered.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
             curve="monotoneX"
             axisLeft={{
               tickSize: 0, tickPadding: 8,
@@ -162,7 +181,10 @@ export function EquityOverTimeChart() {
                 return `$${v}`;
               },
             }}
-            axisBottom={{ tickSize: 0, tickPadding: 8, tickValues: 4 }}
+            axisBottom={{
+              tickSize: 0, tickPadding: 8, tickValues: 4,
+              format: '%b %y',
+            }}
             enableGridY={true}
             enableGridX={false}
             enablePoints={false}
@@ -170,6 +192,7 @@ export function EquityOverTimeChart() {
             areaOpacity={0.06}
             colors={['var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)']}
             theme={nivoTheme}
+            animate={filtered[0]?.data.length < 100}
             layers={[
               'grid',
               'axes',
@@ -182,7 +205,7 @@ export function EquityOverTimeChart() {
             ] as any}
             tooltip={({ point }) => (
               <ChartTooltip>
-                <TooltipHeader>{String(point.data.x)}</TooltipHeader>
+                <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
                 <TooltipRow label={String(point.seriesId)} value={formatCurrency(point.data.y as number)} />
               </ChartTooltip>
             )}

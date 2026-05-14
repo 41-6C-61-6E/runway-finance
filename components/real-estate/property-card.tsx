@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { Home, Landmark, TrendingUp, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
 
 interface MortgageInfo {
@@ -34,6 +35,7 @@ interface PropertyCardProps {
 }
 
 export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue }: PropertyCardProps) {
+  const { isEnabled } = useSyntheticData();
   const [editingValue, setEditingValue] = useState(false);
   const [newValue, setNewValue] = useState(String(property.value));
   const isWhollyOwned = property.linkedMortgages.length === 0;
@@ -47,7 +49,14 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
     setEditingValue(false);
   };
 
-  const latestSnapshots = property.snapshots.slice(-12);
+  const showSynth = isEnabled('realEstate');
+  const latestSnapshots = useMemo(
+    () => {
+      const snaps = property.snapshots.slice(-12);
+      return showSynth ? snaps : snaps.filter((s) => !(s as any).isSynthetic);
+    },
+    [property.snapshots, showSynth]
+  );
   const maxSnapshot = latestSnapshots.length > 0 ? Math.max(...latestSnapshots.map((s) => s.value)) : property.value;
   const minSnapshot = latestSnapshots.length > 0 ? Math.min(...latestSnapshots.map((s) => s.value)) : property.value;
   const snapRange = maxSnapshot - minSnapshot || 1;
@@ -111,7 +120,7 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
         </div>
         <div>
           <div className="text-[10px] text-muted-foreground mb-0.5">LTV</div>
-          <div className={`font-mono text-sm font-semibold ${ltvColor}`}>
+          <div className={`font-mono text-sm font-semibold blur-number ${ltvColor}`}>
             {property.ltv.toFixed(1)}%
           </div>
         </div>
@@ -151,8 +160,8 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                   <span>{payoffProgress.toFixed(1)}% paid off</span>
-                  {m.interestRate > 0 && <span>{m.interestRate.toFixed(2)}% APR</span>}
-                  {m.monthlyPayment > 0 && <span>{formatCurrency(m.monthlyPayment)}/mo</span>}
+                  {m.interestRate > 0 && <span className="blur-number">{m.interestRate.toFixed(2)}% APR</span>}
+                  {m.monthlyPayment > 0 && <span className="blur-number">{formatCurrency(m.monthlyPayment)}/mo</span>}
                 </div>
               </div>
             );
@@ -175,14 +184,14 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
             <TrendingUp className="w-3 h-3" />
             Value History (12mo)
-            {(property.snapshots as any[]).some((s) => s.isSynthetic) && (
+            {showSynth && (property.snapshots as any[]).some((s) => s.isSynthetic) && (
               <span className="text-[9px] text-chart-3 italic">(includes estimates)</span>
             )}
           </div>
           <div className="h-10 flex items-end gap-px">
             {latestSnapshots.map((s, i) => {
               const h = ((s.value - minSnapshot) / snapRange) * 100;
-              const isSynth = (s as any).isSynthetic;
+              const isSynth = showSynth && (s as any).isSynthetic;
               return (
                 <div
                   key={i}

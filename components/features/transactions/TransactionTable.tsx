@@ -436,12 +436,18 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           return (
             <div>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-                  setOpenCategoryTx(isOpen ? null : tx.id);
-                }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const dropdownWidth = 224;
+                    let left = rect.left;
+                    if (left + dropdownWidth > window.innerWidth - 8) {
+                      left = window.innerWidth - dropdownWidth - 8;
+                    }
+                    if (left < 8) left = 8;
+                    setDropdownPos({ top: rect.bottom + 4, left });
+                    setOpenCategoryTx(isOpen ? null : tx.id);
+                  }}
                 className="flex items-center gap-1 max-w-full group/cat"
               >
                 {tx.categoryName ? (
@@ -560,7 +566,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         meta: { className: 'text-right' },
       },
     ],
-    [categories, openCategoryTx, handleSetCategory]
+    [categories, openCategoryTx, handleSetCategory, categoryFilter, dropdownPos]
   );
 
   const table = useReactTable({

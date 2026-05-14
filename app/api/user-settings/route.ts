@@ -19,7 +19,6 @@ export async function GET() {
     .limit(1);
 
   if (!settings || settings.length === 0) {
-    // Create default settings if none exist
     const [created] = await db
       .insert(userSettings)
       .values({
@@ -34,6 +33,11 @@ export async function GET() {
       chartColorScheme: created?.chartColorScheme ?? 'forest',
       forecastMode: created?.forecastMode ?? 'hybrid',
       forecastLookbackMonths: created?.forecastLookbackMonths ?? 3,
+      hiddenPages: created?.hiddenPages ?? {},
+      cardStyle: created?.cardStyle ?? 'default',
+      showSyntheticData: created?.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
+      defaultChartTimeRange: created?.defaultChartTimeRange ?? '1y',
+      defaultChartType: created?.defaultChartType ?? 'line',
     });
   }
 
@@ -44,6 +48,11 @@ export async function GET() {
     chartColorScheme: settings[0].chartColorScheme ?? 'forest',
     forecastMode: settings[0].forecastMode ?? 'hybrid',
     forecastLookbackMonths: settings[0].forecastLookbackMonths ?? 3,
+    hiddenPages: settings[0].hiddenPages ?? {},
+    cardStyle: settings[0].cardStyle ?? 'default',
+    showSyntheticData: settings[0].showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
+    defaultChartTimeRange: settings[0].defaultChartTimeRange ?? '1y',
+    defaultChartType: settings[0].defaultChartType ?? 'line',
   });
 }
 
@@ -60,6 +69,11 @@ export async function PATCH(request: Request) {
   const chartColorScheme = body.chartColorScheme;
   const forecastMode = body.forecastMode;
   const forecastLookbackMonths = body.forecastLookbackMonths;
+  const hiddenPages = body.hiddenPages;
+  const cardStyle = body.cardStyle;
+  const showSyntheticData = body.showSyntheticData;
+  const defaultChartTimeRange = body.defaultChartTimeRange;
+  const defaultChartType = body.defaultChartType;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -84,6 +98,37 @@ export async function PATCH(request: Request) {
 
   if (forecastLookbackMonths !== undefined && (typeof forecastLookbackMonths !== 'number' || forecastLookbackMonths < 1 || forecastLookbackMonths > 24)) {
     return Response.json({ error: 'Invalid forecastLookbackMonths value (must be 1-24)' }, { status: 400 });
+  }
+
+  if (hiddenPages !== undefined && (typeof hiddenPages !== 'object' || hiddenPages === null)) {
+    return Response.json({ error: 'Invalid hiddenPages value' }, { status: 400 });
+  }
+
+  const VALID_CARD_STYLES = ['rounded', 'default', 'square'];
+  if (cardStyle !== undefined && !VALID_CARD_STYLES.includes(cardStyle)) {
+    return Response.json({ error: 'Invalid cardStyle value' }, { status: 400 });
+  }
+
+  const VALID_SYNTHETIC_KEYS = ['global', 'netWorth', 'realEstate', 'cashFlowProjections'];
+  if (showSyntheticData !== undefined) {
+    if (typeof showSyntheticData !== 'object' || showSyntheticData === null || Array.isArray(showSyntheticData)) {
+      return Response.json({ error: 'Invalid showSyntheticData value' }, { status: 400 });
+    }
+    for (const key of VALID_SYNTHETIC_KEYS) {
+      if (key in showSyntheticData && typeof showSyntheticData[key] !== 'boolean') {
+        return Response.json({ error: `Invalid showSyntheticData.${key} value` }, { status: 400 });
+      }
+    }
+  }
+
+  const VALID_CHART_TIME_RANGES = ['1m', '3m', '6m', '1y', '5y', 'ytd', 'all'];
+  if (defaultChartTimeRange !== undefined && !VALID_CHART_TIME_RANGES.includes(defaultChartTimeRange)) {
+    return Response.json({ error: 'Invalid defaultChartTimeRange value' }, { status: 400 });
+  }
+
+  const VALID_CHART_TYPES = ['line', 'bar'];
+  if (defaultChartType !== undefined && !VALID_CHART_TYPES.includes(defaultChartType)) {
+    return Response.json({ error: 'Invalid defaultChartType value' }, { status: 400 });
   }
 
   const db = getDb();
@@ -112,6 +157,11 @@ export async function PATCH(request: Request) {
       chartColorScheme: created?.chartColorScheme ?? 'forest',
       forecastMode: created?.forecastMode ?? 'hybrid',
       forecastLookbackMonths: created?.forecastLookbackMonths ?? 3,
+      hiddenPages: created?.hiddenPages ?? {},
+      cardStyle: created?.cardStyle ?? 'default',
+      showSyntheticData: created?.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
+      defaultChartTimeRange: created?.defaultChartTimeRange ?? '1y',
+      defaultChartType: created?.defaultChartType ?? 'line',
     });
   }
 
@@ -122,6 +172,11 @@ export async function PATCH(request: Request) {
   if (chartColorScheme !== undefined) updates.chartColorScheme = chartColorScheme;
   if (forecastMode !== undefined) updates.forecastMode = forecastMode;
   if (forecastLookbackMonths !== undefined) updates.forecastLookbackMonths = forecastLookbackMonths;
+  if (hiddenPages !== undefined) updates.hiddenPages = hiddenPages;
+  if (cardStyle !== undefined) updates.cardStyle = cardStyle;
+  if (showSyntheticData !== undefined) updates.showSyntheticData = showSyntheticData;
+  if (defaultChartTimeRange !== undefined) updates.defaultChartTimeRange = defaultChartTimeRange;
+  if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -137,5 +192,10 @@ export async function PATCH(request: Request) {
     chartColorScheme: updated.chartColorScheme ?? 'forest',
     forecastMode: updated.forecastMode ?? 'hybrid',
     forecastLookbackMonths: updated.forecastLookbackMonths ?? 3,
+    hiddenPages: updated.hiddenPages ?? {},
+    cardStyle: updated.cardStyle ?? 'default',
+    showSyntheticData: updated.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
+    defaultChartTimeRange: updated.defaultChartTimeRange ?? '1y',
+    defaultChartType: updated.defaultChartType ?? 'line',
   });
 }

@@ -9,7 +9,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-import { TimeRangeFilter, IncludeExcludedFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 
 interface MonthlyData {
@@ -35,7 +35,6 @@ export function IncomeExpenseChart() {
   const [allData, setAllData] = useState<MonthlyData[]>([]);
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const [includeExcluded, setIncludeExcluded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +64,8 @@ export function IncomeExpenseChart() {
     net: d.netCashFlow,
     yearMonth: d.yearMonth,
   }));
+
+  const maxValue = Math.max(...data.flatMap((d) => [d.income, d.expenses]), 1);
 
   const handleClick = (yearMonth: string) => {
     const startDate = yearMonth + '-01';
@@ -110,7 +111,6 @@ export function IncomeExpenseChart() {
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Income vs Expenses</h3>
         <div className="flex items-center gap-2">
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
           <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
         </div>
       </div>
@@ -127,12 +127,13 @@ export function IncomeExpenseChart() {
               ]}
               margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
               xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+              yScale={{ type: 'linear', min: 0, max: maxValue * 1.1 }}
               curve="monotoneX"
               colors={['var(--color-chart-1)', 'var(--color-destructive)']}
               lineWidth={2}
               enablePoints={false}
               enableGridX={false}
+              enableGridY={true}
               axisLeft={{
                 tickSize: 0, tickPadding: 8,
                 format: (v: number) => {
@@ -141,9 +142,13 @@ export function IncomeExpenseChart() {
                   return `$${v}`;
                 },
               }}
-              axisBottom={{ tickSize: 0, tickPadding: 8 }}
+              axisBottom={{
+                tickSize: 0, tickPadding: 8,
+                tickValues: data.length > 30 ? Math.max(4, Math.floor(data.length / 6)) : undefined,
+              }}
               theme={nivoTheme}
               useMesh={true}
+              animate={data.length < 100}
               onClick={(raw) => {
                 const p = raw as unknown as { data: { xFormatted: string } };
                 const matched = data.find((d) => d.month === String(p.data.xFormatted));
@@ -179,10 +184,14 @@ export function IncomeExpenseChart() {
                   return `$${v}`;
                 },
               }}
-              axisBottom={{ tickSize: 0, tickPadding: 8 }}
+              axisBottom={{
+                tickSize: 0, tickPadding: 8,
+                tickValues: data.length > 30 ? Math.max(4, Math.floor(data.length / 6)) : undefined,
+              }}
               enableGridY={true}
               enableGridX={false}
               theme={nivoTheme}
+              animate={data.length < 100}
               onClick={({ data: barData }) => {
                 const matched = data.find((d) => d.month === barData.month);
                 if (matched) handleClick(matched.yearMonth);
