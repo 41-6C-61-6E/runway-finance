@@ -2,10 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { findUser, addUser } from "./users";
-import { logger } from "./logger";
-import { initDb } from "./db";
-
-initDb().catch(err => logger.error('Auth: failed to initialize database:', { error: err instanceof Error ? err.message : String(err) }));
+import { logger } from "@/lib/logger";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production',

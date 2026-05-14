@@ -45,23 +45,33 @@ export function BudgetVsActualChart() {
     .filter((d) => d.type === 'income' && (d.budgeted > 0 || d.actual > 0))
     .map((d) => ({
       category: d.categoryName,
+      spent: Math.min(d.actual, d.budgeted),
+      remaining: Math.max(0, d.budgeted - d.actual),
+      overage: Math.max(0, d.actual - d.budgeted),
       budgeted: d.budgeted,
       actual: d.actual,
+      percentUsed: d.percentUsed,
       categoryId: d.categoryId,
+      type: 'income',
     }));
 
   const expenseItems = budgets
     .filter((d) => d.type === 'expense' && (d.budgeted > 0 || d.actual > 0))
     .map((d) => ({
       category: d.categoryName,
+      spent: Math.min(d.actual, d.budgeted),
+      remaining: Math.max(0, d.budgeted - d.actual),
+      overage: Math.max(0, d.actual - d.budgeted),
       budgeted: d.budgeted,
       actual: d.actual,
+      percentUsed: d.percentUsed,
       categoryId: d.categoryId,
+      type: 'expense',
     }));
 
   const allChartData = [
-    ...incomeItems.map((d) => ({ ...d, section: 'Income' })),
-    ...expenseItems.map((d) => ({ ...d, section: 'Expenses' })),
+    ...incomeItems,
+    ...expenseItems,
   ];
 
   if (loading) {
@@ -104,19 +114,23 @@ export function BudgetVsActualChart() {
         <div className="financial-chart h-full">
           <ResponsiveBar
             data={allChartData}
-            keys={['budgeted', 'actual']}
+            keys={['spent', 'remaining', 'overage']}
             indexBy="category"
-            groupMode="grouped"
-            margin={{ top: 10, right: 60, left: 80, bottom: 60 }}
-            padding={0.2}
-            innerPadding={2}
-            colors={({ id, data: row }) => {
-              const isIncome = (row as unknown as Record<string, string>).section === 'Income';
-              if (id === 'budgeted') return isIncome ? 'var(--color-chart-2)' : 'var(--color-muted-foreground)';
-              return isIncome ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+            groupMode="stacked"
+            layout="horizontal"
+            margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
+            padding={0.3}
+            borderRadius={4}
+            colors={({ id }) => {
+              if (id === 'spent') return 'var(--color-primary)';
+              if (id === 'remaining') return 'var(--color-muted)';
+              return 'var(--color-destructive)';
             }}
-            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
             axisLeft={{
+              tickSize: 0, tickPadding: 8,
+              tickValues: 'start',
+            }}
+            axisBottom={{
               tickSize: 0, tickPadding: 8,
               format: (v: number) => {
                 if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
@@ -124,39 +138,42 @@ export function BudgetVsActualChart() {
                 return `$${v}`;
               },
             }}
-            axisBottom={{ tickSize: 0, tickPadding: 8 }}
-            enableGridY={true}
-            enableGridX={false}
+            enableGridY={false}
+            enableGridX={true}
             theme={nivoTheme}
+            animate={allChartData.length < 50}
             onClick={({ data: barData }) => router.push(`/transactions?categoryId=${(barData as unknown as Record<string, string>).categoryId}`)}
-            tooltip={({ id, value, indexValue }) => (
-              <ChartTooltip>
-                <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                <TooltipRow
-                  label={id === 'budgeted' ? 'Budgeted' : 'Actual'}
-                  value={formatCurrency(value as number)}
-                />
-              </ChartTooltip>
-            )}
+            tooltip={({ id, value, indexValue }) => {
+              const item = allChartData.find((d) => d.category === indexValue);
+              return (
+                <ChartTooltip>
+                  <TooltipHeader>{String(indexValue)}</TooltipHeader>
+                  <TooltipRow label="Budgeted" value={formatCurrency(item?.budgeted ?? 0)} />
+                  <TooltipRow label="Actual" value={formatCurrency(item?.actual ?? 0)} />
+                  <TooltipRow label="Used" value={`${(item?.percentUsed ?? 0).toFixed(0)}%`} />
+                  {item && item.overage > 0 && (
+                    <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
+                      Over budget by {formatCurrency(item.overage)}
+                    </div>
+                  )}
+                </ChartTooltip>
+              );
+            }}
           />
         </div>
       </div>
       <div className="px-5 py-2.5 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-chart-2)' }} />
-          Income Budgeted
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-primary)' }} />
+          Spent
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-chart-1)' }} />
-          Income Actual
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-muted-foreground)' }} />
-          Expense Budgeted
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-muted)' }} />
+          Remaining
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-destructive)' }} />
-          Expense Actual
+          Over Budget
         </div>
       </div>
     </div>

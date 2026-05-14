@@ -12,6 +12,7 @@ interface ChartSeries {
 
 interface ForecastChartProps {
   data: ChartSeries[];
+  showProjections?: boolean;
 }
 
 const LINE_COLORS = [
@@ -22,8 +23,12 @@ const LINE_COLORS = [
   'var(--color-chart-5)',
 ];
 
-export function ForecastChart({ data }: ForecastChartProps) {
-  if (data.length === 0) return null;
+export function ForecastChart({ data, showProjections = true }: ForecastChartProps) {
+  const visibleData = showProjections
+    ? data
+    : data.filter((s) => !String(s.id).includes('(Projected)'));
+
+  if (visibleData.length === 0) return null;
 
   const renderCustomLines = (props: Record<string, unknown>) => {
     const lines = props.lines as Array<{
@@ -55,10 +60,10 @@ export function ForecastChart({ data }: ForecastChartProps) {
     <div className="h-[320px]">
       <div className="financial-chart h-full">
         <ResponsiveLine
-          data={data}
+          data={visibleData}
           margin={{ top: 10, right: 20, left: 60, bottom: 30 }}
           xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+          yScale={{ type: 'linear', min: 0, max: Math.max(...data.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
           curve="monotoneX"
           colors={({ id }) => {
             const idx = data.findIndex((s) => s.id === id);
@@ -67,6 +72,7 @@ export function ForecastChart({ data }: ForecastChartProps) {
           lineWidth={2}
           enablePoints={false}
           enableGridX={false}
+          enableGridY={true}
           axisLeft={{
             tickSize: 0, tickPadding: 8,
             format: (v: number) => {
@@ -77,6 +83,7 @@ export function ForecastChart({ data }: ForecastChartProps) {
           }}
           axisBottom={{
             tickSize: 0, tickPadding: 8,
+            tickValues: visibleData[0]?.data.length > 30 ? Math.max(4, Math.floor(visibleData[0].data.length / 6)) : undefined,
             format: (v: string) => {
               const d = new Date(v + '-01');
               return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
@@ -84,6 +91,7 @@ export function ForecastChart({ data }: ForecastChartProps) {
           }}
           theme={nivoTheme}
           useMesh={true}
+          animate={visibleData[0]?.data.length < 100}
           layers={[
             'grid',
             'axes',

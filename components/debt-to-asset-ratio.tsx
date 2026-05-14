@@ -370,7 +370,7 @@ export function DebtToAssetRatio() {
                   style={{ backgroundColor: cat.color }}
                 />
                 <span className="text-xs text-foreground/80 flex-1">{cat.label}</span>
-                <span className="text-xs text-foreground font-medium tabular-nums">
+                <span className="text-xs text-foreground font-medium tabular-nums blur-number">
                   {unit === '$' ? formatCompact(cat.amount) : `${share.toFixed(1)}%`}
                 </span>
               </div>

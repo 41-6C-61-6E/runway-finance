@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { Search } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -107,6 +108,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   const selectedCat = categoryId ? categories.find((c) => c.id === categoryId) : null;
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
@@ -165,50 +167,87 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
               {showCategoryDropdown && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowCategoryDropdown(false)} />
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    <button
-                      onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
-                    >
-                      None (uncategorized)
-                    </button>
-                    {parents.map((parent) => (
-                      <div key={parent.id}>
-                        <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
-                          {parent.name}
-                        </div>
-                        {getChildren(parent.id).map((child) => (
-                          <button
-                            key={child.id}
-                            onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); }}
-                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
-                              categoryId === child.id
-                                ? 'text-primary bg-primary/10'
-                                : 'text-foreground/80 hover:bg-muted'
-                            }`}
-                          >
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                            {child.name}
-                          </button>
-                        ))}
-                        {getChildren(parent.id).length === 0 && (
-                          <button
-                            key={parent.id}
-                            onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); }}
-                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
-                              categoryId === parent.id
-                                ? 'text-primary bg-primary/10'
-                                : 'text-foreground/80 hover:bg-muted'
-                            }`}
-                          >
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                            {parent.name}
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="fixed inset-0 z-40" onClick={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col">
+                    <div className="relative p-2 border-b border-border">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <input
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        placeholder="Search categories..."
+                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="flex-1 overflow-y-auto max-h-56">
+                      {(() => {
+                        const filter = categorySearch.toLowerCase();
+                        const filteredParents = filter
+                          ? parents.filter((p) =>
+                              p.name.toLowerCase().includes(filter) ||
+                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                            )
+                          : parents;
+                        const noResults = filteredParents.length === 0;
+                        return (
+                          <>
+                            <button
+                              onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
+                            >
+                              None (uncategorized)
+                            </button>
+                            {filteredParents.map((parent) => {
+                              const childList = filter
+                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                : getChildren(parent.id);
+                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                              return (
+                                <div key={parent.id}>
+                                  <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
+                                    {parent.name}
+                                  </div>
+                                  {childList.map((child) => (
+                                    <button
+                                      key={child.id}
+                                      onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                      className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
+                                        categoryId === child.id
+                                          ? 'text-primary bg-primary/10'
+                                          : 'text-foreground/80 hover:bg-muted'
+                                      }`}
+                                    >
+                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                      {child.name}
+                                    </button>
+                                  ))}
+                                  {childList.length === 0 && !filter && (
+                                    <button
+                                      onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                      className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
+                                        categoryId === parent.id
+                                          ? 'text-primary bg-primary/10'
+                                          : 'text-foreground/80 hover:bg-muted'
+                                      }`}
+                                    >
+                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                      {parent.name}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {noResults && (
+                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                                No categories found
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </>
               )}

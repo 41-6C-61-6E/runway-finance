@@ -7,7 +7,6 @@ import { formatCurrency } from '@/lib/utils/format';
 import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { IncludeExcludedFilter } from '@/components/charts/chart-filters';
 
 interface BudgetData {
   categoryId: string;
@@ -25,7 +24,6 @@ export function BudgetVsActual() {
   const [data, setData] = useState<BudgetData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [includeExcluded, setIncludeExcluded] = useState(false);
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -50,9 +48,12 @@ export function BudgetVsActual() {
     .filter((d) => !excludedCategoryIds.has(d.categoryId) && (d.budgeted > 0 || d.actual > 0))
     .map((d) => ({
       category: d.categoryName,
+      spent: Math.min(d.actual, d.budgeted),
+      remaining: Math.max(0, d.budgeted - d.actual),
+      overage: Math.max(0, d.actual - d.budgeted),
       budgeted: d.budgeted,
       actual: d.actual,
-      overBudget: d.remaining < 0 ? d.actual : 0,
+      percentUsed: d.percentUsed,
       categoryId: d.categoryId,
       type: d.type ?? 'expense',
     }));
@@ -106,7 +107,6 @@ export function BudgetVsActual() {
     <div className="bg-card border border-border rounded-xl shadow-sm">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
-        <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
       </div>
       {/* Category filter chips */}
       {chartData.length > 0 && (
@@ -130,20 +130,23 @@ export function BudgetVsActual() {
         <div className="financial-chart h-full">
           <ResponsiveBar
             data={chartData}
-            keys={['budgeted', 'actual']}
+            keys={['spent', 'remaining', 'overage']}
             indexBy="category"
-            groupMode="grouped"
-            margin={{ top: 10, right: 80, left: 80, bottom: 40 }}
-            padding={0.2}
-            innerPadding={2}
-            colors={({ id, data: row }) => {
-              const itemType = (row as unknown as Record<string, string>).type;
-              const isIncome = itemType === 'income';
-              if (id === 'budgeted') return isIncome ? 'var(--color-chart-2)' : 'var(--color-muted-foreground)';
-              return isIncome ? 'var(--color-chart-1)' : 'var(--color-chart-3)';
+            groupMode="stacked"
+            layout="horizontal"
+            margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
+            padding={0.3}
+            borderRadius={4}
+            colors={({ id }) => {
+              if (id === 'spent') return 'var(--color-primary)';
+              if (id === 'remaining') return 'var(--color-muted)';
+              return 'var(--color-destructive)';
             }}
-            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
             axisLeft={{
+              tickSize: 0, tickPadding: 8,
+              tickValues: 'start',
+            }}
+            axisBottom={{
               tickSize: 0, tickPadding: 8,
               format: (v: number) => {
                 if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
@@ -151,24 +154,21 @@ export function BudgetVsActual() {
                 return `$${v}`;
               },
             }}
-            axisBottom={{ tickSize: 0, tickPadding: 8 }}
-            enableGridY={true}
-            enableGridX={false}
+            enableGridY={false}
+            enableGridX={true}
             theme={nivoTheme}
             onClick={({ data: barData }) => handleClick(barData.categoryId)}
             tooltip={({ id, value, indexValue }) => {
               const item = chartData.find((d) => d.category === indexValue);
-              const overBudget = item && id === 'actual' && value > item.budgeted;
               return (
                 <ChartTooltip>
                   <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                  <TooltipRow
-                    label={id === 'budgeted' ? 'Budgeted' : 'Actual'}
-                    value={formatCurrency(value)}
-                  />
-                  {overBudget && (
-                    <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2 }}>
-                      Over budget!
+                  <TooltipRow label="Budgeted" value={formatCurrency(item?.budgeted ?? 0)} />
+                  <TooltipRow label="Actual" value={formatCurrency(item?.actual ?? 0)} />
+                  <TooltipRow label="Used" value={`${(item?.percentUsed ?? 0).toFixed(0)}%`} />
+                  {item && item.overage > 0 && (
+                    <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
+                      ⚠ Over budget by {formatCurrency(item.overage)}
                     </div>
                   )}
                 </ChartTooltip>

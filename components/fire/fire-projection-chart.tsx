@@ -109,7 +109,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             keys={['value']}
             indexBy="age"
             margin={{ top: 10, right: 10, left: 65, bottom: 40 }}
-            padding={0.3}
+            padding={0.1}
             borderRadius={2}
             colors={['var(--color-chart-1)']}
             axisLeft={{
@@ -122,6 +122,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             }}
             axisBottom={{
               tickSize: 0, tickPadding: 8,
+              tickValues: series[1].data.length > 40 ? Math.max(4, Math.floor(series[1].data.length / 8)) : undefined,
               legend: 'Age',
               legendPosition: 'middle',
               legendOffset: 30,
@@ -129,6 +130,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             enableGridY={true}
             enableGridX={false}
             theme={nivoTheme}
+            animate={series[1].data.length < 100}
             tooltip={({ indexValue, value }) => (
               <ChartTooltip>
                 <TooltipHeader>Age {indexValue}</TooltipHeader>
@@ -149,6 +151,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             enableGridX={true}
             axisBottom={{
               tickSize: 0, tickPadding: 8,
+              tickValues: series[0]?.data.length > 30 ? Math.max(4, Math.floor(series[0].data.length / 6)) : undefined,
               legend: 'Age',
               legendPosition: 'middle',
               legendOffset: 30,
@@ -164,6 +167,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             theme={nivoTheme}
             useMesh={true}
             enableSlices="x"
+            animate={series[0]?.data.length < 100}
             sliceTooltip={({ slice }) => (
               <ChartTooltip>
                 <TooltipHeader>Age {String(slice.points[0]?.data.xFormatted)}</TooltipHeader>

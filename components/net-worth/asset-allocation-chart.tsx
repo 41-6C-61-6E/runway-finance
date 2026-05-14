@@ -9,7 +9,6 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-import { IncludeExcludedFilter } from '@/components/charts/chart-filters';
 
 const ASSET_TYPES = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
 const LIABILITY_TYPES = ['credit', 'loan', 'mortgage'];
@@ -42,7 +41,6 @@ export function AssetAllocationChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const [includeExcluded, setIncludeExcluded] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -130,7 +128,6 @@ export function AssetAllocationChart() {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">Asset Allocation</h3>
         <div className="flex items-center gap-2">
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
           <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
         </div>
       </div>
@@ -182,21 +179,7 @@ export function AssetAllocationChart() {
             padding={0.2}
             colors={['var(--color-chart-1)', 'var(--color-destructive)']}
             borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-            enableLabel={true}
-            label={(d) => {
-              if (d.value === 0) return '';
-              const grandTotal = d.id === 'assets' ? totalAssetsAll : totalLiabilitiesAll;
-              const pct = grandTotal > 0 ? ((d.value / grandTotal) * 100).toFixed(1) : '0';
-              const compact = d.value >= 1000000
-                ? `$${(d.value / 1000000).toFixed(1)}M`
-                : d.value >= 1000
-                  ? `$${(d.value / 1000).toFixed(0)}K`
-                  : `$${d.value.toFixed(0)}`;
-              return `${compact} (${pct}%)`;
-            }}
-            labelTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-            labelSkipWidth={40}
-            labelSkipHeight={20}
+            enableLabel={false}
             axisLeft={{ tickSize: 0, tickPadding: 8 }}
             axisBottom={{
               tickSize: 0, tickPadding: 8,

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { aggregateChartData } from '@/lib/utils/chart-aggregation';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -81,29 +82,54 @@ export async function GET(request: Request) {
       )
       .orderBy(accountSnapshots.snapshotDate);
 
-    // Group balances by date, tracking synthetic flag
-    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean }>();
+    // Group snapshots by date for forward-fill
+    const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean }>>();
     for (const snap of accountSnapshotsInRange) {
       const dateStr = String(snap.snapshotDate);
-      const account = userAccounts.find((a) => a.id === snap.accountId);
-      if (!account) continue;
+      if (!snapshotsByDate.has(dateStr)) {
+        snapshotsByDate.set(dateStr, []);
+      }
+      snapshotsByDate.get(dateStr)!.push({
+        accountId: snap.accountId,
+        balance: parseFloat(snap.balance.toString()),
+        isSynthetic: snap.isSynthetic,
+      });
+    }
 
-      const balance = parseFloat(snap.balance.toString());
-      const entry = balancesByDate.get(dateStr) ?? { assets: 0, liabilities: 0, isSynthetic: true };
+    // Forward-fill: carry forward latest known balance per account,
+    // so sparse accounts (e.g. mortgage only snapshotted on the 7th)
+    // still contribute to totals on intervening dates.
+    const latestByAccount = new Map<string, { balance: number; isSynthetic: boolean }>();
+    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean }>();
 
-      const accountType = account.type.toLowerCase();
-      if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
-        entry.assets += balance;
-      } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
-        entry.liabilities += Math.abs(balance);
+    const sortedDates = Array.from(snapshotsByDate.keys()).sort((a, b) => a.localeCompare(b));
+
+    for (const dateStr of sortedDates) {
+      for (const snap of snapshotsByDate.get(dateStr)!) {
+        latestByAccount.set(snap.accountId, { balance: snap.balance, isSynthetic: snap.isSynthetic });
       }
 
-      // A data point is synthetic if ALL snapshots on that date are synthetic
-      if (!snap.isSynthetic) {
-        entry.isSynthetic = false;
+      let assets = 0;
+      let liabilities = 0;
+      let allSynthetic = true;
+
+      for (const account of userAccounts) {
+        const latest = latestByAccount.get(account.id);
+        if (!latest) continue;
+
+        const accountType = account.type.toLowerCase();
+        if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
+          assets += latest.balance;
+        } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
+          liabilities += Math.abs(latest.balance);
+        }
+
+        if (!latest.isSynthetic) {
+          allSynthetic = false;
+        }
       }
 
-      balancesByDate.set(dateStr, entry);
+      balancesByDate.set(dateStr, { assets, liabilities, isSynthetic: allSynthetic });
     }
 
     // Build formatted data
@@ -172,8 +198,10 @@ export async function GET(request: Request) {
 
     const includedCount = userAccounts.filter((a) => !a.isExcludedFromNetWorth).length;
 
+    const aggregated = aggregateChartData(formattedData, ['netWorth', 'totalAssets', 'totalLiabilities']);
+
     return NextResponse.json({
-      data: formattedData,
+      data: aggregated,
       summary: {
         current: currentNetWorth,
         previous: previousNetWorth,

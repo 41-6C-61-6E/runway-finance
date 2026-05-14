@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { IncludeExcludedFilter } from '@/components/charts/chart-filters';
 
 interface CategoryData {
   categoryId: string;
@@ -77,7 +76,6 @@ export function CashFlowSankey() {
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [includeExcluded, setIncludeExcluded] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -189,9 +187,7 @@ export function CashFlowSankey() {
   const nextMonth = () => {
     const d = new Date(month + '-01');
     d.setMonth(d.getMonth() + 1);
-    if (d <= new Date()) {
-      setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -231,9 +227,6 @@ export function CashFlowSankey() {
     <div className="bg-card border border-border rounded-xl shadow-sm">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
-        <div className="flex items-center gap-2">
-          <IncludeExcludedFilter value={includeExcluded} onChange={setIncludeExcluded} />
-        </div>
       </div>
       {/* Month navigation */}
       <div className="px-5 pb-2 flex items-center gap-2">

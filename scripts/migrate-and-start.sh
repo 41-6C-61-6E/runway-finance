@@ -6,6 +6,7 @@ echo "[init] Waiting for database to be ready..."
 max_attempts=30
 attempt=1
 while [ $attempt -le $max_attempts ]; do
+  # nc -z checks TCP connectivity; Alpine sh does not support /dev/tcp
   if nc -z postgres 5432 2>/dev/null; then
     echo "[init] Database is ready!"
     break
@@ -22,11 +23,12 @@ fi
 cd /app
 
 echo "[init] Running database migrations..."
-if node /app/scripts/migrate.mjs 2>&1; then
+node /app/scripts/migrate.mjs 2>&1
+MIGRATE_EXIT=$?
+if [ $MIGRATE_EXIT -eq 0 ]; then
   echo "[init] Migrations completed successfully."
 else
-  EXIT_CODE=$?
-  echo "[init] WARNING: Migrations failed with exit code $EXIT_CODE, continuing with server startup..."
+  echo "[init] WARNING: Migrations failed with exit code $MIGRATE_EXIT, continuing with server startup..."
 fi
 
 echo "[init] Starting Next.js server..."

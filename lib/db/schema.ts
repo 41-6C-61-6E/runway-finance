@@ -78,6 +78,11 @@ export const userSettings = pgTable('user_settings', {
   chartColorScheme: text('chart_color_scheme').notNull().default('forest'),
   forecastMode: text('forecast_mode').notNull().default('hybrid'), // 'historical' | 'budget' | 'hybrid'
   forecastLookbackMonths: integer('forecast_lookback_months').notNull().default(3),
+  hiddenPages: jsonb('hidden_pages').default({}),
+  cardStyle: text('card_style').notNull().default('default'), // 'rounded' | 'default' | 'square'
+  showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
+  defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
+  defaultChartType: text('default_chart_type').notNull().default('line'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

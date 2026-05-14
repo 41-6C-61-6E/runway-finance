@@ -66,7 +66,7 @@ export function BudgetTable() {
     if (!deleteBudget) return;
     setDeleteLoading(true);
     try {
-      await fetch(`/api/budgets?id=${deleteBudget.id}`, { method: 'DELETE', credentials: 'include' });
+      await fetch(`/api/budgets/${deleteBudget.id}`, { method: 'DELETE', credentials: 'include' });
       setDeleteBudget(null);
       fetchBudgets();
     } catch {} finally {

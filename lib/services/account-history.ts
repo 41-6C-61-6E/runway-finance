@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
 import { accountSnapshots, transactions } from '@/lib/db/schema';
-import { eq, and, lt, lte, gte, asc, desc, isNull } from 'drizzle-orm';
+import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
@@ -165,74 +165,73 @@ export async function generateHistoricalAccountSnapshots(
     txByDate.set(txDate, existing + parseFloat(tx.amount));
   }
 
+  // Batch-fetch all existing real snapshots for the full date range
+  const existingReals = await getDb()
+    .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance })
+    .from(accountSnapshots)
+    .where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        gte(accountSnapshots.snapshotDate, effectiveFromDate),
+        lte(accountSnapshots.snapshotDate, to),
+        eq(accountSnapshots.isSynthetic, false)
+      )
+    );
+
+  const realByDate = new Map<string, string>();
+  for (const r of existingReals) {
+    realByDate.set(String(r.snapshotDate), String(r.balance));
+  }
+
   let current = new Date(effectiveFromDate);
   const end = new Date(to);
-  let count = 0;
+  const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean }> = [];
   let skippedReal = 0;
 
   while (current <= end) {
     const dateStr = current.toISOString().split('T')[0];
+    const realBal = realByDate.get(dateStr);
 
-    const [realSnapshot] = await getDb()
-      .select({ id: accountSnapshots.id })
-      .from(accountSnapshots)
-      .where(
-        and(
-          eq(accountSnapshots.accountId, accountId),
-          eq(accountSnapshots.userId, userId),
-          eq(accountSnapshots.snapshotDate, dateStr),
-          eq(accountSnapshots.isSynthetic, false)
-        )
-      )
-      .limit(1);
-
-    if (realSnapshot) {
-      const [realBal] = await getDb()
-        .select({ balance: accountSnapshots.balance })
-        .from(accountSnapshots)
-        .where(
-          and(
-            eq(accountSnapshots.accountId, accountId),
-            eq(accountSnapshots.userId, userId),
-            eq(accountSnapshots.snapshotDate, dateStr),
-            eq(accountSnapshots.isSynthetic, false)
-          )
-        )
-        .limit(1);
-      if (realBal) {
-        runningBalance = parseFloat(realBal.balance);
-      }
+    if (realBal !== undefined) {
+      runningBalance = parseFloat(realBal);
       skippedReal++;
     } else {
       const dailyChange = txByDate.get(dateStr) ?? 0;
       runningBalance += dailyChange;
-
-      await getDb()
-        .insert(accountSnapshots)
-        .values({
-          userId,
-          accountId,
-          snapshotDate: dateStr,
-          balance: String(runningBalance),
-          isSynthetic: true,
-        })
-        .onConflictDoUpdate({
-          target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-          set: { balance: String(runningBalance), isSynthetic: true },
-        });
-      count++;
+      toInsert.push({
+        userId,
+        accountId,
+        snapshotDate: dateStr,
+        balance: String(runningBalance),
+        isSynthetic: true,
+      });
     }
 
     current.setDate(current.getDate() + 1);
   }
 
+  // Batch insert all synthetic snapshots
+  let syntheticCount = 0;
+  if (toInsert.length > 0) {
+    const results = await getDb()
+      .insert(accountSnapshots)
+      .values(toInsert)
+      .onConflictDoUpdate({
+        target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
+        set: { balance: sql`EXCLUDED.balance`, isSynthetic: true },
+      })
+      .returning({ id: accountSnapshots.id });
+    syntheticCount = results.length;
+  }
+
   logger.debug(`${LOG_TAG} Backfill complete`, {
     accountId,
     range: { from: effectiveFromDate, to },
-    syntheticCount: count,
+    syntheticCount,
     skippedRealCount: skippedReal,
     durationMs: Date.now() - startedAt,
   });
 
-  return { syntheticCount: count, skippedRealCount: skippedReal };
+  return { syntheticCount, skippedRealCount: skippedReal };
 }

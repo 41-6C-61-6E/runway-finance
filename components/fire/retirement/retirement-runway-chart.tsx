@@ -91,7 +91,7 @@ export function RetirementRunwayChart({
             keys={['balance']}
             indexBy="age"
             margin={{ top: 10, right: 10, left: 65, bottom: 40 }}
-            padding={0.3}
+            padding={0.1}
             borderRadius={2}
             colors={[projection.success ? 'var(--color-chart-1)' : 'var(--color-destructive)']}
             axisLeft={{
@@ -102,10 +102,15 @@ export function RetirementRunwayChart({
                 return `$${v}`;
               },
             }}
-            axisBottom={{ tickSize: 0, tickPadding: 8, legend: 'Age', legendPosition: 'middle', legendOffset: 30 }}
+            axisBottom={{
+              tickSize: 0, tickPadding: 8,
+              tickValues: projection.years.length > 40 ? Math.max(4, Math.floor(projection.years.length / 8)) : undefined,
+              legend: 'Age', legendPosition: 'middle', legendOffset: 30,
+            }}
             enableGridY={true}
             enableGridX={false}
             theme={nivoTheme}
+            animate={projection.years.length < 100}
             tooltip={({ indexValue, value }) => (
               <ChartTooltip>
                 <TooltipHeader>Age {indexValue}</TooltipHeader>
@@ -145,6 +150,7 @@ export function RetirementRunwayChart({
             theme={nivoTheme}
             useMesh={true}
             enableSlices="x"
+            animate={projection.years.length < 100}
             sliceTooltip={({ slice }) => (
               <ChartTooltip>
                 <TooltipHeader>Age {String(slice.points[0]?.data.xFormatted)}</TooltipHeader>

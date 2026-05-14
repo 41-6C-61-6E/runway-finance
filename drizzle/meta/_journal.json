@@ -92,6 +92,27 @@
       "when": 1747000000007,
       "tag": "0012_add_category_income_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1747000000008,
+      "tag": "0013_add_hidden_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1747000000009,
+      "tag": "0014_add_card_style",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1747000000010,
+      "tag": "0015_add_analytics_settings",
+      "breakpoints": true
     }
   ]
 }

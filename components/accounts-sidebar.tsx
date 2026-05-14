@@ -77,15 +77,16 @@ function AccountRow({
   onOpenDrawer: (account: Account) => void;
 }) {
   const router = useRouter();
+  const num = parseFloat(account.balance);
   const fmt = formatCurrency(account.balance, account.currency);
 
   return (
     <div
-      className="flex items-center justify-between py-1 pl-7 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
+      className="flex items-center justify-between py-1.5 pl-7 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
       onClick={() => router.push(`/transactions?accountId=${account.id}`)}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-[15px] text-muted-foreground truncate">{account.name}</span>
+        <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
@@ -95,7 +96,9 @@ function AccountRow({
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <span className={`font-mono text-[13px] font-semibold tabular-nums blur-number text-muted-foreground`}>
+        <span className={`font-mono text-[13px] font-semibold tabular-nums blur-number ${
+          num < 0 ? 'text-destructive' : 'text-foreground'
+        }`}>
           {fmt.sign}{fmt.text}
         </span>
       </div>
@@ -294,9 +297,9 @@ export default function AccountsSidebar() {
         style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
       >
         {/* Net Worth Header */}
-        <div className="px-3 py-2.5 border-b border-border">
-          <div className="flex items-center justify-between mb-0.5">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Net Worth</div>
+        <div className="px-3 py-3 border-b border-border bg-gradient-to-b from-muted/40 to-transparent">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Net Worth</div>
             <button
               onClick={toggleAccountsCollapsed}
               className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
@@ -305,14 +308,16 @@ export default function AccountsSidebar() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
-          <div className={`font-mono text-base font-bold truncate blur-number text-foreground`}>
+          <div className={`font-mono text-lg font-bold truncate blur-number ${
+            totalNetWorth < 0 ? 'text-destructive' : 'text-foreground'
+          }`}>
             {fmt.text}
           </div>
         </div>
 
         {/* Hierarchical Account List */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-1.5 space-y-1">
+          <div className="p-1.5 space-y-2">
             {sortedGroups.map((group) => {
               const subMap = hierarchy.get(group)!;
               const groupTotal = getGroupTotal(group);
@@ -320,9 +325,9 @@ export default function AccountsSidebar() {
               const groupExpanded = isGroupExpanded(group);
 
               return (
-                <div key={group}>
+                <div key={group} className="border-b border-border/50 pb-2 last:border-b-0 last:pb-0">
                   {/* Group Header */}
-                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-1.5 px-2 py-2 rounded-md bg-muted/40 transition-colors">
                     <button
                       onClick={() => toggleGroup(group)}
                       className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
@@ -337,11 +342,13 @@ export default function AccountsSidebar() {
                       onClick={() => router.push(`/transactions?accountTypes=${GROUP_TO_TYPES[group]?.join(',')}`)}
                       className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
                     >
-                      <span className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest truncate">
                         {group}
                       </span>
                     </button>
-                    <span className={`font-mono text-[13px] font-semibold blur-number text-muted-foreground`}>
+                    <span className={`font-mono text-[13px] font-bold blur-number ${
+                      groupTotal < 0 ? 'text-destructive' : 'text-foreground'
+                    }`}>
                       {groupFmt.sign}{groupFmt.text}
                     </span>
                   </div>
@@ -371,7 +378,9 @@ export default function AccountsSidebar() {
                           >
                             <span className="text-[13px] font-semibold text-muted-foreground/70 truncate">{subGroup}</span>
                           </button>
-                          <span className={`font-mono text-[13px] blur-number text-muted-foreground/70`}>
+                          <span className={`font-mono text-[13px] blur-number ${
+                            subGroupTotal < 0 ? 'text-destructive/80' : 'text-foreground/70'
+                          }`}>
                             {subGroupFmt.sign}{subGroupFmt.text}
                           </span>
                         </div>
