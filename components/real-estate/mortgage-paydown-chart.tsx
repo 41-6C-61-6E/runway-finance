@@ -93,21 +93,13 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
       data: Array<{ x: string; y: number }>;
     }> = [];
 
-    const origination = new Date(mortgageStartDate);
-    const now = new Date();
-
-    // Standard amortization line (all history + projection)
+    // Standard amortization line - always show full loan term
     series.push({
       id: 'Standard',
-      data: standard
-        .filter((r) => {
-          const d = new Date(r.date);
-          return showProjection ? true : d <= now;
-        })
-        .map((r) => ({
-          x: r.date.slice(0, 7),
-          y: r.remainingBalance,
-        })),
+      data: standard.map((r) => ({
+        x: r.date.slice(0, 7),
+        y: r.remainingBalance,
+      })),
     });
 
     // Accelerated line (only if showing projection with extra payments)
@@ -284,8 +276,18 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
               },
             }}
             axisBottom={{
-              tickSize: 0, tickPadding: 8, tickValues: 4,
-              format: (v: string) => v,
+              tickSize: 0, tickPadding: 8,
+              tickValues: (() => {
+                const allDates = chartData[0]?.data.map((d) => d.x) ?? [];
+                const maxTicks = 6;
+                if (allDates.length <= maxTicks) return allDates;
+                const step = Math.ceil(allDates.length / maxTicks);
+                return allDates.filter((_, i) => i % step === 0);
+              })(),
+              format: (v: string) => {
+                const d = new Date(v + '-01');
+                return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+              },
             }}
             enableGridY={true}
             enableGridX={false}
@@ -296,6 +298,7 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
             theme={nivoTheme}
             animate={chartData[0]?.data.length < 100}
             useMesh={true}
+            enableSlices="x"
             layers={[
               'grid',
               'axes',
@@ -326,6 +329,19 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
               <ChartTooltip>
                 <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
                 <TooltipRow label={String(point.seriesId)} value={formatCurrency(Number(point.data.y))} />
+              </ChartTooltip>
+            )}
+            sliceTooltip={({ slice }) => (
+              <ChartTooltip>
+                <TooltipHeader>{String(slice.points[0]?.data.xFormatted)}</TooltipHeader>
+                {slice.points.map((point) => (
+                  <TooltipRow
+                    key={point.id}
+                    label={String(point.seriesId)}
+                    value={formatCurrency(Number(point.data.y))}
+                    color={point.color}
+                  />
+                ))}
               </ChartTooltip>
             )}
           />

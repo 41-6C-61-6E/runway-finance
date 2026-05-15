@@ -137,6 +137,7 @@ export function BudgetVsActual() {
             margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
             padding={0.3}
             borderRadius={4}
+            enableLabel={false}
             colors={({ id }) => {
               if (id === 'spent') return 'var(--color-primary)';
               if (id === 'remaining') return 'var(--color-muted)';

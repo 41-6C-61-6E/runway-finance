@@ -169,6 +169,8 @@ export function NetIncomeAnalysis() {
               margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
               padding={0.3}
               borderRadius={2}
+              enableLabel={false}
+              valueScale={{ type: 'linear', min: 'auto' }}
               colors={({ value }) =>
                 value >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'
               }

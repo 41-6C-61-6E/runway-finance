@@ -176,6 +176,7 @@ export function IncomeExpenseChart() {
               innerPadding={2}
               colors={['var(--color-chart-1)', 'var(--color-destructive)']}
               borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+              enableLabel={false}
               axisLeft={{
                 tickSize: 0, tickPadding: 8,
                 format: (v: number) => {

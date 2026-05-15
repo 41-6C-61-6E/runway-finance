@@ -3,7 +3,6 @@
 import { Suspense } from 'react';
 import { NetWorthChart } from '@/components/net-worth-chart';
 import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
-import { GoalsProgress } from '@/components/net-worth/goals-progress';
 import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
@@ -42,13 +41,7 @@ function NetWorthContent() {
           )}
           
           
-          {isVisible('goalsProgress') && (
-            <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading goals...</div>}>
-                <GoalsProgress />
-              </Suspense>
-            </div>
-          )}
+
         </div>
       </div>
     </div>

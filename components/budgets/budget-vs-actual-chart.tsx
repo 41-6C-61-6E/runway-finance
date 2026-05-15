@@ -27,6 +27,7 @@ export function BudgetVsActualChart() {
   const [budgets, setBudgets] = useState<BudgetData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [excludeIncome, setExcludeIncome] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +53,7 @@ export function BudgetVsActualChart() {
       actual: d.actual,
       percentUsed: d.percentUsed,
       categoryId: d.categoryId,
+      categoryColor: d.categoryColor,
       type: 'income',
     }));
 
@@ -66,11 +68,12 @@ export function BudgetVsActualChart() {
       actual: d.actual,
       percentUsed: d.percentUsed,
       categoryId: d.categoryId,
+      categoryColor: d.categoryColor,
       type: 'expense',
     }));
 
   const allChartData = [
-    ...incomeItems,
+    ...(excludeIncome ? [] : incomeItems),
     ...expenseItems,
   ];
 
@@ -107,8 +110,17 @@ export function BudgetVsActualChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2">
+      <div className="p-5 pb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={excludeIncome}
+            onChange={(e) => setExcludeIncome(e.target.checked)}
+            className="rounded border-border text-primary focus:ring-primary"
+          />
+          <span className="text-xs text-muted-foreground">Exclude Income</span>
+        </label>
       </div>
       <div className="h-[350px] px-2 pb-2">
         <div className="financial-chart h-full">
@@ -121,9 +133,11 @@ export function BudgetVsActualChart() {
             margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
             padding={0.3}
             borderRadius={4}
-            colors={({ id }) => {
-              if (id === 'spent') return 'var(--color-primary)';
-              if (id === 'remaining') return 'var(--color-muted)';
+            enableLabel={false}
+            colors={({ id, data }) => {
+              const catColor = (data as unknown as Record<string, string>).categoryColor;
+              if (id === 'spent') return catColor || 'var(--color-primary)';
+              if (id === 'remaining') return catColor ? `${catColor}66` : 'var(--color-primary)';
               return 'var(--color-destructive)';
             }}
             axisLeft={{
@@ -168,7 +182,7 @@ export function BudgetVsActualChart() {
           Spent
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-muted)' }} />
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--color-primary)', opacity: 0.4 }} />
           Remaining
         </div>
         <div className="flex items-center gap-1.5">

@@ -77,6 +77,7 @@ export async function GET(request: Request) {
           id: property.id,
           name: property.name,
           value: propertyValue,
+          mortgageBalance: Math.abs(totalMortgageBalance),
           manualValue: (meta.manualValue as number) ?? null,
           metadata: meta,
           linkedMortgages: linkedMortgages.map((m) => ({

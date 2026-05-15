@@ -1,4 +1,4 @@
-export type ChartColorSchemeId = 'forest' | 'ocean' | 'sunset' | 'nord' | 'synthwave' | 'monochrome';
+export type ChartColorSchemeId = 'forest' | 'ocean' | 'sunset' | 'nord' | 'synthwave' | 'monochrome' | 'candy' | 'earth' | 'pastel';
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -78,6 +78,42 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.5 0.1 260)',
       'oklch(0.4 0.12 260)',
       'oklch(0.3 0.14 260)',
+    ],
+  },
+  candy: {
+    id: 'candy',
+    name: 'Candy',
+    description: 'Bright pinks, purples, oranges',
+    colors: [
+      'oklch(0.7 0.22 350)',
+      'oklch(0.65 0.2 300)',
+      'oklch(0.72 0.18 30)',
+      'oklch(0.68 0.15 280)',
+      'oklch(0.7 0.2 10)',
+    ],
+  },
+  earth: {
+    id: 'earth',
+    name: 'Earth',
+    description: 'Warm browns, greens, clays',
+    colors: [
+      'oklch(0.6 0.12 120)',
+      'oklch(0.65 0.14 60)',
+      'oklch(0.55 0.1 30)',
+      'oklch(0.6 0.08 200)',
+      'oklch(0.5 0.15 40)',
+    ],
+  },
+  pastel: {
+    id: 'pastel',
+    name: 'Pastel',
+    description: 'Soft, muted pastels',
+    colors: [
+      'oklch(0.78 0.08 180)',
+      'oklch(0.8 0.1 80)',
+      'oklch(0.82 0.08 320)',
+      'oklch(0.78 0.07 240)',
+      'oklch(0.8 0.09 40)',
     ],
   },
 };

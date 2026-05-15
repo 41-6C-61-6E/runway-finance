@@ -38,6 +38,9 @@ export async function GET() {
       showSyntheticData: created?.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
       defaultChartTimeRange: created?.defaultChartTimeRange ?? '1y',
       defaultChartType: created?.defaultChartType ?? 'line',
+      reduceTransparency: created?.reduceTransparency ?? false,
+      hideAccountSubheadings: created?.hideAccountSubheadings ?? false,
+      apiKeys: created?.apiKeys ?? {},
     });
   }
 
@@ -53,6 +56,9 @@ export async function GET() {
     showSyntheticData: settings[0].showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
     defaultChartTimeRange: settings[0].defaultChartTimeRange ?? '1y',
     defaultChartType: settings[0].defaultChartType ?? 'line',
+    reduceTransparency: settings[0].reduceTransparency ?? false,
+    hideAccountSubheadings: settings[0].hideAccountSubheadings ?? false,
+    apiKeys: settings[0].apiKeys ?? {},
   });
 }
 
@@ -74,6 +80,9 @@ export async function PATCH(request: Request) {
   const showSyntheticData = body.showSyntheticData;
   const defaultChartTimeRange = body.defaultChartTimeRange;
   const defaultChartType = body.defaultChartType;
+  const reduceTransparency = body.reduceTransparency;
+  const hideAccountSubheadings = body.hideAccountSubheadings;
+  const apiKeys = body.apiKeys;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -131,6 +140,18 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid defaultChartType value' }, { status: 400 });
   }
 
+  if (reduceTransparency !== undefined && typeof reduceTransparency !== 'boolean') {
+    return Response.json({ error: 'Invalid reduceTransparency value' }, { status: 400 });
+  }
+
+  if (hideAccountSubheadings !== undefined && typeof hideAccountSubheadings !== 'boolean') {
+    return Response.json({ error: 'Invalid hideAccountSubheadings value' }, { status: 400 });
+  }
+
+  if (apiKeys !== undefined && (typeof apiKeys !== 'object' || apiKeys === null || Array.isArray(apiKeys))) {
+    return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
+  }
+
   const db = getDb();
 
   let settings = await db
@@ -162,6 +183,9 @@ export async function PATCH(request: Request) {
       showSyntheticData: created?.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
       defaultChartTimeRange: created?.defaultChartTimeRange ?? '1y',
       defaultChartType: created?.defaultChartType ?? 'line',
+      reduceTransparency: created?.reduceTransparency ?? false,
+      hideAccountSubheadings: created?.hideAccountSubheadings ?? false,
+      apiKeys: created?.apiKeys ?? {},
     });
   }
 
@@ -177,6 +201,9 @@ export async function PATCH(request: Request) {
   if (showSyntheticData !== undefined) updates.showSyntheticData = showSyntheticData;
   if (defaultChartTimeRange !== undefined) updates.defaultChartTimeRange = defaultChartTimeRange;
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
+  if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
+  if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
+  if (apiKeys !== undefined) updates.apiKeys = apiKeys;
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -197,5 +224,8 @@ export async function PATCH(request: Request) {
     showSyntheticData: updated.showSyntheticData ?? { global: true, netWorth: true, realEstate: true, cashFlowProjections: true },
     defaultChartTimeRange: updated.defaultChartTimeRange ?? '1y',
     defaultChartType: updated.defaultChartType ?? 'line',
+    reduceTransparency: updated.reduceTransparency ?? false,
+    hideAccountSubheadings: updated.hideAccountSubheadings ?? false,
+    apiKeys: updated.apiKeys ?? {},
   });
 }

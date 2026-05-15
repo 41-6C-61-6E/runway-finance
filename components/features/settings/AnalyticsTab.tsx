@@ -65,7 +65,7 @@ export default function AnalyticsTab() {
         {/* Global Toggle */}
         <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg mb-3">
           <div>
-            <span className="text-sm font-medium text-foreground">Show estimated data in all charts</span>
+            <span className="text-sm font-medium text-foreground">Show estimated historical data in charts</span>
             <p className="text-xs text-muted-foreground mt-0.5">
               Master toggle for all estimated data. When off, individual module settings are ignored.
             </p>
@@ -87,7 +87,10 @@ export default function AnalyticsTab() {
                 className={`p-3 bg-muted/30 border border-border rounded-lg transition-opacity ${!settings.global ? 'opacity-50' : ''}`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded uppercase tracking-wider">BETA</span>
+                  </div>
                   <Switch
                     checked={moduleEnabled}
                     disabled={!settings.global}
@@ -95,6 +98,9 @@ export default function AnalyticsTab() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{mod.description}</p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                  ⚠ BETA: This feature is under development and data may not be accurate.
+                </p>
                 {!settings.global && (
                   <p className="text-[10px] text-muted-foreground italic mt-1">
                     Enable the global toggle above to customize this module.

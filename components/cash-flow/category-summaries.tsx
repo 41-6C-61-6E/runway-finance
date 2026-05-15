@@ -156,14 +156,29 @@ export function CategorySummaries() {
     );
   }
 
+  function renderHeader() {
+    return (
+      <div className="flex items-center justify-between px-5 py-2 border-b border-border text-xs font-medium text-muted-foreground">
+        <span>Category</span>
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <span className="w-24 text-right">Amount</span>
+          <span className="w-20 text-right">Change</span>
+          <span className="w-14 text-right">%</span>
+          <span className="w-[60px] text-right">Trend</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl">
       <h3 className="text-sm font-semibold text-foreground px-5 pt-5 pb-1">Category Breakdown</h3>
       {income.length > 0 && (
         <>
           <div className="px-5 pt-3 pb-1">
             <span className="text-xs font-medium text-chart-1 uppercase tracking-wider">Income</span>
           </div>
+          {renderHeader()}
           <div className="divide-y divide-border">
             {income.map((cat) => renderCategoryRow(cat, true))}
           </div>
@@ -174,20 +189,12 @@ export function CategorySummaries() {
           <div className="px-5 pt-3 pb-1">
             <span className="text-xs font-medium text-destructive uppercase tracking-wider">Expenses</span>
           </div>
+          {renderHeader()}
           <div className="divide-y divide-border">
             {expenses.map((cat) => renderCategoryRow(cat, false))}
           </div>
         </>
       )}
-      <div className="px-5 py-2 border-t border-border grid grid-cols-3 gap-4 text-xs text-muted-foreground">
-        <span>Category</span>
-        <div className="flex gap-4">
-          <span className="w-24 text-right">Amount</span>
-          <span className="w-20 text-right">Change</span>
-          <span className="w-14 text-right">%</span>
-        </div>
-        <span className="text-right">Trend</span>
-      </div>
     </div>
   );
 }

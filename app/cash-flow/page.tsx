@@ -6,7 +6,6 @@ import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart'
 import { NetIncomeAnalysis } from '@/components/cash-flow/net-income-analysis';
 import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
 import { CategorySummaries } from '@/components/cash-flow/category-summaries';
-import { BudgetVsActual } from '@/components/cash-flow/budget-vs-actual';
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -41,18 +40,11 @@ function CashFlowContent() {
             </div>
           )}
 
-          {(isVisible('spendingBreakdown') || isVisible('budgetVsActual')) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-              {isVisible('spendingBreakdown') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading breakdown...</div>}>
-                  <SpendingBreakdown />
-                </Suspense>
-              )}
-              {isVisible('budgetVsActual') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading budget...</div>}>
-                  <BudgetVsActual />
-                </Suspense>
-              )}
+          {isVisible('spendingBreakdown') && (
+            <div className="mt-5">
+              <Suspense fallback={<div className="text-muted-foreground">Loading breakdown...</div>}>
+                <SpendingBreakdown />
+              </Suspense>
             </div>
           )}
 

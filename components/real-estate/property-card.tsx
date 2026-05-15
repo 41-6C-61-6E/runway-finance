@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
-import { Home, Landmark, TrendingUp, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
+import { Home, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
 
 interface MortgageInfo {
   id: string;
@@ -35,7 +34,6 @@ interface PropertyCardProps {
 }
 
 export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue }: PropertyCardProps) {
-  const { isEnabled } = useSyntheticData();
   const [editingValue, setEditingValue] = useState(false);
   const [newValue, setNewValue] = useState(String(property.value));
   const isWhollyOwned = property.linkedMortgages.length === 0;
@@ -48,18 +46,6 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
     }
     setEditingValue(false);
   };
-
-  const showSynth = isEnabled('realEstate');
-  const latestSnapshots = useMemo(
-    () => {
-      const snaps = property.snapshots.slice(-12);
-      return showSynth ? snaps : snaps.filter((s) => !(s as any).isSynthetic);
-    },
-    [property.snapshots, showSynth]
-  );
-  const maxSnapshot = latestSnapshots.length > 0 ? Math.max(...latestSnapshots.map((s) => s.value)) : property.value;
-  const minSnapshot = latestSnapshots.length > 0 ? Math.min(...latestSnapshots.map((s) => s.value)) : property.value;
-  const snapRange = maxSnapshot - minSnapshot || 1;
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">
@@ -177,32 +163,6 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
           <Link2 className="w-3 h-3" />
           Link a mortgage
         </button>
-      )}
-
-      {property.snapshots.length > 1 && (
-        <div className="mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
-            <TrendingUp className="w-3 h-3" />
-            Value History (12mo)
-            {showSynth && (property.snapshots as any[]).some((s) => s.isSynthetic) && (
-              <span className="text-[9px] text-chart-3 italic">(includes estimates)</span>
-            )}
-          </div>
-          <div className="h-10 flex items-end gap-px">
-            {latestSnapshots.map((s, i) => {
-              const h = ((s.value - minSnapshot) / snapRange) * 100;
-              const isSynth = showSynth && (s as any).isSynthetic;
-              return (
-                <div
-                  key={i}
-                  className={`flex-1 rounded-sm transition-colors relative group ${isSynth ? 'bg-chart-3/20 border-t border-dashed border-chart-3/40' : 'bg-chart-3/40 hover:bg-chart-3/60'}`}
-                  style={{ height: `${Math.max(h, 5)}%` }}
-                  title={`${s.date}: ${formatCurrency(s.value)}${isSynth ? ' (estimated)' : ''}`}
-                />
-              );
-            })}
-          </div>
-        </div>
       )}
     </div>
   );

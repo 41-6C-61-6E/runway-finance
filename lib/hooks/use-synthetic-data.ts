@@ -10,10 +10,10 @@ export type SyntheticDataSettings = {
 };
 
 const DEFAULTS: SyntheticDataSettings = {
-  global: true,
-  netWorth: true,
-  realEstate: true,
-  cashFlowProjections: true,
+  global: false,
+  netWorth: false,
+  realEstate: false,
+  cashFlowProjections: false,
 };
 
 export function useSyntheticData() {

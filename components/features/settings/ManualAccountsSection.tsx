@@ -17,7 +17,7 @@ type ManualAccount = {
   balanceDate: string | null;
 };
 
-type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage';
+type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
   realestate: 'Real Estate',
@@ -27,6 +27,7 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   silver: 'Silver',
   otherAsset: 'Other Asset',
   mortgage: 'Mortgage',
+  cash: 'Cash',
 };
 
 const SYNC_FREQUENCIES = [
@@ -58,6 +59,7 @@ const ASSET_TYPE_ICONS: Record<string, string> = {
   silver: '🥈',
   otherAsset: '📦',
   mortgage: '📋',
+  cash: '💵',
 };
 
 function getSubTypeLabel(account: ManualAccount): string {
@@ -80,6 +82,7 @@ const ACCOUNT_TYPE_MAP: Record<string, string> = {
   silver: 'metals',
   otherAsset: 'otherAsset',
   mortgage: 'mortgage',
+  cash: 'cash',
 };
 
 const formatCurrency = (balance: string, currency: string) => {
@@ -390,7 +393,7 @@ export default function ManualAccountsSection() {
   };
 
   const canAdjust = (account: ManualAccount) => {
-    return ['vehicle', 'otherAsset'].includes(account.type) || account.type === 'metals';
+    return ['vehicle', 'otherAsset', 'mortgage', 'cash'].includes(account.type) || account.type === 'metals';
   };
 
   const mortgageAccounts = accounts.filter((a) => a.type === 'mortgage');
@@ -666,6 +669,17 @@ export default function ManualAccountsSection() {
             />
           </div>
         );
+      case 'cash':
+        return (
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Description (optional)</label>
+            <Input
+              value={createMeta.description || ''}
+              onChange={(e) => setCreateMeta((m) => ({ ...m, description: e.target.value }))}
+              placeholder="e.g., Home savings, Emergency fund"
+            />
+          </div>
+        );
     }
   };
 
@@ -723,13 +737,14 @@ export default function ManualAccountsSection() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : 'otherAsset']}</span>
+                    <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : getSubTypeLabel(account) === 'Cash' ? 'cash' : 'otherAsset']}</span>
                     <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                       account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
                       account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
                       account.type === 'crypto' ? 'bg-chart-2/20 text-chart-2' :
                       account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
                       account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
+                      account.type === 'cash' ? 'bg-chart-1/20 text-chart-1' :
                       'bg-muted text-muted-foreground'
                     }`}>
                       {getSubTypeLabel(account)}
@@ -822,6 +837,7 @@ export default function ManualAccountsSection() {
                 <option value="gold">Gold</option>
                 <option value="silver">Silver</option>
                 <option value="otherAsset">Other Asset</option>
+                <option value="cash">Cash</option>
               </select>
             </div>
             <div>

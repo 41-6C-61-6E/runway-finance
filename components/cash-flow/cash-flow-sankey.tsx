@@ -24,7 +24,7 @@ interface SummaryData {
 
 interface SankeyNode {
   id: string;
-  nodeColor?: string;
+  color?: string;
 }
 
 interface SankeyLink {
@@ -72,10 +72,19 @@ const sankeyTheme = {
 
 export function CashFlowSankey() {
   const router = useRouter();
-  const [month, setMonth] = useState(getCurrentMonth());
+  const currentMonth = getCurrentMonth();
+  const [month, setMonth] = useState(currentMonth);
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const CHART_COLORS = [
+    'var(--color-chart-1)',
+    'var(--color-chart-2)',
+    'var(--color-chart-3)',
+    'var(--color-chart-4)',
+    'var(--color-chart-5)',
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,23 +110,23 @@ export function CashFlowSankey() {
         const links: SankeyLink[] = [];
 
         if (incomeCategories.length > 0) {
-          for (const cat of incomeCategories) {
-            nodes.push({ id: cat.categoryName, nodeColor: cat.categoryColor });
-          }
+          incomeCategories.forEach((cat, i) => {
+            nodes.push({ id: cat.categoryName, color: CHART_COLORS[i % CHART_COLORS.length] });
+          });
         } else if (totalIncome > 0) {
-          nodes.push({ id: 'Income' });
+          nodes.push({ id: 'Income', color: CHART_COLORS[0] });
         }
 
         if (expenseCategories.length > 0) {
-          for (const cat of expenseCategories) {
-            nodes.push({ id: cat.categoryName, nodeColor: cat.categoryColor });
-          }
+          expenseCategories.forEach((cat, i) => {
+            nodes.push({ id: cat.categoryName, color: CHART_COLORS[(i + incomeCategories.length) % CHART_COLORS.length] });
+          });
         } else if (totalExpenses > 0) {
-          nodes.push({ id: 'Expenses' });
+          nodes.push({ id: 'Expenses', color: CHART_COLORS[1] });
         }
 
         if (savings > 0) {
-          nodes.push({ id: 'Savings', nodeColor: 'var(--color-chart-1)' });
+          nodes.push({ id: 'Savings', color: CHART_COLORS[2] });
         }
 
         const sources = incomeCategories.length > 0
@@ -179,15 +188,20 @@ export function CashFlowSankey() {
   };
 
   const prevMonth = () => {
-    const d = new Date(month + '-01');
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
     d.setMonth(d.getMonth() - 1);
     setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
   const nextMonth = () => {
-    const d = new Date(month + '-01');
-    d.setMonth(d.getMonth() + 1);
-    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    const [y, m] = month.split('-').map(Number);
+    const next = new Date(y, m - 1, 1);
+    next.setMonth(next.getMonth() + 1);
+    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+    if (nextStr <= getCurrentMonth()) {
+      setMonth(nextStr);
+    }
   };
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -250,7 +264,7 @@ export function CashFlowSankey() {
             data={sankeyData}
             margin={{ top: 20, right: 120, bottom: 20, left: 120 }}
             align="justify"
-            colors={{ datum: 'data.nodeColor' }}
+            colors={node => (node as unknown as { color: string }).color}
             nodeOpacity={0.95}
             nodeHoverOthersOpacity={0.25}
             nodeThickness={20}

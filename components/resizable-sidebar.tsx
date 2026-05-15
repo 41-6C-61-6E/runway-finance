@@ -4,20 +4,22 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
+import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
-const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: HiddenPageKey }[] = [
+const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
   { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
+  { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
 ]
@@ -41,6 +43,7 @@ export default function ResizableSidebar() {
   const { data: session } = useSession()
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const { isHidden } = useHiddenPages()
+  const { reduceTransparency } = useReduceTransparency()
   const [appStatus, setAppStatus] = useState<{
     connected: boolean
     lastSyncAt: string | null
@@ -97,7 +100,11 @@ export default function ResizableSidebar() {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="fixed left-0 top-0 z-20 h-screen backdrop-blur-md border-r flex flex-col justify-between transition-all duration-200 bg-sidebar/80 dark:bg-sidebar/80 border-sidebar-border"
+        className={`fixed left-0 top-0 z-20 h-screen border-r flex flex-col justify-between transition-all duration-200 border-sidebar-border ${
+          reduceTransparency
+            ? 'bg-sidebar'
+            : 'backdrop-blur-md bg-sidebar/80 dark:bg-sidebar/80'
+        }`}
         style={{ width: `${sidebarWidth}px` }}
       >
         {/* Logo / Brand */}
@@ -117,7 +124,7 @@ export default function ResizableSidebar() {
 
         {/* Navigation Links */}
         <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
-          {navItems.filter((item) => !isHidden(item.pageKey)).map((item) => {
+          {navItems.filter((item) => item.pageKey === 'settings' || !isHidden(item.pageKey as HiddenPageKey)).map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
             return (

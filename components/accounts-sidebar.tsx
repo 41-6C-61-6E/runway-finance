@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, ChevronLeft, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
+import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 
 type Account = {
   id: string;
@@ -77,12 +78,11 @@ function AccountRow({
   onOpenDrawer: (account: Account) => void;
 }) {
   const router = useRouter();
-  const num = parseFloat(account.balance);
   const fmt = formatCurrency(account.balance, account.currency);
 
   return (
     <div
-      className="flex items-center justify-between py-1.5 pl-7 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
+      className="flex items-center justify-between py-1 pl-6 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
       onClick={() => router.push(`/transactions?accountId=${account.id}`)}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -96,9 +96,7 @@ function AccountRow({
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <span className={`font-mono text-[13px] font-semibold tabular-nums blur-number ${
-          num < 0 ? 'text-destructive' : 'text-foreground'
-        }`}>
+        <span className="font-mono text-[13px] font-semibold tabular-nums blur-number text-foreground">
           {fmt.sign}{fmt.text}
         </span>
       </div>
@@ -123,6 +121,7 @@ export default function AccountsSidebar() {
     },
   });
 
+  const { hideSubheadings } = useAccountSubheadings();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -196,6 +195,49 @@ export default function AccountsSidebar() {
     setSelectedAccount(null);
     refetch();
   }, [refetch]);
+
+  const renderFlatAccounts = useCallback((subMap: Map<string, Account[]>, onOpen: (a: Account) => void) => {
+    const allAccounts: Account[] = [];
+    for (const accs of subMap.values()) {
+      for (const acc of accs) {
+        allAccounts.push(acc);
+      }
+    }
+    return allAccounts.map((account) => (
+      <AccountRow key={account.id} account={account} onOpenDrawer={onOpen} />
+    ));
+  }, []);
+
+  const renderGroupedAccounts = useCallback(
+    (group: string, subMap: Map<string, Account[]>, getTotal: (g: string, sg: string) => number, isExpanded: (g: string, sg: string) => boolean, toggle: (g: string, sg: string) => void, onOpen: (a: Account) => void) => {
+      return Array.from(subMap.entries()).map(([subGroup, accs]) => {
+        const subGroupTotal = getTotal(group, subGroup);
+        const subGroupFmt = formatCurrency(String(subGroupTotal), 'USD');
+        const subGroupExpanded = isExpanded(group, subGroup);
+        return (
+          <div key={`${group}::${subGroup}`}>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-muted/30 transition-colors">
+              <button onClick={() => toggle(group, subGroup)} className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0">
+                {subGroupExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />
+                )}
+              </button>
+              <button onClick={() => router.push(`/transactions?accountTypes=${SUB_GROUP_TO_TYPES[subGroup]?.join(',')}`)} className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer">
+                <span className="text-[13px] font-semibold text-muted-foreground/70 truncate">{subGroup}</span>
+              </button>
+              <span className="font-mono text-[13px] blur-number text-foreground/70">{subGroupFmt.sign}{subGroupFmt.text}</span>
+            </div>
+            {subGroupExpanded && accs.map((account) => (
+              <AccountRow key={account.id} account={account} onOpenDrawer={onOpen} />
+            ))}
+          </div>
+        );
+      });
+    },
+    [router]
+  );
 
   const sortedGroups = Array.from(hierarchy.keys()).sort((a, b) => {
     const ai = GROUP_ORDER.indexOf(a);
@@ -325,7 +367,7 @@ export default function AccountsSidebar() {
               const groupExpanded = isGroupExpanded(group);
 
               return (
-                <div key={group} className="border-b border-border/50 pb-2 last:border-b-0 last:pb-0">
+                <div key={group} className="pb-2 last:pb-0">
                   {/* Group Header */}
                   <div className="flex items-center gap-1.5 px-2 py-2 rounded-md bg-muted/40 transition-colors">
                     <button
@@ -346,56 +388,16 @@ export default function AccountsSidebar() {
                         {group}
                       </span>
                     </button>
-                    <span className={`font-mono text-[13px] font-bold blur-number ${
-                      groupTotal < 0 ? 'text-destructive' : 'text-foreground'
-                    }`}>
+                    <span className="font-mono text-[13px] font-bold blur-number text-foreground">
                       {groupFmt.sign}{groupFmt.text}
                     </span>
                   </div>
 
-                  {/* Sub-groups */}
-                  {groupExpanded && Array.from(subMap.entries()).map(([subGroup, accs]) => {
-                    const subGroupTotal = getSubGroupTotal(group, subGroup);
-                    const subGroupFmt = formatCurrency(String(subGroupTotal), 'USD');
-                    const subGroupExpanded = isSubGroupExpanded(group, subGroup);
-
-                    return (
-                      <div key={`${group}::${subGroup}`}>
-                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-muted/30 transition-colors">
-                          <button
-                            onClick={() => toggleSubGroup(group, subGroup)}
-                            className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
-                          >
-                            {subGroupExpanded ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => router.push(`/transactions?accountTypes=${SUB_GROUP_TO_TYPES[subGroup]?.join(',')}`)}
-                            className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
-                          >
-                            <span className="text-[13px] font-semibold text-muted-foreground/70 truncate">{subGroup}</span>
-                          </button>
-                          <span className={`font-mono text-[13px] blur-number ${
-                            subGroupTotal < 0 ? 'text-destructive/80' : 'text-foreground/70'
-                          }`}>
-                            {subGroupFmt.sign}{subGroupFmt.text}
-                          </span>
-                        </div>
-
-                        {/* Accounts */}
-                        {subGroupExpanded && accs.map((account) => (
-                          <AccountRow
-                            key={account.id}
-                            account={account}
-                            onOpenDrawer={handleOpenDrawer}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
+                  {/* Sub-groups (or flat accounts) */}
+                  {groupExpanded && (hideSubheadings
+                    ? renderFlatAccounts(subMap, handleOpenDrawer)
+                    : renderGroupedAccounts(group, subMap, getSubGroupTotal, isSubGroupExpanded, toggleSubGroup, handleOpenDrawer)
+                  )}
                 </div>
               );
             })}
