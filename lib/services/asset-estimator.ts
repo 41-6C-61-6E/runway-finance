@@ -8,6 +8,18 @@ const LOG_TAG = '[asset-estimator]';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface ApiConfig {
+  metalsApiUrl?: string;
+  metalsApiKey?: string;
+  redfinApiUrl?: string;
+  redfinApiKey?: string;
+  fredApiUrl?: string;
+  fredApiKey?: string;
+  btcApiUrl?: string;
+  btcApiKey?: string;
+  btcXpubApiUrl?: string;
+}
+
 export interface PurchaseInfo {
   purchasePrice: number;
   purchaseDate: string;
@@ -23,9 +35,6 @@ export type { AmortizationParams, AmortizationRow, ExtraPaymentParams } from '@/
 
 // ─── FRED API ────────────────────────────────────────────────────────────────
 
-const FRED_API_KEY = () => process.env.FRED_API_KEY ?? '';
-const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations';
-
 interface FredObservation {
   date: string;
   value: string;
@@ -34,15 +43,17 @@ interface FredObservation {
 async function fetchFredSeries(
   seriesId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  apiConfig?: ApiConfig
 ): Promise<FredObservation[]> {
-  const apiKey = FRED_API_KEY();
+  const apiKey = apiConfig?.fredApiKey || process.env.FRED_API_KEY || '';
   if (!apiKey) {
     logger.debug(`${LOG_TAG} No FRED_API_KEY configured, skipping FRED fetch`);
     return [];
   }
 
-  const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}&sort_order=asc`;
+  const baseUrl = apiConfig?.fredApiUrl || 'https://api.stlouisfed.org/fred/series/observations';
+  const url = `${baseUrl}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}&sort_order=asc`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) {
@@ -109,7 +120,8 @@ export async function estimateRealEstateHistory(
   purchasePrice: number,
   purchaseDate: string,
   currentValue: number,
-  zipCode?: string
+  zipCode?: string,
+  apiConfig?: ApiConfig
 ): Promise<Array<{ date: string; value: number }>> {
   const today = new Date().toISOString().split('T')[0];
   const snapshots: Array<{ date: string; value: number }> = [];
@@ -119,13 +131,13 @@ export async function estimateRealEstateHistory(
   if (zipCode) {
     const metroSeries = findMetroSeries(zipCode);
     if (metroSeries) {
-      hpiData = await fetchFredSeries(metroSeries, purchaseDate, today);
+      hpiData = await fetchFredSeries(metroSeries, purchaseDate, today, apiConfig);
     }
     if (hpiData.length === 0) {
-      hpiData = await fetchFredSeries('USSTHPI', purchaseDate, today);
+      hpiData = await fetchFredSeries('USSTHPI', purchaseDate, today, apiConfig);
     }
   } else {
-    hpiData = await fetchFredSeries('USSTHPI', purchaseDate, today);
+    hpiData = await fetchFredSeries('USSTHPI', purchaseDate, today, apiConfig);
   }
 
   if (hpiData.length >= 2) {
@@ -217,7 +229,8 @@ export function estimateVehicleHistory(
 export async function estimateMetalsHistory(
   amountOz: number,
   metalType: 'gold' | 'silver',
-  purchaseDate: string
+  purchaseDate: string,
+  apiConfig?: ApiConfig
 ): Promise<Array<{ date: string; value: number }>> {
   const today = new Date().toISOString().split('T')[0];
   const ticker = metalType === 'gold' ? 'GC=F' : 'SI=F';
@@ -225,7 +238,8 @@ export async function estimateMetalsHistory(
   try {
     const startTs = Math.floor(new Date(purchaseDate).getTime() / 1000);
     const endTs = Math.floor(new Date(today).getTime() / 1000);
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTs}&period2=${endTs}&interval=1mo`;
+    const baseUrl = apiConfig?.metalsApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart';
+    const url = `${baseUrl}/${ticker}?period1=${startTs}&period2=${endTs}&interval=1mo`;
 
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -285,7 +299,8 @@ export async function generateAssetHistorySnapshots(
   accountId: string,
   userId: string,
   accountType: string,
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
+  apiConfig?: ApiConfig
 ): Promise<number> {
   const { getDb } = await import(/* @vite-ignore */ '@/lib/db');
   const db = getDb();
@@ -301,7 +316,7 @@ export async function generateAssetHistorySnapshots(
       const currentValue = metadata.manualValue as number ?? await getAccountCurrentBalance(accountId);
 
       if (purchasePrice > 0 && purchaseDate < today) {
-        snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode);
+        snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode, apiConfig);
       }
       break;
     }
@@ -322,7 +337,7 @@ export async function generateAssetHistorySnapshots(
       const purchaseDate = metadata.purchaseDate as string ?? today;
 
       if (amountOz > 0 && purchaseDate < today) {
-        snapshots = await estimateMetalsHistory(amountOz, subType, purchaseDate);
+        snapshots = await estimateMetalsHistory(amountOz, subType, purchaseDate, apiConfig);
       }
       break;
     }

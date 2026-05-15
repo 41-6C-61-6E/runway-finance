@@ -237,38 +237,35 @@ export default function FilterSidebar({ filters, onChange, onClearAll }: FilterS
           </label>
           {parents.map((parent) => {
             const children = getChildren(parent.id);
-            if (children.length > 0) {
-              return (
-                <div key={parent.id}>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-1">
-                    {parent.name}
-                  </div>
-                  {children.map((child) => (
-                    <label key={child.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer ml-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategoryIds.includes(child.id)}
-                        onChange={() => toggleCategoryId(child.id)}
-                        className="rounded border-border bg-background text-primary focus:ring-ring"
-                      />
-                      <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: child.color }} />
-                      {child.name}
-                    </label>
-                  ))}
-                </div>
-              );
-            }
             return (
-              <label key={parent.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedCategoryIds.includes(parent.id)}
-                  onChange={() => toggleCategoryId(parent.id)}
-                  className="rounded border-border bg-background text-primary focus:ring-ring"
-                />
-                <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                {parent.name}
-              </label>
+              <div key={parent.id}>
+                <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategoryIds.includes(parent.id)}
+                    onChange={() => toggleCategoryId(parent.id)}
+                    className="rounded border-border bg-background text-primary focus:ring-ring"
+                  />
+                  <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                  {parent.name}
+                </label>
+                {children.length > 0 && (
+                  <div className="ml-2">
+                    {children.map((child) => (
+                      <label key={child.id} className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryIds.includes(child.id)}
+                          onChange={() => toggleCategoryId(child.id)}
+                          className="rounded border-border bg-background text-primary focus:ring-ring"
+                        />
+                        <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: child.color }} />
+                        {child.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
-import { createManualAccount, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
+import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 
 export async function GET() {
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const apiConfig = await readApiConfig(userId);
     const account = await createManualAccount({
       userId,
       name: body.name,
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       metadata: body.metadata,
       initialValue: body.initialValue,
       currency: body.currency,
+      apiConfig,
     });
     logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
     return NextResponse.json(account, { status: 201 });

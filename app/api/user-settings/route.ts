@@ -40,6 +40,7 @@ export async function GET() {
       defaultChartType: created?.defaultChartType ?? 'line',
       reduceTransparency: created?.reduceTransparency ?? false,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? false,
+      showMathEnabled: created?.showMathEnabled ?? false,
       apiKeys: created?.apiKeys ?? {},
     });
   }
@@ -58,6 +59,7 @@ export async function GET() {
     defaultChartType: settings[0].defaultChartType ?? 'line',
     reduceTransparency: settings[0].reduceTransparency ?? false,
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? false,
+    showMathEnabled: settings[0].showMathEnabled ?? false,
     apiKeys: settings[0].apiKeys ?? {},
   });
 }
@@ -82,6 +84,7 @@ export async function PATCH(request: Request) {
   const defaultChartType = body.defaultChartType;
   const reduceTransparency = body.reduceTransparency;
   const hideAccountSubheadings = body.hideAccountSubheadings;
+  const showMathEnabled = body.showMathEnabled;
   const apiKeys = body.apiKeys;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
@@ -152,6 +155,10 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
   }
 
+  if (showMathEnabled !== undefined && typeof showMathEnabled !== 'boolean') {
+    return Response.json({ error: 'Invalid showMathEnabled value' }, { status: 400 });
+  }
+
   const db = getDb();
 
   let settings = await db
@@ -185,6 +192,7 @@ export async function PATCH(request: Request) {
       defaultChartType: created?.defaultChartType ?? 'line',
       reduceTransparency: created?.reduceTransparency ?? false,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? false,
+      showMathEnabled: created?.showMathEnabled ?? false,
       apiKeys: created?.apiKeys ?? {},
     });
   }
@@ -203,6 +211,7 @@ export async function PATCH(request: Request) {
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
+  if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
   if (apiKeys !== undefined) updates.apiKeys = apiKeys;
   updates.updatedAt = new Date();
 
@@ -226,6 +235,7 @@ export async function PATCH(request: Request) {
     defaultChartType: updated.defaultChartType ?? 'line',
     reduceTransparency: updated.reduceTransparency ?? false,
     hideAccountSubheadings: updated.hideAccountSubheadings ?? false,
+    showMathEnabled: updated.showMathEnabled ?? false,
     apiKeys: updated.apiKeys ?? {},
   });
 }

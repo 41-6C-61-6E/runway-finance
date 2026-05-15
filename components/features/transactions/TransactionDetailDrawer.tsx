@@ -209,6 +209,17 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
                                     {parent.name}
                                   </div>
+                                  <button
+                                    onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                    className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
+                                      categoryId === parent.id
+                                        ? 'text-primary bg-primary/10'
+                                        : 'text-foreground/80 hover:bg-muted'
+                                    }`}
+                                  >
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                    {parent.name}
+                                  </button>
                                   {childList.map((child) => (
                                     <button
                                       key={child.id}
@@ -221,19 +232,6 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                                     >
                                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
                                       {child.name}
-                                    </button>
-                                  ))}
-                                  {childList.length === 0 && !filter && (
-                                    <button
-                                      onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
-                                      className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
-                                        categoryId === parent.id
-                                          ? 'text-primary bg-primary/10'
-                                          : 'text-foreground/80 hover:bg-muted'
-                                      }`}
-                                    >
-                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                                      {parent.name}
                                     </button>
                                   )}
                                 </div>

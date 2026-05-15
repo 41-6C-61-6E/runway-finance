@@ -516,6 +516,17 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
                                     {parent.name}
                                   </div>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, parent.id, parent.name, parent.color); }}
+                                    className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors ${
+                                      tx.categoryId === parent.id
+                                        ? 'text-primary bg-primary/10'
+                                        : 'text-foreground/80 hover:bg-muted'
+                                    }`}
+                                  >
+                                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                    {parent.name}
+                                  </button>
                                   {childList.map((child) => (
                                     <button
                                       key={child.id}

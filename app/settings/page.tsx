@@ -1012,99 +1012,164 @@ export default function SettingsPage() {
 
           {/* API Keys */}
           <div className="p-5 bg-card border border-border rounded-xl">
-          <h2 className="text-base font-semibold text-foreground mb-1">API Keys</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            Manage API keys used for manual account valuations and data enrichment.
-          </p>
+            <h2 className="text-base font-semibold text-foreground mb-1">API Keys &amp; Endpoints</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Configure the endpoints and keys used for manual account valuations.
+            </p>
 
-          {apiKeysLoading ? (
-            <div className="text-muted-foreground text-sm py-4">Loading...</div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Metals (Gold/Silver) API
-                </label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Used to fetch spot prices for precious metal manual accounts.
-                </p>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={apiKeys.metalsApiUrl || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiUrl: e.target.value }))}
-                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <input
-                    type="password"
-                    value={apiKeys.metalsApiKey || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiKey: e.target.value }))}
-                    placeholder="API key"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+            {apiKeysLoading ? (
+              <div className="text-muted-foreground text-sm py-4">Loading...</div>
+            ) : (
+              <div className="space-y-6">
+
+                {/* Metals API */}
+                <div className="p-4 bg-muted/20 border border-border rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Metals (Gold/Silver) API
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Fetches spot prices for gold/silver manual accounts. Uses Yahoo Finance by default.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.metalsApiUrl || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiUrl: e.target.value }))}
+                      placeholder="Default: https://query1.finance.yahoo.com/v8/finance/chart"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.metalsApiKey || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiKey: e.target.value }))}
+                      placeholder="API key (not required for Yahoo Finance)"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
+                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
+{`curl -s -A 'Mozilla/5.0' '${apiKeys.metalsApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart'}/GC=F'`}
+                    </pre>
+                  </details>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Redfin Property API
-                </label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Used to estimate real estate property values for manual accounts.
-                </p>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={apiKeys.redfinApiUrl || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiUrl: e.target.value }))}
-                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <input
-                    type="password"
-                    value={apiKeys.redfinApiKey || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiKey: e.target.value }))}
-                    placeholder="API key"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                {/* Redfin API */}
+                <div className="p-4 bg-muted/20 border border-border rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Redfin Property API
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Estimates real estate property values for manual accounts. Uses Redfin public page by default.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.redfinApiUrl || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiUrl: e.target.value }))}
+                      placeholder="Default: https://www.redfin.com/what-is-my-home-worth"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.redfinApiKey || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiKey: e.target.value }))}
+                      placeholder="API key (not required for public page)"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
+                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
+{`curl -s -A 'Mozilla/5.0' '${apiKeys.redfinApiUrl || 'https://www.redfin.com/what-is-my-home-worth'}?propertyId=12345'`}
+                    </pre>
+                  </details>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  FRED API (Federal Reserve)
-                </label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Used to fetch economic indicators and interest rate data.
-                </p>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={apiKeys.fredApiUrl || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiUrl: e.target.value }))}
-                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <input
-                    type="password"
-                    value={apiKeys.fredApiKey || ''}
-                    onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiKey: e.target.value }))}
-                    placeholder="API key"
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                {/* FRED API */}
+                <div className="p-4 bg-muted/20 border border-border rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    FRED API (Federal Reserve)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Fetches Home Price Index data for real estate historical estimates. Requires a free API key from FRED.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.fredApiUrl || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiUrl: e.target.value }))}
+                      placeholder="Default: https://api.stlouisfed.org/fred/series/observations"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.fredApiKey || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiKey: e.target.value }))}
+                      placeholder="FRED API key"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
+                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
+{`curl -s '${apiKeys.fredApiUrl || 'https://api.stlouisfed.org/fred/series/observations'}?series_id=USSTHPI&api_key=${apiKeys.fredApiKey ? '*'.repeat(8) : 'YOUR_KEY'}&file_type=json'`}
+                    </pre>
+                  </details>
                 </div>
-              </div>
 
-              <button
-                onClick={handleSaveApiKeys}
-                className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
-              >
-                {apiKeysSaved ? 'Saved!' : 'Save API Keys'}
-              </button>
-            </div>
-          )}
-        </div>
+                {/* BTC / Crypto API */}
+                <div className="p-4 bg-muted/20 border border-border rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Bitcoin / Crypto API
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Fetches BTC spot price and xpub wallet balances for crypto manual accounts. Uses Yahoo Finance and Trezor Blockbook by default.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.btcApiUrl || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcApiUrl: e.target.value }))}
+                      placeholder="Default: https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="text"
+                      value={apiKeys.btcXpubApiUrl || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcXpubApiUrl: e.target.value }))}
+                      placeholder="Default: https://{host}/api/v2/xpub/{xpub}?details=basic"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.btcApiKey || ''}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcApiKey: e.target.value }))}
+                      placeholder="API key (not required for public endpoints)"
+                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example calls</summary>
+                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
+{`# BTC spot price
+curl -s -A 'Mozilla/5.0' '${apiKeys.btcApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD'}'
+
+# BTC wallet balance (Trezor Blockbook)
+curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=basic'`}
+                    </pre>
+                  </details>
+                </div>
+
+                <button
+                  onClick={handleSaveApiKeys}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+                >
+                  {apiKeysSaved ? 'Saved!' : 'Save API Keys'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

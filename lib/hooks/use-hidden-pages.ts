@@ -11,6 +11,7 @@ export const HIDDEN_PAGE_KEYS = [
   'fire',
   'dataExplorer',
   'goals',
+  'spending',
 ] as const;
 
 export type HiddenPageKey = (typeof HIDDEN_PAGE_KEYS)[number];

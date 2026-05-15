@@ -12,6 +12,7 @@ import { RetirementMetrics } from './retirement-metrics';
 import { RetirementRunwayChart } from './retirement-runway-chart';
 import { RetirementMonteCarlo } from './retirement-monte-carlo';
 import { RetirementYearlyTable } from './retirement-yearly-table';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 export function RetirementPlanner() {
@@ -88,20 +89,32 @@ export function RetirementPlanner() {
       </div>
 
       {isVisible('retirementInputs') && (
-        <RetirementInputs plan={plan} onUpdate={handleUpdate} />
+        <div>
+          <RetirementInputs plan={plan} onUpdate={handleUpdate} />
+          <MathDescription chartId="retirementInputs" />
+        </div>
       )}
 
       {isVisible('retirementMetrics') && (
-        <RetirementMetrics projection={projection} successRate={monteCarlo.successRate} />
+        <div>
+          <RetirementMetrics projection={projection} successRate={monteCarlo.successRate} />
+          <MathDescription chartId="retirementMetrics" />
+        </div>
       )}
 
       {isVisible('retirementRunwayChart') && (
-        <RetirementRunwayChart projection={projection} monteCarlo={monteCarlo} />
+        <div>
+          <RetirementRunwayChart projection={projection} monteCarlo={monteCarlo} />
+          <MathDescription chartId="retirementRunwayChart" />
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {isVisible('retirementMonteCarlo') && (
-          <RetirementMonteCarlo monteCarlo={monteCarlo} />
+          <div>
+            <RetirementMonteCarlo monteCarlo={monteCarlo} />
+            <MathDescription chartId="retirementMonteCarlo" />
+          </div>
         )}
         <RetirementYearlyTable projection={projection} />
       </div>

@@ -1,12 +1,52 @@
 import { getDb } from '@/lib/db';
-import { accounts, transactions, accountSnapshots, netWorthSnapshots } from '@/lib/db/schema';
+import { accounts, transactions, accountSnapshots, netWorthSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { logger } from '@/lib/logger';
 import { ensureSystemCategories } from '@/lib/db/seed-categories';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
+import type { ApiConfig } from '@/lib/services/asset-estimator';
 
 const LOG_TAG = '[manual-accounts]';
+
+export type { ApiConfig };
+
+export const DEFAULT_API_CONFIG: ApiConfig = {
+  metalsApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart',
+  metalsApiKey: '',
+  redfinApiUrl: 'https://www.redfin.com/what-is-my-home-worth',
+  redfinApiKey: '',
+  fredApiUrl: 'https://api.stlouisfed.org/fred/series/observations',
+  fredApiKey: '',
+  btcApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD',
+  btcApiKey: '',
+  btcXpubApiUrl: 'https://{host}/api/v2/xpub/{xpub}?details=basic',
+};
+
+export async function readApiConfig(userId: string): Promise<ApiConfig> {
+  try {
+    const db = getDb();
+    const [settings] = await db
+      .select({ apiKeys: userSettings.apiKeys })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+    const keys = (settings?.apiKeys ?? {}) as Record<string, string>;
+    return {
+      metalsApiUrl: keys.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl,
+      metalsApiKey: keys.metalsApiKey || '',
+      redfinApiUrl: keys.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl,
+      redfinApiKey: keys.redfinApiKey || '',
+      fredApiUrl: keys.fredApiUrl || DEFAULT_API_CONFIG.fredApiUrl,
+      fredApiKey: keys.fredApiKey || (typeof process !== 'undefined' ? (process.env.FRED_API_KEY ?? '') : ''),
+      btcApiUrl: keys.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl,
+      btcApiKey: keys.btcApiKey || '',
+      btcXpubApiUrl: keys.btcXpubApiUrl || DEFAULT_API_CONFIG.btcXpubApiUrl,
+    };
+  } catch {
+    return { ...DEFAULT_API_CONFIG };
+  }
+}
 
 export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
 
@@ -32,6 +72,7 @@ export interface CreateManualAccountInput {
   metadata?: Record<string, unknown>;
   initialValue?: number;
   currency?: string;
+  apiConfig?: ApiConfig;
 }
 
 export interface SyncResult {
@@ -54,8 +95,9 @@ function manualExternalId(): string {
   return `manual-${randomUUID()}`;
 }
 
-export async function fetchRedfinValue(propertyId: string): Promise<number> {
-  const url = `https://www.redfin.com/what-is-my-home-worth?propertyId=${encodeURIComponent(propertyId)}`;
+export async function fetchRedfinValue(propertyId: string, apiConfig?: ApiConfig): Promise<number> {
+  const baseUrl = apiConfig?.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl!;
+  const url = `${baseUrl}?propertyId=${encodeURIComponent(propertyId)}`;
   const curlCmd = `curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' '${url}'`;
   logger.info(`${LOG_TAG} Redfin API call`, { propertyId, url });
   logger.debug(`${LOG_TAG} Redfin curl: ${curlCmd}`);
@@ -81,8 +123,8 @@ export async function fetchRedfinValue(propertyId: string): Promise<number> {
 
 const TREZOR_HOSTS = ['btc2.trezor.io', 'btc1.trezor.io', 'btc3.trezor.io'];
 
-async function fetchBtcPrice(): Promise<number> {
-  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD';
+async function fetchBtcPrice(apiConfig?: ApiConfig): Promise<number> {
+  const url = apiConfig?.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl!;
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
   logger.info(`${LOG_TAG} BTC price API call`, { url });
   logger.debug(`${LOG_TAG} BTC price curl: ${curlCmd}`);
@@ -110,7 +152,7 @@ async function fetchBtcPrice(): Promise<number> {
   return price;
 }
 
-export async function fetchBitcoinBalance(xpub: string): Promise<number> {
+export async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise<number> {
   const hasDescriptor = xpub.includes('(');
   const xpubFormats = hasDescriptor
     ? [xpub]
@@ -119,9 +161,15 @@ export async function fetchBitcoinBalance(xpub: string): Promise<number> {
   let lastError: string | null = null;
   let btcAmount: number | null = null;
 
+  const hostList = apiConfig?.btcXpubApiUrl
+    ? [new URL(apiConfig.btcXpubApiUrl.replace('{host}', 'host').replace('/api/v2/xpub/{xpub}?details=basic', '')).hostname]
+    : TREZOR_HOSTS;
+
+  const baseUrlTemplate = apiConfig?.btcXpubApiUrl || 'https://{host}/api/v2/xpub/{xpub}?details=basic';
+
   for (const fmt of xpubFormats) {
-    for (const host of TREZOR_HOSTS) {
-      const url = `https://${host}/api/v2/xpub/${encodeURIComponent(fmt)}?details=basic`;
+    for (const host of hostList) {
+      const url = baseUrlTemplate.replace('{host}', host).replace('{xpub}', encodeURIComponent(fmt));
       const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
       logger.info(`${LOG_TAG} Bitcoin API call`, { host, xpub: fmt, url });
       logger.debug(`${LOG_TAG} Bitcoin curl: ${curlCmd}`);
@@ -182,12 +230,12 @@ export async function fetchBitcoinBalance(xpub: string): Promise<number> {
   }
 
   if (btcAmount === null) {
-    throw new Error(`Bitcoin fetch failed (${xpubFormats.length} formats x ${TREZOR_HOSTS.length} hosts)\n  last: ${lastError}`);
+    throw new Error(`Bitcoin fetch failed (${xpubFormats.length} formats x ${hostList.length} hosts)\n  last: ${lastError}`);
   }
 
   logger.info(`${LOG_TAG} BTC wallet balance: ${btcAmount} BTC`);
 
-  const btcPrice = await fetchBtcPrice();
+  const btcPrice = await fetchBtcPrice(apiConfig);
   const usdValue = btcAmount * btcPrice;
 
   logger.info(`${LOG_TAG} BTC value: ${btcAmount} BTC x $${btcPrice} = $${usdValue}`);
@@ -195,9 +243,10 @@ export async function fetchBitcoinBalance(xpub: string): Promise<number> {
   return usdValue;
 }
 
-export async function fetchSpotPrice(type: 'gold' | 'silver'): Promise<number> {
+export async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): Promise<number> {
+  const baseUrl = apiConfig?.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl!;
   const ticker = type === 'gold' ? 'GC=F' : 'SI=F';
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
+  const url = `${baseUrl}/${ticker}`;
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
   logger.info(`${LOG_TAG} Spot price API call`, { ticker, url });
   logger.debug(`${LOG_TAG} Spot price curl: ${curlCmd}`);
@@ -268,7 +317,7 @@ export async function createManualAccount(input: CreateManualAccountInput) {
   const hasPurchaseHistory = !!meta.purchaseDate && (!!meta.purchasePrice || accountType === 'metals');
   if (hasPurchaseHistory) {
     try {
-      await generateAssetHistorySnapshots(account.id, input.userId, input.type, meta);
+      await generateAssetHistorySnapshots(account.id, input.userId, input.type, meta, input.apiConfig);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to generate history snapshots for ${account.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -281,7 +330,8 @@ export async function createManualAccount(input: CreateManualAccountInput) {
 
 export async function syncManualAccount(
   accountId: string,
-  userId: string
+  userId: string,
+  apiConfig?: ApiConfig
 ): Promise<SyncResult> {
   const db = getDb();
   const [account] = await db
@@ -303,20 +353,20 @@ export async function syncManualAccount(
       case 'realestate': {
         const propertyId = meta.propertyId as string;
         if (!propertyId) throw new Error('No propertyId in metadata');
-        newValue = await fetchRedfinValue(propertyId);
+        newValue = await fetchRedfinValue(propertyId, apiConfig);
         break;
       }
       case 'crypto': {
         const xpub = meta.xpub as string;
         if (!xpub) throw new Error('No xpub in metadata');
-        newValue = await fetchBitcoinBalance(xpub);
+        newValue = await fetchBitcoinBalance(xpub, apiConfig);
         break;
       }
       case 'metals': {
         const subType = (meta.subType ?? 'gold') as 'gold' | 'silver';
         const amountOz = parseFloat(String(meta.amountOz ?? '0'));
         if (amountOz <= 0) throw new Error('No amountOz in metadata');
-        const spotPrice = await fetchSpotPrice(subType);
+        const spotPrice = await fetchSpotPrice(subType, apiConfig);
         newValue = amountOz * spotPrice;
         break;
       }
@@ -370,7 +420,7 @@ export async function syncManualAccount(
   // Regenerate synthetic history for real estate to keep HPI curve aligned
   if (account.type === 'realestate' || account.type === 'metals') {
     try {
-      await generateAssetHistorySnapshots(accountId, userId, account.type, account.metadata as Record<string, unknown> ?? {});
+      await generateAssetHistorySnapshots(accountId, userId, account.type, account.metadata as Record<string, unknown> ?? {}, apiConfig);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to regenerate history for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -392,7 +442,8 @@ export async function adjustManualAccountValue(
   userId: string,
   newValue: number,
   note?: string,
-  amountOz?: number
+  amountOz?: number,
+  apiConfig?: ApiConfig
 ): Promise<SyncResult> {
   const db = getDb();
   const [account] = await db
@@ -412,7 +463,7 @@ export async function adjustManualAccountValue(
   if (account.type === 'metals' && amountOz !== undefined) {
     try {
       const subType = (meta.subType ?? 'gold') as 'gold' | 'silver';
-      const spotPrice = await fetchSpotPrice(subType);
+      const spotPrice = await fetchSpotPrice(subType, apiConfig);
       finalNewValue = amountOz * spotPrice;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Spot price fetch failed';

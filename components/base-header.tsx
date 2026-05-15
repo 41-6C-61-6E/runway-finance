@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function BaseHeader() {
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-background/80 border-b border-border shadow-sm">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-background/40 border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">

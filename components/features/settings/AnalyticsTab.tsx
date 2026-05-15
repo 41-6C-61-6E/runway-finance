@@ -4,7 +4,8 @@ import { Switch } from '@/components/ui/switch';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
-import { Check } from 'lucide-react';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { Check, Calculator } from 'lucide-react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
@@ -43,15 +44,38 @@ export default function AnalyticsTab() {
   const { visibility, loading: visLoading, updateVisibility } = useChartVisibility();
   const { settings, loading: synthLoading, isEnabled, updateSettings } = useSyntheticData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
+  const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
 
-  const loading = visLoading || synthLoading || defaultsLoading;
+  const loading = visLoading || synthLoading || defaultsLoading || mathLoading;
 
   if (loading) {
     return <div className="text-muted-foreground py-4">Loading...</div>;
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10">      {/* ── Show the Math ──────────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Show the Math</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          When enabled, displays a description of the logic and math used to calculate
+          each analytics card&rsquo;s values below the card.
+        </p>
+        <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
+          <div className="flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-muted-foreground" />
+            <div>
+              <span className="text-sm font-medium text-foreground">Show math explanations on cards</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Explains the formulas and data sources behind each chart and summary card.
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={showMathEnabled}
+            onCheckedChange={updateShowMath}
+          />
+        </div>
+      </div>
       {/* ── Synthetic & Estimated Data ─────────────────────────────────── */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-1">Synthetic &amp; Estimated Data</h2>
