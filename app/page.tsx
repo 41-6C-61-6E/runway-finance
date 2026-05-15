@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { NetWorthChart } from '@/components/net-worth-chart';
 import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
 import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function NetWorthContent() {
@@ -17,7 +18,10 @@ function NetWorthContent() {
           
           {isVisible('netWorthSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <NetWorthSummary />
+              <div>
+                <NetWorthSummary />
+                <MathDescription chartId="netWorthSummary" />
+              </div>
             </Suspense>
           )}
           
@@ -26,14 +30,20 @@ function NetWorthContent() {
               {isVisible('netWorthChart') && (
                 <div className="lg:col-span-2">
                   <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                    <NetWorthChart />
+                    <div>
+                      <NetWorthChart />
+                      <MathDescription chartId="netWorthChart" />
+                    </div>
                   </Suspense>
                 </div>
               )}
               {isVisible('debtToAssetRatio') && (
                 <div>
                   <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
-                    <DebtToAssetRatio />
+                    <div>
+                      <DebtToAssetRatio />
+                      <MathDescription chartId="debtToAssetRatio" />
+                    </div>
                   </Suspense>
                 </div>
               )}

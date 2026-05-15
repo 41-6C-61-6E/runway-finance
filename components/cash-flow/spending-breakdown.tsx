@@ -174,23 +174,30 @@ export function SpendingBreakdown() {
       </div>
       <div className="h-[350px] relative">
         <div className="financial-chart h-full">
-          {chartType === 'bar' ? (
+          {chartType === 'bar' ? (() => {
+            const formatTick = (v: number) => {
+              if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+              if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+              return `$${v}`;
+            };
+            // Estimate max label width: use the max possible value from data
+            const maxValue = pieData.length > 0 ? Math.max(...pieData.map(d => d.value)) : 0;
+            const maxLabel = formatTick(maxValue);
+            // Approximate char width at fontSize 11 is ~7px, add tickPadding 8 and buffer 12
+            const dynamicLeft = Math.max(80, maxLabel.length * 7 + 8 + 12);
+            return (
             <ResponsiveBar
               data={pieData}
               keys={['value']}
               indexBy="id"
-              margin={{ top: 10, right: 10, left: 80, bottom: 50 }}
+              margin={{ top: 10, right: 10, left: dynamicLeft, bottom: 50 }}
               padding={0.3}
               borderRadius={2}
               enableLabel={false}
               colors={{ datum: 'data.color' }}
               axisLeft={{
                 tickSize: 0, tickPadding: 8,
-                format: (v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                },
+                format: formatTick,
               }}
               axisBottom={{
                 tickSize: 0, tickPadding: 8,
@@ -212,7 +219,8 @@ export function SpendingBreakdown() {
                 );
               }}
             />
-          ) : (
+            );
+          })() : (
             <ResponsivePie
               data={pieData}
               margin={{ top: 20, right: 80, bottom: 20, left: 80 }}

@@ -8,6 +8,7 @@ import { FireCalculator } from '@/components/fire/fire-calculator';
 import { WhatIfAnalysis } from '@/components/fire/what-if-analysis';
 import { FireScenarios } from '@/components/fire/fire-scenarios';
 import { RetirementPlanner } from '@/components/fire/retirement/retirement-planner';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 export interface FireScenario {
@@ -85,7 +86,10 @@ function FireContent() {
             <>
               {isVisible('fireMetrics') && (
                 <Suspense fallback={<div className="text-muted-foreground">Loading metrics...</div>}>
-                  <FireMetrics scenario={scenario} />
+                  <div>
+                    <FireMetrics scenario={scenario} />
+                    <MathDescription chartId="fireMetrics" />
+                  </div>
                 </Suspense>
               )}
 
@@ -94,16 +98,22 @@ function FireContent() {
                   {isVisible('fireProjectionChart') && (
                     <div className="lg:col-span-2">
                       <Suspense fallback={<div className="text-muted-foreground">Loading projection...</div>}>
-                        <FireProjectionChart scenario={scenario} />
+                        <div>
+                          <FireProjectionChart scenario={scenario} />
+                          <MathDescription chartId="fireProjectionChart" />
+                        </div>
                       </Suspense>
                     </div>
                   )}
                   {isVisible('fireProgressRing') && (
                     <div>
-                      <FireProgressRing
-                        current={scenario.currentInvestableAssets}
-                        target={scenario.targetAnnualExpenses / scenario.safeWithdrawalRate}
-                      />
+                      <div>
+                        <FireProgressRing
+                          current={scenario.currentInvestableAssets}
+                          target={scenario.targetAnnualExpenses / scenario.safeWithdrawalRate}
+                        />
+                        <MathDescription chartId="fireProgressRing" />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -113,14 +123,20 @@ function FireContent() {
                 <FireCalculator scenario={scenario} onUpdate={handleScenarioUpdate} />
                 {isVisible('whatIfAnalysis') && (
                   <Suspense fallback={<div className="text-muted-foreground">Loading analysis...</div>}>
-                    <WhatIfAnalysis baseScenario={scenario} />
+                    <div>
+                      <WhatIfAnalysis baseScenario={scenario} />
+                      <MathDescription chartId="whatIfAnalysis" />
+                    </div>
                   </Suspense>
                 )}
               </div>
 
               {isVisible('fireScenarios') && (
                 <div className="mt-5">
-                  <FireScenarios onLoad={handleLoadScenario} />
+                  <div>
+                    <FireScenarios onLoad={handleLoadScenario} />
+                    <MathDescription chartId="fireScenarios" />
+                  </div>
                 </div>
               )}
             </>

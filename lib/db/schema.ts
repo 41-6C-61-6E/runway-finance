@@ -85,6 +85,7 @@ export const userSettings = pgTable('user_settings', {
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
+  showMathEnabled: boolean('show_math_enabled').notNull().default(false),
   apiKeys: jsonb('api_keys').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

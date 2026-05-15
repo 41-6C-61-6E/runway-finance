@@ -47,7 +47,8 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
       <>
         {series.map((s) => {
           const isProjected = String(s.id).includes('(Projected)');
-          const path = lineGen(s.data);
+          const positions = s.data.map((d) => (d as { position: { x: number; y: number } }).position);
+          const path = lineGen(positions);
           return (
             <path
               key={String(s.id)}

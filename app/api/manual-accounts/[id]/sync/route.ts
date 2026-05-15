@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { syncManualAccount } from '@/lib/services/manual-accounts';
+import { syncManualAccount, readApiConfig } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +25,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'not_found', message: 'Account not found' }, { status: 404 });
   }
 
-  const result = await syncManualAccount(id, userId);
+  const apiConfig = await readApiConfig(userId);
+  const result = await syncManualAccount(id, userId, apiConfig);
 
   logger.info('POST /api/manual-accounts/[id]/sync', { userId, id, accountType: account.type, status: result.status });
 

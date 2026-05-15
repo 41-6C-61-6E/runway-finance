@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 interface CategoryData {
   categoryId: string;
@@ -49,18 +51,35 @@ function MiniSparkline({ value, prev, isIncome }: { value: number; prev: number;
   );
 }
 
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthForTimeRange(range: TimeRange): string {
+  const now = new Date();
+  if (range === '1m' || range === '3m' || range === '6m' || range === '1y' || range === 'ytd' || range === 'all') {
+    return getCurrentMonth();
+  }
+  return getCurrentMonth();
+}
+
 export function CategorySummaries() {
   const router = useRouter();
+  const { isVisible } = useChartVisibility();
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
+
+  const month = getMonthForTimeRange(timeframe);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/cash-flow/categories');
+        const res = await fetch(`/api/cash-flow/categories?month=${month}`);
         if (!res.ok) throw new Error('Failed to fetch categories');
         const json = await res.json();
         setAllCategories(json);
@@ -71,15 +90,21 @@ export function CategorySummaries() {
       }
     };
     fetchData();
-  }, []);
+  }, [month]);
 
-  const income = allCategories
-    .filter((c) => c.isIncome && c.amount > 0)
-    .sort((a, b) => b.amount - a.amount);
+  const income = useMemo(() =>
+    allCategories
+      .filter((c) => c.isIncome && c.amount > 0)
+      .sort((a, b) => b.amount - a.amount),
+    [allCategories]
+  );
 
-  const expenses = allCategories
-    .filter((c) => !c.isIncome && c.amount > 0)
-    .sort((a, b) => b.amount - a.amount);
+  const expenses = useMemo(() =>
+    allCategories
+      .filter((c) => !c.isIncome && c.amount > 0)
+      .sort((a, b) => b.amount - a.amount),
+    [allCategories]
+  );
 
   const handleCategoryClick = (categoryId: string) => {
     router.push(`/transactions?categoryId=${categoryId}`);
@@ -88,11 +113,12 @@ export function CategorySummaries() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Category Breakdown</h3>
-        <div className="animate-pulse space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 bg-muted rounded" />
-          ))}
+        <div className="p-5 pb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+        </div>
+        <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -101,7 +127,10 @@ export function CategorySummaries() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Category Breakdown</h3>
+        <div className="p-5 pb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+        </div>
         <ChartEmptyState variant="error" error={error} />
       </div>
     );
@@ -110,8 +139,11 @@ export function CategorySummaries() {
   if (income.length === 0 && expenses.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Category Breakdown</h3>
-        <ChartEmptyState variant="nodata" description="No category data for this month" />
+        <div className="p-5 pb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+        </div>
+        <ChartEmptyState variant="nodata" description="No category data for this period" />
       </div>
     );
   }
@@ -156,6 +188,14 @@ export function CategorySummaries() {
     );
   }
 
+  function renderSectionHeader(label: string, colorClass: string) {
+    return (
+      <div className="px-5 pt-3 pb-1">
+        <span className={`text-xs font-medium ${colorClass} uppercase tracking-wider`}>{label}</span>
+      </div>
+    );
+  }
+
   function renderHeader() {
     return (
       <div className="flex items-center justify-between px-5 py-2 border-b border-border text-xs font-medium text-muted-foreground">
@@ -170,31 +210,35 @@ export function CategorySummaries() {
     );
   }
 
+  function renderSection(categories: CategoryData[], isIncome: boolean) {
+    if (categories.length === 0) return null;
+    const colorClass = isIncome ? 'text-chart-1' : 'text-destructive';
+    const sectionKey = isIncome ? 'categoryIncome' : 'categoryExpenses';
+    const sectionVisible = isVisible(sectionKey);
+
+    return (
+      <div className="relative">
+        <div className="px-5 pt-3 pb-1">
+          <span className={`text-xs font-medium ${colorClass} uppercase tracking-wider`}>
+            {isIncome ? 'Income' : 'Expenses'}
+          </span>
+        </div>
+        {renderHeader()}
+        <div className="divide-y divide-border">
+          {categories.map((cat) => renderCategoryRow(cat, isIncome))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-card border border-border rounded-xl">
-      <h3 className="text-sm font-semibold text-foreground px-5 pt-5 pb-1">Category Breakdown</h3>
-      {income.length > 0 && (
-        <>
-          <div className="px-5 pt-3 pb-1">
-            <span className="text-xs font-medium text-chart-1 uppercase tracking-wider">Income</span>
-          </div>
-          {renderHeader()}
-          <div className="divide-y divide-border">
-            {income.map((cat) => renderCategoryRow(cat, true))}
-          </div>
-        </>
-      )}
-      {expenses.length > 0 && (
-        <>
-          <div className="px-5 pt-3 pb-1">
-            <span className="text-xs font-medium text-destructive uppercase tracking-wider">Expenses</span>
-          </div>
-          {renderHeader()}
-          <div className="divide-y divide-border">
-            {expenses.map((cat) => renderCategoryRow(cat, false))}
-          </div>
-        </>
-      )}
+    <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="p-5 pb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+        <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+      </div>
+      {income.length > 0 && renderSection(income, true)}
+      {expenses.length > 0 && renderSection(expenses, false)}
     </div>
   );
 }

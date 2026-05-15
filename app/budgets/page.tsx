@@ -5,6 +5,7 @@ import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetVsActualChart } from '@/components/budgets/budget-vs-actual-chart';
 import { BudgetTable } from '@/components/budgets/budget-table';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function BudgetsContent() {
@@ -21,14 +22,20 @@ function BudgetsContent() {
 
           {isVisible('budgetSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <BudgetSummary />
+              <div>
+                <BudgetSummary />
+                <MathDescription chartId="budgetSummary" />
+              </div>
             </Suspense>
           )}
 
           {isVisible('budgetVsActualChart') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                <BudgetVsActualChart />
+                <div>
+                  <BudgetVsActualChart />
+                  <MathDescription chartId="budgetVsActualChart" />
+                </div>
               </Suspense>
             </div>
           )}
@@ -36,7 +43,10 @@ function BudgetsContent() {
           {isVisible('budgetTable') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading budgets...</div>}>
-                <BudgetTable />
+                <div>
+                  <BudgetTable />
+                  <MathDescription chartId="budgetTable" />
+                </div>
               </Suspense>
             </div>
           )}

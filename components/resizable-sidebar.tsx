@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
@@ -16,6 +16,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow' },
+  { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
@@ -103,7 +104,7 @@ export default function ResizableSidebar() {
         className={`fixed left-0 top-0 z-20 h-screen border-r flex flex-col justify-between transition-all duration-200 border-sidebar-border ${
           reduceTransparency
             ? 'bg-sidebar'
-            : 'backdrop-blur-md bg-sidebar/80 dark:bg-sidebar/80'
+            : 'backdrop-blur-md bg-sidebar/40 dark:bg-sidebar/40'
         }`}
         style={{ width: `${sidebarWidth}px` }}
       >

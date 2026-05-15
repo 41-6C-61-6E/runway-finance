@@ -5,6 +5,8 @@ import AccountsSidebar from '@/components/accounts-sidebar';
 import ResizableSidebar from '@/components/resizable-sidebar';
 import { useSidebar, SidebarProvider } from '@/components/sidebar-context';
 import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
+import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
+import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
 import { ReactNode } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -19,13 +21,17 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
       <PrivacyModeProvider>
-        <>
-          <ResizableSidebar />
-          {!isSettingsPage && <AccountsSidebar />}
-          <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
-            {children}
-          </AuthenticatedLayoutContent>
-        </>
+        <ReduceTransparencyProvider>
+        <AccountSubheadingsProvider>
+          <>
+            <ResizableSidebar />
+            {!isSettingsPage && <AccountsSidebar />}
+            <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
+              {children}
+            </AuthenticatedLayoutContent>
+          </>
+        </AccountSubheadingsProvider>
+        </ReduceTransparencyProvider>
       </PrivacyModeProvider>
     </SidebarProvider>
   );

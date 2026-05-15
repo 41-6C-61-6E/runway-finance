@@ -113,6 +113,27 @@
       "when": 1747000000010,
       "tag": "0015_add_analytics_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1747000000011,
+      "tag": "0016_add_goal_percentage_and_reserve",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1747000000012,
+      "tag": "0017_api_keys_and_toggles",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1747000000013,
+      "tag": "0018_add_show_math_enabled",
+      "breakpoints": true
     }
   ]
 }

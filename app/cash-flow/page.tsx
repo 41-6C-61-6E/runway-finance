@@ -4,10 +4,10 @@ import { Suspense } from 'react';
 import { CashFlowSummary } from '@/components/cash-flow/cash-flow-summary';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
 import { NetIncomeAnalysis } from '@/components/cash-flow/net-income-analysis';
-import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
-import { CategorySummaries } from '@/components/cash-flow/category-summaries';
+
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function CashFlowContent() {
@@ -21,7 +21,10 @@ function CashFlowContent() {
 
           {isVisible('cashFlowSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <CashFlowSummary />
+              <div>
+                <CashFlowSummary />
+                <MathDescription chartId="cashFlowSummary" />
+              </div>
             </Suspense>
           )}
 
@@ -29,37 +32,32 @@ function CashFlowContent() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               {isVisible('incomeExpenseChart') && (
                 <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                  <IncomeExpenseChart />
+                  <div>
+                    <IncomeExpenseChart />
+                    <MathDescription chartId="incomeExpenseChart" />
+                  </div>
                 </Suspense>
               )}
               {isVisible('netIncomeAnalysis') && (
                 <Suspense fallback={<div className="text-muted-foreground">Loading analysis...</div>}>
-                  <NetIncomeAnalysis />
+                  <div>
+                    <NetIncomeAnalysis />
+                    <MathDescription chartId="netIncomeAnalysis" />
+                  </div>
                 </Suspense>
               )}
             </div>
           )}
 
-          {isVisible('spendingBreakdown') && (
-            <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading breakdown...</div>}>
-                <SpendingBreakdown />
-              </Suspense>
-            </div>
-          )}
 
-          {isVisible('categorySummaries') && (
-            <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading categories...</div>}>
-                <CategorySummaries />
-              </Suspense>
-            </div>
-          )}
 
           {isVisible('cashFlowSankey') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading sankey...</div>}>
-                <CashFlowSankey />
+                <div>
+                  <CashFlowSankey />
+                  <MathDescription chartId="cashFlowSankey" />
+                </div>
               </Suspense>
             </div>
           )}
@@ -67,7 +65,10 @@ function CashFlowContent() {
           {isVisible('cashFlowForecast') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading forecast...</div>}>
-                <CashFlowForecast />
+                <div>
+                  <CashFlowForecast />
+                  <MathDescription chartId="cashFlowForecast" />
+                </div>
               </Suspense>
             </div>
           )}

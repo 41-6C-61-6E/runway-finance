@@ -6,6 +6,7 @@ import { PropertyCards } from '@/components/real-estate/property-cards';
 import { EquityOverTimeChart } from '@/components/real-estate/equity-over-time-chart';
 import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-allocation-chart';
 import { MortgagePaydownSection } from '@/components/real-estate/mortgage-paydown-section';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function RealEstateContent() {
@@ -19,7 +20,10 @@ function RealEstateContent() {
 
           {isVisible('realEstateSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <RealEstateSummary />
+              <div>
+                <RealEstateSummary />
+                <MathDescription chartId="realEstateSummary" />
+              </div>
             </Suspense>
           )}
 
@@ -27,12 +31,18 @@ function RealEstateContent() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               {isVisible('equityOverTimeChart') && (
                 <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                  <EquityOverTimeChart />
+                  <div>
+                    <EquityOverTimeChart />
+                    <MathDescription chartId="equityOverTimeChart" />
+                  </div>
                 </Suspense>
               )}
               {isVisible('portfolioAllocationChart') && (
                 <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
-                  <PortfolioAllocationChart />
+                  <div>
+                    <PortfolioAllocationChart />
+                    <MathDescription chartId="portfolioAllocationChart" />
+                  </div>
                 </Suspense>
               )}
             </div>
@@ -41,7 +51,10 @@ function RealEstateContent() {
           {isVisible('propertyCards') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading properties...</div>}>
-                <PropertyCards />
+                <div>
+                  <PropertyCards />
+                  <MathDescription chartId="propertyCards" />
+                </div>
               </Suspense>
             </div>
           )}
@@ -49,7 +62,10 @@ function RealEstateContent() {
           {isVisible('mortgagePaydown') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading mortgage paydown...</div>}>
-                <MortgagePaydownSection />
+                <div>
+                  <MortgagePaydownSection />
+                  <MathDescription chartId="mortgagePaydown" />
+                </div>
               </Suspense>
             </div>
           )}

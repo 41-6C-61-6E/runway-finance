@@ -13,7 +13,7 @@ export default function Sidebar() {
   const isActive = (href: string) => pathname === href
 
   return (
-    <aside className="fixed left-0 top-0 z-20 h-screen w-64 p-6 bg-sidebar/80 backdrop-blur-md border-r border-sidebar-border flex flex-col justify-between">
+    <aside className="fixed left-0 top-0 z-20 h-screen w-64 p-6 bg-sidebar/40 backdrop-blur-md border-r border-sidebar-border flex flex-col justify-between">
       <div className="space-y-6">
 
         {/* Navigation Links */}

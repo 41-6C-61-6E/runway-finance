@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { GoalsSummary } from '@/components/goals/goals-summary';
 import { GoalsList } from '@/components/goals/goals-list';
+import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 function GoalsContent() {
@@ -18,14 +19,20 @@ function GoalsContent() {
 
           {isVisible('goalsSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <GoalsSummary />
+              <div>
+                <GoalsSummary />
+                <MathDescription chartId="goalsSummary" />
+              </div>
             </Suspense>
           )}
 
           {isVisible('goalsList') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading goals...</div>}>
-                <GoalsList />
+                <div>
+                  <GoalsList />
+                  <MathDescription chartId="goalsList" />
+                </div>
               </Suspense>
             </div>
           )}

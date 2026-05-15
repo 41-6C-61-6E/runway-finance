@@ -19,11 +19,18 @@ export const CHARTS = {
       cashFlowSummary: 'Summary Cards',
       incomeExpenseChart: 'Income vs Expense Chart',
       netIncomeAnalysis: 'Net Income Analysis',
-      spendingBreakdown: 'Spending Breakdown',
       budgetVsActual: 'Budget vs Actual',
-      categorySummaries: 'Category Summaries',
       cashFlowSankey: 'Sankey Diagram',
       cashFlowForecast: 'Cash Flow Forecast',
+    },
+  },
+  spending: {
+    label: 'Spending',
+    charts: {
+      spendingBreakdown: 'Spending Breakdown',
+      categorySummaries: 'Category Breakdown',
+      categoryIncome: 'Income Section',
+      categoryExpenses: 'Expenses Section',
     },
   },
   fire: {
