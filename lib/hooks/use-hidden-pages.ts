@@ -10,7 +10,7 @@ export const HIDDEN_PAGE_KEYS = [
   'realEstate',
   'fire',
   'dataExplorer',
-  'settings',
+  'goals',
 ] as const;
 
 export type HiddenPageKey = (typeof HIDDEN_PAGE_KEYS)[number];

@@ -28,24 +28,32 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
     ? data
     : data.filter((s) => !String(s.id).includes('(Projected)'));
 
-  if (visibleData.length === 0) return null;
+  if (visibleData.length === 0 || !visibleData.some((s) => s.data.length > 0)) return null;
+
+  const allValues = visibleData.flatMap((s) => s.data.map((d) => d.y));
+  const maxVal = allValues.length > 0 ? Math.max(...allValues, 1) : 1;
+  const minVal = allValues.length > 0 ? Math.min(...allValues, 0) : 0;
+  const safeMax = Math.max(maxVal, minVal + 1);
 
   const renderCustomLines = (props: Record<string, unknown>) => {
-    const lines = props.lines as Array<{
-      id: string | number;
-      path: string;
+    const series = props.series as Array<{
+      id: string;
+      data: readonly Record<string, unknown>[];
       color: string;
     }>;
+    const lineGen = props.lineGenerator as ((d: readonly unknown[]) => string | null) | undefined;
+    if (!series || typeof lineGen !== 'function') return null;
     return (
       <>
-        {lines.map((line) => {
-          const isProjected = String(line.id).includes('(Projected)');
+        {series.map((s) => {
+          const isProjected = String(s.id).includes('(Projected)');
+          const path = lineGen(s.data);
           return (
             <path
-              key={String(line.id)}
-              d={line.path}
+              key={String(s.id)}
+              d={path || ''}
               fill="none"
-              stroke={line.color}
+              stroke={s.color}
               strokeWidth={2}
               strokeDasharray={isProjected ? '8 4' : undefined}
               opacity={isProjected ? 0.8 : 1}
@@ -63,7 +71,7 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
           data={visibleData}
           margin={{ top: 10, right: 20, left: 60, bottom: 30 }}
           xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: 0, max: Math.max(...data.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
+          yScale={{ type: 'linear', min: minVal, max: safeMax * 1.1 }}
           curve="monotoneX"
           colors={({ id }) => {
             const idx = data.findIndex((s) => s.id === id);
@@ -83,7 +91,7 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
           }}
           axisBottom={{
             tickSize: 0, tickPadding: 8,
-            tickValues: visibleData[0]?.data.length > 30 ? Math.max(4, Math.floor(visibleData[0].data.length / 6)) : undefined,
+            tickValues: visibleData[0]?.data && visibleData[0].data.length > 30 ? Math.max(4, Math.floor(visibleData[0].data.length / 6)) : undefined,
             format: (v: string) => {
               const d = new Date(v + '-01');
               return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });

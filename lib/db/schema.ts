@@ -83,6 +83,9 @@ export const userSettings = pgTable('user_settings', {
   showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
   defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
   defaultChartType: text('default_chart_type').notNull().default('line'),
+  reduceTransparency: boolean('reduce_transparency').notNull().default(false),
+  hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
+  apiKeys: jsonb('api_keys').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -323,6 +326,8 @@ export const financialGoals = pgTable('financial_goals', {
   priority: integer('priority').notNull().default(0), // 0=low, 1=medium, 2=high
   status: text('status').notNull().default('active'), // 'active'|'completed'|'paused'
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  percentage: numeric('percentage', { precision: 5, scale: 2 }).notNull().default('100'),
+  reserve: numeric('reserve', { precision: 20, scale: 4 }).notNull().default('0'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

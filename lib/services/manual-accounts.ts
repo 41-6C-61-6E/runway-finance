@@ -8,10 +8,10 @@ import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 
 const LOG_TAG = '[manual-accounts]';
 
-export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage';
+export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
 
 export const MANUAL_ACCOUNT_TYPES: AssetSubType[] = [
-  'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset', 'mortgage',
+  'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset', 'mortgage', 'cash',
 ];
 
 export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
@@ -22,6 +22,7 @@ export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
   silver: 'metals',
   otherAsset: 'otherAsset',
   mortgage: 'mortgage',
+  cash: 'cash',
 };
 
 export interface CreateManualAccountInput {

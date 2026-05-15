@@ -20,6 +20,8 @@ import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 import { useHiddenPages, HIDDEN_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
+import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
+import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 
 type Connection = {
   id: string;
@@ -73,8 +75,10 @@ export default function SettingsPage() {
   const { scheme: chartScheme, updateScheme: updateChartScheme } = useChartColorScheme();
   const { cardStyle, updateCardStyle } = useCardStyle();
   const { isHidden, updateHidden } = useHiddenPages();
+  const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
+  const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'apis'>('general');
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -83,6 +87,35 @@ export default function SettingsPage() {
   const [togglingAccount, setTogglingAccount] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  const [apiKeysLoading, setApiKeysLoading] = useState(true);
+  const [apiKeysSaved, setApiKeysSaved] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/user-settings', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        setApiKeys(data.apiKeys ?? {});
+      })
+      .catch(() => {})
+      .finally(() => setApiKeysLoading(false));
+  }, []);
+
+  const handleSaveApiKeys = async () => {
+    setApiKeysSaved(false);
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ apiKeys }),
+      });
+      setApiKeysSaved(true);
+      setTimeout(() => setApiKeysSaved(false), 2000);
+    } catch {}
+  };
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -360,6 +393,14 @@ export default function SettingsPage() {
             >
               Analytics
             </button>
+            <button
+              onClick={() => setActiveTab('apis')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'apis' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              APIs
+            </button>
           </div>
 
           {activeTab === 'general' && (
@@ -476,6 +517,30 @@ export default function SettingsPage() {
                   checked={privacyMode ?? false}
                   onCheckedChange={togglePrivacyMode}
                   disabled={privacyModeLoading}
+                />
+              </div>
+
+              {/* Reduce Transparency */}
+              <div className="flex items-center justify-between pb-5 border-b border-border">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Reduce Transparency</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Use solid backgrounds for the sidebar instead of glass/transparent</p>
+                </div>
+                <Switch
+                  checked={reduceTransparency}
+                  onCheckedChange={updateReduceTransparency}
+                />
+              </div>
+
+              {/* Hide Account Subheadings */}
+              <div className="flex items-center justify-between pb-5 border-b border-border">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Hide Account Subheadings</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Group accounts by major category only (e.g. Banking, Credit)</p>
+                </div>
+                <Switch
+                  checked={hideSubheadings}
+                  onCheckedChange={updateHideSubheadings}
                 />
               </div>
 
@@ -906,6 +971,140 @@ export default function SettingsPage() {
       {activeTab === 'analytics' && (
         <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AnalyticsTab />
+        </div>
+      )}
+
+      {activeTab === 'apis' && (
+        <div className="space-y-4">
+          {/* Current Connection Details */}
+          {connections.length > 0 && (
+            <div className="p-5 bg-card border border-border rounded-xl">
+              <h2 className="text-base font-semibold text-foreground mb-1">Active Connection</h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                The following SimpleFIN bridge connection is currently in use for automatic accounts.
+              </p>
+              <div className="space-y-2">
+                {connections.map((conn) => (
+                  <div key={conn.id} className="p-3 bg-muted/30 border border-border rounded-lg space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{conn.label}</span>
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${
+                        conn.lastSyncStatus === 'ok'
+                          ? 'bg-chart-1/20 text-chart-1'
+                          : conn.lastSyncStatus === 'error'
+                          ? 'bg-destructive/20 text-destructive'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {conn.lastSyncStatus === 'ok' ? 'Active' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+                      </span>
+                    </div>
+                    {conn.accessUrlEncrypted && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground">Access URL</span>
+                        <p className="text-xs font-mono text-foreground truncate">{maskAccessUrl(conn)}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* API Keys */}
+          <div className="p-5 bg-card border border-border rounded-xl">
+          <h2 className="text-base font-semibold text-foreground mb-1">API Keys</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Manage API keys used for manual account valuations and data enrichment.
+          </p>
+
+          {apiKeysLoading ? (
+            <div className="text-muted-foreground text-sm py-4">Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Metals (Gold/Silver) API
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Used to fetch spot prices for precious metal manual accounts.
+                </p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={apiKeys.metalsApiUrl || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiUrl: e.target.value }))}
+                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <input
+                    type="password"
+                    value={apiKeys.metalsApiKey || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiKey: e.target.value }))}
+                    placeholder="API key"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Redfin Property API
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Used to estimate real estate property values for manual accounts.
+                </p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={apiKeys.redfinApiUrl || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiUrl: e.target.value }))}
+                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <input
+                    type="password"
+                    value={apiKeys.redfinApiKey || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiKey: e.target.value }))}
+                    placeholder="API key"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  FRED API (Federal Reserve)
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Used to fetch economic indicators and interest rate data.
+                </p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={apiKeys.fredApiUrl || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiUrl: e.target.value }))}
+                    placeholder="API endpoint URL (e.g. https://api.example.com/v1)"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <input
+                    type="password"
+                    value={apiKeys.fredApiKey || ''}
+                    onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiKey: e.target.value }))}
+                    placeholder="API key"
+                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveApiKeys}
+                className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+              >
+                {apiKeysSaved ? 'Saved!' : 'Save API Keys'}
+              </button>
+            </div>
+          )}
+        </div>
         </div>
       )}
     </div>

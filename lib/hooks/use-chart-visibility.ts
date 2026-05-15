@@ -11,7 +11,6 @@ export const CHARTS = {
       debtToAssetRatio: 'Debt-to-Asset Ratio',
       assetAllocationChart: 'Asset Allocation Chart',
       accountValuesChart: 'Account Values Chart',
-      goalsProgress: 'Goals Progress',
     },
   },
   cashFlow: {
@@ -62,6 +61,13 @@ export const CHARTS = {
       budgetSummary: 'Summary Cards',
       budgetVsActualChart: 'Budget vs Actual Chart',
       budgetTable: 'Budget Items Table',
+    },
+  },
+  goals: {
+    label: 'Financial Goals',
+    charts: {
+      goalsSummary: 'Summary Cards',
+      goalsList: 'Goals List',
     },
   },
 } as const;

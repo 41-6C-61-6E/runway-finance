@@ -72,10 +72,13 @@ export function SpendingBreakdown() {
   }, [month]);
 
   const expenseCategories = allCategories
-    .filter((c) => !c.isIncome && c.amount > 0 && !excludedCategoryIds.has(c.categoryId));
-  const totalSpending = expenseCategories.reduce((sum, c) => sum + c.amount, 0);
+    .filter((c) => !c.isIncome && c.amount > 0);
 
-  const pieData = expenseCategories.map((c) => ({
+  const visibleCategories = expenseCategories
+    .filter((c) => !excludedCategoryIds.has(c.categoryId));
+  const totalSpending = visibleCategories.reduce((sum, c) => sum + c.amount, 0);
+
+  const pieData = visibleCategories.map((c) => ({
     id: c.categoryName,
     label: c.categoryName,
     value: c.amount,
@@ -145,26 +148,27 @@ export function SpendingBreakdown() {
         <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
         {/* Category multi-select */}
         {expenseCategories.length > 0 && (
-          <div className="flex flex-wrap gap-1 max-w-[300px]">
-            {expenseCategories.slice(0, 8).map((c) => (
-              <button
-                key={c.categoryId}
-                onClick={() => toggleCategory(c.categoryId)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${
-                  excludedCategoryIds.has(c.categoryId)
-                    ? 'border-border text-muted-foreground/40 line-through opacity-50'
-                    : 'border-border/50 text-muted-foreground hover:border-foreground/30'
-                }`}
-                style={{ borderColor: excludedCategoryIds.has(c.categoryId) ? undefined : c.categoryColor + '40' }}
-              >
-                {c.categoryName}
-              </button>
-            ))}
-            {expenseCategories.length > 8 && (
-              <span className="text-[10px] text-muted-foreground/50 self-center">
-                +{expenseCategories.length - 8} more
-              </span>
-            )}
+          <div className="flex flex-wrap gap-1 max-w-full">
+            {expenseCategories.map((c) => {
+              const isExcluded = excludedCategoryIds.has(c.categoryId);
+              return (
+                <button
+                  key={c.categoryId}
+                  onClick={() => toggleCategory(c.categoryId)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${
+                    isExcluded
+                      ? 'border-border/30 text-muted-foreground/30'
+                      : 'text-foreground font-medium'
+                  }`}
+                  style={{
+                    borderColor: isExcluded ? undefined : c.categoryColor,
+                    backgroundColor: isExcluded ? undefined : c.categoryColor + '15',
+                  }}
+                >
+                  {c.categoryName}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -178,6 +182,7 @@ export function SpendingBreakdown() {
               margin={{ top: 10, right: 10, left: 80, bottom: 50 }}
               padding={0.3}
               borderRadius={2}
+              enableLabel={false}
               colors={{ datum: 'data.color' }}
               axisLeft={{
                 tickSize: 0, tickPadding: 8,
@@ -237,13 +242,14 @@ export function SpendingBreakdown() {
                   direction: 'row',
                   justify: false,
                   translateY: 56,
-                  itemsSpacing: 0,
-                  itemWidth: 100,
+                  itemsSpacing: 4,
+                  itemWidth: 120,
                   itemHeight: 18,
                   itemDirection: 'left-to-right',
                   itemOpacity: 1,
                   symbolSize: 10,
                   symbolShape: 'circle',
+                  effects: [{ on: 'hover', style: { itemOpacity: 0.7 } }],
                 },
               ]}
             />
