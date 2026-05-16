@@ -114,5 +114,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(accounts.id, id))
     .returning();
 
-  return NextResponse.json(updated);
+  if (!updated) {
+    return NextResponse.json(
+      { error: 'not_found', message: 'Account not found after update' },
+      { status: 404 }
+    );
+  }
+
+  const decrypted = await decryptRow('accounts', updated, dek);
+  return NextResponse.json(decrypted);
 }

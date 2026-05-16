@@ -125,6 +125,9 @@ export async function encryptField(plaintext: string, key: Uint8Array): Promise<
 }
 
 export async function decryptField(payload: string, key: Uint8Array): Promise<string> {
+  if (typeof payload !== 'string') {
+    return String(payload);
+  }
   let parsed: any;
   try {
     parsed = JSON.parse(payload);
@@ -143,26 +146,26 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   transactions: ['description', 'payee', 'memo', 'notes', 'amount'],
   accounts: ['name', 'balance', 'institution', 'metadata'],
   categories: ['name'],
-  category_rules: ['name', 'condition_value', 'set_payee'],
+  category_rules: ['name', 'conditionValue', 'setPayee'],
   budgets: ['amount', 'notes'],
-  financial_goals: ['name', 'description', 'target_amount', 'current_amount', 'percentage', 'reserve'],
-  net_worth_snapshots: ['total_assets', 'total_liabilities', 'net_worth'],
-  monthly_cash_flow: ['total_income', 'total_expenses', 'net_cash_flow', 'transaction_count'],
-  category_spending_summary: ['amount', 'transaction_count'],
-  category_income_summary: ['amount', 'transaction_count'],
+  financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve'],
+  net_worth_snapshots: ['totalAssets', 'totalLiabilities', 'netWorth'],
+  monthly_cash_flow: ['totalIncome', 'totalExpenses', 'netCashFlow', 'transactionCount'],
+  category_spending_summary: ['amount', 'transactionCount'],
+  category_income_summary: ['amount', 'transactionCount'],
   account_snapshots: ['balance'],
   retirement_projections: [
-    'name', 'portfolio_at_retirement', 'expected_return_rate', 'inflation_rate',
-    'annual_withdrawal', 'ss_annual', 'pension_annual', 'part_time_income',
-    'rental_income_annual', 'healthcare_annual', 'legacy_goal',
+    'name', 'portfolioAtRetirement', 'expectedReturnRate', 'inflationRate',
+    'annualWithdrawal', 'ssAnnual', 'pensionAnnual', 'partTimeIncome',
+    'rentalIncomeAnnual', 'healthcareAnnual', 'legacyGoal',
   ],
   fire_scenarios: [
-    'name', 'target_annual_expenses', 'current_investable_assets', 'annual_contributions',
-    'expected_return_rate', 'inflation_rate', 'safe_withdrawal_rate',
+    'name', 'targetAnnualExpenses', 'currentInvestableAssets', 'annualContributions',
+    'expectedReturnRate', 'inflationRate', 'safeWithdrawalRate',
   ],
-  simplefin_connections: ['access_url_encrypted', 'access_url_iv', 'access_url_tag'],
-  sync_logs: ['accounts_synced', 'transactions_fetched', 'transactions_new', 'duration_ms'],
-  user_settings: ['api_keys'],
+  simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
+  sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs'],
+  user_settings: ['apiKeys'],
 };
 
 export async function encryptRow<T extends Record<string, any>>(table: string, row: T, key: Uint8Array): Promise<T> {
