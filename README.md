@@ -1,4 +1,4 @@
-# Runway Finance
+# Runway Finance [DEV BETA BUILD] Not intended for use yet
 
 Self-hosted personal finance app for tracking net worth, managing transactions, analyzing cash flow, and planning for financial independence (FIRE). Docker-native, dark by default, single-user.
 
