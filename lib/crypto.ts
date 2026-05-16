@@ -126,7 +126,9 @@ export async function encryptField(plaintext: string, key: Uint8Array): Promise<
 
 export async function decryptField(payload: string, key: Uint8Array): Promise<string> {
   if (typeof payload !== 'string') {
-    return String(payload);
+    // Non-string payloads (e.g., jsonb objects from the database) should not be passed here.
+    // Return empty string to signal that decryption is not applicable.
+    return '';
   }
   let parsed: any;
   try {
