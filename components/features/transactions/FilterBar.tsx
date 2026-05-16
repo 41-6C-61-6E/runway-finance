@@ -44,8 +44,17 @@ const ACCOUNT_TYPES = [
   { value: 'credit', label: 'Credit' },
   { value: 'loan', label: 'Loan' },
   { value: 'investment', label: 'Investment' },
+  { value: 'brokerage', label: 'Brokerage' },
+  { value: 'retirement', label: 'Retirement' },
   { value: 'mortgage', label: 'Mortgage' },
+  { value: 'realestate', label: 'Real Estate' },
+  { value: 'vehicle', label: 'Vehicle' },
+  { value: 'crypto', label: 'Crypto' },
+  { value: 'metals', label: 'Metals' },
+  { value: 'hsa', label: 'HSA' },
   { value: 'other', label: 'Other' },
+  { value: 'otherAsset', label: 'Other Asset' },
+  { value: 'otherLiability', label: 'Other Liability' },
 ];
 
 function MultiSelectDropdown({
@@ -158,7 +167,7 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
   const accountTypesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/accounts?includeHidden=true', { credentials: 'include' })
+    fetch('/api/accounts', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => setAccounts(Array.isArray(data) ? data : []))
       .catch(() => setAccounts([]));

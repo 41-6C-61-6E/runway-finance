@@ -373,7 +373,7 @@ export function CashFlowSankey() {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const res = await fetch('/api/accounts?includeHidden=false');
+        const res = await fetch('/api/accounts');
         if (!res.ok) return;
         const json = await res.json();
         setAllAccounts(json);

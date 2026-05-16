@@ -52,7 +52,7 @@ export function PropertyCards() {
     try {
       const [reRes, mortRes] = await Promise.all([
         fetch('/api/real-estate', { credentials: 'include' }),
-        fetch('/api/accounts?type=mortgage&includeHidden=false', { credentials: 'include' }),
+        fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
       ]);
       if (!reRes.ok) throw new Error('Failed to fetch real estate data');
       setData(await reRes.json());

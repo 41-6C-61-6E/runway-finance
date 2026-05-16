@@ -6,6 +6,7 @@ import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
 import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
+import { OnboardingChecklist } from '@/components/onboarding-checklist';
 
 function NetWorthContent() {
   const { isVisible } = useChartVisibility();
@@ -15,6 +16,7 @@ function NetWorthContent() {
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
           <h1 className="text-xl font-semibold text-foreground mb-5">Net Worth</h1>
+          <OnboardingChecklist />
           
           {isVisible('netWorthSummary') && (
             <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>

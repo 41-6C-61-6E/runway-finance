@@ -67,7 +67,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: Budge
     const fetchData = async () => {
       const [catRes, acctRes] = await Promise.all([
         fetch('/api/categories', { credentials: 'include' }),
-        fetch('/api/accounts?includeHidden=false', { credentials: 'include' }),
+        fetch('/api/accounts', { credentials: 'include' }),
       ]);
       if (catRes.ok) setCategories(await catRes.json());
       if (acctRes.ok) {

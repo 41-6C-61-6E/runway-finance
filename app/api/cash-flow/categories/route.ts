@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { categorySpendingSummary, categoryIncomeSummary, categories, transactions, accounts } from '@/lib/db/schema';
-import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
+import { eq, and, or, gte, lte, sql, inArray, isNull } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 
@@ -31,12 +31,12 @@ export async function GET(request: Request) {
       lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false),
+      or(isNull(transactions.categoryId), eq(categories.excludeFromReports, false)),
     );
     if (accountIds.length > 0) {
       whereClause = and(whereClause, inArray(transactions.accountId, accountIds));
-    }
-    if (isIncome === true) {
-      whereClause = and(whereClause, eq(categories.isIncome, true));
     }
 
     // Fetch all matching transactions (we need to decrypt amounts in memory since SQL aggregations won't work on encrypted data)
@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       })
       .from(transactions)
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(whereClause);
 
     // Decrypt and aggregate in memory
@@ -55,6 +56,8 @@ export async function GET(request: Request) {
     for (const row of txRows) {
       if (!row.categoryId) continue;
       const decrypted = parseFloat(await decryptField(row.amount, dek));
+      if (isIncome === true && decrypted <= 0) continue;
+      if (isIncome === false && decrypted >= 0) continue;
       const absVal = Math.abs(decrypted);
       if (absVal <= 0) continue;
       catTotals.set(row.categoryId, (catTotals.get(row.categoryId) || 0) + absVal);

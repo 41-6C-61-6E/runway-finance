@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
         .from(accounts)
         .where(and(
           eq(accounts.id, goal[0].linkedAccountId),
-          eq(accounts.userId, session.user.id)
+          eq(accounts.userId, session.user.id),
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
         ))
         .limit(1);
 
@@ -108,7 +110,9 @@ export async function GET(req: NextRequest) {
       .from(accounts)
       .where(and(
         eq(accounts.id, goal[0].linkedAccountId),
-        eq(accounts.userId, session.user.id)
+        eq(accounts.userId, session.user.id),
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
       ))
       .limit(1);
 

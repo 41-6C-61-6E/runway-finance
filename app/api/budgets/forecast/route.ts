@@ -40,7 +40,11 @@ export async function GET(request: Request) {
     const userAccounts = await db
       .select()
       .from(accounts)
-      .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, false)));
+      .where(and(
+        eq(accounts.userId, userId),
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
+      ));
 
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
 
@@ -80,6 +84,7 @@ export async function GET(request: Request) {
           eq(budgets.userId, userId),
           sql`${budgets.fundingAccountId} IS NOT NULL`,
           eq(budgets.isRecurring, true),
+          eq(categories.excludeFromReports, false),
         )
       );
 
@@ -91,6 +96,12 @@ export async function GET(request: Request) {
 
     // ── Fetch transactions for historical analysis ─────────────────────
     const fundingAccountIds = fundingAccounts.map((a: any) => a.id);
+    const allCategories = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.userId, userId));
+    const catById = new Map(allCategories.map((cat) => [cat.id.toString(), cat]));
+
     const allTxns = await db
       .select({ amount: transactions.amount, accountId: transactions.accountId, categoryId: transactions.categoryId })
       .from(transactions)
@@ -99,6 +110,8 @@ export async function GET(request: Request) {
           eq(transactions.userId, userId),
           sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
           inArray(transactions.accountId, fundingAccountIds),
+          eq(transactions.pending, false),
+          eq(transactions.ignored, false),
         )
       );
 
@@ -110,6 +123,13 @@ export async function GET(request: Request) {
     for (const txn of allTxns) {
       const amount = parseFloat(await decryptField(txn.amount, dek));
       const accId = txn.accountId;
+      const category = txn.categoryId ? catById.get(txn.categoryId.toString()) : undefined;
+      let excluded = category?.excludeFromReports ?? false;
+      if (!excluded && category?.parentId) {
+        const parent = catById.get(category.parentId.toString());
+        if (parent?.excludeFromReports) excluded = true;
+      }
+      if (excluded) continue;
 
       if (amount > 0) {
         if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);

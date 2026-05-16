@@ -7,6 +7,7 @@ import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from 
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 const LOG_TAG = '[sync]';
 
@@ -27,7 +28,11 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
@@ -43,9 +48,9 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
     const balance = acc.balance ? parseFloat(acc.balance) : 0;
     const accountType = acc.type.toLowerCase();
 
-    if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
+    if (isAssetAccount(accountType)) {
       totalAssets += balance;
-    } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
+    } else if (isLiabilityAccount(accountType)) {
       totalLiabilities += Math.abs(balance);
     }
 
@@ -83,7 +88,11 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
@@ -111,9 +120,14 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   if (userAccounts.length === 0) {
+    await getDb().delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
     return;
   }
 
@@ -169,6 +183,8 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     }
   }
 
+  await getDb().delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
+
   for (const [yearMonth, data] of Object.entries(monthlyData)) {
     const netCashFlow = data.income - data.expenses;
 
@@ -199,9 +215,14 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   if (userAccounts.length === 0) {
+    await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
     return;
   }
 
@@ -265,6 +286,8 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     categoryByMonth[yearMonth][catId].count++;
   }
 
+  await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
+
   for (const monthData of Object.values(categoryByMonth)) {
     for (const catData of Object.values(monthData)) {
       await getDb()
@@ -292,9 +315,16 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
-  if (userAccounts.length === 0) return;
+  if (userAccounts.length === 0) {
+    await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
+    return;
+  }
 
   const allCategories = await getDb()
     .select()
@@ -355,6 +385,8 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     categoryByMonth[yearMonth][catId].amount += parseFloat(tx.amount);
     categoryByMonth[yearMonth][catId].count++;
   }
+
+  await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
 
   for (const monthData of Object.values(categoryByMonth)) {
     for (const catData of Object.values(monthData)) {

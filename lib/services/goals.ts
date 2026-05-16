@@ -44,7 +44,12 @@ export async function getGoalProgress(goalId: string): Promise<GoalProgress | nu
     const acct = await db
       .select({ balance: accounts.balance })
       .from(accounts)
-      .where(and(eq(accounts.id, g.linkedAccountId), eq(accounts.userId, g.userId)))
+      .where(and(
+        eq(accounts.id, g.linkedAccountId),
+        eq(accounts.userId, g.userId),
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
+      ))
       .limit(1);
     if (acct[0]) {
       linkedAccountBalance = parseFloat(acct[0].balance);

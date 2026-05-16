@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and, or, sql, gte, lte, asc, desc, inArray, not } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, inArray } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const parsed = TransactionFilterSchema.safeParse({
     accountId: searchParams.get('accountId') ?? undefined,
     accountIds: searchParams.get('accountIds') ?? undefined,
-    accountTypes: searchParams.get('accountTypes') ?? undefined,
+    accountTypes: searchParams.get('accountTypes') ?? searchParams.get('accountType') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,
     categoryId: searchParams.get('categoryId') ?? undefined,
@@ -52,21 +52,13 @@ export async function GET(request: Request) {
 
   logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset });
 
-  // Build where clause (excluding encrypted field filters — applied in memory)
-  const whereConditions = [eq(transactions.userId, userId)];
-
-  // Filter out hidden accounts unless explicitly filtering by accountId
-  if (!filters.accountId) {
-    const hiddenAccountIds = await getDb()
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, true)));
-    
-    if (hiddenAccountIds.length > 0) {
-      const hiddenIds = hiddenAccountIds.map((a) => a.id);
-      whereConditions.push(not(inArray(transactions.accountId, hiddenIds)));
-    }
-  }
+  // Build where clause (excluding encrypted field filters — applied in memory).
+  // Hidden and excluded accounts are global exclusions for user-facing data.
+  const whereConditions = [
+    eq(transactions.userId, userId),
+    eq(accounts.isHidden, false),
+    eq(accounts.isExcludedFromNetWorth, false),
+  ];
 
   if (filters.accountIds) {
     const ids = filters.accountIds.split(',').map(id => id.trim()).filter(Boolean);

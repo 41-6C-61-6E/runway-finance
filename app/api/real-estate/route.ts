@@ -43,7 +43,11 @@ export async function GET(request: Request) {
     const allAccounts = await db
       .select()
       .from(accounts)
-      .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, false)))
+      .where(and(
+        eq(accounts.userId, userId),
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
+      ))
       .orderBy(asc(accounts.displayOrder));
 
     // Decrypt all accounts

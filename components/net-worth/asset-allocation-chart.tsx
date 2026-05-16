@@ -9,9 +9,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
-
-const ASSET_TYPES = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
-const LIABILITY_TYPES = ['credit', 'loan', 'mortgage'];
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 function formatTypeLabel(type: string): string {
   const map: Record<string, string> = {
@@ -47,7 +45,7 @@ export function AssetAllocationChart() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/accounts?includeHidden=true');
+        const res = await fetch('/api/accounts');
         if (!res.ok) throw new Error('Failed to fetch accounts');
         const data = await res.json();
         setAccounts(data);
@@ -65,9 +63,9 @@ export function AssetAllocationChart() {
     for (const acc of accounts) {
       const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
       if (!totalsByType[acc.type]) totalsByType[acc.type] = { assets: 0, liabilities: 0 };
-      if (ASSET_TYPES.includes(acc.type)) {
+      if (isAssetAccount(acc.type)) {
         totalsByType[acc.type].assets += balance;
-      } else if (LIABILITY_TYPES.includes(acc.type)) {
+      } else if (isLiabilityAccount(acc.type)) {
         totalsByType[acc.type].liabilities += Math.abs(balance);
       }
     }
@@ -75,6 +73,7 @@ export function AssetAllocationChart() {
       .sort(([, a], [, b]) => (b.assets + b.liabilities) - (a.assets + a.liabilities))
       .map(([type, vals]) => ({
         type: formatTypeLabel(type),
+        rawType: type,
         assets: vals.assets,
         liabilities: vals.liabilities,
       }));
@@ -84,12 +83,12 @@ export function AssetAllocationChart() {
   const totalLiabilitiesAll = chartData.reduce((s, d) => s + d.liabilities, 0);
 
   const pieData = chartData.flatMap((d) => [
-    d.assets > 0 ? { id: `${d.type} (Assets)`, value: d.assets, color: 'var(--color-chart-1)', type: d.type } : null,
-    d.liabilities > 0 ? { id: `${d.type} (Liabilities)`, value: d.liabilities, color: 'var(--color-destructive)', type: d.type } : null,
+    d.assets > 0 ? { id: `${d.type} (Assets)`, value: d.assets, color: 'var(--color-chart-1)', type: d.rawType } : null,
+    d.liabilities > 0 ? { id: `${d.type} (Liabilities)`, value: d.liabilities, color: 'var(--color-destructive)', type: d.rawType } : null,
   ].filter(Boolean) as { id: string; value: number; color: string; type: string }[]);
 
   const handleClick = (accountType: string) => {
-    router.push(`/transactions?accountType=${accountType}`);
+    router.push(`/transactions?accountTypes=${accountType}`);
   };
 
   if (loading) {

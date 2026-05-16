@@ -5,9 +5,10 @@ import { ResponsivePie } from '@nivo/pie';
 import { useRouter } from 'next/navigation';
 import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES } from '@/lib/utils/account-scope';
 
-const ASSET_TYPES = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
-const LIABILITY_TYPES = ['credit', 'loan', 'mortgage'];
+const ASSET_TYPES = ASSET_ACCOUNT_TYPES;
+const LIABILITY_TYPES = LIABILITY_ACCOUNT_TYPES;
 
 const RATING_THRESHOLDS = [
   { max: 0.35, label: 'Excellent', hue: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -93,7 +94,7 @@ export function DebtToAssetRatio() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/accounts?includeHidden=true');
+        const res = await fetch('/api/accounts');
         if (!res.ok) throw new Error('Failed to fetch accounts');
         const data = await res.json();
         setAccounts(data);
@@ -172,7 +173,7 @@ export function DebtToAssetRatio() {
   }, [activeCategories, activeTotal, unit]);
 
   const handleClick = (accountType: string) => {
-    router.push(`/transactions?accountType=${accountType}`);
+    router.push(`/transactions?accountTypes=${accountType}`);
   };
 
   const pct = ratio * 100;

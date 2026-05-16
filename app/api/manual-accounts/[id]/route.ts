@@ -7,6 +7,13 @@ import { deleteManualAccount } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
+import {
+  createAccountSnapshots,
+  createNetWorthSnapshot,
+  updateCategoryIncomeSummaries,
+  updateCategorySpendingSummaries,
+  updateMonthlyCashFlowSummaries,
+} from '@/lib/services/sync';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -79,8 +86,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(accounts.id, id))
     .returning();
 
+  if (body.isHidden !== undefined || body.isExcludedFromNetWorth !== undefined) {
+    const today = new Date().toISOString().split('T')[0];
+    await Promise.all([
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
+    ]);
+  }
+
   logger.info('PATCH /api/manual-accounts/[id]', { userId, id, fieldsChanged: Object.keys(updateData) });
-  return NextResponse.json(updated);
+  return NextResponse.json(updated ? await decryptRow('accounts', updated, dek) : updated);
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

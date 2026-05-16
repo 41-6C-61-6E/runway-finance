@@ -18,10 +18,10 @@ export function MathDescription({ chartId }: { chartId: string }) {
         <Calculator className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
         <div className="min-w-0">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
-            How this is calculated
+            Data trust and calculation
           </p>
           <p className="text-xs text-muted-foreground/80 leading-relaxed">
-            {math.description}
+            {math.description} Hidden accounts, excluded accounts, ignored transactions, pending transactions, and categories excluded from reports are omitted from analytics wherever the underlying data supports those filters.
           </p>
         </div>
       </div>
