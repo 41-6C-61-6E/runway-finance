@@ -128,21 +128,25 @@ export async function GET(request: Request) {
       }
 
       // Aggregate uncategorized across range
-      const uncatWhere = accountIdList.length > 0
-        ? `AND user_id = ${session.user.id}
+      const uncatSqlRange = accountIdList.length > 0
+        ? sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
+            FROM transactions
+            WHERE user_id = ${session.user.id}
               AND to_char(date, 'YYYY-MM') >= ${startMonth}
               AND to_char(date, 'YYYY-MM') <= ${endMonth}
               AND category_id IS NULL
               AND pending = false
               AND amount != 0
               AND account_id IN (${sql.raw(accountIdList.map((id) => `'${id}'`).join(', '))})`
-        : `AND user_id = ${session.user.id}
+        : sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
+            FROM transactions
+            WHERE user_id = ${session.user.id}
               AND to_char(date, 'YYYY-MM') >= ${startMonth}
               AND to_char(date, 'YYYY-MM') <= ${endMonth}
               AND category_id IS NULL
               AND pending = false
               AND amount != 0`;
-      const uncatResult = await db.execute(sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total FROM transactions WHERE ${uncatWhere}`);
+      const uncatResult = await db.execute(uncatSqlRange);
       const uncatRow = uncatResult.rows?.[0] as { total: unknown } | undefined;
       const uncategorizedTotal = Math.abs(parseFloat(String(uncatRow?.total ?? '0')));
 

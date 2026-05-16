@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
@@ -14,6 +14,9 @@ interface CategoryData {
   categoryColor: string;
   isIncome: boolean;
   amount: number;
+  parentId?: string | null;
+  parentName?: string | null;
+  parentColor?: string | null;
 }
 
 interface SummaryData {
@@ -27,6 +30,13 @@ interface AccountData {
   id: string;
   name: string;
   type: string;
+}
+
+interface CategoryInfo {
+  id: string;
+  parentId: string | null;
+  name: string;
+  color: string;
 }
 
 interface SankeyNode {
@@ -122,7 +132,6 @@ const FALLBACK_COLORS = [
   'var(--color-chart-5)',
 ];
 
-// Ensure a hex color is bright enough to be visible on dark backgrounds
 function boostColor(hex: string): string {
   const num = parseInt(hex.replace('#', ''), 16);
   const r = (num >> 16) & 0xff;
@@ -137,6 +146,208 @@ function boostColor(hex: string): string {
   return `#${((nr << 16) | (ng << 8) | nb).toString(16).padStart(6, '0')}`;
 }
 
+function buildParentLookup(allCategoryInfo: CategoryInfo[]): Map<string, { parentId: string; parentName: string; parentColor: string }> {
+  const lookup = new Map<string, { parentId: string; parentName: string; parentColor: string }>();
+  const byId = new Map<string, CategoryInfo>();
+  allCategoryInfo.forEach((c) => byId.set(c.id, c));
+  allCategoryInfo.forEach((cat) => {
+    if (cat.parentId) {
+      const parent = byId.get(cat.parentId);
+      if (parent) {
+        lookup.set(cat.id, { parentId: cat.parentId, parentName: parent.name, parentColor: parent.color });
+      }
+    }
+  });
+  return lookup;
+}
+
+function buildSankeyData(
+  categories: CategoryData[],
+  totalIncome: number,
+  totalExpenses: number,
+  showParents: boolean,
+  parentLookup: Map<string, { parentId: string; parentName: string; parentColor: string }>,
+): SankeyData {
+  const enriched = categories.map((cat) => {
+    const parentInfo = parentLookup.get(cat.categoryId);
+    if (parentInfo) {
+      return { ...cat, parentId: parentInfo.parentId, parentName: parentInfo.parentName, parentColor: parentInfo.parentColor };
+    }
+    return cat;
+  });
+
+  const incomeCategories = enriched.filter((c) => c.isIncome && c.amount > 0);
+  const expenseCategories = enriched.filter((c) => !c.isIncome && c.amount > 0);
+  const savings = Math.max(0, totalIncome - totalExpenses);
+
+  const nodes: SankeyNode[] = [];
+  const links: SankeyLink[] = [];
+  const hubId = '__available_funds__';
+  const createdParentNodes = new Set<string>();
+
+  if (showParents) {
+    const incomeByParent = new Map<string, CategoryData[]>();
+    const incomeNoParent: CategoryData[] = [];
+
+    incomeCategories.forEach((cat) => {
+      if (cat.parentId) {
+        const arr = incomeByParent.get(cat.parentId);
+        if (arr) arr.push(cat);
+        else incomeByParent.set(cat.parentId, [cat]);
+      } else {
+        incomeNoParent.push(cat);
+      }
+    });
+
+    incomeByParent.forEach((children, parentId) => {
+      const parentNodeId = `inc_parent_${parentId}`;
+      if (!createdParentNodes.has(parentNodeId)) {
+        createdParentNodes.add(parentNodeId);
+        const first = children[0];
+        const childIds = children.map((c) => c.categoryId).join(',');
+        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : FALLBACK_COLORS[0];
+        nodes.push({
+          id: parentNodeId,
+          label: first.parentName || 'Income',
+          color: boostColor(parentColor),
+          categoryId: childIds,
+        });
+      }
+
+      let totalForParent = 0;
+      children.forEach((cat) => {
+        const childNodeId = `inc_${cat.categoryId}`;
+        nodes.push({
+          id: childNodeId,
+          label: cat.categoryName,
+          color: boostColor(cat.categoryColor),
+          categoryId: cat.categoryId,
+        });
+        links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
+        totalForParent += cat.amount;
+      });
+
+      links.push({ source: parentNodeId, target: hubId, value: totalForParent });
+    });
+
+    incomeNoParent.forEach((cat) => {
+      const childNodeId = `inc_${cat.categoryId}`;
+      nodes.push({
+        id: childNodeId,
+        label: cat.categoryName,
+        color: boostColor(cat.categoryColor),
+        categoryId: cat.categoryId,
+      });
+      links.push({ source: childNodeId, target: hubId, value: cat.amount });
+    });
+  } else {
+    incomeCategories.forEach((cat) => {
+      const childNodeId = `inc_${cat.categoryId}`;
+      const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
+      nodes.push({
+        id: childNodeId,
+        label,
+        color: boostColor(cat.categoryColor),
+        categoryId: cat.categoryId,
+      });
+      links.push({ source: childNodeId, target: hubId, value: cat.amount });
+    });
+  }
+
+  if (incomeCategories.length === 0 && totalIncome > 0) {
+    const fallbackId = 'inc_fallback';
+    nodes.push({ id: fallbackId, label: 'Income', color: FALLBACK_COLORS[0] });
+    links.push({ source: fallbackId, target: hubId, value: totalIncome });
+  }
+
+  if (totalIncome > 0) {
+    nodes.push({ id: hubId, label: 'Available Funds', color: FALLBACK_COLORS[2] });
+  }
+
+  if (showParents) {
+    const expenseByParent = new Map<string, CategoryData[]>();
+    const expenseNoParent: CategoryData[] = [];
+
+    expenseCategories.forEach((cat) => {
+      if (cat.parentId) {
+        const arr = expenseByParent.get(cat.parentId);
+        if (arr) arr.push(cat);
+        else expenseByParent.set(cat.parentId, [cat]);
+      } else {
+        expenseNoParent.push(cat);
+      }
+    });
+
+    expenseByParent.forEach((children, parentId) => {
+      const parentNodeId = `exp_parent_${parentId}`;
+      if (!createdParentNodes.has(parentNodeId)) {
+        createdParentNodes.add(parentNodeId);
+        const first = children[0];
+        const childIds = children.map((c) => c.categoryId).join(',');
+        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : FALLBACK_COLORS[1];
+        nodes.push({
+          id: parentNodeId,
+          label: first.parentName || 'Expenses',
+          color: boostColor(parentColor),
+          categoryId: childIds,
+        });
+      }
+
+      let totalForParent = 0;
+      children.forEach((cat) => {
+        const childNodeId = `exp_${cat.categoryId}`;
+        nodes.push({
+          id: childNodeId,
+          label: cat.categoryName,
+          color: boostColor(cat.categoryColor),
+          categoryId: cat.categoryId,
+        });
+        links.push({ source: parentNodeId, target: childNodeId, value: cat.amount });
+        totalForParent += cat.amount;
+      });
+
+      links.push({ source: hubId, target: parentNodeId, value: totalForParent });
+    });
+
+    expenseNoParent.forEach((cat) => {
+      const childNodeId = `exp_${cat.categoryId}`;
+      nodes.push({
+        id: childNodeId,
+        label: cat.categoryName,
+        color: boostColor(cat.categoryColor),
+        categoryId: cat.categoryId,
+      });
+      links.push({ source: hubId, target: childNodeId, value: cat.amount });
+    });
+  } else {
+    expenseCategories.forEach((cat) => {
+      const childNodeId = `exp_${cat.categoryId}`;
+      const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
+      nodes.push({
+        id: childNodeId,
+        label,
+        color: boostColor(cat.categoryColor),
+        categoryId: cat.categoryId,
+      });
+      links.push({ source: hubId, target: childNodeId, value: cat.amount });
+    });
+  }
+
+  if (expenseCategories.length === 0 && totalExpenses > 0) {
+    const fallbackId = 'exp_fallback';
+    nodes.push({ id: fallbackId, label: 'Expenses', color: FALLBACK_COLORS[1] });
+    links.push({ source: hubId, target: fallbackId, value: totalExpenses });
+  }
+
+  if (savings > 0) {
+    const savingsId = '__savings__';
+    nodes.push({ id: savingsId, label: 'Savings', color: FALLBACK_COLORS[2] });
+    links.push({ source: hubId, target: savingsId, value: savings });
+  }
+
+  return { nodes, links };
+}
+
 export function CashFlowSankey() {
   const router = useRouter();
   const currentMonth = getCurrentMonth();
@@ -147,6 +358,11 @@ export function CashFlowSankey() {
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
+  const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
+  const [showParents, setShowParents] = useState(true);
+  const [accountFilterOpen, setAccountFilterOpen] = useState(false);
+  const [accountSearch, setAccountSearch] = useState('');
+  const accountFilterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (timeframe !== '1m') {
@@ -154,7 +370,6 @@ export function CashFlowSankey() {
     }
   }, [timeframe]);
 
-  // Fetch accounts for filtering
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
@@ -162,16 +377,32 @@ export function CashFlowSankey() {
         if (!res.ok) return;
         const json = await res.json();
         setAllAccounts(json);
-        // Reset excluded accounts when accounts list changes
         setExcludedAccountIds(new Set());
       } catch {
-        // Silently fail - accounts are optional for sankey
+        // Silently fail
       }
     };
     fetchAccounts();
   }, []);
 
-  // Toggle account inclusion/exclusion
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((data) => setAllCategoryInfo(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (accountFilterRef.current && !accountFilterRef.current.contains(e.target as Node)) {
+        setAccountFilterOpen(false);
+        setAccountSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
       const next = new Set(prev);
@@ -181,7 +412,6 @@ export function CashFlowSankey() {
     });
   };
 
-  // Build account filter query param
   const getAccountIdsParam = (): string => {
     if (excludedAccountIds.size === 0 || excludedAccountIds.size >= allAccounts.length) return '';
     const includedAccounts = allAccounts.filter((a) => !excludedAccountIds.has(a.id));
@@ -222,57 +452,9 @@ export function CashFlowSankey() {
           totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
         }
 
-        const incomeCategories = categories.filter((c) => c.isIncome && c.amount > 0);
-        const expenseCategories = categories.filter((c) => !c.isIncome && c.amount > 0);
-        const savings = Math.max(0, totalIncome - totalExpenses);
-
-        const nodes: SankeyNode[] = [];
-        const links: SankeyLink[] = [];
-
-        // Hub node — acts as the bridge between income and expenses
-        const hubId = '__available_funds__';
-
-        // --- Income column (left side) ---
-        if (incomeCategories.length > 0) {
-          incomeCategories.forEach((cat) => {
-            const nodeId = `inc_${cat.categoryId}`;
-            nodes.push({ id: nodeId, label: cat.categoryName, color: boostColor(cat.categoryColor), categoryId: cat.categoryId });
-            // Each income category links to the hub with its real total
-            links.push({ source: nodeId, target: hubId, value: cat.amount });
-          });
-        } else if (totalIncome > 0) {
-          const fallbackId = 'inc_fallback';
-          nodes.push({ id: fallbackId, label: 'Income', color: FALLBACK_COLORS[0] });
-          links.push({ source: fallbackId, target: hubId, value: totalIncome });
-        }
-
-        // Hub node (middle column)
-        if (totalIncome > 0) {
-          nodes.push({ id: hubId, label: 'Available Funds', color: FALLBACK_COLORS[2] });
-        }
-
-        // --- Expense column (right side) ---
-        if (expenseCategories.length > 0) {
-          expenseCategories.forEach((cat) => {
-            const nodeId = `exp_${cat.categoryId}`;
-            nodes.push({ id: nodeId, label: cat.categoryName, color: boostColor(cat.categoryColor), categoryId: cat.categoryId });
-            // Hub links to each expense category with its real total
-            links.push({ source: hubId, target: nodeId, value: cat.amount });
-          });
-        } else if (totalExpenses > 0) {
-          const fallbackId = 'exp_fallback';
-          nodes.push({ id: fallbackId, label: 'Expenses', color: FALLBACK_COLORS[1] });
-          links.push({ source: hubId, target: fallbackId, value: totalExpenses });
-        }
-
-        // Savings link from hub
-        if (savings > 0) {
-          const savingsId = '__savings__';
-          nodes.push({ id: savingsId, label: 'Savings', color: FALLBACK_COLORS[2] });
-          links.push({ source: hubId, target: savingsId, value: savings });
-        }
-
-        setSankeyData({ nodes, links });
+        const parentLookup = buildParentLookup(allCategoryInfo);
+        const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
+        setSankeyData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -280,7 +462,7 @@ export function CashFlowSankey() {
       }
     };
     fetchData();
-  }, [timeframe, month, excludedAccountIds, allAccounts]);
+  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
 
   const getNodeCategoryId = (nodeName: string): string | undefined => {
     return sankeyData?.nodes.find((n) => n.id === nodeName)?.categoryId;
@@ -296,7 +478,6 @@ export function CashFlowSankey() {
   };
 
   const handleNodeClick = (nodeId: string) => {
-    // Skip non-category hub nodes
     if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) {
@@ -347,7 +528,7 @@ export function CashFlowSankey() {
         <div className="p-5 pb-2">
           <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
         </div>
-        <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+        <div className="h-[450px] flex items-center justify-center text-muted-foreground">
           <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
         </div>
       </div>
@@ -375,10 +556,100 @@ export function CashFlowSankey() {
     );
   }
 
+  const filteredAccounts = allAccounts.filter(
+    (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()),
+  );
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
+        <div className="flex items-center gap-3">
+          {/* Parent categories toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <span className="text-[10px] text-muted-foreground">Groups</span>
+            <button
+              onClick={() => setShowParents(!showParents)}
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                showParents ? 'bg-primary' : 'bg-muted-foreground/30'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
+                  showParents ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                }`}
+              />
+            </button>
+          </label>
+          {/* Account filter dropdown */}
+          {allAccounts.length > 0 && (
+            <div className="relative" ref={accountFilterRef}>
+              <button
+                type="button"
+                onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
+                className="px-2.5 py-1 bg-background border border-input rounded-lg text-foreground text-[10px] focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}</span>
+                <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {accountFilterOpen && (
+                <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 flex flex-col">
+                  <div className="p-2 border-b border-border">
+                    <input
+                      type="text"
+                      value={accountSearch}
+                      onChange={(e) => setAccountSearch(e.target.value)}
+                      placeholder="Search accounts..."
+                      className="w-full px-2 py-1 bg-background border border-input rounded text-[10px] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-1">
+                    {filteredAccounts.length === 0 ? (
+                      <div className="px-2 py-3 text-[10px] text-muted-foreground text-center">No results</div>
+                    ) : (
+                      <>
+                        <label className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
+                          <input
+                            type="checkbox"
+                            checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
+                            onChange={() => {
+                              const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
+                              const next = new Set(excludedAccountIds);
+                              if (allSelected) {
+                                filteredAccounts.forEach((a) => next.add(a.id));
+                              } else {
+                                filteredAccounts.forEach((a) => next.delete(a.id));
+                              }
+                              setExcludedAccountIds(next);
+                            }}
+                            className="rounded border-border bg-background text-primary focus:ring-ring"
+                          />
+                          Select All
+                        </label>
+                        {filteredAccounts.map((acc) => (
+                          <label
+                            key={acc.id}
+                            className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!excludedAccountIds.has(acc.id)}
+                              onChange={() => toggleAccount(acc.id)}
+                              className="rounded border-border bg-background text-primary focus:ring-ring"
+                            />
+                            {acc.name}
+                          </label>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <div className="px-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <TimeRangeFilter value={timeframe} presets={
@@ -400,38 +671,18 @@ export function CashFlowSankey() {
           </div>
         )}
       </div>
-      {/* Account filter pills */}
-      {allAccounts.length > 0 && (
-        <div className="px-5 pb-2 flex flex-wrap gap-1">
-          {allAccounts.map((acc) => {
-            const isExcluded = excludedAccountIds.has(acc.id);
-            return (
-              <button
-                key={acc.id}
-                onClick={() => toggleAccount(acc.id)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${
-                  isExcluded
-                    ? 'border-border/30 text-muted-foreground/30'
-                    : 'border-primary/30 text-foreground font-medium bg-primary/5'
-                }`}
-              >
-                {acc.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div className="h-[400px] px-2 pb-2">
-        <div className="financial-chart h-full">
+      <div className={showParents ? 'h-[550px]' : 'h-[400px]'}>
+        <div className="financial-chart h-full px-2 pb-2">
           <ResponsiveSankey
             data={sankeyData}
+            label="label"
             margin={{ top: 20, right: 120, bottom: 20, left: 120 }}
             align="justify"
             colors={node => (node as unknown as { color: string }).color}
             nodeOpacity={1}
             nodeHoverOthersOpacity={0.6}
-            nodeThickness={24}
-            nodeSpacing={28}
+            nodeThickness={showParents ? 20 : 24}
+            nodeSpacing={showParents ? 22 : 28}
             nodeBorderWidth={0}
             linkOpacity={1}
             linkHoverOpacity={1}

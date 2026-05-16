@@ -233,7 +233,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
                                       {child.name}
                                     </button>
-                                  )}
+                                  ))}
                                 </div>
                               );
                             })}

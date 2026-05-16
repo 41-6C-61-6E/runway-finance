@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       const ids = accountIdsParam.split(',').filter(Boolean);
       fundingAccounts = fundingAccounts.filter((a) => ids.includes(a.id));
     } else if (accountType === 'banking') {
-      fundingAccounts = fundingAccounts.filter((a) => ['checking', 'savings', 'credit'].includes(a.type));
+      fundingAccounts = fundingAccounts.filter((a) => ['checking', 'savings'].includes(a.type));
     } else if (accountType === 'cash') {
       fundingAccounts = fundingAccounts.filter((a) => ['checking', 'savings'].includes(a.type));
     }
