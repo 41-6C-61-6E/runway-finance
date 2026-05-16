@@ -49,6 +49,24 @@ function getDateRange(point: NetWorthDataPoint): { startDate: string; endDate: s
   };
 }
 
+function toFiniteNumber(value: unknown): number {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function toDateKey(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  if (typeof value === 'string') {
+    const dateOnly = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    if (dateOnly) return dateOnly;
+  }
+
+  return null;
+}
+
 export function NetWorthChart() {
   const router = useRouter();
   const { isEnabled } = useSyntheticData();
@@ -77,8 +95,26 @@ export function NetWorthChart() {
         if (!response.ok) throw new Error('Failed to fetch chart data');
 
         const result: ChartResponse = await response.json();
-        setData(result.data);
-        setSummary(result.summary);
+        const normalizedData = Array.isArray(result.data)
+          ? result.data
+              .map((point) => ({
+                date: toDateKey(point.date) ?? String(point.date),
+                netWorth: toFiniteNumber(point.netWorth),
+                totalAssets: toFiniteNumber(point.totalAssets),
+                totalLiabilities: toFiniteNumber(point.totalLiabilities),
+                isSynthetic: Boolean(point.isSynthetic),
+              }))
+              .filter((point) => /^\d{4}-\d{2}-\d{2}$/.test(point.date))
+          : [];
+        setData(normalizedData);
+        setSummary(result.summary ? {
+          current: toFiniteNumber(result.summary.current),
+          previous: toFiniteNumber(result.summary.previous),
+          change: toFiniteNumber(result.summary.change),
+          percentChange: toFiniteNumber(result.summary.percentChange),
+          includedAccounts: toFiniteNumber(result.summary.includedAccounts),
+          totalAccounts: toFiniteNumber(result.summary.totalAccounts),
+        } : null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -127,14 +163,17 @@ export function NetWorthChart() {
 
   const SyntheticOverlay = ({ series, xScale, yScale }: any) => {
     const mainSeries = series[0];
-    if (!mainSeries || mainSeries.data.length < 2) return null;
+    if (!mainSeries || !Array.isArray(mainSeries.data) || mainSeries.data.length < 2) return null;
 
     const estimatedPoints: Array<{ x: number; y: number }> = [];
 
-    for (const d of mainSeries.data) {
-      const px = xScale(d.data.x);
-      const py = yScale(d.data.y);
-      if (px != null && py != null && d.data.isSynthetic) {
+    for (const point of mainSeries.data) {
+      const data = point?.data;
+      if (!data?.isSynthetic) continue;
+
+      const px = point.position?.x ?? xScale?.(data.x);
+      const py = point.position?.y ?? yScale?.(data.y);
+      if (Number.isFinite(px) && Number.isFinite(py)) {
         estimatedPoints.push({ x: px, y: py });
       }
     }
@@ -278,9 +317,9 @@ export function NetWorthChart() {
           'mesh',
         ] as any}
         onClick={(raw) => {
-          const p = raw as unknown as { data: { x: Date; xFormatted: string } };
-          const d = p.data.x;
-          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const p = raw as unknown as { data?: { x?: Date | string; xFormatted?: string } };
+          const dateStr = toDateKey(p.data?.x);
+          if (!dateStr) return;
           const pt = chartData.find((pt) => pt.date === dateStr);
           if (pt) handlePointClick(pt);
         }}
