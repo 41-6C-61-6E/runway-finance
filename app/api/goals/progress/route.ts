@@ -63,9 +63,9 @@ export async function POST(req: NextRequest) {
       .returning();
 
     logger.info('POST /api/goals/progress', { goalId, newCurrentAmount });
-    const decryptedGoal = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];
+    const updatedGoal = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];
     return NextResponse.json({
-      goal: decryptedGoal,
+      goal: updatedGoal,
       syncedBalance: newCurrentAmount,
     });
   } catch (err) {
