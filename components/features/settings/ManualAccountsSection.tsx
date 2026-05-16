@@ -323,6 +323,10 @@ export default function ManualAccountsSection() {
     for (const [k, v] of Object.entries(meta)) {
       flat[k] = String(v ?? '');
     }
+    if (account.type === 'realestate') {
+      const ids = (meta.mortgageAccountIds as string[]) ?? [];
+      flat.linkedMortgageId = ids[0] ?? '';
+    }
     setEditMeta(flat);
     setError('');
   };
@@ -339,6 +343,9 @@ export default function ManualAccountsSection() {
       }
       if (editAccount.type === 'realestate') {
         metadata.propertyId = editMeta.propertyId || '';
+        if (editMeta.purchasePrice) metadata.purchasePrice = parseFloat(editMeta.purchasePrice);
+        if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
+        if (editMeta.zipCode) metadata.zipCode = editMeta.zipCode;
         if (editMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [editMeta.linkedMortgageId];
         } else {
@@ -952,6 +959,33 @@ export default function ManualAccountsSection() {
                     value={editMeta.propertyId || ''}
                     onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
                     placeholder="e.g., 446533"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editMeta.purchasePrice || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
+                    <Input
+                      type="date"
+                      value={editMeta.purchaseDate || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
+                  <Input
+                    value={editMeta.zipCode || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, zipCode: e.target.value }))}
+                    placeholder="e.g., 94105"
                   />
                 </div>
                 {linkedMortgageField(editMeta, (m) => setEditMeta(m))}
