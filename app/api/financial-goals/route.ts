@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { financialGoals } from '@/lib/db/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRows, encryptRow } from '@/lib/crypto';
+import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -61,9 +61,10 @@ export async function POST(req: NextRequest) {
     }, dek);
 
     const goal = await getDb().insert(financialGoals).values(encryptedValues).returning();
+    const decrypted = await decryptRow('financial_goals', goal[0], dek);
 
     logger.info('POST /api/financial-goals', { goalId: goal[0].id });
-    return NextResponse.json(goal[0], { status: 201 });
+    return NextResponse.json(decrypted, { status: 201 });
   } catch (err) {
     logger.error('POST /api/financial-goals', { error: err });
     return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
@@ -122,7 +123,8 @@ export async function PATCH(req: NextRequest) {
       .returning();
 
     logger.info('PATCH /api/financial-goals', { goalId: id });
-    return NextResponse.json(updated[0]);
+    const decrypted = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];
+    return NextResponse.json(decrypted);
   } catch (err) {
     logger.error('PATCH /api/financial-goals', { error: err });
     return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
