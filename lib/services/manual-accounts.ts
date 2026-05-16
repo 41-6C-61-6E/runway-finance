@@ -5,6 +5,8 @@ import { randomUUID } from 'crypto';
 import { logger } from '@/lib/logger';
 import { ensureSystemCategories } from '@/lib/db/seed-categories';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
+import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
+import { getSessionDEK } from '@/lib/crypto-context';
 import type { ApiConfig } from '@/lib/services/asset-estimator';
 
 const LOG_TAG = '[manual-accounts]';
@@ -31,7 +33,12 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
       .from(userSettings)
       .where(eq(userSettings.userId, userId))
       .limit(1);
-    const keys = (settings?.apiKeys ?? {}) as Record<string, string>;
+    let keys: Record<string, string> = {};
+    if (settings?.apiKeys) {
+      const dek = await getSessionDEK();
+      const decrypted = await decryptField(settings.apiKeys, dek);
+      keys = JSON.parse(decrypted);
+    }
     return {
       metalsApiUrl: keys.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl,
       metalsApiKey: keys.metalsApiKey || '',
@@ -43,7 +50,8 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
       btcApiKey: keys.btcApiKey || '',
       btcXpubApiUrl: keys.btcXpubApiUrl || DEFAULT_API_CONFIG.btcXpubApiUrl,
     };
-  } catch {
+  } catch (err) {
+    // May fail if no session DEK is available, fall back to defaults
     return { ...DEFAULT_API_CONFIG };
   }
 }
@@ -272,33 +280,37 @@ export async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiCon
   return price;
 }
 
-export async function createManualAccount(input: CreateManualAccountInput) {
+export async function createManualAccount(input: CreateManualAccountInput, dek?: Uint8Array) {
   const db = getDb();
   const accountType = ACCOUNT_TYPE_MAP[input.type];
 
   const initialValue = input.initialValue ?? 0;
 
+  const rawValues = {
+    userId: input.userId,
+    connectionId: null,
+    externalId: manualExternalId(),
+    name: input.name,
+    currency: input.currency ?? 'USD',
+    balance: String(initialValue),
+    balanceDate: new Date(),
+    type: accountType,
+    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+    institution: null,
+    isHidden: false,
+    isExcludedFromNetWorth: false,
+    displayOrder: 0,
+  };
+
+  const values = dek ? await encryptRow('accounts', rawValues, dek) : rawValues;
+
   const [account] = await db
     .insert(accounts)
-    .values({
-      userId: input.userId,
-      connectionId: null,
-      externalId: manualExternalId(),
-      name: input.name,
-      currency: input.currency ?? 'USD',
-      balance: String(initialValue),
-      balanceDate: new Date(),
-      type: accountType,
-      metadata: input.metadata ?? {},
-      institution: null,
-      isHidden: false,
-      isExcludedFromNetWorth: false,
-      displayOrder: 0,
-    })
+    .values(values)
     .returning();
 
   if (initialValue !== 0) {
-    await db.insert(transactions).values({
+    const txnValues = {
       userId: input.userId,
       accountId: account.id,
       externalId: adjExternalId(),
@@ -309,7 +321,9 @@ export async function createManualAccount(input: CreateManualAccountInput) {
       memo: null,
       pending: false,
       categoryId: await ensureSystemCategories(input.userId),
-    });
+    };
+    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+    await db.insert(transactions).values(encryptedTxn);
   }
 
   // Generate synthetic historical snapshots if purchase info is present
@@ -331,7 +345,8 @@ export async function createManualAccount(input: CreateManualAccountInput) {
 export async function syncManualAccount(
   accountId: string,
   userId: string,
-  apiConfig?: ApiConfig
+  apiConfig?: ApiConfig,
+  dek?: Uint8Array
 ): Promise<SyncResult> {
   const db = getDb();
   const [account] = await db
@@ -344,8 +359,9 @@ export async function syncManualAccount(
     return { status: 'error', newBalance: 0, oldBalance: 0, changed: false, errorMessage: 'Account not found' };
   }
 
-  const oldBalance = parseFloat(account.balance.toString());
-  const meta = (account.metadata ?? {}) as Record<string, unknown>;
+  const oldBalance = parseFloat(dek ? await decryptField(account.balance, dek) : account.balance.toString());
+  const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
+  const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}') as Record<string, unknown>;
   let newValue: number;
 
   try {
@@ -388,11 +404,12 @@ export async function syncManualAccount(
   const delta = newValue - oldBalance;
   logger.info(`${LOG_TAG} Sync comparison for ${accountId} (${account.type}): oldBalance=${oldBalance}, newValue=${newValue}, delta=${delta}`);
 
-  await db.update(accounts).set({
-    balance: String(newValue),
+  const accountUpdate: any = {
+    balance: dek ? await encryptField(String(newValue), dek) : String(newValue),
     balanceDate: new Date(),
     updatedAt: new Date(),
-  }).where(eq(accounts.id, accountId));
+  };
+  await db.update(accounts).set(accountUpdate).where(eq(accounts.id, accountId));
 
   if (Math.abs(delta) > 0.0001) {
     const assetTypeLabels: Record<string, string> = {
@@ -400,7 +417,7 @@ export async function syncManualAccount(
       crypto: 'Bitcoin',
       metals: 'Metals',
     };
-    await db.insert(transactions).values({
+    const txnValues = {
       userId,
       accountId,
       externalId: adjExternalId(),
@@ -411,16 +428,20 @@ export async function syncManualAccount(
       memo: null,
       pending: false,
       categoryId: await ensureSystemCategories(userId),
-    });
+    };
+    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+    await db.insert(transactions).values(encryptedTxn);
   }
 
   await createAccountSnapshotsForUser(userId);
-  await updateNetWorthSnapshot(userId);
+  await updateNetWorthSnapshot(userId, dek);
 
   // Regenerate synthetic history for real estate to keep HPI curve aligned
   if (account.type === 'realestate' || account.type === 'metals') {
     try {
-      await generateAssetHistorySnapshots(accountId, userId, account.type, account.metadata as Record<string, unknown> ?? {}, apiConfig);
+      const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
+      const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}') as Record<string, unknown>;
+      await generateAssetHistorySnapshots(accountId, userId, account.type, meta, apiConfig);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to regenerate history for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -443,7 +464,8 @@ export async function adjustManualAccountValue(
   newValue: number,
   note?: string,
   amountOz?: number,
-  apiConfig?: ApiConfig
+  apiConfig?: ApiConfig,
+  dek?: Uint8Array
 ): Promise<SyncResult> {
   const db = getDb();
   const [account] = await db
@@ -456,9 +478,10 @@ export async function adjustManualAccountValue(
     return { status: 'error', newBalance: 0, oldBalance: 0, changed: false, errorMessage: 'Account not found' };
   }
 
-  const oldBalance = parseFloat(account.balance.toString());
+  const oldBalance = parseFloat(dek ? await decryptField(account.balance, dek) : account.balance.toString());
   let finalNewValue = newValue;
-  const meta = (account.metadata ?? {}) as Record<string, unknown>;
+  const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
+  const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}');
 
   if (account.type === 'metals' && amountOz !== undefined) {
     try {
@@ -471,15 +494,19 @@ export async function adjustManualAccountValue(
       return { status: 'error', newBalance: oldBalance, oldBalance, changed: false, errorMessage: msg };
     }
 
+    const updatedMeta = { ...meta, amountOz };
+    const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
+    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
     await db.update(accounts).set({
-      balance: String(finalNewValue),
+      balance: encryptedBalance,
       balanceDate: new Date(),
       updatedAt: new Date(),
-      metadata: { ...meta, amountOz },
+      metadata: encryptedMeta,
     }).where(eq(accounts.id, accountId));
   } else {
+    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
     await db.update(accounts).set({
-      balance: String(finalNewValue),
+      balance: encryptedBalance,
       balanceDate: new Date(),
       updatedAt: new Date(),
     }).where(eq(accounts.id, accountId));
@@ -488,7 +515,7 @@ export async function adjustManualAccountValue(
   const delta = finalNewValue - oldBalance;
 
   if (Math.abs(delta) > 0.0001) {
-    await db.insert(transactions).values({
+    const txnValues = {
       userId,
       accountId,
       externalId: adjExternalId(),
@@ -499,11 +526,13 @@ export async function adjustManualAccountValue(
       memo: null,
       pending: false,
       categoryId: await ensureSystemCategories(userId),
-    });
+    };
+    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+    await db.insert(transactions).values(encryptedTxn);
   }
 
   await createAccountSnapshotsForUser(userId);
-  await updateNetWorthSnapshot(userId);
+  await updateNetWorthSnapshot(userId, dek);
 
   const changed = Math.abs(delta) > 0.0001;
   logger.info(`${LOG_TAG} Account value adjusted`, { accountId, type: account.type, oldBalance, newValue: finalNewValue, changed, note });
@@ -554,20 +583,21 @@ async function createAccountSnapshotsForUser(userId: string) {
 
   const today = nowISO();
   for (const acc of userAccounts) {
+    const balance = acc.balance;
     await db.insert(accountSnapshots).values({
       userId,
       accountId: acc.id,
       snapshotDate: today,
-      balance: acc.balance.toString(),
+      balance,
       isSynthetic: false,
     }).onConflictDoUpdate({
       target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-      set: { balance: acc.balance.toString(), isSynthetic: false },
+      set: { balance, isSynthetic: false },
     });
   }
 }
 
-async function updateNetWorthSnapshot(userId: string) {
+async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
   const db = getDb();
   const userAccounts = await db
     .select()
@@ -581,7 +611,7 @@ async function updateNetWorthSnapshot(userId: string) {
   for (const acc of userAccounts) {
     if (acc.isExcludedFromNetWorth) continue;
 
-    const balance = parseFloat(acc.balance.toString());
+    const balance = parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance.toString());
     const accountType = acc.type.toLowerCase();
 
     const assetTypes = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
@@ -603,20 +633,18 @@ async function updateNetWorthSnapshot(userId: string) {
   const netWorth = totalAssets - totalLiabilities;
   const today = nowISO();
 
-  await db.insert(netWorthSnapshots).values({
+  const nwValues: any = {
     userId,
     snapshotDate: today,
     totalAssets: String(totalAssets),
     totalLiabilities: String(totalLiabilities),
     netWorth: String(netWorth),
     breakdown,
-  }).onConflictDoUpdate({
+  };
+  const encryptedNw = dek ? await encryptRow('net_worth_snapshots', nwValues, dek) : nwValues;
+
+  await db.insert(netWorthSnapshots).values(encryptedNw).onConflictDoUpdate({
     target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
-    set: {
-      totalAssets: String(totalAssets),
-      totalLiabilities: String(totalLiabilities),
-      netWorth: String(netWorth),
-      breakdown,
-    },
+    set: encryptedNw,
   });
 }

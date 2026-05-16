@@ -4,6 +4,8 @@ import { getDb } from '@/lib/db';
 import { budgets } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { encryptRow } from '@/lib/crypto';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -11,6 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   let body: Record<string, unknown>;
   try {
@@ -30,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const updateData: Record<string, unknown> = {};
+  let updateData: Record<string, unknown> = {};
   if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
   if (body.periodType !== undefined) updateData.periodType = body.periodType;
   if (body.amount !== undefined) updateData.amount = String(body.amount);
@@ -43,6 +46,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.rollover !== undefined) updateData.rollover = body.rollover;
   if (body.notes !== undefined) updateData.notes = body.notes || null;
   updateData.updatedAt = new Date();
+
+  updateData = await encryptRow('budgets', updateData, dek);
 
   try {
     const [updated] = await db

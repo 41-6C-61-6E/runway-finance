@@ -3,13 +3,16 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { monthlyCashFlow } from '@/lib/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField } from '@/lib/crypto';
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const db = getDb();
+  const dek = await getSessionDEK();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -23,13 +26,13 @@ export async function GET() {
       and(eq(monthlyCashFlow.userId, session.user.id), eq(monthlyCashFlow.yearMonth, previousMonth))
     );
 
-    const income = current ? parseFloat(current.totalIncome.toString()) : 0;
-    const expenses = current ? parseFloat(current.totalExpenses.toString()) : 0;
+    const income = current ? parseFloat(await decryptField(current.totalIncome, dek)) : 0;
+    const expenses = current ? parseFloat(await decryptField(current.totalExpenses, dek)) : 0;
     const netIncome = income - expenses;
     const savingsRate = income > 0 ? (netIncome / income) * 100 : 0;
 
-    const prevIncome = previous ? parseFloat(previous.totalIncome.toString()) : 0;
-    const prevExpenses = previous ? parseFloat(previous.totalExpenses.toString()) : 0;
+    const prevIncome = previous ? parseFloat(await decryptField(previous.totalIncome, dek)) : 0;
+    const prevExpenses = previous ? parseFloat(await decryptField(previous.totalExpenses, dek)) : 0;
     const prevNet = prevIncome - prevExpenses;
 
     logger.info('GET /api/cash-flow/summary', { currentMonth, netIncome });

@@ -16,24 +16,25 @@ services:
 
   runway-app:
     container_name: runway-app
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
+    image: alanracek/runway-finance:latest
     ports:
       - "3001:3000"
     env_file:
       - .env
     environment:
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}        # URL where login page and app are hosted
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}  # Admin set KEY used for authenticaiton
+
+      #Not implemented yet
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - DATABASE_URL=${DATABASE_URL}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - REGISTRATION_PIN=${REGISTRATION_PIN}
+
+      # User defined
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}      # Admin set KEY used for passowrd resets and data recovery
+      - REGISTRATION_PIN=${REGISTRATION_PIN}  # PIN needed to register a new account, set to empty string to disable new registration
       - FRED_API_KEY=${FRED_API_KEY}
 
+      - DATABASE_URL=${DATABASE_URL}
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
       - SYNC_CRON_SCHEDULE=0 */6 * * *

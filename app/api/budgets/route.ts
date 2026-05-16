@@ -4,6 +4,8 @@ import { getDb } from '@/lib/db';
 import { budgets, categories, categorySpendingSummary, categoryIncomeSummary } from '@/lib/db/schema';
 import { eq, and, or, isNull, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
 
 function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
   if (periodKey) {
@@ -71,6 +73,7 @@ export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const periodType = searchParams.get('periodType') || 'monthly';
@@ -111,9 +114,16 @@ export async function GET(request: Request) {
         )
       );
 
+    // Decrypt budget amounts and notes
+    const decryptedBudgetRows = await Promise.all(budgetRows.map(async (row) => ({
+      ...row,
+      amount: await decryptField(row.amount, dek),
+      notes: row.notes ? await decryptField(row.notes, dek).catch(() => row.notes) : null,
+    })));
+
     const categoryIds = budgetRows.map((b) => b.categoryId).filter(Boolean);
-    const incomeCategoryIds = budgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean);
-    const expenseCategoryIds = budgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean);
+    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean);
+    const expenseCategoryIds = decryptedBudgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean);
 
     async function fetchActuals(
       table: typeof categorySpendingSummary | typeof categoryIncomeSummary,
@@ -124,66 +134,42 @@ export async function GET(request: Request) {
       const yearCol = 'yearMonth' in table ? table.yearMonth : categorySpendingSummary.yearMonth;
       const amountCol = 'amount' in table ? table.amount : categorySpendingSummary.amount;
 
-      let rows: Array<{ categoryId: string; amount: string }> = [];
+      // Fetch individual monthly rows (no SUM at DB level since values are encrypted)
+      const rawRows = await db
+        .select({
+          categoryId: idCol,
+          yearMonth: yearCol,
+          amount: amountCol,
+        })
+        .from(table)
+        .where(
+          and(
+            eq(table.userId, session.user.id),
+            sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
+          )
+        );
 
-      if (periodType === 'quarterly') {
-        const [y, q] = bounds.yearMonth.split('-Q').map(Number);
-        const months = [];
-        for (let m = (q - 1) * 3 + 1; m <= q * 3; m++) {
-          months.push(`${y}-${String(m).padStart(2, '0')}`);
+      // Decrypt and aggregate in memory
+      const totals = new Map<string, number>();
+      for (const row of rawRows) {
+        const ym = String(row.yearMonth);
+        // Filter by period in memory
+        if (periodType === 'quarterly') {
+          const qStart = bounds.startDate.slice(0, 7);
+          const qEnd = bounds.endDate.slice(0, 7);
+          if (ym < qStart || ym > qEnd) continue;
+        } else if (periodType === 'yearly') {
+          if (!ym.startsWith(bounds.yearMonth)) continue;
+        } else {
+          if (ym !== bounds.yearMonth) continue;
         }
-        const yearColName = yearCol.name;
-        const idColName = idCol.name;
-        rows = await db
-          .select({
-            categoryId: idCol,
-            amount: sql<string>`SUM(${amountCol})`,
-          })
-          .from(table)
-          .where(
-            and(
-              eq(table.userId, session.user.id),
-              sql`${yearCol} IN ${sql.raw(`(${months.map((m) => `'${m}'`).join(',')})`)}`,
-              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
-            )
-          )
-          .groupBy(idCol);
-      } else if (periodType === 'yearly') {
-        rows = await db
-          .select({
-            categoryId: idCol,
-            amount: sql<string>`SUM(${amountCol})`,
-          })
-          .from(table)
-          .where(
-            and(
-              eq(table.userId, session.user.id),
-              sql`${yearCol} LIKE ${bounds.yearMonth + '%'}`,
-              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
-            )
-          )
-          .groupBy(idCol);
-      } else {
-        rows = await db
-          .select({
-            categoryId: idCol,
-            amount: amountCol,
-          })
-          .from(table)
-          .where(
-            and(
-              eq(table.userId, session.user.id),
-              eq(yearCol, bounds.yearMonth),
-              sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
-            )
-          );
+
+        const decrypted = await decryptField(String(row.amount), dek);
+        const prev = totals.get(row.categoryId) || 0;
+        totals.set(row.categoryId, prev + parseFloat(decrypted));
       }
 
-      const map = new Map<string, number>();
-      for (const row of rows) {
-        map.set(row.categoryId, parseFloat(row.amount.toString()));
-      }
-      return map;
+      return totals;
     }
 
     const [expenseActualMap, incomeActualMap] = await Promise.all([
@@ -191,8 +177,8 @@ export async function GET(request: Request) {
       fetchActuals(categoryIncomeSummary, incomeCategoryIds),
     ]);
 
-    const data = budgetRows.map((row) => {
-      const budgeted = parseFloat(row.amount.toString());
+    const data = decryptedBudgetRows.map((row) => {
+      const budgeted = parseFloat(row.amount);
       const isIncome = row.isIncome ?? false;
       const actual = isIncome
         ? incomeActualMap.get(row.categoryId) || 0
@@ -239,6 +225,7 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -248,20 +235,22 @@ export async function POST(request: Request) {
 
   const db = getDb();
   try {
+    const encryptedValues = await encryptRow('budgets', {
+      userId: session.user.id,
+      categoryId: body.categoryId as string,
+      periodType: (body.periodType as string) || 'monthly',
+      yearMonth: body.periodKey as string ?? null,
+      periodKey: body.periodKey as string ?? null,
+      amount: String(body.amount ?? 0),
+      isRecurring: body.isRecurring !== false,
+      fundingAccountId: (body.fundingAccountId as string) ?? null,
+      rollover: body.rollover === true,
+      notes: (body.notes as string) ?? null,
+    }, dek);
+
     const [budget] = await db
       .insert(budgets)
-      .values({
-        userId: session.user.id,
-        categoryId: body.categoryId as string,
-        periodType: (body.periodType as string) || 'monthly',
-        yearMonth: body.periodKey as string ?? null,
-        periodKey: body.periodKey as string ?? null,
-        amount: String(body.amount ?? 0),
-        isRecurring: body.isRecurring !== false,
-        fundingAccountId: (body.fundingAccountId as string) ?? null,
-        rollover: body.rollover === true,
-        notes: (body.notes as string) ?? null,
-      })
+      .values(encryptedValues)
       .returning();
 
     return NextResponse.json(budget, { status: 201 });

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
-import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData } from '@/lib/utils/chart-aggregation';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRows } from '@/lib/crypto';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
   const includeExcluded = searchParams.get('includeExcluded') === 'true';
@@ -63,6 +66,9 @@ export async function GET(request: Request) {
       .select()
       .from(accounts)
       .where(eq(accounts.userId, userId));
+
+    // Decrypt account balances and other encrypted fields
+    const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
 
     // Primary path: aggregate from account_snapshots (includes both real and synthetic)
     const accountSnapshotsInRange = await getDb()
@@ -82,16 +88,22 @@ export async function GET(request: Request) {
       )
       .orderBy(accountSnapshots.snapshotDate);
 
+    // Decrypt snapshot balances
+    const decryptedSnapshots = await Promise.all(accountSnapshotsInRange.map(async (snap) => ({
+      ...snap,
+      balance: parseFloat(await decryptField(snap.balance, dek)),
+    })));
+
     // Group snapshots by date for forward-fill
     const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean }>>();
-    for (const snap of accountSnapshotsInRange) {
+    for (const snap of decryptedSnapshots) {
       const dateStr = String(snap.snapshotDate);
       if (!snapshotsByDate.has(dateStr)) {
         snapshotsByDate.set(dateStr, []);
       }
       snapshotsByDate.get(dateStr)!.push({
         accountId: snap.accountId,
-        balance: parseFloat(snap.balance.toString()),
+        balance: snap.balance,
         isSynthetic: snap.isSynthetic,
       });
     }
@@ -113,7 +125,7 @@ export async function GET(request: Request) {
       let liabilities = 0;
       let allSynthetic = true;
 
-      for (const account of userAccounts) {
+      for (const account of decryptedAccounts) {
         const latest = latestByAccount.get(account.id);
         if (!latest) continue;
 
@@ -148,12 +160,12 @@ export async function GET(request: Request) {
       let totalAssets = 0;
       let totalLiabilities = 0;
 
-      for (const acc of userAccounts) {
+      for (const acc of decryptedAccounts) {
         if (acc.isExcludedFromNetWorth && !includeExcluded) {
           continue;
         }
 
-        const balance = parseFloat(acc.balance.toString());
+        const balance = parseFloat(acc.balance);
         
         if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(acc.type.toLowerCase())) {
           totalAssets += balance;
@@ -171,7 +183,7 @@ export async function GET(request: Request) {
         totalLiabilities,
       };
 
-      const includedCount = userAccounts.filter(
+      const includedCount = decryptedAccounts.filter(
         (a) => !a.isExcludedFromNetWorth || includeExcluded
       ).length;
 
@@ -196,7 +208,7 @@ export async function GET(request: Request) {
     const change = currentNetWorth - previousNetWorth;
     const percentChange = previousNetWorth !== 0 ? (change / previousNetWorth) * 100 : 0;
 
-    const includedCount = userAccounts.filter((a) => !a.isExcludedFromNetWorth).length;
+    const includedCount = decryptedAccounts.filter((a) => !a.isExcludedFromNetWorth).length;
 
     const aggregated = aggregateChartData(formattedData, ['netWorth', 'totalAssets', 'totalLiabilities']);
 
@@ -208,7 +220,7 @@ export async function GET(request: Request) {
         change,
         percentChange,
         includedAccounts: includedCount,
-        totalAccounts: userAccounts.length,
+        totalAccounts: decryptedAccounts.length,
       },
     });
   } catch (error) {

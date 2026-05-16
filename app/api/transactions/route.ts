@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and, or, sql, gt, gte, lte, asc, desc, inArray, not } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, asc, desc, inArray, not } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRow, decryptRows } from '@/lib/crypto';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -16,6 +18,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
   const parsed = TransactionFilterSchema.safeParse({
@@ -49,7 +52,7 @@ export async function GET(request: Request) {
 
   logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset });
 
-  // Build where clause
+  // Build where clause (excluding encrypted field filters — applied in memory)
   const whereConditions = [eq(transactions.userId, userId)];
 
   // Filter out hidden accounts unless explicitly filtering by accountId
@@ -91,12 +94,6 @@ export async function GET(request: Request) {
   if (filters.reviewed !== undefined) {
     whereConditions.push(eq(transactions.reviewed, filters.reviewed));
   }
-  if (filters.minAmount !== undefined) {
-    whereConditions.push(gt(sql`ABS(${transactions.amount})`, filters.minAmount));
-  }
-  if (filters.maxAmount !== undefined) {
-    whereConditions.push(lte(sql`ABS(${transactions.amount})`, filters.maxAmount));
-  }
 
   // Handle category filter
   if (filters.categoryIds) {
@@ -124,14 +121,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // Handle search with FTS
-  if (filters.search) {
-    const searchQuery = sql`to_tsvector('english', ${transactions.description} || ' ' || COALESCE(${transactions.payee}, '') || ' ' || COALESCE(${transactions.notes}, ''))`;
-    const searchVector = sql`plainto_tsquery('english', ${filters.search})`;
-    whereConditions.push(sql`${searchQuery} @@ ${searchVector}`);
-  }
+  // Note: search (FTS), minAmount, maxAmount filters are applied in memory after decryption
+  // Note: sort by amount or description is also done in memory
 
-  // Get total count (leftJoin accounts for accountTypes filter)
+  // Get total count (before in-memory filters)
   const [totalRow] = await getDb()
     .select({ count: sql<number>`count(*)` })
     .from(transactions)
@@ -139,12 +132,9 @@ export async function GET(request: Request) {
     .where(and(...whereConditions))
     .limit(1);
 
-  const total = totalRow?.count ?? 0;
+  const totalBeforeFilters = totalRow?.count ?? 0;
 
-  // Build ordered query with joins
-  const sortColumn = filters.sort === 'amount' ? transactions.amount : filters.sort === 'description' ? transactions.description : transactions.date;
-  const orderFn = filters.order === 'asc' ? asc : desc;
-
+  // Fetch all matching rows (we need to decrypt before filtering/sorting by encrypted fields)
   const result = await getDb()
     .select({
       transaction: transactions,
@@ -161,19 +151,59 @@ export async function GET(request: Request) {
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .where(and(...whereConditions))
-    .orderBy(orderFn(sortColumn))
-    .limit(filters.limit)
-    .offset(filters.offset);
+    .orderBy(desc(transactions.date));
 
-  // Transform to flat structure
-  const data = result.map((row) => ({
-    ...row.transaction,
-    accountName: row.account?.name ?? null,
-    category: row.category ?? null,
+  // Decrypt all transactions
+  const decryptedTxns = await Promise.all(result.map(async (row) => {
+    const tx = await decryptRow('transactions', row.transaction, dek);
+    let accountName: string | null = null;
+    if (row.account?.name) {
+      accountName = await decryptField(row.account.name, dek);
+    }
+    let category = row.category;
+    if (category?.name) {
+      category = { ...category, name: await decryptField(category.name, dek) };
+    }
+    return { ...tx, accountName, category };
   }));
 
-  logger.info('Transactions fetched', { total, returned: data.length });
-  return NextResponse.json({ data, total, limit: filters.limit, offset: filters.offset });
+  // Apply search filter in memory
+  let filtered = decryptedTxns;
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    filtered = filtered.filter((t: any) =>
+      (t.description?.toLowerCase().includes(q) ?? false) ||
+      (t.payee?.toLowerCase().includes(q) ?? false) ||
+      (t.notes?.toLowerCase().includes(q) ?? false)
+    );
+  }
+
+  // Apply amount filters in memory
+  if (filters.minAmount !== undefined) {
+    filtered = filtered.filter((t: any) => Math.abs(parseFloat(t.amount) || 0) > filters.minAmount!);
+  }
+  if (filters.maxAmount !== undefined) {
+    filtered = filtered.filter((t: any) => Math.abs(parseFloat(t.amount) || 0) <= filters.maxAmount!);
+  }
+
+  // Sort in memory
+  const isEncryptedSort = filters.sort === 'amount' || filters.sort === 'description';
+  if (isEncryptedSort) {
+    filtered.sort((a: any, b: any) => {
+      const aVal = filters.sort === 'amount' ? Math.abs(parseFloat(a.amount) || 0) : (a.description ?? '');
+      const bVal = filters.sort === 'amount' ? Math.abs(parseFloat(b.amount) || 0) : (b.description ?? '');
+      if (filters.order === 'asc') return aVal > bVal ? 1 : -1;
+      return aVal < bVal ? 1 : -1;
+    });
+  }
+
+  const total = filtered.length;
+
+  // Paginate
+  const sliced = filtered.slice(filters.offset, filters.offset + filters.limit);
+
+  logger.info('Transactions fetched', { total, returned: sliced.length });
+  return NextResponse.json({ data: sliced, total, limit: filters.limit, offset: filters.offset });
 }
 
 export async function PATCH(request: Request) {

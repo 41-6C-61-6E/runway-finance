@@ -4,6 +4,8 @@ import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -15,6 +17,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
@@ -37,7 +40,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  return NextResponse.json(account);
+  const decrypted = await decryptRow('accounts', account, dek);
+  return NextResponse.json(decrypted);
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -82,7 +86,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const updateData: Record<string, unknown> = {};
+  const dek = await getSessionDEK();
+  let updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.isHidden !== undefined) updateData.isHidden = body.isHidden;
   if (body.isExcludedFromNetWorth !== undefined) updateData.isExcludedFromNetWorth = body.isExcludedFromNetWorth;
@@ -91,9 +96,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.balance !== undefined) updateData.balance = String(body.balance);
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
 
-  const changedFields = Object.keys(updateData);
-  logger.info('Updating account', { accountId: id, changedFields });
-
   if (Object.keys(updateData).length === 0) {
     logger.warn('No valid fields to update for account', { accountId: id });
     return NextResponse.json(
@@ -101,6 +103,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { status: 400 }
     );
   }
+
+  updateData = await encryptRow('accounts', updateData, dek);
+  const changedFields = Object.keys(updateData);
+  logger.info('Updating account', { accountId: id, changedFields });
 
   const [updated] = await getDb()
     .update(accounts)

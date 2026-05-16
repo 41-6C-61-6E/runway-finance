@@ -5,6 +5,8 @@ import { categories } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows, encryptRow } from '@/lib/crypto';
 
 const CreateCategorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -22,14 +24,16 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const cats = await getDb()
     .select()
     .from(categories)
     .where(eq(categories.userId, userId))
     .orderBy(asc(categories.displayOrder));
 
-  logger.info('GET /api/categories', { userId, count: cats.length });
-  return NextResponse.json(cats);
+  const decrypted = await decryptRows('categories', cats, dek);
+  logger.info('GET /api/categories', { userId, count: decrypted.length });
+  return NextResponse.json(decrypted);
 }
 
 export async function POST(request: Request) {
@@ -39,6 +43,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   let body: unknown;
   try {
     body = await request.json();
@@ -56,18 +61,20 @@ export async function POST(request: Request) {
 
   const { name, parentId, color, isIncome, excludeFromReports, displayOrder } = parsed.data;
 
+  const encryptedValues = await encryptRow('categories', {
+    userId,
+    name,
+    parentId: parentId ?? null,
+    color,
+    isIncome,
+    isSystem: false,
+    excludeFromReports,
+    displayOrder,
+  }, dek);
+
   const [cat] = await getDb()
     .insert(categories)
-    .values({
-      userId,
-      name,
-      parentId: parentId ?? null,
-      color,
-      isIncome,
-      isSystem: false,
-      excludeFromReports,
-      displayOrder,
-    })
+    .values(encryptedValues)
     .returning();
 
   logger.info('POST /api/categories - created', { userId, name, isIncome });

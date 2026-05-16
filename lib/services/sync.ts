@@ -3,7 +3,8 @@ import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapsho
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { eq, and, inArray, isNull } from 'drizzle-orm';
-import { decrypt } from '@/lib/crypto';
+import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
+import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
 
@@ -22,22 +23,24 @@ export type SyncResult = {
   errorMessage?: string;
 };
 
-export async function createNetWorthSnapshot(userId: string, snapshotDate: string) {
+export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
     .where(eq(accounts.userId, userId));
 
+  const decrypted = await decryptRows('accounts', userAccounts, dek);
+
   let totalAssets = 0;
   let totalLiabilities = 0;
   const breakdown: Record<string, { count: number; value: number }> = {};
 
-  for (const acc of userAccounts) {
+  for (const acc of decrypted) {
     if (acc.isExcludedFromNetWorth) {
       continue;
     }
 
-    const balance = parseFloat(acc.balance.toString());
+    const balance = acc.balance ? parseFloat(acc.balance) : 0;
     const accountType = acc.type.toLowerCase();
 
     if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
@@ -60,49 +63,51 @@ export async function createNetWorthSnapshot(userId: string, snapshotDate: strin
     .values({
       userId,
       snapshotDate,
-      totalAssets: String(totalAssets),
-      totalLiabilities: String(totalLiabilities),
-      netWorth: String(netWorth),
+      totalAssets: await encryptField(String(totalAssets), dek),
+      totalLiabilities: await encryptField(String(totalLiabilities), dek),
+      netWorth: await encryptField(String(netWorth), dek),
       breakdown,
     })
     .onConflictDoUpdate({
       target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
       set: {
-        totalAssets: String(totalAssets),
-        totalLiabilities: String(totalLiabilities),
-        netWorth: String(netWorth),
+        totalAssets: await encryptField(String(totalAssets), dek),
+        totalLiabilities: await encryptField(String(totalLiabilities), dek),
+        netWorth: await encryptField(String(netWorth), dek),
         breakdown,
       },
     });
 }
 
-export async function createAccountSnapshots(userId: string, snapshotDate: string) {
+export async function createAccountSnapshots(userId: string, dek: Uint8Array, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
     .where(eq(accounts.userId, userId));
 
-  for (const acc of userAccounts) {
+  const decrypted = await decryptRows('accounts', userAccounts, dek);
+
+  for (const acc of decrypted) {
     await getDb()
       .insert(accountSnapshots)
       .values({
         userId,
         accountId: acc.id,
         snapshotDate,
-        balance: acc.balance.toString(),
+        balance: acc.balance,
         isSynthetic: false,
       })
       .onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
         set: {
-          balance: acc.balance.toString(),
+          balance: acc.balance,
           isSynthetic: false,
         },
       });
   }
 }
 
-export async function updateMonthlyCashFlowSummaries(userId: string) {
+export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8Array) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -132,9 +137,11 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
       )
     );
 
+  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+
   const monthlyData: Record<string, { income: number; expenses: number; count: number }> = {};
 
-  for (const tx of allTransactions) {
+  for (const tx of decryptedTxns) {
     if (tx.ignored) continue;
 
     const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
@@ -148,7 +155,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
 
     const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-    const amount = parseFloat(tx.amount.toString());
+    const amount = parseFloat(tx.amount);
 
     if (!monthlyData[yearMonth]) {
       monthlyData[yearMonth] = { income: 0, expenses: 0, count: 0 };
@@ -170,25 +177,25 @@ export async function updateMonthlyCashFlowSummaries(userId: string) {
       .values({
         userId,
         yearMonth,
-        totalIncome: String(data.income),
-        totalExpenses: String(data.expenses),
-        netCashFlow: String(netCashFlow),
-        transactionCount: data.count,
+        totalIncome: await encryptField(String(data.income), dek),
+        totalExpenses: await encryptField(String(data.expenses), dek),
+        netCashFlow: await encryptField(String(netCashFlow), dek),
+        transactionCount: await encryptField(String(data.count), dek),
       })
       .onConflictDoUpdate({
         target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
         set: {
-          totalIncome: String(data.income),
-          totalExpenses: String(data.expenses),
-          netCashFlow: String(netCashFlow),
-          transactionCount: data.count,
+          totalIncome: await encryptField(String(data.income), dek),
+          totalExpenses: await encryptField(String(data.expenses), dek),
+          netCashFlow: await encryptField(String(netCashFlow), dek),
+          transactionCount: await encryptField(String(data.count), dek),
           updatedAt: new Date(),
         },
       });
   }
 }
 
-export async function updateCategorySpendingSummaries(userId: string) {
+export async function updateCategorySpendingSummaries(userId: string, dek: Uint8Array) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -218,13 +225,15 @@ export async function updateCategorySpendingSummaries(userId: string) {
       )
     );
 
+  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+
   const categoryByMonth: Record<
     string,
     Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
   > = {};
 
-  for (const tx of allTransactions) {
-    if (!tx.categoryId || parseFloat(tx.amount.toString()) >= 0 || tx.ignored) continue;
+  for (const tx of decryptedTxns) {
+    if (!tx.categoryId || parseFloat(tx.amount) >= 0 || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
 
@@ -252,7 +261,7 @@ export async function updateCategorySpendingSummaries(userId: string) {
       };
     }
 
-    categoryByMonth[yearMonth][catId].amount += Math.abs(parseFloat(tx.amount.toString()));
+    categoryByMonth[yearMonth][catId].amount += Math.abs(parseFloat(tx.amount));
     categoryByMonth[yearMonth][catId].count++;
   }
 
@@ -264,14 +273,14 @@ export async function updateCategorySpendingSummaries(userId: string) {
           userId,
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
-          transactionCount: catData.count,
+          amount: await encryptField(String(catData.amount), dek),
+          transactionCount: await encryptField(String(catData.count), dek),
         })
         .onConflictDoUpdate({
           target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
           set: {
-            amount: String(catData.amount),
-            transactionCount: catData.count,
+            amount: await encryptField(String(catData.amount), dek),
+            transactionCount: await encryptField(String(catData.count), dek),
             updatedAt: new Date(),
           },
         });
@@ -279,7 +288,7 @@ export async function updateCategorySpendingSummaries(userId: string) {
   }
 }
 
-export async function updateCategoryIncomeSummaries(userId: string) {
+export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Array) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -307,13 +316,15 @@ export async function updateCategoryIncomeSummaries(userId: string) {
       )
     );
 
+  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+
   const categoryByMonth: Record<
     string,
     Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
   > = {};
 
-  for (const tx of allTransactions) {
-    if (!tx.categoryId || parseFloat(tx.amount.toString()) <= 0 || tx.ignored) continue;
+  for (const tx of decryptedTxns) {
+    if (!tx.categoryId || parseFloat(tx.amount) <= 0 || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
     if (!category || !category.isIncome) continue;
@@ -341,7 +352,7 @@ export async function updateCategoryIncomeSummaries(userId: string) {
       };
     }
 
-    categoryByMonth[yearMonth][catId].amount += parseFloat(tx.amount.toString());
+    categoryByMonth[yearMonth][catId].amount += parseFloat(tx.amount);
     categoryByMonth[yearMonth][catId].count++;
   }
 
@@ -353,14 +364,14 @@ export async function updateCategoryIncomeSummaries(userId: string) {
           userId,
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
-          transactionCount: catData.count,
+          amount: await encryptField(String(catData.amount), dek),
+          transactionCount: await encryptField(String(catData.count), dek),
         })
         .onConflictDoUpdate({
           target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.yearMonth],
           set: {
-            amount: String(catData.amount),
-            transactionCount: catData.count,
+            amount: await encryptField(String(catData.amount), dek),
+            transactionCount: await encryptField(String(catData.count), dek),
             updatedAt: new Date(),
           },
         });
@@ -368,10 +379,25 @@ export async function updateCategoryIncomeSummaries(userId: string) {
   }
 }
 
-export async function syncConnection(connectionId: string, userId: string): Promise<SyncResult> {
+export async function syncConnection(connectionId: string, userId: string, dekOverride?: Uint8Array): Promise<SyncResult> {
   const startedAt = Date.now();
 
   logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
+
+  // Get DEK — either from override (cron) or from session (user request)
+  let dek: Uint8Array;
+  try {
+    dek = dekOverride ?? await getSessionDEK();
+  } catch (err) {
+    return {
+      status: 'error',
+      accountsSynced: 0,
+      transactionsFetched: 0,
+      transactionsNew: 0,
+      transactionsUpdated: 0,
+      errorMessage: 'Encryption key unavailable — authentication required',
+    };
+  }
 
   const [log] = await getDb()
     .insert(syncLogs)
@@ -379,9 +405,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       userId,
       connectionId,
       status: 'running',
-      accountsSynced: 0,
-      transactionsFetched: 0,
-      transactionsNew: 0,
+      accountsSynced: '0',
+      transactionsFetched: '0',
+      transactionsNew: '0',
       startedAt: new Date(),
     })
     .returning();
@@ -397,11 +423,10 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       throw new Error('Connection not found or unauthorized');
     }
 
-    const accessUrl = await decrypt({
-      ciphertext: connection.accessUrlEncrypted,
-      iv: connection.accessUrlIv,
-      tag: connection.accessUrlTag,
-    });
+    const accessUrl = await decryptField(
+      connection.accessUrlEncrypted,
+      dek,
+    );
 
     const now = new Date();
     const startDate = connection.lastSyncAt
@@ -421,7 +446,16 @@ export async function syncConnection(connectionId: string, userId: string): Prom
     let transactionsUpdated = 0;
 
     const externalIdToAccountId = new Map<string, string>();
-    const syncedTxData: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }[] = [];
+
+    // Track plaintext transaction data for in-memory rule matching
+    const rawTxData: Array<{
+      externalId: string;
+      accountId: string;
+      description: string;
+      payee: string | null;
+      memo: string | null;
+      amount: string;
+    }> = [];
 
     logger.info(`${LOG_TAG} SimpleFIN data fetched`, {
       connectionId,
@@ -452,9 +486,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           .update(accounts)
           .set({
             connectionId,
-            balance: String(balanceNum),
+            balance: await encryptField(sfAccount.balance, dek),
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
-            institution: sfAccount.org.name,
+            institution: await encryptField(sfAccount.org.name, dek),
             updatedAt: now,
           })
           .where(eq(accounts.id, orphanedAccount.id))
@@ -466,12 +500,12 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             userId,
             connectionId,
             externalId: sfAccount.id,
-            name: sfAccount.name,
+            name: await encryptField(sfAccount.name, dek),
             currency: sfAccount.currency,
-            balance: String(balanceNum),
+            balance: await encryptField(sfAccount.balance, dek),
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
             type: inferAccountType(sfAccount),
-            institution: sfAccount.org.name,
+            institution: await encryptField(sfAccount.org.name, dek),
             isHidden: false,
             isExcludedFromNetWorth: false,
             displayOrder: 0,
@@ -479,9 +513,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
           .onConflictDoUpdate({
             target: [accounts.connectionId, accounts.externalId],
             set: {
-              balance: String(balanceNum),
+              balance: await encryptField(sfAccount.balance, dek),
               balanceDate: new Date(sfAccount['balance-date'] * 1000),
-              institution: sfAccount.org.name,
+              institution: await encryptField(sfAccount.org.name, dek),
               updatedAt: now,
             },
           })
@@ -503,18 +537,29 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             ? new Date(sfTx.posted * 1000).toISOString().split('T')[0]
             : null;
 
+          // Encrypt sensitive fields before storing
           const txData = {
             userId,
             accountId,
             externalId: sfTx.id,
             date: txDate,
             postedDate: txPostedDate,
-            amount: String(amountNum),
+            amount: await encryptField(String(amountNum), dek),
+            description: await encryptField(sfTx.description, dek),
+            payee: sfTx.payee ? await encryptField(sfTx.payee, dek) : null,
+            memo: sfTx.memo ? await encryptField(sfTx.memo, dek) : null,
+            pending: sfTx.pending ?? false,
+          };
+
+          // Keep plaintext for rule matching
+          rawTxData.push({
+            externalId: sfTx.id,
+            accountId,
             description: sfTx.description,
             payee: sfTx.payee ?? null,
             memo: sfTx.memo ?? null,
-            pending: sfTx.pending ?? false,
-          };
+            amount: String(amountNum),
+          });
 
           await getDb()
             .insert(transactions)
@@ -522,22 +567,13 @@ export async function syncConnection(connectionId: string, userId: string): Prom
             .onConflictDoUpdate({
               target: [transactions.accountId, transactions.externalId],
               set: {
-                amount: String(amountNum),
+                amount: txData.amount,
                 pending: sfTx.pending ?? false,
-                description: sfTx.description,
+                description: txData.description,
                 postedDate: txPostedDate,
                 updatedAt: now,
               },
             });
-
-          syncedTxData.push({
-            externalId: sfTx.id,
-            accountId: accountId,
-            description: sfTx.description,
-            payee: sfTx.payee ?? null,
-            memo: sfTx.memo ?? null,
-            amount: String(amountNum),
-          });
 
           const existing = await getDb()
             .select({ id: transactions.id })
@@ -562,26 +598,37 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       durationMs: ms(startedAt),
     });
 
-    if (syncedTxData.length > 0) {
+    // Apply categorization rules using in-memory plaintext data
+    if (rawTxData.length > 0) {
+      // Read back IDs and existing categoryIds from DB
       const syncedTxnsWithIds = await getDb()
         .select({
           id: transactions.id,
-          description: transactions.description,
-          payee: transactions.payee,
-          memo: transactions.memo,
-          amount: transactions.amount,
-          categoryId: transactions.categoryId,
           externalId: transactions.externalId,
+          categoryId: transactions.categoryId,
         })
         .from(transactions)
         .where(
           inArray(
             transactions.externalId,
-            syncedTxData.map((t) => t.externalId)
+            rawTxData.map((t) => t.externalId)
           )
         );
 
-      const uncategorized = syncedTxnsWithIds.filter((t) => !t.categoryId);
+      // Merge plaintext descriptions back for rule matching
+      const syncedWithPlaintext = syncedTxnsWithIds.map((dbTx) => {
+        const raw = rawTxData.find((r) => r.externalId === dbTx.externalId);
+        return {
+          id: dbTx.id,
+          description: raw?.description ?? '',
+          payee: raw?.payee ?? null,
+          memo: raw?.memo ?? null,
+          amount: raw?.amount ?? '0',
+          categoryId: dbTx.categoryId,
+        };
+      });
+
+      const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
       if (uncategorized.length > 0) {
         const ruleResults = await applyRulesToTransactions(uncategorized, userId);
         logger.info(`${LOG_TAG} Categorization rules applied`, {
@@ -593,7 +640,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
         for (const [txId, action] of ruleResults) {
           const updateData: Record<string, unknown> = { updatedAt: new Date() };
           if (action.categoryId) updateData.categoryId = action.categoryId;
-          if (action.payee) updateData.payee = action.payee;
+          if (action.payee) {
+            updateData.payee = await encryptField(action.payee, dek);
+          }
           if (action.reviewed !== null) updateData.reviewed = action.reviewed;
           if (Object.keys(updateData).length > 1) {
             await getDb()
@@ -626,18 +675,18 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       .set({
         status: 'success',
         completedAt: now,
-        accountsSynced,
-        transactionsFetched,
-        transactionsNew,
-        durationMs: Date.now() - log.startedAt.getTime(),
+        accountsSynced: await encryptField(String(accountsSynced), dek),
+        transactionsFetched: await encryptField(String(transactionsFetched), dek),
+        transactionsNew: await encryptField(String(transactionsNew), dek),
+        durationMs: await encryptField(String(Date.now() - log.startedAt.getTime()), dek),
       })
       .where(eq(syncLogs.id, log.id));
 
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(userId, today);
+    await createNetWorthSnapshot(userId, dek, today);
     logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
-    await createAccountSnapshots(userId, today);
+    await createAccountSnapshots(userId, dek, today);
     logger.debug(`${LOG_TAG} Account snapshots created`, { userId, date: today, durationMs: ms(startedAt) });
 
     for (const sfAccount of data.accounts) {
@@ -669,9 +718,9 @@ export async function syncConnection(connectionId: string, userId: string): Prom
       }
     }
 
-    await updateMonthlyCashFlowSummaries(userId);
-    await updateCategorySpendingSummaries(userId);
-    await updateCategoryIncomeSummaries(userId);
+    await updateMonthlyCashFlowSummaries(userId, dek);
+    await updateCategorySpendingSummaries(userId, dek);
+    await updateCategoryIncomeSummaries(userId, dek);
 
     const totalDurationMs = Date.now() - startedAt;
     logger.info(`${LOG_TAG} Sync completed successfully`, {
@@ -704,7 +753,7 @@ export async function syncConnection(connectionId: string, userId: string): Prom
         status: 'error',
         completedAt: new Date(),
         errorMessage,
-        durationMs: Date.now() - log.startedAt.getTime(),
+        durationMs: await encryptField(String(Date.now() - log.startedAt.getTime()), dekOverride ?? new Uint8Array(0)).catch(() => '0'),
       })
       .where(eq(syncLogs.id, log.id));
 
