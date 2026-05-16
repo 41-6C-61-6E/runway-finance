@@ -147,7 +147,7 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
       <div className="mb-4">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
           <span>Payoff Progress</span>
-          <span>{payoffProgress.toFixed(1)}%</span>
+          <span className="blur-number">{payoffProgress.toFixed(1)}%</span>
         </div>
         <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
           <div className="h-full bg-chart-2 rounded-full transition-all" style={{ width: `${Math.min(payoffProgress, 100)}%` }} />
@@ -158,15 +158,15 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
       <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
         <div>
           <span className="text-muted-foreground">Rate</span>
-          <div className="font-mono font-medium text-foreground">{mortgage.interestRate.toFixed(2)}%</div>
+          <div className="font-mono font-medium text-foreground blur-number">{mortgage.interestRate.toFixed(2)}%</div>
         </div>
         <div>
           <span className="text-muted-foreground">Payment</span>
-          <div className="font-mono font-medium text-foreground">{formatCurrency(monthlyPayment)}/mo</div>
+          <div className="font-mono font-medium text-foreground blur-number">{formatCurrency(monthlyPayment)}/mo</div>
         </div>
         <div>
           <span className="text-muted-foreground">Term</span>
-          <div className="font-mono font-medium text-foreground">{termMonths}mo</div>
+          <div className="font-mono font-medium text-foreground blur-number">{termMonths}mo</div>
         </div>
       </div>
 
