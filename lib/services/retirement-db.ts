@@ -57,7 +57,7 @@ export async function saveRetirementPlan(
   plan: RetirementPlan,
   dek?: Uint8Array,
 ): Promise<RetirementPlan> {
-  const data: Record<string, unknown> = {
+  const data: typeof retirementProjections.$inferInsert = {
     userId,
     name: plan.name,
     fireScenarioId: plan.fireScenarioId || null,
@@ -78,7 +78,9 @@ export async function saveRetirementPlan(
     legacyGoal: plan.legacyGoal.toString(),
   };
 
-  const values = dek ? await encryptRow('retirement_projections', data, dek) : data;
+  const values: typeof retirementProjections.$inferInsert = dek
+    ? (await encryptRow('retirement_projections', data, dek)) as typeof retirementProjections.$inferInsert
+    : data;
 
   if (plan.id) {
     const [updated] = await getDb()
