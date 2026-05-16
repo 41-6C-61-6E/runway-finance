@@ -170,8 +170,9 @@ export async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): 
   let lastError: string | null = null;
   let btcAmount: number | null = null;
 
-  const hostList = apiConfig?.btcXpubApiUrl
-    ? [new URL(apiConfig.btcXpubApiUrl.replace('{host}', 'host').replace('/api/v2/xpub/{xpub}?details=basic', '')).hostname]
+  const hasCustomXpubUrl = apiConfig?.btcXpubApiUrl && !apiConfig.btcXpubApiUrl.includes('{host}');
+  const hostList = hasCustomXpubUrl
+    ? [new URL(apiConfig.btcXpubApiUrl).hostname]
     : TREZOR_HOSTS;
 
   const baseUrlTemplate = apiConfig?.btcXpubApiUrl || 'https://{host}/api/v2/xpub/{xpub}?details=basic';

@@ -22,6 +22,7 @@ import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-
 import { useHiddenPages, HIDDEN_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
+import { OnboardingChecklist } from '@/components/onboarding-checklist';
 
 type Connection = {
   id: string;
@@ -405,6 +406,9 @@ export default function SettingsPage() {
 
           {activeTab === 'general' && (
           <>
+
+          {/* Setup Checklist */}
+          <OnboardingChecklist />
 
           {/* Combined Settings */}
           <div className="p-5 bg-card border border-border rounded-xl">
