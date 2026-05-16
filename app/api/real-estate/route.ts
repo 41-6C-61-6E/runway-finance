@@ -7,6 +7,27 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseMetadata(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -34,10 +55,8 @@ export async function GET(request: Request) {
 
     const properties = await Promise.all(
       realEstateAccounts.map(async (property: any) => {
-        const meta: Record<string, unknown> = property.metadata
-          ? (typeof property.metadata === 'string' ? JSON.parse(property.metadata) : property.metadata)
-          : {};
-        const linkedMortgageIds = (meta.mortgageAccountIds ?? []) as string[];
+        const meta = parseMetadata(property.metadata);
+        const linkedMortgageIds = getStringArray(meta.mortgageAccountIds);
         const linkedMortgages = linkedMortgageIds
           .map((id) => mortgageMap.get(id))
           .filter(Boolean) as any[];
@@ -101,9 +120,7 @@ export async function GET(request: Request) {
           manualValue: (meta.manualValue as number) ?? null,
           metadata: meta,
           linkedMortgages: linkedMortgages.map((m: any) => {
-            const mortgageMeta: Record<string, unknown> = m.metadata
-              ? (typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata)
-              : {};
+            const mortgageMeta = parseMetadata(m.metadata);
             return {
               id: m.id,
               name: m.name,
