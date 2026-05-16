@@ -47,7 +47,7 @@ export function BudgetTable() {
     try {
       const [budgetRes, acctRes] = await Promise.all([
         fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' }),
-        fetch('/api/accounts?includeHidden=false', { credentials: 'include' }),
+        fetch('/api/accounts', { credentials: 'include' }),
       ]);
       if (!budgetRes.ok) throw new Error('Failed to fetch');
       const data = await budgetRes.json();

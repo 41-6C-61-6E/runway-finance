@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
+import { filterReportableAccounts } from '@/lib/utils/account-scope';
 
 type Account = {
   id: string;
@@ -115,7 +116,7 @@ export default function AccountsSidebar() {
   const { data: accounts = [], refetch } = useQuery({
     queryKey: ['accounts', false],
     queryFn: async () => {
-      const res = await fetch(`/api/accounts?includeHidden=false`, { credentials: 'include' });
+      const res = await fetch(`/api/accounts`, { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
@@ -127,7 +128,7 @@ export default function AccountsSidebar() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedSubGroups, setExpandedSubGroups] = useState<Record<string, boolean>>({});
 
-  const visibleAccounts = accounts.filter((a) => !a.isHidden && !a.isExcludedFromNetWorth);
+  const visibleAccounts: Account[] = filterReportableAccounts(accounts as Account[]);
 
   const hierarchy = useMemo(() => {
     const map = new Map<string, Map<string, Account[]>>();

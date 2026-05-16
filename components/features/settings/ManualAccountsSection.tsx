@@ -143,7 +143,7 @@ export default function ManualAccountsSection() {
     try {
       const [res, reRes] = await Promise.all([
         fetch('/api/manual-accounts', { credentials: 'include' }),
-        fetch('/api/accounts?type=realestate&includeHidden=false', { credentials: 'include' }),
+        fetch('/api/accounts?type=realestate', { credentials: 'include' }),
       ]);
       const data = await res.json();
       setAccounts(Array.isArray(data) ? data : []);

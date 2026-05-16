@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { aggregateChartData } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
+import { filterReportableAccounts, isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -56,7 +57,6 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
-  const includeExcluded = searchParams.get('includeExcluded') === 'true';
 
   const [startDate, endDate] = getDateRange(timeframe);
 
@@ -69,6 +69,7 @@ export async function GET(request: Request) {
 
     // Decrypt account balances and other encrypted fields
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
+    const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
     // Primary path: aggregate from account_snapshots (includes both real and synthetic)
     const accountSnapshotsInRange = await getDb()
@@ -125,14 +126,14 @@ export async function GET(request: Request) {
       let liabilities = 0;
       let allSynthetic = true;
 
-      for (const account of decryptedAccounts) {
+      for (const account of reportableAccounts) {
         const latest = latestByAccount.get(account.id);
         if (!latest) continue;
 
         const accountType = account.type.toLowerCase();
-        if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(accountType)) {
+        if (isAssetAccount(accountType)) {
           assets += latest.balance;
-        } else if (['credit', 'loan', 'mortgage'].includes(accountType)) {
+        } else if (isLiabilityAccount(accountType)) {
           liabilities += Math.abs(latest.balance);
         }
 
@@ -160,17 +161,13 @@ export async function GET(request: Request) {
       let totalAssets = 0;
       let totalLiabilities = 0;
 
-      for (const acc of decryptedAccounts) {
-        if (acc.isExcludedFromNetWorth && !includeExcluded) {
-          continue;
-        }
-
+      for (const acc of reportableAccounts) {
         const balance = parseFloat(acc.balance);
         
-        if (['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'].includes(acc.type.toLowerCase())) {
+        if (isAssetAccount(acc.type.toLowerCase())) {
           totalAssets += balance;
         } 
-        else if (['credit', 'loan', 'mortgage'].includes(acc.type.toLowerCase())) {
+        else if (isLiabilityAccount(acc.type.toLowerCase())) {
           totalLiabilities += Math.abs(balance);
         }
       }
@@ -183,10 +180,6 @@ export async function GET(request: Request) {
         totalLiabilities,
       };
 
-      const includedCount = decryptedAccounts.filter(
-        (a) => !a.isExcludedFromNetWorth || includeExcluded
-      ).length;
-
       return NextResponse.json({
         data: [currentSnapshot],
         summary: {
@@ -194,7 +187,7 @@ export async function GET(request: Request) {
           previous: netWorth,
           change: 0,
           percentChange: 0,
-          includedAccounts: includedCount,
+          includedAccounts: reportableAccounts.length,
           totalAccounts: userAccounts.length,
         },
       });
@@ -208,8 +201,6 @@ export async function GET(request: Request) {
     const change = currentNetWorth - previousNetWorth;
     const percentChange = previousNetWorth !== 0 ? (change / previousNetWorth) * 100 : 0;
 
-    const includedCount = decryptedAccounts.filter((a) => !a.isExcludedFromNetWorth).length;
-
     const aggregated = aggregateChartData(formattedData, ['netWorth', 'totalAssets', 'totalLiabilities']);
 
     return NextResponse.json({
@@ -219,7 +210,7 @@ export async function GET(request: Request) {
         previous: previousNetWorth,
         change,
         percentChange,
-        includedAccounts: includedCount,
+        includedAccounts: reportableAccounts.length,
         totalAccounts: decryptedAccounts.length,
       },
     });

@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { budgets, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
-import { eq, and, or, isNull } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 
@@ -38,7 +38,8 @@ export async function GET(request: Request) {
           or(
             eq(budgets.yearMonth, month),
             and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
-          )
+          ),
+          eq(categories.excludeFromReports, false)
         )
       );
 
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
           and(
             eq(table.userId, session.user.id),
             eq(table.yearMonth, month),
-            ...catIds.map((cid) => eq(idCol, cid))
+            inArray(idCol, catIds)
           )
         );
       const map = new Map<string, number>();

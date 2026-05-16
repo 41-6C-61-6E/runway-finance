@@ -91,7 +91,7 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
 
     const fetchAccounts = async () => {
       try {
-        const res = await fetch('/api/accounts?includeHidden=false', { credentials: 'include' });
+        const res = await fetch('/api/accounts', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           setAccounts(data.filter((a: Account) => a.type !== 'credit'));

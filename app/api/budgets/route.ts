@@ -110,6 +110,7 @@ export async function GET(request: Request) {
             eq(budgets.yearMonth, bounds.yearMonth),
             and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
           ),
+          eq(categories.excludeFromReports, false),
           periodType ? eq(budgets.periodType, periodType) : undefined,
         )
       );

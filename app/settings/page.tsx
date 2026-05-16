@@ -814,7 +814,7 @@ export default function SettingsPage() {
           {hasConnection && (
             <div className="p-5 bg-card border border-border rounded-xl">
               <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
-              <p className="text-xs text-muted-foreground mb-4">Manage hidden accounts and net worth exclusions.</p>
+              <p className="text-xs text-muted-foreground mb-4">Hidden and excluded accounts are omitted everywhere: dashboards, charts, transactions, forecasts, goals, and exports.</p>
 
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex rounded-lg bg-muted border border-border overflow-hidden">

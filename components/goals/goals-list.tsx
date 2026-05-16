@@ -70,7 +70,7 @@ export function GoalsList() {
         const balances: Record<string, number | null> = {};
 
         for (const accountId of uniqueAccountIds) {
-          const acctRes = await fetch(`/api/accounts?includeHidden=false`, { credentials: 'include' });
+          const acctRes = await fetch(`/api/accounts`, { credentials: 'include' });
           if (acctRes.ok) {
             const accounts: Array<{ id: string; balance: string }> = await acctRes.json();
             const acct = accounts.find((a) => a.id === accountId);

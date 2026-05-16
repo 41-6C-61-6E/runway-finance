@@ -6,6 +6,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
+import { filterReportableAccounts } from '@/lib/utils/account-scope';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
     .orderBy(asc(accounts.displayOrder));
 
   const decrypted = await decryptRows('accounts', result, dek);
-  logger.info('Accounts fetched', { count: decrypted.length });
-  return NextResponse.json(decrypted);
+  const scoped = includeHidden ? decrypted : filterReportableAccounts(decrypted);
+  logger.info('Accounts fetched', { count: scoped.length });
+  return NextResponse.json(scoped);
 }

@@ -58,7 +58,7 @@ export default function ResizableSidebar() {
       try {
         const [connRes, acctRes, txnRes] = await Promise.all([
           fetch('/api/connections', { credentials: 'include' }),
-          fetch('/api/accounts?includeHidden=true', { credentials: 'include' }),
+          fetch('/api/accounts', { credentials: 'include' }),
           fetch('/api/transactions?limit=1', { credentials: 'include' }),
         ])
         const connections = connRes.ok ? await connRes.json() : []

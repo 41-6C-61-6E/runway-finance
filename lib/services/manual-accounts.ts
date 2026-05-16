@@ -8,6 +8,7 @@ import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
 import type { ApiConfig } from '@/lib/services/asset-estimator';
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -579,7 +580,11 @@ async function createAccountSnapshotsForUser(userId: string) {
   const userAccounts = await db
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   const today = nowISO();
   for (const acc of userAccounts) {
@@ -602,24 +607,23 @@ async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
   const userAccounts = await db
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, userId));
+    .where(and(
+      eq(accounts.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false)
+    ));
 
   let totalAssets = 0;
   let totalLiabilities = 0;
   const breakdown: Record<string, { count: number; value: number }> = {};
 
   for (const acc of userAccounts) {
-    if (acc.isExcludedFromNetWorth) continue;
-
     const balance = parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance.toString());
     const accountType = acc.type.toLowerCase();
 
-    const assetTypes = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
-    const liabilityTypes = ['credit', 'loan', 'mortgage'];
-
-    if (assetTypes.includes(accountType)) {
+    if (isAssetAccount(accountType)) {
       totalAssets += balance;
-    } else if (liabilityTypes.includes(accountType)) {
+    } else if (isLiabilityAccount(accountType)) {
       totalLiabilities += Math.abs(balance);
     }
 

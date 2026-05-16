@@ -6,8 +6,8 @@ import { AuthenticatedLayout } from "@/components/authenticated-layout";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "To the Moon!",
-  description: "For your money.",
+  title: "Runway Finance",
+  description: "Self-hosted personal finance tracking and planning.",
   icons: {
     icon: "/favicon.svg",
     apple: "/icons/apple-touch-icon.png",

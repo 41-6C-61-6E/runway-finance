@@ -67,8 +67,8 @@ export function NetWorthSummary() {
         setLoading(true);
         setError(null);
         const [accountsRes, chartRes] = await Promise.all([
-          fetch('/api/accounts?includeHidden=true'),
-          fetch('/api/net-worth/chart?timeframe=1y&includeExcluded=true'),
+          fetch('/api/accounts'),
+          fetch('/api/net-worth/chart?timeframe=1y'),
         ]);
         if (!accountsRes.ok || !chartRes.ok) throw new Error('Failed to fetch data');
         const [accountsData, chartResponse]: [AccountData[], ChartResponse] = await Promise.all([

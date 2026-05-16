@@ -6,6 +6,13 @@ import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
+import {
+  createAccountSnapshots,
+  createNetWorthSnapshot,
+  updateCategoryIncomeSummaries,
+  updateCategorySpendingSummaries,
+  updateMonthlyCashFlowSummaries,
+} from '@/lib/services/sync';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -122,5 +129,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const decrypted = await decryptRow('accounts', updated, dek);
+
+  if (
+    body.isHidden !== undefined ||
+    body.isExcludedFromNetWorth !== undefined ||
+    body.balance !== undefined ||
+    body.type !== undefined
+  ) {
+    const today = new Date().toISOString().split('T')[0];
+    await Promise.all([
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
+    ]);
+  }
+
   return NextResponse.json(decrypted);
 }
