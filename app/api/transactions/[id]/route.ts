@@ -6,6 +6,8 @@ import { eq, and } from 'drizzle-orm';
 import { PatchTransactionSchema } from '@/lib/validations/transaction';
 import { sanitizeText } from '@/lib/utils/sanitize';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -17,6 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   logger.info('Fetching transaction', { transactionId: id });
@@ -46,10 +49,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const row = result[0];
+
+  // Decrypt transaction fields
+  const decryptedTx = await decryptRow('transactions', row.transaction, dek);
+
+  // Decrypt account name if present
+  let accountName: string | null = null;
+  if (row.accountName) {
+    accountName = await decryptField(row.accountName, dek);
+  }
+
+  // Decrypt category name if present
+  let category = row.category;
+  if (category?.name) {
+    category = { ...category, name: await decryptField(category.name, dek) };
+  }
+
   return NextResponse.json({
-    ...row.transaction,
-    accountName: row.accountName ?? null,
-    category: row.category ?? null,
+    ...decryptedTx,
+    accountName: accountName ?? null,
+    category: category ?? null,
   });
 }
 
@@ -63,6 +82,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   const [existing] = await getDb()
@@ -107,7 +127,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (ignored !== undefined) changedFields.push('ignored');
   logger.info('Updating transaction', { transactionId: id, changedFields });
 
-  // Sanitize text fields
+  // Sanitize and encrypt text fields
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (categoryId !== undefined) updateData.categoryId = categoryId;
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
@@ -115,9 +135,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (reviewed !== undefined) updateData.reviewed = reviewed;
   if (ignored !== undefined) updateData.ignored = ignored;
 
+  const encrypted = await encryptRow('transactions', updateData, dek);
   const [updated] = await getDb()
     .update(transactions)
-    .set(updateData)
+    .set(encrypted)
     .where(eq(transactions.id, id))
     .returning();
 

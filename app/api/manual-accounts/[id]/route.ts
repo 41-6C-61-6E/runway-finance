@@ -5,6 +5,8 @@ import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { deleteManualAccount } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -13,6 +15,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
@@ -26,8 +29,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'not_found', message: 'Account not found' }, { status: 404 });
   }
 
-  logger.info('GET /api/manual-accounts/[id]', { userId, id, type: account.type, name: account.name });
-  return NextResponse.json(account);
+  const decrypted = await decryptRow('accounts', account, dek);
+  logger.info('GET /api/manual-accounts/[id]', { userId, id, type: decrypted.type, name: decrypted.name });
+  return NextResponse.json(decrypted);
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,7 +60,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'validation_error', message: 'Invalid request body' }, { status: 400 });
   }
 
-  const updateData: Record<string, unknown> = {};
+  const dek = await getSessionDEK();
+  let updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.isHidden !== undefined) updateData.isHidden = body.isHidden;
   if (body.isExcludedFromNetWorth !== undefined) updateData.isExcludedFromNetWorth = body.isExcludedFromNetWorth;
@@ -67,6 +72,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'validation_error', message: 'No valid fields to update' }, { status: 400 });
   }
 
+  updateData = await encryptRow('accounts', updateData, dek);
   const [updated] = await getDb()
     .update(accounts)
     .set({ ...updateData, updatedAt: new Date() })

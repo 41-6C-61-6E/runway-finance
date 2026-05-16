@@ -5,12 +5,15 @@ import { logger } from '@/lib/logger';
 import { financialGoals } from '@/lib/db/schema';
 import { accounts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {
+    const dek = await getSessionDEK();
     const { goalId } = await req.json();
 
     if (!goalId) {
@@ -30,7 +33,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    let newCurrentAmount = parseFloat(goal[0].currentAmount);
+    const decryptedGoal = await decryptRow('financial_goals', goal[0], dek);
+    let newCurrentAmount = parseFloat(decryptedGoal.currentAmount);
 
     if (goal[0].linkedAccountId) {
       const acct = await getDb()
@@ -43,14 +47,16 @@ export async function POST(req: NextRequest) {
         .limit(1);
 
       if (acct[0]) {
-        newCurrentAmount = parseFloat(acct[0].balance);
+        const decryptedBalance = await decryptField(acct[0].balance, dek);
+        newCurrentAmount = parseFloat(decryptedBalance);
       }
     }
 
+    const encrypted = await encryptRow('financial_goals', { currentAmount: String(newCurrentAmount) }, dek);
     const updated = await getDb()
       .update(financialGoals)
       .set({
-        currentAmount: String(newCurrentAmount),
+        ...encrypted,
         updatedAt: new Date(),
       })
       .where(eq(financialGoals.id, goalId))
@@ -71,6 +77,7 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(req.url);
   const goalId = searchParams.get('goalId');
 
@@ -91,6 +98,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
   }
 
+  const decrypted = await decryptRow('financial_goals', goal[0], dek);
+
   let linkedAccountBalance: number | null = null;
   if (goal[0].linkedAccountId) {
     const acct = await getDb()
@@ -103,16 +112,17 @@ export async function GET(req: NextRequest) {
       .limit(1);
 
     if (acct[0]) {
-      linkedAccountBalance = parseFloat(acct[0].balance);
+      const decryptedBalance = await decryptField(acct[0].balance, dek);
+      linkedAccountBalance = parseFloat(decryptedBalance);
     }
   }
 
-  const target = parseFloat(goal[0].targetAmount);
-  const current = parseFloat(goal[0].currentAmount);
+  const target = parseFloat(decrypted.targetAmount);
+  const current = parseFloat(decrypted.currentAmount);
   const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
 
   return NextResponse.json({
-    goal: goal[0],
+    goal: decrypted,
     progress,
     linkedAccountBalance,
   });

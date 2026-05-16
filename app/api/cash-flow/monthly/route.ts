@@ -3,12 +3,15 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { monthlyCashFlow } from '@/lib/db/schema';
-import { eq, desc, and, gte, sql } from 'drizzle-orm';
+import { eq, and, gte } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField } from '@/lib/crypto';
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '12', 10);
 
@@ -30,12 +33,12 @@ export async function GET(request: Request) {
       )
       .orderBy(monthlyCashFlow.yearMonth);
 
-    const data = rows.map((row) => ({
+    const data = await Promise.all(rows.map(async (row) => ({
       yearMonth: row.yearMonth,
-      income: parseFloat(row.totalIncome.toString()),
-      expenses: parseFloat(row.totalExpenses.toString()),
-      netCashFlow: parseFloat(row.netCashFlow.toString()),
-    }));
+      income: parseFloat(await decryptField(row.totalIncome, dek)),
+      expenses: parseFloat(await decryptField(row.totalExpenses, dek)),
+      netCashFlow: parseFloat(await decryptField(row.netCashFlow, dek)),
+    })));
 
     logger.info('GET /api/cash-flow/monthly', { months, count: data.length });
     return NextResponse.json(data);

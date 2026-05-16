@@ -1,5 +1,17 @@
 import bcrypt from 'bcryptjs';
 import { getPool } from './db';
+import { deriveKeyFromPassword, unwrapKey, wrapKey, generateDEK, getServerKey } from './crypto';
+import { getDb } from './db';
+import { userEncryptionKeys } from './db/schema';
+import { eq } from 'drizzle-orm';
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  return new Uint8Array(hex.match(/.{2}/g)!.map((c) => parseInt(c, 16)));
+}
 
 export interface User {
   username: string;
@@ -81,10 +93,72 @@ export async function updatePassword(username: string, currentPassword: string, 
       [password_hash, username]
     );
 
+    // Re-wrap DEK with new password
+    try {
+      const db = getDb();
+      const [keyRow] = await db
+        .select()
+        .from(userEncryptionKeys)
+        .where(eq(userEncryptionKeys.userId, username))
+        .limit(1);
+
+      if (keyRow) {
+        const salt = hexToBytes(keyRow.salt);
+        const oldKek = await deriveKeyFromPassword(currentPassword, salt);
+        const dek = await unwrapKey({
+          ciphertext: keyRow.wrappedDek,
+          iv: keyRow.wrappingIv,
+          tag: keyRow.wrappingTag,
+        }, oldKek);
+
+        const newSalt = crypto.getRandomValues(new Uint8Array(32));
+        const newKek = await deriveKeyFromPassword(newPassword, newSalt);
+        const pwdWrapped = await wrapKey(dek, newKek);
+
+        // Also re-wrap with server key
+        const serverKey = getServerKey();
+        const serverWrapped = await wrapKey(dek, serverKey);
+
+        await db.update(userEncryptionKeys).set({
+          wrappedDek: pwdWrapped.ciphertext,
+          wrappingIv: pwdWrapped.iv,
+          wrappingTag: pwdWrapped.tag,
+          serverWrappedDek: serverWrapped.ciphertext,
+          serverWrappingIv: serverWrapped.iv,
+          serverWrappingTag: serverWrapped.tag,
+          salt: bytesToHex(newSalt),
+          updatedAt: new Date(),
+        }).where(eq(userEncryptionKeys.userId, username));
+      }
+    } catch (err: any) {
+      return { success: false, error: `Password updated but key re-wrap failed: ${err.message}` };
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to update password' };
   } finally {
     client.release();
   }
+}
+
+export async function createUserEncryptionKeys(username: string, password: string): Promise<void> {
+  const dek = generateDEK();
+  const salt = crypto.getRandomValues(new Uint8Array(32));
+  const kek = await deriveKeyFromPassword(password, salt);
+  const pwdWrapped = await wrapKey(dek, kek);
+  const serverKey = getServerKey();
+  const serverWrapped = await wrapKey(dek, serverKey);
+
+  const db = getDb();
+  await db.insert(userEncryptionKeys).values({
+    userId: username,
+    wrappedDek: pwdWrapped.ciphertext,
+    wrappingIv: pwdWrapped.iv,
+    wrappingTag: pwdWrapped.tag,
+    serverWrappedDek: serverWrapped.ciphertext,
+    serverWrappingIv: serverWrapped.iv,
+    serverWrappingTag: serverWrapped.tag,
+    salt: bytesToHex(salt),
+  });
 }

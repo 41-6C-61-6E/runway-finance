@@ -105,18 +105,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // Encrypt the access URL
-  const { encrypt } = await import('@/lib/crypto');
-  const encrypted = await encrypt(accessUrl);
+  // Encrypt the access URL with user's DEK
+  const { encryptField } = await import('@/lib/crypto');
+  const { getSessionDEK } = await import('@/lib/crypto-context');
+  const dek = await getSessionDEK();
+  const encryptedPayload = await encryptField(accessUrl, dek);
 
   // Insert connection
   const [connection] = await getDb()
     .insert(simplifinConnections)
     .values({
       userId,
-      accessUrlEncrypted: encrypted.ciphertext,
-      accessUrlIv: encrypted.iv,
-      accessUrlTag: encrypted.tag,
+      accessUrlEncrypted: encryptedPayload,
+      accessUrlIv: '',
+      accessUrlTag: '',
       label,
     })
     .returning();

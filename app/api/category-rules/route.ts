@@ -5,6 +5,8 @@ import { categoryRules, categories } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows, encryptRow } from '@/lib/crypto';
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(200),
@@ -26,6 +28,7 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   const rules = await getDb()
     .select({
@@ -41,12 +44,19 @@ export async function GET() {
     .where(eq(categoryRules.userId, userId))
     .orderBy(asc(categoryRules.priority));
 
-  const data = rules.map((r) => ({
-    ...r.rule,
-    isSystem: r.rule.isSystem,
-    categoryName: r.category?.name ?? null,
-    categoryColor: r.category?.color ?? null,
-  }));
+  const decryptedRules = await decryptRows('category_rules', rules.map((r) => r.rule), dek);
+  const decryptedCategories = await decryptRows('categories', rules.map((r) => r.category).filter(Boolean), dek);
+  const catMap = new Map(decryptedCategories.map((c: any) => [c.id, c]));
+
+  const data = decryptedRules.map((rule: any) => {
+    const cat = catMap.get(rule.setCategoryId);
+    return {
+      ...rule,
+      isSystem: rule.isSystem,
+      categoryName: cat?.name ?? null,
+      categoryColor: cat?.color ?? null,
+    };
+  });
 
   logger.info('GET /api/category-rules', { userId, count: data.length });
   return NextResponse.json(data);
@@ -59,6 +69,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   let body: unknown;
   try {
     body = await request.json();
@@ -76,21 +87,23 @@ export async function POST(request: Request) {
 
   const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, setCategoryId, setPayee, setReviewed } = parsed.data;
 
+  const encryptedValues = await encryptRow('category_rules', {
+    userId,
+    name,
+    priority,
+    isActive,
+    conditionField,
+    conditionOperator,
+    conditionValue,
+    conditionCaseSensitive,
+    setCategoryId: setCategoryId ?? null,
+    setPayee: setPayee ?? null,
+    setReviewed: setReviewed ?? null,
+  }, dek);
+
   const [rule] = await getDb()
     .insert(categoryRules)
-    .values({
-      userId,
-      name,
-      priority,
-      isActive,
-      conditionField,
-      conditionOperator,
-      conditionValue,
-      conditionCaseSensitive,
-      setCategoryId: setCategoryId ?? null,
-      setPayee: setPayee ?? null,
-      setReviewed: setReviewed ?? null,
-    })
+    .values(encryptedValues)
     .returning();
 
   logger.info('POST /api/category-rules - created', { userId, name: rule.name, conditionField: rule.conditionField, conditionOperator: rule.conditionOperator, conditionValue: rule.conditionValue });

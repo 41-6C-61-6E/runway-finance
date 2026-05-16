@@ -5,6 +5,8 @@ import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows } from '@/lib/crypto';
 
 export async function GET() {
   const session = await auth();
@@ -13,6 +15,7 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   const result = await getDb()
     .select()
@@ -25,8 +28,9 @@ export async function GET() {
     )
     .orderBy(asc(accounts.displayOrder), asc(accounts.name));
 
-  logger.info('GET /api/manual-accounts', { userId, count: result.length });
-  return NextResponse.json(result);
+  const decrypted = await decryptRows('accounts', result, dek);
+  logger.info('GET /api/manual-accounts', { userId, count: decrypted.length });
+  return NextResponse.json(decrypted);
 }
 
 export async function POST(request: Request) {
@@ -36,6 +40,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   let body: {
     name?: string;
@@ -68,7 +73,7 @@ export async function POST(request: Request) {
       initialValue: body.initialValue,
       currency: body.currency,
       apiConfig,
-    });
+    }, dek);
     logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
     return NextResponse.json(account, { status: 201 });
   } catch (err) {

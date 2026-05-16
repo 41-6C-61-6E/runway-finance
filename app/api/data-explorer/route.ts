@@ -3,8 +3,10 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { eq, and, or, sql, asc, desc, inArray, like, gte, lte, gt, lt, not, isNull, isNotNull, ne } from 'drizzle-orm';
-import { DataExplorerQuerySchema, DataExplorerFilterSchema, ALLOWED_TABLES } from '@/lib/validations/data-explorer';
+import { DataExplorerQuerySchema, DataExplorerFilterSchema } from '@/lib/validations/data-explorer';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { ENCRYPTED_FIELDS, decryptRows } from '@/lib/crypto';
 
 type PgTable = any;
 type ColumnMeta = {
@@ -324,6 +326,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
   let parsedFilters: Array<{ field: string; op: string; value: unknown }> = [];
@@ -387,10 +390,14 @@ export async function GET(request: Request) {
     }
     const data = await dataQuery;
 
+    // Decrypt encrypted fields for this table
+    const encryptedFields = ENCRYPTED_FIELDS[tableKey];
+    const decrypted = encryptedFields ? await decryptRows(tableKey, data, dek) : data;
+
     const columns = extractColumns(table, config.columnOverrides);
 
     return NextResponse.json({
-      data,
+      data: decrypted,
       total,
       limit,
       offset,

@@ -4,15 +4,21 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { fireScenarios } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const dek = await getSessionDEK();
   const [scenario] = await getDb().select().from(fireScenarios).where(eq(fireScenarios.id, id));
   if (!scenario) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
+  const decrypted = await decryptRow('fire_scenarios', scenario, dek);
   logger.info('GET /api/fire/scenarios/[id]', { scenarioId: id });
-  return NextResponse.json(scenario);
+  return NextResponse.json(decrypted);
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const body = await request.json();
   const updateData: Record<string, any> = {};
   const numericFields = ['currentAge', 'targetAge', 'expectedReturnRate', 'inflationRate', 'safeWithdrawalRate'];
@@ -36,7 +43,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.currentInvestableAssets !== undefined) updateData.currentInvestableAssets = body.currentInvestableAssets.toString();
   if (body.annualContributions !== undefined) updateData.annualContributions = body.annualContributions.toString();
 
-  const [updated] = await getDb().update(fireScenarios).set(updateData).where(eq(fireScenarios.id, id)).returning();
+  const encrypted = await encryptRow('fire_scenarios', updateData, dek);
+  const [updated] = await getDb().update(fireScenarios).set(encrypted).where(eq(fireScenarios.id, id)).returning();
   logger.info('PATCH /api/fire/scenarios/[id]', { scenarioId: id });
   return NextResponse.json(updated);
 }

@@ -1,6 +1,8 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections } from '@/lib/db/schema';
+import { simplifinConnections, userEncryptionKeys } from '@/lib/db/schema';
 import { syncConnection } from '@/lib/services/sync';
+import { getServerDEK } from '@/lib/crypto-context';
+import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[runway-sync]';
@@ -24,7 +26,9 @@ export async function syncAllConnections(): Promise<void> {
   for (let i = 0; i < connections.length; i++) {
     const conn = connections[i];
     try {
-      const result = await syncConnection(conn.id, conn.userId);
+      // Get DEK from server recovery key for background sync
+      const dek = await getServerDEK(conn.userId);
+      const result = await syncConnection(conn.id, conn.userId, dek);
       if (result.status === 'success') {
         logger.info(
           `${LOG_TAG} Connection synced (${i + 1}/${connections.length})`,

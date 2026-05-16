@@ -4,11 +4,14 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { financialGoals } from '@/lib/db/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows, encryptRow } from '@/lib/crypto';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
   const type = searchParams.get('type');
@@ -23,8 +26,9 @@ export async function GET(req: NextRequest) {
     .where(and(...conditions))
     .orderBy(asc(financialGoals.priority), desc(financialGoals.targetDate));
 
-  logger.info('GET /api/financial-goals', { count: goals.length, status, type });
-  return NextResponse.json(goals);
+  const decrypted = await decryptRows('financial_goals', goals, dek);
+  logger.info('GET /api/financial-goals', { count: decrypted.length, status, type });
+  return NextResponse.json(decrypted);
 }
 
 export async function POST(req: NextRequest) {
@@ -32,6 +36,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {
+    const dek = await getSessionDEK();
     const body = await req.json();
     const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve } = body;
 
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'name, type, and targetAmount are required' }, { status: 400 });
     }
 
-    const goal = await getDb().insert(financialGoals).values({
+    const encryptedValues = await encryptRow('financial_goals', {
       userId: session.user.id,
       name,
       description: description || null,
@@ -53,7 +58,9 @@ export async function POST(req: NextRequest) {
       linkedAccountId: linkedAccountId || null,
       percentage: percentage != null ? String(percentage) : '100',
       reserve: reserve != null ? String(reserve) : '0',
-    }).returning();
+    }, dek);
+
+    const goal = await getDb().insert(financialGoals).values(encryptedValues).returning();
 
     logger.info('POST /api/financial-goals', { goalId: goal[0].id });
     return NextResponse.json(goal[0], { status: 201 });
@@ -70,6 +77,7 @@ export async function PATCH(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   try {
+    const dek = await getSessionDEK();
     const body = await req.json();
     const { id, ...updates } = body;
 
@@ -92,15 +100,22 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
+    const updateData: Record<string, unknown> = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.targetAmount !== undefined) updateData.targetAmount = String(updates.targetAmount);
+    if (updates.currentAmount !== undefined) updateData.currentAmount = String(updates.currentAmount);
+    if (updates.targetDate !== undefined) updateData.targetDate = updates.targetDate || null;
+    if (updates.percentage !== undefined) updateData.percentage = String(updates.percentage);
+    if (updates.reserve !== undefined) updateData.reserve = String(updates.reserve);
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.priority !== undefined) updateData.priority = updates.priority;
+
+    const encrypted = await encryptRow('financial_goals', updateData, dek);
     const updated = await getDb()
       .update(financialGoals)
       .set({
-        ...updates,
-        targetAmount: updates.targetAmount !== undefined ? String(updates.targetAmount) : undefined,
-        currentAmount: updates.currentAmount !== undefined ? String(updates.currentAmount) : undefined,
-        targetDate: updates.targetDate || null,
-        percentage: updates.percentage !== undefined ? String(updates.percentage) : undefined,
-        reserve: updates.reserve !== undefined ? String(updates.reserve) : undefined,
+        ...encrypted,
         updatedAt: new Date(),
       })
       .where(eq(financialGoals.id, goalId))

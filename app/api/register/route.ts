@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addUser, findUser } from '@/lib/users';
+import { addUser, findUser, createUserEncryptionKeys } from '@/lib/users';
 import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
 import { seedUserCategories } from '@/lib/db/seed-categories';
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     }
 
     await addUser({ username, password, email });
+    await createUserEncryptionKeys(username, password);
     await seedUserCategories(username);
     await seedUserDefaultRules(username);
     logger.info('Register API: user created', { username })

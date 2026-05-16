@@ -4,11 +4,14 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { budgets, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
 import { eq, and, or, isNull } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField } from '@/lib/crypto';
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -63,7 +66,10 @@ export async function GET(request: Request) {
         );
       const map = new Map<string, number>();
       for (const row of rows) {
-        map.set(row.categoryId, parseFloat(row.amount.toString()));
+        try {
+          const decrypted = await decryptField(row.amount, dek);
+          map.set(row.categoryId, parseFloat(decrypted));
+        } catch { /* skip unparseable */ }
       }
       return map;
     }
@@ -73,8 +79,8 @@ export async function GET(request: Request) {
       fetchActuals(categoryIncomeSummary, incomeIds),
     ]);
 
-    const data = budgetRows.map((row) => {
-      const budgeted = parseFloat(row.amount.toString());
+    const data = await Promise.all(budgetRows.map(async (row) => {
+      const budgeted = parseFloat(await decryptField(row.amount, dek));
       const isIncome = row.isIncome ?? false;
       const actual = isIncome
         ? incomeActualMap.get(row.categoryId) || 0
@@ -92,7 +98,7 @@ export async function GET(request: Request) {
         percentUsed,
         type: isIncome ? 'income' : 'expense',
       };
-    });
+    }));
 
     logger.info('GET /api/cash-flow/budgets', { month, count: data.length });
     return NextResponse.json(data);

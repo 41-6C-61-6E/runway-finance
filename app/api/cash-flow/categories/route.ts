@@ -4,11 +4,14 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { categorySpendingSummary, categoryIncomeSummary, categories, transactions, accounts } from '@/lib/db/schema';
 import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRows } from '@/lib/crypto';
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month');
@@ -21,73 +24,116 @@ export async function GET(request: Request) {
 
   const db = getDb();
 
+  async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
+    let whereClause = and(
+      eq(transactions.userId, session.user.id),
+      gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
+      lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
+      eq(transactions.pending, false),
+      eq(transactions.ignored, false),
+    );
+    if (accountIds.length > 0) {
+      whereClause = and(whereClause, inArray(transactions.accountId, accountIds));
+    }
+    if (isIncome === true) {
+      whereClause = and(whereClause, eq(categories.isIncome, true));
+    }
+
+    // Fetch all matching transactions (we need to decrypt amounts in memory since SQL aggregations won't work on encrypted data)
+    const txRows = await db
+      .select({
+        amount: transactions.amount,
+        categoryId: transactions.categoryId,
+      })
+      .from(transactions)
+      .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+      .where(whereClause);
+
+    // Decrypt and aggregate in memory
+    const catTotals = new Map<string, number>();
+    let catCounts = new Map<string, number>();
+    for (const row of txRows) {
+      if (!row.categoryId) continue;
+      const decrypted = parseFloat(await decryptField(row.amount, dek));
+      const absVal = Math.abs(decrypted);
+      if (absVal <= 0) continue;
+      catTotals.set(row.categoryId, (catTotals.get(row.categoryId) || 0) + absVal);
+      catCounts.set(row.categoryId, (catCounts.get(row.categoryId) || 0) + 1);
+    }
+
+    // Fetch category names/colors
+    const catIds = Array.from(catTotals.keys());
+    if (catIds.length === 0) return [];
+
+    const cats = await db
+      .select({ id: categories.id, name: categories.name, color: categories.color, isIncome: categories.isIncome })
+      .from(categories)
+      .where(and(eq(categories.userId, session.user.id), inArray(categories.id, catIds)));
+
+    const decryptedCats = await decryptRows('categories', cats, dek);
+    const catInfo = new Map(decryptedCats.map((c: any) => [c.id, c]));
+
+    return catIds.map((catId) => {
+      const info = catInfo.get(catId);
+      return {
+        categoryId: catId,
+        categoryName: info?.name || 'Uncategorized',
+        categoryColor: info?.color || '#6366f1',
+        isIncome: info?.isIncome || false,
+        amount: catTotals.get(catId) || 0,
+        transactionCount: catCounts.get(catId) || 0,
+      };
+    });
+  }
+
+  async function fetchUncategorizedTotal(start: string, end: string, accountIds: string[]): Promise<{ total: number; count: number; isIncome: boolean }> {
+    let whereClause = and(
+      eq(transactions.userId, session.user.id),
+      gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
+      lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
+      eq(transactions.categoryId, null),
+      eq(transactions.pending, false),
+      eq(transactions.ignored, false),
+    );
+    if (accountIds.length > 0) {
+      whereClause = and(whereClause, inArray(transactions.accountId, accountIds));
+    }
+
+    const rows = await db
+      .select({ amount: transactions.amount })
+      .from(transactions)
+      .where(whereClause);
+
+    let total = 0;
+    let count = 0;
+    for (const row of rows) {
+      const decrypted = parseFloat(await decryptField(row.amount, dek));
+      if (Math.abs(decrypted) <= 0) continue;
+      total += Math.abs(decrypted);
+      count++;
+    }
+    return { total, count, isIncome: total > 0 };
+  }
+
   try {
     if (isRange) {
-      // ── Multi-month mode ──────────────────────────────────────────────
       let rows: any[];
       let incomeRows: any[];
 
       if (accountIdList.length > 0) {
-        // Query transactions directly when filtering by account
-        rows = await db
-          .select({
-            categoryId: transactions.categoryId,
-            amount: sql<string>`SUM(ABS(${transactions.amount}))`,
-            transactionCount: sql<number>`COUNT(*)`,
-            categoryName: categories.name,
-            categoryColor: categories.color,
-            isIncome: categories.isIncome,
-          })
-          .from(transactions)
-          .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-          .innerJoin(categories, eq(transactions.categoryId, categories.id))
-          .where(
-            and(
-              eq(transactions.userId, session.user.id),
-              gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, startMonth),
-              lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, endMonth),
-              eq(categories.excludeFromReports, false),
-              inArray(accounts.id, accountIdList),
-              eq(transactions.pending, false),
-              eq(transactions.ignored, false),
-              sql`ABS(${transactions.amount}) > 0`,
-            )
-          )
-          .groupBy(transactions.categoryId, categories.name, categories.color, categories.isIncome);
-
-        // Fetch income categories from transactions
-        incomeRows = await db
-          .select({
-            categoryId: transactions.categoryId,
-            amount: sql<string>`SUM(ABS(${transactions.amount}))`,
-            transactionCount: sql<number>`COUNT(*)`,
-            categoryName: categories.name,
-            categoryColor: categories.color,
-            isIncome: categories.isIncome,
-          })
-          .from(transactions)
-          .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-          .innerJoin(categories, eq(transactions.categoryId, categories.id))
-          .where(
-            and(
-              eq(transactions.userId, session.user.id),
-              gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, startMonth),
-              lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, endMonth),
-              eq(categories.excludeFromReports, false),
-              eq(categories.isIncome, true),
-              inArray(accounts.id, accountIdList),
-              eq(transactions.pending, false),
-              eq(transactions.ignored, false),
-              sql`ABS(${transactions.amount}) > 0`,
-            )
-          )
-          .groupBy(transactions.categoryId, categories.name, categories.color, categories.isIncome);
+        const [spending, income] = await Promise.all([
+          fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, false),
+          fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, true),
+        ]);
+        rows = spending;
+        incomeRows = income;
       } else {
+        // Use summary tables (pre-computed, but encrypted)
         rows = await db
           .select({
             categoryId: categorySpendingSummary.categoryId,
-            amount: sql<string>`SUM(${categorySpendingSummary.amount})`,
-            transactionCount: sql<number>`SUM(${categorySpendingSummary.transactionCount})`,
+            amount: categorySpendingSummary.amount,
+            transactionCount: categorySpendingSummary.transactionCount,
             categoryName: categories.name,
             categoryColor: categories.color,
             isIncome: categories.isIncome,
@@ -97,19 +143,17 @@ export async function GET(request: Request) {
           .where(
             and(
               eq(categorySpendingSummary.userId, session.user.id),
-              gte(categorySpendingSummary.yearMonth, startMonth),
-              lte(categorySpendingSummary.yearMonth, endMonth),
+              gte(categorySpendingSummary.yearMonth, startMonth!),
+              lte(categorySpendingSummary.yearMonth, endMonth!),
               eq(categories.excludeFromReports, false),
             )
-          )
-          .groupBy(categorySpendingSummary.categoryId, categories.name, categories.color, categories.isIncome);
+          );
 
-        // Also fetch income categories across range
         incomeRows = await db
           .select({
             categoryId: categoryIncomeSummary.categoryId,
-            amount: sql<string>`SUM(${categoryIncomeSummary.amount})`,
-            transactionCount: sql<number>`SUM(${categoryIncomeSummary.transactionCount})`,
+            amount: categoryIncomeSummary.amount,
+            transactionCount: categoryIncomeSummary.transactionCount,
             categoryName: categories.name,
             categoryColor: categories.color,
             isIncome: categories.isIncome,
@@ -119,54 +163,40 @@ export async function GET(request: Request) {
           .where(
             and(
               eq(categoryIncomeSummary.userId, session.user.id),
-              gte(categoryIncomeSummary.yearMonth, startMonth),
-              lte(categoryIncomeSummary.yearMonth, endMonth),
+              gte(categoryIncomeSummary.yearMonth, startMonth!),
+              lte(categoryIncomeSummary.yearMonth, endMonth!),
               eq(categories.excludeFromReports, false),
             )
-          )
-          .groupBy(categoryIncomeSummary.categoryId, categories.name, categories.color, categories.isIncome);
+          );
       }
 
-      // Aggregate uncategorized across range
-      const uncatSqlRange = accountIdList.length > 0
-        ? sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-            FROM transactions
-            WHERE user_id = ${session.user.id}
-              AND to_char(date, 'YYYY-MM') >= ${startMonth}
-              AND to_char(date, 'YYYY-MM') <= ${endMonth}
-              AND category_id IS NULL
-              AND pending = false
-              AND amount != 0
-              AND account_id IN (${sql.raw(accountIdList.map((id) => `'${id}'`).join(', '))})`
-        : sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-            FROM transactions
-            WHERE user_id = ${session.user.id}
-              AND to_char(date, 'YYYY-MM') >= ${startMonth}
-              AND to_char(date, 'YYYY-MM') <= ${endMonth}
-              AND category_id IS NULL
-              AND pending = false
-              AND amount != 0`;
-      const uncatResult = await db.execute(uncatSqlRange);
-      const uncatRow = uncatResult.rows?.[0] as { total: unknown } | undefined;
-      const uncategorizedTotal = Math.abs(parseFloat(String(uncatRow?.total ?? '0')));
+      const { total: uncategorizedTotal } = await fetchUncategorizedTotal(startMonth!, endMonth!, accountIdList);
 
-      const data: any[] = rows.map((r) => ({
-        categoryId: r.categoryId ?? '',
-        categoryName: r.categoryName || 'Uncategorized',
-        categoryColor: r.categoryColor || '#6366f1',
-        isIncome: r.isIncome || false,
-        amount: parseFloat(r.amount.toString()),
-      }));
-
-      // Merge income category rows
-      for (const r of incomeRows) {
-        data.push({
-          categoryId: r.categoryId ?? '',
-          categoryName: r.categoryName || 'Uncategorized',
-          categoryColor: r.categoryColor || '#6366f1',
-          isIncome: true,
-          amount: parseFloat(r.amount.toString()),
-        });
+      // Decrypt summary data if not from transaction-direct mode
+      const data: any[] = [];
+      if (accountIdList.length === 0) {
+        for (const r of rows) {
+          const decryptedAmt = await decryptField(r.amount, dek);
+          data.push({
+            categoryId: r.categoryId ?? '',
+            categoryName: r.categoryName || 'Uncategorized',
+            categoryColor: r.categoryColor || '#6366f1',
+            isIncome: r.isIncome || false,
+            amount: parseFloat(decryptedAmt),
+          });
+        }
+        for (const r of incomeRows) {
+          const decryptedAmt = await decryptField(r.amount, dek);
+          data.push({
+            categoryId: r.categoryId ?? '',
+            categoryName: r.categoryName || 'Uncategorized',
+            categoryColor: r.categoryColor || '#6366f1',
+            isIncome: true,
+            amount: parseFloat(decryptedAmt),
+          });
+        }
+      } else {
+        data.push(...rows, ...incomeRows);
       }
 
       if (uncategorizedTotal !== 0) {
@@ -183,7 +213,7 @@ export async function GET(request: Request) {
       return NextResponse.json(data);
     }
 
-    // ── Single-month mode (existing behavior) ───────────────────────────
+    // ── Single-month mode ───────────────────────────────────────────────
     const resolvedMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const prevDate = new Date(parseInt(resolvedMonth.split('-')[0]), parseInt(resolvedMonth.split('-')[1]) - 2, 1);
@@ -193,58 +223,12 @@ export async function GET(request: Request) {
     let currentIncomeRows: any[];
 
     if (accountIdList.length > 0) {
-      // Query transactions directly when filtering by account
-      currentRows = await db
-        .select({
-          categoryId: transactions.categoryId,
-          amount: sql<string>`SUM(ABS(${transactions.amount}))`,
-          transactionCount: sql<number>`COUNT(*)`,
-          categoryName: categories.name,
-          categoryColor: categories.color,
-          isIncome: categories.isIncome,
-        })
-        .from(transactions)
-        .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-        .innerJoin(categories, eq(transactions.categoryId, categories.id))
-        .where(
-          and(
-            eq(transactions.userId, session.user.id),
-            sql`to_char(${transactions.date}, 'YYYY-MM') = ${resolvedMonth}`,
-            eq(categories.excludeFromReports, false),
-            inArray(accounts.id, accountIdList),
-            eq(transactions.pending, false),
-            eq(transactions.ignored, false),
-            sql`ABS(${transactions.amount}) > 0`,
-          )
-        )
-        .groupBy(transactions.categoryId, categories.name, categories.color, categories.isIncome);
-
-      // Fetch income categories from transactions
-      currentIncomeRows = await db
-        .select({
-          categoryId: transactions.categoryId,
-          amount: sql<string>`SUM(ABS(${transactions.amount}))`,
-          transactionCount: sql<number>`COUNT(*)`,
-          categoryName: categories.name,
-          categoryColor: categories.color,
-          isIncome: categories.isIncome,
-        })
-        .from(transactions)
-        .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-        .innerJoin(categories, eq(transactions.categoryId, categories.id))
-        .where(
-          and(
-            eq(transactions.userId, session.user.id),
-            sql`to_char(${transactions.date}, 'YYYY-MM') = ${resolvedMonth}`,
-            eq(categories.excludeFromReports, false),
-            eq(categories.isIncome, true),
-            inArray(accounts.id, accountIdList),
-            eq(transactions.pending, false),
-            eq(transactions.ignored, false),
-            sql`ABS(${transactions.amount}) > 0`,
-          )
-        )
-        .groupBy(transactions.categoryId, categories.name, categories.color, categories.isIncome);
+      const [spending, income] = await Promise.all([
+        fetchTransactionsAggregated(resolvedMonth, resolvedMonth, accountIdList, false),
+        fetchTransactionsAggregated(resolvedMonth, resolvedMonth, accountIdList, true),
+      ]);
+      currentRows = spending;
+      currentIncomeRows = income;
     } else {
       currentRows = await db
         .select({
@@ -265,7 +249,6 @@ export async function GET(request: Request) {
           )
         );
 
-      // Also fetch income categories for current month
       currentIncomeRows = await db
         .select({
           categoryId: categoryIncomeSummary.categoryId,
@@ -286,65 +269,11 @@ export async function GET(request: Request) {
         );
     }
 
-    // Build uncategorized WHERE clause with optional account filter
-    const uncatAccountFilter = accountIdList.length > 0
-      ? ` AND account_id IN (${accountIdList.map((id) => `'${id}'`).join(', ')})`
-      : '';
+    const { total: uncategorizedAmountStr, count: uncategorizedCount, isIncome: uncategorizedIsIncome } = await fetchUncategorizedTotal(resolvedMonth, resolvedMonth, accountIdList);
+    const uncategorizedAmount = uncategorizedAmountStr;
 
-    // Fetch uncategorized transactions for current month
-    const uncatSql = accountIdList.length > 0
-      ? sql`SELECT CAST(COUNT(*) AS INTEGER) as cnt, CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-          FROM transactions
-          WHERE user_id = ${session.user.id}
-            AND to_char(date, 'YYYY-MM') = ${resolvedMonth}
-            AND category_id IS NULL
-            AND pending = false
-            AND amount != 0
-            AND account_id IN (${sql.raw(accountIdList.map((id) => `'${id}'`).join(', '))})`
-      : sql`SELECT CAST(COUNT(*) AS INTEGER) as cnt, CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-          FROM transactions
-          WHERE user_id = ${session.user.id}
-            AND to_char(date, 'YYYY-MM') = ${resolvedMonth}
-            AND category_id IS NULL
-            AND pending = false
-            AND amount != 0`;
-
-    const uncategorizedResult = await db.execute(uncatSql);
-    const uncatRow = uncategorizedResult.rows?.[0] as { cnt: unknown; total: unknown } | undefined;
-    let uncategorizedAmount = 0;
-    let uncategorizedCount = 0;
-    let uncategorizedIsIncome = false;
-    if (uncatRow) {
-      const cnt = parseInt(String(uncatRow.cnt)) || 0;
-      const rawTotal = parseFloat(String(uncatRow.total)) || 0;
-      if (cnt > 0 && rawTotal !== 0) {
-        uncategorizedAmount = Math.abs(rawTotal);
-        uncategorizedCount = cnt;
-        uncategorizedIsIncome = rawTotal > 0;
-      }
-    }
-
-    // Fetch uncategorized transactions for previous month
-    const prevUncatSql = accountIdList.length > 0
-      ? sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-          FROM transactions
-          WHERE user_id = ${session.user.id}
-            AND to_char(date, 'YYYY-MM') = ${previousMonth}
-            AND category_id IS NULL
-            AND pending = false
-            AND amount != 0
-            AND account_id IN (${sql.raw(accountIdList.map((id) => `'${id}'`).join(', '))})`
-      : sql`SELECT CAST(COALESCE(SUM(amount), 0) AS REAL) as total
-          FROM transactions
-          WHERE user_id = ${session.user.id}
-            AND to_char(date, 'YYYY-MM') = ${previousMonth}
-            AND category_id IS NULL
-            AND pending = false
-            AND amount != 0`;
-
-    const prevUncategorizedResult = await db.execute(prevUncatSql);
-    const prevUncatRow = prevUncategorizedResult.rows?.[0] as { total: unknown } | undefined;
-    const prevUncategorizedAmount = prevUncatRow ? Math.abs(parseFloat(String(prevUncatRow.total)) || 0) : 0;
+    // Fetch previous month uncategorized
+    const { total: prevUncategorizedAmount } = await fetchUncategorizedTotal(previousMonth, previousMonth, accountIdList);
 
     if (uncategorizedAmount !== 0) {
       currentRows.push({
@@ -357,72 +286,66 @@ export async function GET(request: Request) {
       });
     }
 
-    const previousRows = await db
-      .select({
-        categoryId: categorySpendingSummary.categoryId,
-        amount: categorySpendingSummary.amount,
-      })
-      .from(categorySpendingSummary)
-      .where(
-        and(
-          eq(categorySpendingSummary.userId, session.user.id),
-          eq(categorySpendingSummary.yearMonth, previousMonth)
-        )
-      );
+    // Decrypt summary data for previous month
+    async function fetchPreviousSummary(table: typeof categorySpendingSummary | typeof categoryIncomeSummary, catIds: string[]): Promise<Map<string, number>> {
+      const map = new Map<string, number>();
+      if (catIds.length === 0) return map;
+      const idCol = 'categoryId' in table ? table.categoryId : categorySpendingSummary.categoryId;
+      const rows = await db
+        .select({ categoryId: idCol, amount: table.amount })
+        .from(table)
+        .where(and(eq(table.userId, session.user.id), eq(table.yearMonth, previousMonth)));
+      for (const row of rows) {
+        try {
+          const decrypted = await decryptField(row.amount, dek);
+          map.set(row.categoryId, parseFloat(decrypted));
+        } catch { /* skip */ }
+      }
+      return map;
+    }
 
-    // Fetch previous month income categories for change calculation
-    const prevIncomeRows = await db
-      .select({
-        categoryId: categoryIncomeSummary.categoryId,
-        amount: categoryIncomeSummary.amount,
-      })
-      .from(categoryIncomeSummary)
-      .where(
-        and(
-          eq(categoryIncomeSummary.userId, session.user.id),
-          eq(categoryIncomeSummary.yearMonth, previousMonth)
-        )
-      );
+    const [prevExpenseMap, prevIncomeMap] = await Promise.all([
+      fetchPreviousSummary(categorySpendingSummary, []),
+      fetchPreviousSummary(categoryIncomeSummary, []),
+    ]);
 
     const prevMap = new Map<string, number>();
-    for (const row of previousRows) {
-      prevMap.set(row.categoryId, parseFloat(row.amount.toString()));
-    }
-    for (const row of prevIncomeRows) {
-      prevMap.set(row.categoryId, parseFloat(row.amount.toString()));
-    }
-    // Add previous uncategorized amount to prevMap
+    for (const [k, v] of prevExpenseMap) prevMap.set(k, v);
+    for (const [k, v] of prevIncomeMap) prevMap.set(k, v);
     if (prevUncategorizedAmount !== 0) {
       prevMap.set('uncategorized', prevUncategorizedAmount);
     }
 
-    const data = currentRows.map((row) => {
-      const amount = parseFloat(row.amount.toString());
-      const prevAmount = prevMap.get(row.categoryId) || 0;
-      const prevAmountNum = prevAmount || 0;
-      const change = amount - prevAmountNum;
-      const percentChange = prevAmountNum > 0 ? ((amount - prevAmountNum) / prevAmountNum) * 100 : 0;
+    const data: any[] = [];
 
-      return {
+    // Process spending rows
+    for (const row of currentRows) {
+      const amount = row.categoryId === 'uncategorized'
+        ? uncategorizedAmount
+        : parseFloat(await decryptField(row.amount, dek));
+      const prevAmount = prevMap.get(row.categoryId) || 0;
+      const change = amount - prevAmount;
+      const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
+
+      data.push({
         categoryId: row.categoryId ?? '',
         categoryName: row.categoryName || 'Uncategorized',
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: row.isIncome || false,
         amount,
-        transactionCount: row.transactionCount,
+        transactionCount: row.transactionCount ? parseInt(String(row.transactionCount)) || 0 : 0,
         previousAmount: prevAmount,
         change,
         percentChange,
-      };
-    });
+      });
+    }
 
-    // Map income rows to same data shape
+    // Process income rows (only for summary-table mode; in transaction mode income is already included)
     for (const row of currentIncomeRows) {
-      const amount = parseFloat(row.amount.toString());
+      const amount = parseFloat(await decryptField(row.amount, dek));
       const prevAmount = prevMap.get(row.categoryId) || 0;
-      const prevAmountNum = prevAmount || 0;
-      const change = amount - prevAmountNum;
-      const percentChange = prevAmountNum > 0 ? ((amount - prevAmountNum) / prevAmountNum) * 100 : 0;
+      const change = amount - prevAmount;
+      const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
       data.push({
         categoryId: row.categoryId ?? '',
@@ -430,7 +353,7 @@ export async function GET(request: Request) {
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: true,
         amount,
-        transactionCount: row.transactionCount,
+        transactionCount: row.transactionCount ? parseInt(String(row.transactionCount)) || 0 : 0,
         previousAmount: prevAmount,
         change,
         percentChange,

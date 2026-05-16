@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows } from '@/lib/crypto';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
@@ -34,5 +37,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .limit(limit)
     .offset(offset);
 
-  return NextResponse.json({ data: logs, total, limit, offset });
+  const decrypted = await decryptRows('sync_logs', logs, dek);
+  return NextResponse.json({ data: decrypted, total, limit, offset });
 }

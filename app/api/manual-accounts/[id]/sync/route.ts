@@ -5,6 +5,7 @@ import { accounts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { syncManualAccount, readApiConfig } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -13,6 +14,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
@@ -26,7 +28,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const apiConfig = await readApiConfig(userId);
-  const result = await syncManualAccount(id, userId, apiConfig);
+  const result = await syncManualAccount(id, userId, apiConfig, dek);
 
   logger.info('POST /api/manual-accounts/[id]/sync', { userId, id, accountType: account.type, status: result.status });
 

@@ -4,11 +4,14 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { financialGoals } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRow } from '@/lib/crypto';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(req.url);
   const goalId = searchParams.get('goalId');
 
@@ -29,8 +32,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
   }
 
-  const target = parseFloat(goal[0].targetAmount);
-  const current = parseFloat(goal[0].currentAmount);
+  const decrypted = await decryptRow('financial_goals', goal[0], dek);
+  const target = parseFloat(decrypted.targetAmount);
+  const current = parseFloat(decrypted.currentAmount);
   const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
 
   const milestones = [
@@ -41,7 +45,7 @@ export async function GET(req: NextRequest) {
   ];
 
   return NextResponse.json({
-    goal: goal[0],
+    goal: decrypted,
     progress,
     milestones,
   });

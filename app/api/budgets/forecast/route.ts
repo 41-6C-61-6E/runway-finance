@@ -4,6 +4,8 @@ import { getDb } from '@/lib/db';
 import { accounts, budgets, categories, transactions, userSettings, accountSnapshots } from '@/lib/db/schema';
 import { eq, and, sql, inArray, desc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRow, decryptRows } from '@/lib/crypto';
 
 function normalizeToMonthly(amount: number, periodType: string): number {
   if (periodType === 'quarterly') return amount / 3;
@@ -16,6 +18,7 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '6', 10);
 
@@ -39,17 +42,19 @@ export async function GET(request: Request) {
       .from(accounts)
       .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, false)));
 
+    const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
+
     const accountType = searchParams.get('accountType') || 'banking';
     const accountIdsParam = searchParams.get('accountIds');
 
-    let fundingAccounts = userAccounts;
+    let fundingAccounts = decryptedAccounts;
     if (accountIdsParam) {
       const ids = accountIdsParam.split(',').filter(Boolean);
-      fundingAccounts = fundingAccounts.filter((a) => ids.includes(a.id));
+      fundingAccounts = fundingAccounts.filter((a: any) => ids.includes(a.id));
     } else if (accountType === 'banking') {
-      fundingAccounts = fundingAccounts.filter((a) => ['checking', 'savings'].includes(a.type));
+      fundingAccounts = fundingAccounts.filter((a: any) => ['checking', 'savings'].includes(a.type));
     } else if (accountType === 'cash') {
-      fundingAccounts = fundingAccounts.filter((a) => ['checking', 'savings'].includes(a.type));
+      fundingAccounts = fundingAccounts.filter((a: any) => ['checking', 'savings'].includes(a.type));
     }
 
     if (fundingAccounts.length === 0) {
@@ -78,81 +83,75 @@ export async function GET(request: Request) {
         )
       );
 
-    // ── Fetch historical income per account over lookback period ───
-    const historicalIncomeRows = await db
-      .select({
-        accountId: transactions.accountId,
-        total: sql<string>`SUM(${transactions.amount})`,
-      })
+    // Decrypt budget amounts
+    const decryptedBudgetRows = await Promise.all(budgetRows.map(async (b) => ({
+      ...b,
+      amount: await decryptField(b.amount, dek),
+    })));
+
+    // ── Fetch transactions for historical analysis ─────────────────────
+    const fundingAccountIds = fundingAccounts.map((a: any) => a.id);
+    const allTxns = await db
+      .select({ amount: transactions.amount, accountId: transactions.accountId, categoryId: transactions.categoryId })
       .from(transactions)
       .where(
         and(
           eq(transactions.userId, userId),
           sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
-          sql`${transactions.amount} > 0`,
-          inArray(transactions.accountId, fundingAccounts.map((a) => a.id)),
+          inArray(transactions.accountId, fundingAccountIds),
         )
-      )
-      .groupBy(transactions.accountId);
+      );
+
+    // Decrypt all transaction amounts and categorize
+    const incomeByAccount = new Map<string, number[]>();
+    const expenseByAccount = new Map<string, number[]>();
+    const expenseByAccountAndCategory = new Map<string, Map<string, number[]>>();
+
+    for (const txn of allTxns) {
+      const amount = parseFloat(await decryptField(txn.amount, dek));
+      const accId = txn.accountId;
+
+      if (amount > 0) {
+        if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
+        incomeByAccount.get(accId)!.push(amount);
+      } else {
+        const absAmt = Math.abs(amount);
+        if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
+        expenseByAccount.get(accId)!.push(absAmt);
+
+        if (txn.categoryId) {
+          if (!expenseByAccountAndCategory.has(accId)) expenseByAccountAndCategory.set(accId, new Map());
+          if (!expenseByAccountAndCategory.get(accId)!.has(txn.categoryId)) {
+            expenseByAccountAndCategory.get(accId)!.set(txn.categoryId, []);
+          }
+          expenseByAccountAndCategory.get(accId)!.get(txn.categoryId)!.push(absAmt);
+        }
+      }
+    }
 
     const avgMonthlyIncome = new Map<string, number>();
-    for (const row of historicalIncomeRows) {
-      avgMonthlyIncome.set(row.accountId, parseFloat(row.total.toString()) / lookbackMonths);
+    for (const [accId, amounts] of incomeByAccount) {
+      const total = amounts.reduce((s, a) => s + a, 0);
+      avgMonthlyIncome.set(accId, total / lookbackMonths);
     }
-
-    // ── Fetch historical expenses per account over lookback period ─────
-    const historicalExpenseRows = await db
-      .select({
-        accountId: transactions.accountId,
-        total: sql<string>`SUM(ABS(${transactions.amount}))`,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
-          sql`${transactions.amount} < 0`,
-          inArray(transactions.accountId, fundingAccounts.map((a) => a.id)),
-        )
-      )
-      .groupBy(transactions.accountId);
 
     const avgMonthlyExpense = new Map<string, number>();
-    for (const row of historicalExpenseRows) {
-      avgMonthlyExpense.set(row.accountId, parseFloat(row.total.toString()) / lookbackMonths);
+    for (const [accId, amounts] of expenseByAccount) {
+      const total = amounts.reduce((s, a) => s + a, 0);
+      avgMonthlyExpense.set(accId, total / lookbackMonths);
     }
 
-    // ── Fetch historical expenses per category+account (for hybrid) ────
-    const historicalCategoryExpenseRows = await db
-      .select({
-        accountId: transactions.accountId,
-        categoryId: transactions.categoryId,
-        total: sql<string>`SUM(ABS(${transactions.amount}))`,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
-          sql`${transactions.amount} < 0`,
-          sql`${transactions.categoryId} IS NOT NULL`,
-          inArray(transactions.accountId, fundingAccounts.map((a) => a.id)),
-        )
-      )
-      .groupBy(transactions.accountId, transactions.categoryId);
-
     const categoryExpenseByAccount = new Map<string, Map<string, number>>();
-    for (const row of historicalCategoryExpenseRows) {
-      const catId = row.categoryId;
-      if (!catId) continue;
-      if (!categoryExpenseByAccount.has(row.accountId)) {
-        categoryExpenseByAccount.set(row.accountId, new Map());
+    for (const [accId, catMap] of expenseByAccountAndCategory) {
+      const result = new Map<string, number>();
+      for (const [catId, amounts] of catMap) {
+        result.set(catId, amounts.reduce((s, a) => s + a, 0) / lookbackMonths);
       }
-      categoryExpenseByAccount.get(row.accountId)!.set(catId, parseFloat(row.total.toString()) / lookbackMonths);
+      categoryExpenseByAccount.set(accId, result);
     }
 
     const budgetedCategoriesByAccount = new Map<string, Set<string>>();
-    for (const b of budgetRows) {
+    for (const b of decryptedBudgetRows) {
       if (!b.fundingAccountId || !b.categoryId) continue;
       if (!budgetedCategoriesByAccount.has(b.fundingAccountId)) {
         budgetedCategoriesByAccount.set(b.fundingAccountId, new Set());
@@ -181,7 +180,7 @@ export async function GET(request: Request) {
       const ym = `${forecastDate.getFullYear()}-${String(forecastDate.getMonth() + 1).padStart(2, '0')}`;
       const label = forecastDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
-      const accountProjections = fundingAccounts.map((acc) => {
+      const accountProjections = fundingAccounts.map((acc: any) => {
         let estInflows: number;
         let budgetedOutflows: number;
 
@@ -189,22 +188,21 @@ export async function GET(request: Request) {
           estInflows = avgMonthlyIncome.get(acc.id) || 0;
           budgetedOutflows = avgMonthlyExpense.get(acc.id) || 0;
         } else if (forecastMode === 'budget') {
-          estInflows = budgetRows
-            .filter((b) => b.fundingAccountId === acc.id && b.isIncome)
-            .reduce((sum, b) => sum + normalizeToMonthly(parseFloat(b.amount.toString()), b.periodType), 0);
-          budgetedOutflows = budgetRows
-            .filter((b) => b.fundingAccountId === acc.id && !b.isIncome)
-            .reduce((sum, b) => sum + normalizeToMonthly(parseFloat(b.amount.toString()), b.periodType), 0);
+          estInflows = decryptedBudgetRows
+            .filter((b: any) => b.fundingAccountId === acc.id && b.isIncome)
+            .reduce((sum: number, b: any) => sum + normalizeToMonthly(parseFloat(b.amount), b.periodType), 0);
+          budgetedOutflows = decryptedBudgetRows
+            .filter((b: any) => b.fundingAccountId === acc.id && !b.isIncome)
+            .reduce((sum: number, b: any) => sum + normalizeToMonthly(parseFloat(b.amount), b.periodType), 0);
         } else {
-          // Hybrid: inflows from actuals, outflows from budget where exists, historical otherwise
           estInflows = avgMonthlyIncome.get(acc.id) || 0;
 
           const budgetedCats = budgetedCategoriesByAccount.get(acc.id) || new Set();
           const historicalCats = categoryExpenseByAccount.get(acc.id) || new Map();
 
-          const budgetedPart = budgetRows
-            .filter((b) => b.fundingAccountId === acc.id && !b.isIncome)
-            .reduce((sum, b) => sum + normalizeToMonthly(parseFloat(b.amount.toString()), b.periodType), 0);
+          const budgetedPart = decryptedBudgetRows
+            .filter((b: any) => b.fundingAccountId === acc.id && !b.isIncome)
+            .reduce((sum: number, b: any) => sum + normalizeToMonthly(parseFloat(b.amount), b.periodType), 0);
 
           const historicalPart = Array.from(historicalCats.entries())
             .filter(([catId]) => !budgetedCats.has(catId))
@@ -231,7 +229,7 @@ export async function GET(request: Request) {
 
       for (const proj of accountProjections) {
         proj.startingBalance = i === 0
-          ? parseFloat(fundingAccounts.find((a) => a.id === proj.accountId)?.balance.toString() || '0')
+          ? parseFloat(fundingAccounts.find((a: any) => a.id === proj.accountId)?.balance || '0')
           : forecastMonths[i - 1].accounts.find((a) => a.accountId === proj.accountId)?.projectedBalance || 0;
         proj.projectedBalance = proj.startingBalance + proj.inflows - proj.outflows;
       }
@@ -253,19 +251,25 @@ export async function GET(request: Request) {
         and(
           eq(accountSnapshots.userId, userId),
           sql`${accountSnapshots.snapshotDate} >= ${snapshotStartStr}`,
-          inArray(accountSnapshots.accountId, fundingAccounts.map((a) => a.id)),
+          inArray(accountSnapshots.accountId, fundingAccountIds),
         )
       )
       .orderBy(accountSnapshots.snapshotDate);
 
+    // Decrypt snapshot balances
+    const decryptedSnapshots = await Promise.all(snapshotRows.map(async (snap) => ({
+      ...snap,
+      balance: parseFloat(await decryptField(snap.balance, dek)),
+    })));
+
     // Group snapshots by account and month (take last snapshot per month)
     const historicalByMonth = new Map<string, Map<string, number>>();
-    for (const snap of snapshotRows) {
+    for (const snap of decryptedSnapshots) {
       const ym = snap.snapshotDate.substring(0, 7);
       if (!historicalByMonth.has(snap.accountId)) {
         historicalByMonth.set(snap.accountId, new Map());
       }
-      historicalByMonth.get(snap.accountId)!.set(ym, parseFloat(snap.balance.toString()));
+      historicalByMonth.get(snap.accountId)!.set(ym, snap.balance);
     }
 
     // Build chart data: historical (solid) + projected (dashed)
@@ -305,10 +309,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       forecast: forecastMonths,
-      accounts: fundingAccounts.map((a) => ({
+      accounts: fundingAccounts.map((a: any) => ({
         id: a.id,
         name: a.name,
-        balance: parseFloat(a.balance.toString()),
+        balance: parseFloat(a.balance),
         type: a.type,
       })),
       historical: chartData,

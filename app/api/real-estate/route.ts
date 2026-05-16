@@ -4,12 +4,15 @@ import { getDb } from '@/lib/db';
 import { accounts, accountSnapshots } from '@/lib/db/schema';
 import { eq, and, inArray, asc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, decryptRows } from '@/lib/crypto';
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '24', 10);
 
@@ -22,21 +25,26 @@ export async function GET(request: Request) {
       .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, false)))
       .orderBy(asc(accounts.displayOrder));
 
-    const realEstateAccounts = allAccounts.filter((a) => a.type === 'realestate');
-    const mortgageAccounts = allAccounts.filter((a) => a.type === 'mortgage');
-    const mortgageMap = new Map(mortgageAccounts.map((m) => [m.id, m]));
+    // Decrypt all accounts
+    const decryptedAccounts = await decryptRows('accounts', allAccounts, dek);
+
+    const realEstateAccounts = decryptedAccounts.filter((a: any) => a.type === 'realestate');
+    const mortgageAccounts = decryptedAccounts.filter((a: any) => a.type === 'mortgage');
+    const mortgageMap = new Map(mortgageAccounts.map((m: any) => [m.id, m]));
 
     const properties = await Promise.all(
-      realEstateAccounts.map(async (property) => {
-        const meta = (property.metadata ?? {}) as Record<string, unknown>;
+      realEstateAccounts.map(async (property: any) => {
+        const meta: Record<string, unknown> = property.metadata
+          ? (typeof property.metadata === 'string' ? JSON.parse(property.metadata) : property.metadata)
+          : {};
         const linkedMortgageIds = (meta.mortgageAccountIds ?? []) as string[];
         const linkedMortgages = linkedMortgageIds
           .map((id) => mortgageMap.get(id))
-          .filter(Boolean) as typeof mortgageAccounts;
+          .filter(Boolean) as any[];
 
-        const propertyValue = parseFloat(property.balance.toString());
+        const propertyValue = parseFloat(property.balance);
         const totalMortgageBalance = linkedMortgages.reduce(
-          (sum, m) => sum + parseFloat(m.balance.toString()),
+          (sum, m) => sum + parseFloat(m.balance),
           0
         );
         const equity = propertyValue - Math.abs(totalMortgageBalance);
@@ -59,6 +67,12 @@ export async function GET(request: Request) {
           )
           .orderBy(asc(accountSnapshots.snapshotDate));
 
+        const decryptedSnapshots = await Promise.all(snapshots.map(async (s) => ({
+          date: s.snapshotDate,
+          value: parseFloat(await decryptField(s.balance, dek)),
+          isSynthetic: s.isSynthetic,
+        })));
+
         const mortgageSnapshots = linkedMortgageIds.length > 0
           ? await db
               .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance, accountId: accountSnapshots.accountId, isSynthetic: accountSnapshots.isSynthetic })
@@ -73,6 +87,12 @@ export async function GET(request: Request) {
               .orderBy(asc(accountSnapshots.snapshotDate))
           : [];
 
+        const decryptedMortgageSnapshots = await Promise.all(mortgageSnapshots.map(async (s) => ({
+          date: s.snapshotDate,
+          value: parseFloat(await decryptField(s.balance, dek)),
+          isSynthetic: s.isSynthetic,
+        })));
+
         return {
           id: property.id,
           name: property.name,
@@ -80,29 +100,26 @@ export async function GET(request: Request) {
           mortgageBalance: Math.abs(totalMortgageBalance),
           manualValue: (meta.manualValue as number) ?? null,
           metadata: meta,
-          linkedMortgages: linkedMortgages.map((m) => ({
-            id: m.id,
-            name: m.name,
-            balance: parseFloat(m.balance.toString()),
-            originalLoanAmount: parseFloat(String((m.metadata as Record<string, unknown>)?.originalLoanAmount ?? '0')),
-            interestRate: parseFloat(String((m.metadata as Record<string, unknown>)?.interestRate ?? '0')),
-            monthlyPayment: parseFloat(String((m.metadata as Record<string, unknown>)?.monthlyPayment ?? '0')),
-            termMonths: parseInt(String((m.metadata as Record<string, unknown>)?.termMonths ?? '360'), 10),
-            metadata: (m.metadata as Record<string, unknown>) ?? {},
-          })),
+          linkedMortgages: linkedMortgages.map((m: any) => {
+            const mortgageMeta: Record<string, unknown> = m.metadata
+              ? (typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata)
+              : {};
+            return {
+              id: m.id,
+              name: m.name,
+              balance: parseFloat(m.balance),
+              originalLoanAmount: parseFloat(String(mortgageMeta?.originalLoanAmount ?? '0')),
+              interestRate: parseFloat(String(mortgageMeta?.interestRate ?? '0')),
+              monthlyPayment: parseFloat(String(mortgageMeta?.monthlyPayment ?? '0')),
+              termMonths: parseInt(String(mortgageMeta?.termMonths ?? '360'), 10),
+              metadata: mortgageMeta ?? {},
+            };
+          }),
           equity,
           ltv,
           saleProceeds: Math.max(0, saleProceeds),
-          snapshots: snapshots.map((s) => ({
-            date: s.snapshotDate,
-            value: parseFloat(s.balance.toString()),
-            isSynthetic: s.isSynthetic,
-          })),
-          mortgageSnapshots: mortgageSnapshots.map((s) => ({
-            date: s.snapshotDate,
-            value: parseFloat(s.balance.toString()),
-            isSynthetic: s.isSynthetic,
-          })),
+          snapshots: decryptedSnapshots,
+          mortgageSnapshots: decryptedMortgageSnapshots,
         };
       })
     );

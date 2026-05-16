@@ -154,32 +154,39 @@ export default function ResizableSidebar() {
         {/* Bottom section */}
         {session?.user && (
           <div className={isCollapsed ? 'space-y-2 pb-4 flex flex-col items-center' : 'space-y-3 p-3'}>
-            {!isCollapsed && appStatus && (
+            {!isCollapsed && (
               <div className="px-3 py-2.5 rounded-lg border border-sidebar-border space-y-1.5">
                 <div className="text-xs text-sidebar-foreground/50 font-medium">Status</div>
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    appStatus.connected
-                      ? appStatus.lastSyncStatus === 'ok'
-                        ? 'bg-chart-1'
-                        : appStatus.lastSyncStatus === 'error'
-                        ? 'bg-destructive'
-                        : 'bg-chart-3'
-                      : 'bg-muted-foreground/50'
-                  }`} />
-                  <span className="text-xs text-sidebar-foreground/70">
-                    {appStatus.connected ? 'Connected' : 'No bridge'}
-                  </span>
+                <div className="text-xs text-sidebar-foreground/70">
+                  Signed in as: {session?.user?.name}
                 </div>
-                {appStatus.connected && (
-                  <div className="text-xs text-sidebar-foreground/50">
-                    {formatRelativeTime(appStatus.lastSyncAt)}
-                  </div>
+                {appStatus && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        appStatus.connected
+                          ? appStatus.lastSyncStatus === 'ok'
+                            ? 'bg-chart-1'
+                            : appStatus.lastSyncStatus === 'error'
+                            ? 'bg-destructive'
+                            : 'bg-chart-3'
+                          : 'bg-muted-foreground/50'
+                      }`} />
+                      <span className="text-xs text-sidebar-foreground/70">
+                        {appStatus.connected ? 'Connected' : 'No bridge'}
+                      </span>
+                    </div>
+                    {appStatus.connected && (
+                      <div className="text-xs text-sidebar-foreground/50">
+                        {formatRelativeTime(appStatus.lastSyncAt)}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 text-xs text-sidebar-foreground/50">
+                      <span>{appStatus.accounts} accts</span>
+                      <span>{appStatus.transactions} txns</span>
+                    </div>
+                  </>
                 )}
-                <div className="flex items-center gap-3 text-xs text-sidebar-foreground/50">
-                  <span>{appStatus.accounts} accts</span>
-                  <span>{appStatus.transactions} txns</span>
-                </div>
               </div>
             )}
 
@@ -197,6 +204,15 @@ export default function ResizableSidebar() {
               </>
             )}
 
+            {isCollapsed && session?.user?.name && (
+              <SimpleTooltip label={session.user.name} show={isCollapsed}>
+                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mb-1">
+                  <span className="text-xs font-semibold text-primary">
+                    {session.user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              </SimpleTooltip>
+            )}
             {isCollapsed && (
               <div className="flex flex-col items-center gap-1">
                 <SimpleTooltip label="Change Password" show={isCollapsed}>

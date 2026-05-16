@@ -3,6 +3,8 @@ import { getDb } from '@/lib/db';
 import { userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { ACCENT_NAMES } from '@/lib/utils/apply-accent';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField, encryptField } from '@/lib/crypto';
 
 export async function GET() {
   const session = await auth();
@@ -11,6 +13,7 @@ export async function GET() {
   }
 
   const db = getDb();
+  const dek = await getSessionDEK();
 
   let settings = await db
     .select()
@@ -45,6 +48,14 @@ export async function GET() {
     });
   }
 
+  let apiKeys: Record<string, string> = {};
+  if (settings[0].apiKeys) {
+    try {
+      const decrypted = await decryptField(settings[0].apiKeys, dek);
+      apiKeys = JSON.parse(decrypted);
+    } catch { /* return empty */ }
+  }
+
   return Response.json({
     privacyMode: settings[0].privacyMode,
     accentColor: settings[0].accentColor ?? 'violet',
@@ -60,7 +71,7 @@ export async function GET() {
     reduceTransparency: settings[0].reduceTransparency ?? false,
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? false,
     showMathEnabled: settings[0].showMathEnabled ?? false,
-    apiKeys: settings[0].apiKeys ?? {},
+    apiKeys,
   });
 }
 
@@ -197,6 +208,7 @@ export async function PATCH(request: Request) {
     });
   }
 
+  const dek = await getSessionDEK();
   const updates: Record<string, any> = {};
   if (privacyMode !== undefined) updates.privacyMode = privacyMode;
   if (accentColor !== undefined) updates.accentColor = accentColor;
@@ -212,7 +224,7 @@ export async function PATCH(request: Request) {
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
   if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
-  if (apiKeys !== undefined) updates.apiKeys = apiKeys;
+  if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -220,6 +232,13 @@ export async function PATCH(request: Request) {
     .set(updates)
     .where(eq(userSettings.userId, session.user.id))
     .returning();
+
+  let updatedApiKeys: Record<string, string> = {};
+  if (updated.apiKeys) {
+    try {
+      updatedApiKeys = JSON.parse(await decryptField(updated.apiKeys, dek));
+    } catch { /* return empty */ }
+  }
 
   return Response.json({
     privacyMode: updated.privacyMode,
@@ -236,6 +255,6 @@ export async function PATCH(request: Request) {
     reduceTransparency: updated.reduceTransparency ?? false,
     hideAccountSubheadings: updated.hideAccountSubheadings ?? false,
     showMathEnabled: updated.showMathEnabled ?? false,
-    apiKeys: updated.apiKeys ?? {},
+    apiKeys: updatedApiKeys,
   });
 }

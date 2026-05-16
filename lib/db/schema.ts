@@ -11,6 +11,20 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+// ── User Encryption Keys ──────────────────────────────────────────────────────
+export const userEncryptionKeys = pgTable('user_encryption_keys', {
+  userId: text('user_id').primaryKey(),
+  wrappedDek: text('wrapped_dek').notNull(),
+  wrappingIv: text('wrapping_iv').notNull(),
+  wrappingTag: text('wrapping_tag').notNull(),
+  serverWrappedDek: text('server_wrapped_dek'),
+  serverWrappingIv: text('server_wrapping_iv'),
+  serverWrappingTag: text('server_wrapping_tag'),
+  salt: text('salt').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Next Auth Tables (existing) ──────────────────────────────────────────────
 // These are created by Next Auth's Drizzle adapter automatically.
 // We define them here for type completeness.
@@ -65,28 +79,28 @@ export const verification = pgTable('verification', {
 // ── User Settings ────────────────────────────────────────────────────────────
 export const userSettings = pgTable('user_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull().unique(), // Next Auth user ID (text UUID)
+  userId: text('user_id').notNull().unique(),
   currency: text('currency').notNull().default('USD'),
   locale: text('locale').notNull().default('en-US'),
   timezone: text('timezone').notNull().default('America/New_York'),
-  theme: text('theme').notNull().default('dark'), // 'dark' | 'darker'
+  theme: text('theme').notNull().default('dark'),
   accentColor: text('accent_color').notNull().default('indigo'),
   compactMode: boolean('compact_mode').notNull().default(false),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
   privacyMode: boolean('privacy_mode').notNull().default(false),
   chartVisibility: jsonb('chart_visibility').default({}),
   chartColorScheme: text('chart_color_scheme').notNull().default('forest'),
-  forecastMode: text('forecast_mode').notNull().default('hybrid'), // 'historical' | 'budget' | 'hybrid'
+  forecastMode: text('forecast_mode').notNull().default('hybrid'),
   forecastLookbackMonths: integer('forecast_lookback_months').notNull().default(3),
   hiddenPages: jsonb('hidden_pages').default({}),
-  cardStyle: text('card_style').notNull().default('default'), // 'rounded' | 'default' | 'square'
+  cardStyle: text('card_style').notNull().default('default'),
   showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
   defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
   showMathEnabled: boolean('show_math_enabled').notNull().default(false),
-  apiKeys: jsonb('api_keys').default({}),
+  apiKeys: text('api_keys'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -116,10 +130,10 @@ export const accounts = pgTable(
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),
     currency: text('currency').notNull().default('USD'),
-    balance: numeric('balance', { precision: 20, scale: 4 }).notNull().default('0'),
+    balance: text('balance').notNull(),
     balanceDate: timestamp('balance_date', { withTimezone: true }),
-    type: text('type').notNull(), // 'checking'|'savings'|'credit'|'investment'|'loan'|'other'|'realestate'|'vehicle'|'crypto'|'metals'|'otherAsset'
-    metadata: jsonb('metadata'), // Type-specific config: {propertyId, xpub, amountOz, subType, etc.}
+    type: text('type').notNull(),
+    metadata: text('metadata'),
     institution: text('institution'),
     isHidden: boolean('is_hidden').notNull().default(false),
     isExcludedFromNetWorth: boolean('is_excluded_from_net_worth').notNull().default(false),
@@ -157,7 +171,7 @@ export const transactions = pgTable(
     externalId: text('external_id').notNull(),
     date: date('date').notNull(),
     postedDate: date('posted_date'),
-    amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
+    amount: text('amount').notNull(),
     description: text('description').notNull(),
     payee: text('payee'),
     memo: text('memo'),
@@ -179,12 +193,12 @@ export const syncLogs = pgTable('sync_logs', {
   connectionId: uuid('connection_id').references(() => simplifinConnections.id),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
-  status: text('status').notNull(), // 'running'|'success'|'partial'|'error'
-  accountsSynced: integer('accounts_synced').notNull().default(0),
-  transactionsFetched: integer('transactions_fetched').notNull().default(0),
-  transactionsNew: integer('transactions_new').notNull().default(0),
+  status: text('status').notNull(),
+  accountsSynced: text('accounts_synced').notNull(),
+  transactionsFetched: text('transactions_fetched').notNull(),
+  transactionsNew: text('transactions_new').notNull(),
   errorMessage: text('error_message'),
-  durationMs: integer('duration_ms'),
+  durationMs: text('duration_ms'),
 });
 
 // ── Category Rules ───────────────────────────────────────────────────────────
@@ -213,9 +227,9 @@ export const netWorthSnapshots = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').notNull(),
     snapshotDate: date('snapshot_date').notNull(),
-    totalAssets: numeric('total_assets', { precision: 20, scale: 4 }).notNull(),
-    totalLiabilities: numeric('total_liabilities', { precision: 20, scale: 4 }).notNull(),
-    netWorth: numeric('net_worth', { precision: 20, scale: 4 }).notNull(),
+    totalAssets: text('total_assets').notNull(),
+    totalLiabilities: text('total_liabilities').notNull(),
+    netWorth: text('net_worth').notNull(),
     breakdown: jsonb('breakdown').notNull(),
   },
   (t) => [unique().on(t.userId, t.snapshotDate)]
@@ -232,7 +246,7 @@ export const accountSnapshots = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     snapshotDate: date('snapshot_date').notNull(),
-    balance: numeric('balance', { precision: 20, scale: 4 }).notNull(),
+    balance: text('balance').notNull(),
     isSynthetic: boolean('is_synthetic').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -246,11 +260,11 @@ export const monthlyCashFlow = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').notNull(),
-    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
-    totalIncome: numeric('total_income', { precision: 20, scale: 4 }).notNull().default('0'),
-    totalExpenses: numeric('total_expenses', { precision: 20, scale: 4 }).notNull().default('0'),
-    netCashFlow: numeric('net_cash_flow', { precision: 20, scale: 4 }).notNull().default('0'),
-    transactionCount: integer('transaction_count').notNull().default(0),
+    yearMonth: text('year_month').notNull(),
+    totalIncome: text('total_income').notNull(),
+    totalExpenses: text('total_expenses').notNull(),
+    netCashFlow: text('net_cash_flow').notNull(),
+    transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.userId, t.yearMonth)]
@@ -266,9 +280,9 @@ export const categorySpendingSummary = pgTable(
     categoryId: uuid('category_id')
       .notNull()
       .references(() => categories.id, { onDelete: 'cascade' }),
-    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
-    amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
-    transactionCount: integer('transaction_count').notNull().default(0),
+    yearMonth: text('year_month').notNull(),
+    amount: text('amount').notNull(),
+    transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
@@ -284,9 +298,9 @@ export const categoryIncomeSummary = pgTable(
     categoryId: uuid('category_id')
       .notNull()
       .references(() => categories.id, { onDelete: 'cascade' }),
-    yearMonth: text('year_month').notNull(), // Format: 'YYYY-MM'
-    amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
-    transactionCount: integer('transaction_count').notNull().default(0),
+    yearMonth: text('year_month').notNull(),
+    amount: text('amount').notNull(),
+    transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
@@ -300,10 +314,10 @@ export const budgets = pgTable('budgets', {
   categoryId: uuid('category_id')
     .notNull()
     .references(() => categories.id, { onDelete: 'cascade' }),
-  yearMonth: text('year_month'), // Format: 'YYYY-MM', null = recurring monthly
-  periodType: text('period_type').notNull().default('monthly'), // 'monthly' | 'quarterly' | 'yearly'
-  periodKey: text('period_key'), // null for recurring, or 'YYYY-MM', 'YYYY-Qn', 'YYYY'
-  amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),
+  yearMonth: text('year_month'),
+  periodType: text('period_type').notNull().default('monthly'),
+  periodKey: text('period_key'),
+  amount: text('amount').notNull(),
   isRecurring: boolean('is_recurring').notNull().default(true),
   fundingAccountId: uuid('funding_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   rollover: boolean('rollover').notNull().default(false),
@@ -319,16 +333,16 @@ export const financialGoals = pgTable('financial_goals', {
   userId: text('user_id').notNull(),
   name: text('name').notNull(),
   description: text('description'),
-  type: text('type').notNull(), // 'savings'|'payoff'|'investment'|'other'
-  targetAmount: numeric('target_amount', { precision: 20, scale: 4 }).notNull(),
-  currentAmount: numeric('current_amount', { precision: 20, scale: 4 }).notNull().default('0'),
+  type: text('type').notNull(),
+  targetAmount: text('target_amount').notNull(),
+  currentAmount: text('current_amount').notNull(),
   targetDate: date('target_date'),
-  category: text('category'), // Optional categorization
-  priority: integer('priority').notNull().default(0), // 0=low, 1=medium, 2=high
-  status: text('status').notNull().default('active'), // 'active'|'completed'|'paused'
+  category: text('category'),
+  priority: integer('priority').notNull().default(0),
+  status: text('status').notNull().default('active'),
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
-  percentage: numeric('percentage', { precision: 5, scale: 2 }).notNull().default('100'),
-  reserve: numeric('reserve', { precision: 20, scale: 4 }).notNull().default('0'),
+  percentage: text('percentage').notNull(),
+  reserve: text('reserve').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -337,23 +351,23 @@ export const financialGoals = pgTable('financial_goals', {
 export const retirementProjections = pgTable('retirement_projections', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
-  name: text('name').notNull().default('Primary Plan'),
+  name: text('name').notNull(),
   fireScenarioId: uuid('fire_scenario_id').references(() => fireScenarios.id, { onDelete: 'set null' }),
   retirementAge: integer('retirement_age'),
   lifeExpectancy: integer('life_expectancy').default(95),
-  portfolioAtRetirement: numeric('portfolio_at_retirement', { precision: 20, scale: 4 }).default('0'),
-  expectedReturnRate: numeric('expected_return_rate', { precision: 6, scale: 4 }).default('0.05'),
-  inflationRate: numeric('inflation_rate', { precision: 6, scale: 4 }).default('0.03'),
-  annualWithdrawal: numeric('annual_withdrawal', { precision: 20, scale: 4 }),
+  portfolioAtRetirement: text('portfolio_at_retirement'),
+  expectedReturnRate: text('expected_return_rate'),
+  inflationRate: text('inflation_rate'),
+  annualWithdrawal: text('annual_withdrawal'),
   ssStartAge: integer('ss_start_age').default(67),
-  ssAnnual: numeric('ss_annual', { precision: 20, scale: 4 }).default('0'),
+  ssAnnual: text('ss_annual'),
   pensionStartAge: integer('pension_start_age').default(65),
-  pensionAnnual: numeric('pension_annual', { precision: 20, scale: 4 }).default('0'),
-  partTimeIncome: numeric('part_time_income', { precision: 20, scale: 4 }).default('0'),
+  pensionAnnual: text('pension_annual'),
+  partTimeIncome: text('part_time_income'),
   partTimeEndAge: integer('part_time_end_age'),
-  rentalIncomeAnnual: numeric('rental_income_annual', { precision: 20, scale: 4 }).default('0'),
-  healthcareAnnual: numeric('healthcare_annual', { precision: 20, scale: 4 }).default('0'),
-  legacyGoal: numeric('legacy_goal', { precision: 20, scale: 4 }).default('0'),
+  rentalIncomeAnnual: text('rental_income_annual'),
+  healthcareAnnual: text('healthcare_annual'),
+  legacyGoal: text('legacy_goal'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -362,16 +376,16 @@ export const retirementProjections = pgTable('retirement_projections', {
 export const fireScenarios = pgTable('fire_scenarios', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
-  name: text('name').notNull().default('Primary Scenario'),
+  name: text('name').notNull(),
   isDefault: boolean('is_default').notNull().default(false),
   currentAge: integer('current_age'),
   targetAge: integer('target_age'),
-  targetAnnualExpenses: numeric('target_annual_expenses', { precision: 20, scale: 4 }),
-  currentInvestableAssets: numeric('current_investable_assets', { precision: 20, scale: 4 }),
-  annualContributions: numeric('annual_contributions', { precision: 20, scale: 4 }),
-  expectedReturnRate: numeric('expected_return_rate', { precision: 6, scale: 4 }).default('0.07'),
-  inflationRate: numeric('inflation_rate', { precision: 6, scale: 4 }).default('0.03'),
-  safeWithdrawalRate: numeric('safe_withdrawal_rate', { precision: 6, scale: 4 }).default('0.04'),
+  targetAnnualExpenses: text('target_annual_expenses'),
+  currentInvestableAssets: text('current_investable_assets'),
+  annualContributions: text('annual_contributions'),
+  expectedReturnRate: text('expected_return_rate'),
+  inflationRate: text('inflation_rate'),
+  safeWithdrawalRate: text('safe_withdrawal_rate'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
