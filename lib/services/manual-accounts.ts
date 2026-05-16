@@ -361,8 +361,17 @@ export async function syncManualAccount(
   }
 
   const oldBalance = parseFloat(dek ? await decryptField(account.balance, dek) : account.balance.toString());
-  const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
-  const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}') as Record<string, unknown>;
+  let rawMeta: string | Record<string, unknown>;
+  if (dek && account.metadata) {
+    const decrypted = await decryptField(account.metadata, dek);
+    rawMeta = decrypted || '{}';
+  } else if (typeof account.metadata === 'string') {
+    rawMeta = account.metadata || '{}';
+  } else {
+    // account.metadata is a jsonb object from the database (no encryption)
+    rawMeta = account.metadata || {};
+  }
+  const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) as Record<string, unknown>;
   let newValue: number;
 
   try {
@@ -440,8 +449,16 @@ export async function syncManualAccount(
   // Regenerate synthetic history for real estate to keep HPI curve aligned
   if (account.type === 'realestate' || account.type === 'metals') {
     try {
-      const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
-      const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}') as Record<string, unknown>;
+      let rawMeta: string | Record<string, unknown>;
+      if (dek && account.metadata) {
+        const decrypted = await decryptField(account.metadata, dek);
+        rawMeta = decrypted || '{}';
+      } else if (typeof account.metadata === 'string') {
+        rawMeta = account.metadata || '{}';
+      } else {
+        rawMeta = account.metadata || {};
+      }
+      const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) as Record<string, unknown>;
       await generateAssetHistorySnapshots(accountId, userId, account.type, meta, apiConfig);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to regenerate history for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
@@ -481,8 +498,17 @@ export async function adjustManualAccountValue(
 
   const oldBalance = parseFloat(dek ? await decryptField(account.balance, dek) : account.balance.toString());
   let finalNewValue = newValue;
-  const rawMeta = dek && account.metadata ? await decryptField(account.metadata, dek) : (account.metadata ?? '{}');
-  const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : '{}');
+  let rawMeta: string | Record<string, unknown>;
+  if (dek && account.metadata) {
+    const decrypted = await decryptField(account.metadata, dek);
+    rawMeta = decrypted || '{}';
+  } else if (typeof account.metadata === 'string') {
+    rawMeta = account.metadata || '{}';
+  } else {
+    // account.metadata is a jsonb object from the database (no encryption)
+    rawMeta = account.metadata || {};
+  }
+  const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta));
 
   if (account.type === 'metals' && amountOz !== undefined) {
     try {
