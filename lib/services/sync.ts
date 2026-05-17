@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db';
+import { getDb, getPool } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
@@ -70,17 +70,17 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
     .values({
       userId,
       snapshotDate,
-      totalAssets: await encryptField(String(totalAssets), dek),
-      totalLiabilities: await encryptField(String(totalLiabilities), dek),
-      netWorth: await encryptField(String(netWorth), dek),
+      totalAssets: String(totalAssets),
+      totalLiabilities: String(totalLiabilities),
+      netWorth: String(netWorth),
       breakdown,
     })
     .onConflictDoUpdate({
       target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
       set: {
-        totalAssets: await encryptField(String(totalAssets), dek),
-        totalLiabilities: await encryptField(String(totalLiabilities), dek),
-        netWorth: await encryptField(String(netWorth), dek),
+        totalAssets: String(totalAssets),
+        totalLiabilities: String(totalLiabilities),
+        netWorth: String(netWorth),
         breakdown,
       },
     });
@@ -99,21 +99,19 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
   for (const acc of decrypted) {
-    const encryptedBalance = await encryptField(acc.balance, dek);
-    
     await getDb()
       .insert(accountSnapshots)
       .values({
         userId,
         accountId: acc.id,
         snapshotDate,
-        balance: encryptedBalance,
+        balance: acc.balance,
         isSynthetic: false,
       })
       .onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
         set: {
-          balance: encryptedBalance,
+          balance: acc.balance,
           isSynthetic: false,
         },
       });
@@ -197,18 +195,18 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
       .values({
         userId,
         yearMonth,
-        totalIncome: await encryptField(String(data.income), dek),
-        totalExpenses: await encryptField(String(data.expenses), dek),
-        netCashFlow: await encryptField(String(netCashFlow), dek),
-        transactionCount: await encryptField(String(data.count), dek),
+        totalIncome: String(data.income),
+        totalExpenses: String(data.expenses),
+        netCashFlow: String(netCashFlow),
+        transactionCount: data.count,
       })
       .onConflictDoUpdate({
         target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
         set: {
-          totalIncome: await encryptField(String(data.income), dek),
-          totalExpenses: await encryptField(String(data.expenses), dek),
-          netCashFlow: await encryptField(String(netCashFlow), dek),
-          transactionCount: await encryptField(String(data.count), dek),
+          totalIncome: String(data.income),
+          totalExpenses: String(data.expenses),
+          netCashFlow: String(netCashFlow),
+          transactionCount: data.count,
           updatedAt: new Date(),
         },
       });
@@ -300,14 +298,14 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
           userId,
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
-          amount: await encryptField(String(catData.amount), dek),
-          transactionCount: await encryptField(String(catData.count), dek),
+          amount: String(catData.amount),
+          transactionCount: catData.count,
         })
         .onConflictDoUpdate({
           target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
           set: {
-            amount: await encryptField(String(catData.amount), dek),
-            transactionCount: await encryptField(String(catData.count), dek),
+            amount: String(catData.amount),
+            transactionCount: catData.count,
             updatedAt: new Date(),
           },
         });
@@ -400,14 +398,14 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
           userId,
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
-          amount: await encryptField(String(catData.amount), dek),
-          transactionCount: await encryptField(String(catData.count), dek),
+          amount: String(catData.amount),
+          transactionCount: catData.count,
         })
         .onConflictDoUpdate({
           target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.yearMonth],
           set: {
-            amount: await encryptField(String(catData.amount), dek),
-            transactionCount: await encryptField(String(catData.count), dek),
+            amount: String(catData.amount),
+            transactionCount: catData.count,
             updatedAt: new Date(),
           },
         });
@@ -441,9 +439,9 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       userId,
       connectionId,
       status: 'running',
-      accountsSynced: '0',
-      transactionsFetched: '0',
-      transactionsNew: '0',
+      accountsSynced: 0,
+      transactionsFetched: 0,
+      transactionsNew: 0,
       startedAt: new Date(),
     })
     .returning();
@@ -522,7 +520,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           .update(accounts)
           .set({
             connectionId,
-            balance: await encryptField(sfAccount.balance, dek),
+            balance: sfAccount.balance,
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
             institution: await encryptField(sfAccount.org.name, dek),
             updatedAt: now,
@@ -538,7 +536,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             externalId: sfAccount.id,
             name: await encryptField(sfAccount.name, dek),
             currency: sfAccount.currency,
-            balance: await encryptField(sfAccount.balance, dek),
+            balance: sfAccount.balance,
             balanceDate: new Date(sfAccount['balance-date'] * 1000),
             type: inferAccountType(sfAccount),
             institution: await encryptField(sfAccount.org.name, dek),
@@ -549,7 +547,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           .onConflictDoUpdate({
             target: [accounts.connectionId, accounts.externalId],
             set: {
-              balance: await encryptField(sfAccount.balance, dek),
+              balance: sfAccount.balance,
               balanceDate: new Date(sfAccount['balance-date'] * 1000),
               institution: await encryptField(sfAccount.org.name, dek),
               updatedAt: now,
@@ -580,7 +578,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             externalId: sfTx.id,
             date: txDate,
             postedDate: txPostedDate,
-            amount: await encryptField(String(amountNum), dek),
+            amount: String(amountNum),
             description: await encryptField(sfTx.description, dek),
             payee: sfTx.payee ? await encryptField(sfTx.payee, dek) : null,
             memo: sfTx.memo ? await encryptField(sfTx.memo, dek) : null,
@@ -729,10 +727,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .set({
         status: 'success',
         completedAt: now,
-        accountsSynced: await encryptField(String(accountsSynced), dek),
-        transactionsFetched: await encryptField(String(transactionsFetched), dek),
-        transactionsNew: await encryptField(String(transactionsNew), dek),
-        durationMs: await encryptField(String(Date.now() - log.startedAt.getTime()), dek),
+        accountsSynced,
+        transactionsFetched,
+        transactionsNew,
+        durationMs: Date.now() - log.startedAt.getTime(),
       })
       .where(eq(syncLogs.id, log.id));
 
@@ -808,7 +806,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         status: 'error',
         completedAt: new Date(),
         errorMessage,
-        durationMs: await encryptField(String(Date.now() - log.startedAt.getTime()), dekOverride ?? new Uint8Array(0)).catch(() => '0'),
+        durationMs: Date.now() - log.startedAt.getTime(),
       })
       .where(eq(syncLogs.id, log.id));
 

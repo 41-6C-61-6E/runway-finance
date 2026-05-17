@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db';
+import { getDb, getPool } from '@/lib/db';
 import { accountSnapshots, transactions } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
 import { decryptField, encryptField } from '@/lib/crypto';
@@ -44,8 +44,7 @@ export async function getLatestRealSnapshot(
     .limit(1);
 
   if (!snapshot) return null;
-  const decryptedBalance = dek ? await decryptField(snapshot.balance, dek) : snapshot.balance;
-  return { date: String(snapshot.date), balance: String(decryptedBalance) };
+  return { date: String(snapshot.date), balance: String(snapshot.balance) };
 }
 
 /**
@@ -130,7 +129,7 @@ export async function generateHistoricalAccountSnapshots(
 
   if (latestReal) {
     effectiveFromDate = latestReal.date;
-    runningBalance = parseFloat(dek ? await decryptField(latestReal.balance, dek) : latestReal.balance);
+    runningBalance = parseFloat(latestReal.balance);
   } else if (earliestTxDate) {
     effectiveFromDate = earliestTxDate;
     runningBalance = 0;
@@ -143,21 +142,14 @@ export async function generateHistoricalAccountSnapshots(
 
   if (txs.length === 0) {
     if (effectiveFromDate === from) {
-      const encryptedBalance = dek ? await encryptField(String(runningBalance), dek) : String(runningBalance);
-      
-      await getDb()
-        .insert(accountSnapshots)
-        .values({
-          userId,
-          accountId,
-          snapshotDate: from,
-          balance: encryptedBalance,
-          isSynthetic: true,
-        })
-        .onConflictDoUpdate({
-          target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-          set: { balance: encryptedBalance, isSynthetic: true },
-        });
+      const pool = getPool();
+      await pool.query(
+        `INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT ("user_id", "account_id", "snapshot_date") 
+         DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic`,
+        [userId, accountId, from, String(runningBalance), true]
+      );
       logger.debug(`${LOG_TAG} Single synthetic snapshot inserted`, { accountId, date: from, balance: runningBalance });
       return { syntheticCount: 1, skippedRealCount: 0 };
     }
@@ -168,7 +160,7 @@ export async function generateHistoricalAccountSnapshots(
   for (const tx of txs) {
     const txDate = String(tx.postedDate ?? tx.date);
     const existing = txByDate.get(txDate) ?? 0;
-    const amount = dek ? parseFloat(await decryptField(tx.amount, dek)) : parseFloat(tx.amount);
+    const amount = parseFloat(tx.amount);
     txByDate.set(txDate, existing + amount);
   }
 
@@ -191,50 +183,75 @@ export async function generateHistoricalAccountSnapshots(
     realByDate.set(String(r.snapshotDate), String(r.balance));
   }
 
-  let current = new Date(effectiveFromDate);
-  const end = new Date(to);
+  // Use UTC midnight for stable date iteration to avoid DST-related duplicates
+  let current = new Date(effectiveFromDate + 'T00:00:00Z');
+  const end = new Date(to + 'T00:00:00Z');
   const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean }> = [];
+  const seenDates = new Set<string>();
   let skippedReal = 0;
 
   while (current <= end) {
     const dateStr = current.toISOString().split('T')[0];
+    if (seenDates.has(dateStr)) {
+      current.setUTCDate(current.getUTCDate() + 1);
+      continue;
+    }
+    seenDates.add(dateStr);
+
     const realBal = realByDate.get(dateStr);
 
     if (realBal !== undefined) {
-      runningBalance = parseFloat(dek ? await decryptField(realBal, dek) : realBal);
+      runningBalance = parseFloat(realBal);
       skippedReal++;
     } else {
       const dailyChange = txByDate.get(dateStr) ?? 0;
       runningBalance += dailyChange;
-      const encryptedBalance = dek ? await encryptField(String(runningBalance), dek) : String(runningBalance);
-      
       toInsert.push({
         userId,
         accountId,
         snapshotDate: dateStr,
-        balance: encryptedBalance,
+        balance: String(runningBalance),
         isSynthetic: true,
       });
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   // Batch insert all synthetic snapshots in chunks to avoid PostgreSQL parameter limits
   const BATCH_SIZE = 100;
   let syntheticCount = 0;
   if (toInsert.length > 0) {
+    const pool = getPool();
     for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
       const chunk = toInsert.slice(i, i + BATCH_SIZE);
-      const results = await getDb()
-        .insert(accountSnapshots)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-          set: { balance: sql`EXCLUDED.balance`, isSynthetic: true },
-        })
-        .returning({ id: accountSnapshots.id });
-      syntheticCount += results.length;
+      
+      // Build parameterized SQL query with explicit TEXT cast for balance
+      const params: any[] = [];
+      const valuePlaceholders: string[] = [];
+      let paramIdx = 1;
+      
+      for (const row of chunk) {
+        params.push(row.userId, row.accountId, row.snapshotDate, row.balance, row.isSynthetic);
+        valuePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4})`);
+        paramIdx += 5;
+      }
+      
+      const sqlText = `
+        INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
+        VALUES ${valuePlaceholders.join(', ')}
+        ON CONFLICT ("user_id", "account_id", "snapshot_date") 
+        DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic
+        RETURNING "id"
+      `;
+      
+      try {
+        const result = await pool.query(sqlText, params);
+        syntheticCount += result.rows.length;
+      } catch (err) {
+        logger.error(`${LOG_TAG} Batch insert failed`, { error: err instanceof Error ? err.message : String(err), chunkSize: chunk.length });
+        throw err;
+      }
     }
   }
 
