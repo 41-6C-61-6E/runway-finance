@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers } from 'lucide-react';
 
 type AiProposal = {
   id: string;
@@ -126,6 +126,7 @@ export default function AiSuggestionsPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -133,12 +134,22 @@ export default function AiSuggestionsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [newProposalsCount, setNewProposalsCount] = useState(0);
+  const [newTxnsCount, setNewTxnsCount] = useState(0);
+  const [newCategoriesCount, setNewCategoriesCount] = useState(0);
+  const [newRulesCount, setNewRulesCount] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [batchSize, setBatchSize] = useState<number | null>(null);
+  const [totalToAnalyze, setTotalToAnalyze] = useState<number | null>(null);
+  const [lastBatchAt, setLastBatchAt] = useState<number | null>(null);
+  const [lastBatchDuration, setLastBatchDuration] = useState<number | null>(null);
   const analyzingRef = useRef(false);
 
   const STATUS_KEY = 'ai_analysis_status';
   const ANALYSIS_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
-  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number } | null;
+  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number; totalToAnalyze?: number | null } | null;
 
   const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
 
@@ -146,6 +157,14 @@ export default function AiSuggestionsPage() {
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
   };
+
+  useEffect(() => {
+    // Fetch batch size for display in status banner
+    fetch('/api/user-settings', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setBatchSize(data.aiBatchSize ?? 25))
+      .catch(() => setBatchSize(25));
+  }, []);
 
   const fetchProposals = useCallback(async () => {
     try {
@@ -164,9 +183,9 @@ export default function AiSuggestionsPage() {
 
   useEffect(() => {
     fetchProposals();
-    // Restore analysis status from sessionStorage (survives navigation)
+    // Restore analysis status from localStorage (survives navigation and reload)
     try {
-      const raw = sessionStorage.getItem(STATUS_KEY);
+      const raw = localStorage.getItem(STATUS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as NonNullable<AnalysisStatus>;
         
@@ -177,17 +196,24 @@ export default function AiSuggestionsPage() {
             // Analysis has been running too long, mark as failed
             const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
             setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
-            sessionStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
+            localStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
             return;
           }
         }
         
         setSavedStatus(parsed);
         if (parsed.status === 'running') {
+          setStartTime(parsed.startedAt || null);
+          setTotalToAnalyze(parsed.totalToAnalyze ?? null);
           setAnalyzing(true);
         }
       }
     } catch { /* ignore */ }
+
+    return () => {
+      // When navigating away, mark as not analyzing in this component instance
+      analyzingRef.current = false;
+    };
   }, [fetchProposals]);
 
   // Check for analysis timeout periodically
@@ -205,17 +231,54 @@ export default function AiSuggestionsPage() {
     }, 30000); // Check every 30 seconds
     return () => clearInterval(checkTimeout);
   }, [analyzing, savedStatus?.startedAt]);
+
+  useEffect(() => {
+    if (!analyzing || !startTime) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [analyzing, startTime]);
+
   useEffect(() => {
     if (!analyzing) return;
     const interval = setInterval(() => {
-      fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+      fetch('/api/ai/proposals', { credentials: 'include' })
         .then((r) => r.json())
         .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
+            let displayData = data;
+            if (filterStatus !== 'all') displayData = displayData.filter(p => p.status === filterStatus);
+            if (filterType !== 'all') displayData = displayData.filter(p => p.type === filterType);
+
+            if (startTime) {
+              const sessionProposals = data.filter((p: AiProposal) => 
+                new Date(p.createdAt).getTime() >= startTime
+              );
+              
+              // Track batch timing if we received more items
+              if (sessionProposals.length > newProposalsCount) {
+                const now = Date.now();
+                const reference = lastBatchAt || startTime;
+                setLastBatchDuration(Math.floor((now - reference) / 1000));
+                setLastBatchAt(now);
+              }
+              setNewProposalsCount(sessionProposals.length);
+              setNewTxnsCount(sessionProposals.filter((p: AiProposal) => p.type === 'categorize').length);
+              setNewCategoriesCount(sessionProposals.filter((p: AiProposal) => p.type === 'create_category').length);
+              setNewRulesCount(sessionProposals.filter((p: AiProposal) => p.type === 'create_rule').length);
+            }
+
             setProposals((prev) => {
               const existingIds = new Set(prev.map((p) => p.id));
-              const newOnes = data.filter((p: AiProposal) => !existingIds.has(p.id));
-              if (newOnes.length > 0) return [...newOnes, ...prev];
+              const newOnes = displayData.filter((p: AiProposal) => !existingIds.has(p.id));
+              if (newOnes.length > 0) {
+                const merged = [...newOnes, ...prev];
+                return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              }
               return prev;
             });
           }
@@ -223,7 +286,7 @@ export default function AiSuggestionsPage() {
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [analyzing]);
+  }, [analyzing, startTime, filterStatus, filterType]);
 
   const persistStatus = (status: AnalysisStatus) => {
     setSavedStatus(status);
@@ -232,53 +295,111 @@ export default function AiSuggestionsPage() {
       const statusWithTimestamp = status.status === 'running' && !status.startedAt
         ? { ...status, startedAt: Date.now() }
         : status;
-      sessionStorage.setItem(STATUS_KEY, JSON.stringify(statusWithTimestamp));
+      localStorage.setItem(STATUS_KEY, JSON.stringify(statusWithTimestamp));
     } else {
-      sessionStorage.removeItem(STATUS_KEY);
+      localStorage.removeItem(STATUS_KEY);
     }
   };
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
     analyzingRef.current = true;
-    persistStatus({ status: 'running', message: 'Analysis started — you can navigate away, it will continue in the background.' });
+    const startedAt = Date.now();
+    
+    // Get initial count of items to analyze
+    const txnRes = await fetch('/api/transactions?countOnly=true&uncategorized=true', { credentials: 'include' }).catch(() => null);
+    const txnCount = txnRes?.ok ? (await txnRes.json()).count : null;
+
+    setTotalToAnalyze(txnCount);
+    setStartTime(startedAt);
+    setLastBatchAt(null);
+    setLastBatchDuration(null);
+    setNewProposalsCount(0);
+    setNewTxnsCount(0);
+    setNewCategoriesCount(0);
+    setNewRulesCount(0);
+    setElapsedSeconds(0);
+    persistStatus({ 
+      status: 'running', 
+      message: 'Analysis started — you can navigate away, it will continue in the background.',
+      startedAt,
+      totalToAnalyze: txnCount
+    });
     setFeedback(null);
+
     try {
-      const res = await fetch('/api/ai/analyze', { method: 'POST', credentials: 'include' });
-      const data = await res.json();
+      const res = await fetch('/api/ai/analyze', { 
+        method: 'POST', 
+        credentials: 'include',
+        keepalive: true // Ensures the request completes even if page is navigated
+      });
       
+      const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
+      
+      let finalStatus: AnalysisStatus;
       if (!res.ok) {
-        const msg = data.error || 'Failed to run analysis. Please check your AI provider configuration.';
-        persistStatus({ status: 'error', message: msg });
-        showFeedback('error', msg);
+        finalStatus = { 
+          status: 'error', 
+          message: data.error || 'Failed to run analysis. Please check your AI provider configuration.' 
+        };
+      } else {
+        const msg = data.errors?.length
+          ? `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`
+          : `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
+        finalStatus = { status: data.errors?.length ? 'error' : 'completed', message: msg };
+      }
+
+      // Always persist the outcome so it is visible upon return
+      localStorage.setItem(STATUS_KEY, JSON.stringify(finalStatus));
+
+      if (analyzingRef.current) {
+        setSavedStatus(finalStatus);
+        showFeedback(finalStatus.status === 'completed' ? 'success' : 'error', finalStatus.message);
+        await fetchProposals();
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+
+      const errorStatus: AnalysisStatus = { status: 'error', message: 'Failed to run analysis. Please try again or check your connection.' };
+      localStorage.setItem(STATUS_KEY, JSON.stringify(errorStatus));
+      if (analyzingRef.current) {
+        setSavedStatus(errorStatus);
+        showFeedback('error', errorStatus.message);
+      }
+    } finally {
+      if (analyzingRef.current) {
         setAnalyzing(false);
         analyzingRef.current = false;
-        return;
       }
-      
-      let msg: string;
-      if (data.errors?.length) {
-        msg = `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`;
-        persistStatus({ status: 'error', message: msg });
-      } else {
-        msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
-        persistStatus({ status: 'completed', message: msg });
-      }
-      showFeedback('success', msg);
-      await fetchProposals();
-    } catch (err) {
-      if (!analyzingRef.current) return;
-      const msg = 'Failed to run analysis. Please try again or check your connection.';
-      persistStatus({ status: 'error', message: msg });
-      showFeedback('error', msg);
     }
-    setAnalyzing(false);
-    analyzingRef.current = false;
   };
 
   const dismissStatus = () => {
     persistStatus(null);
     setAnalyzing(false);
+    setStartTime(null);
+    setNewProposalsCount(0);
+    setNewTxnsCount(0);
+    setNewCategoriesCount(0);
+    setNewRulesCount(0);
+    setTotalToAnalyze(null);
+    setLastBatchAt(null);
+    setLastBatchDuration(null);
+  };
+
+  const handleCancel = async () => {
+    if (!confirm('Are you sure you want to stop the current analysis? Suggestions created so far will remain.')) return;
+    
+    analyzingRef.current = false;
+    try {
+      // Signal the backend to abort the background process
+      await fetch('/api/ai/cancel', { method: 'POST', credentials: 'include' });
+    } catch {
+      // Fallback if endpoint not found, we still want to stop local state
+    } finally {
+      dismissStatus();
+      showFeedback('success', 'Analysis stopped.');
+    }
   };
 
   const handleTestProvider = async () => {
@@ -311,24 +432,62 @@ export default function AiSuggestionsPage() {
       const res = await fetch(`/api/ai/proposals/${id}/approve`, { method: 'POST', credentials: 'include' });
       if (!res.ok) {
         const data = await res.json();
-        showFeedback('error', data.error || 'Failed to approve');
+        showFeedback('error', data.error || 'Failed to approve suggestion');
       } else {
         showFeedback('success', 'Approved.');
       }
       await fetchProposals();
     } catch {
       showFeedback('error', 'Failed to approve.');
+    } finally {
+      setProcessing(null);
     }
-    setProcessing(null);
   };
 
   const handleReject = async (id: string) => {
     setProcessing(id);
     try {
-      await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const data = await res.json();
+        showFeedback('error', data.error || 'Failed to reject suggestion');
+      }
       await fetchProposals();
-    } catch {}
-    setProcessing(null);
+    } catch {
+      showFeedback('error', 'Failed to reject suggestion.');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!confirm('Are you sure you want to clear all approved and rejected suggestions? This cannot be undone.')) return;
+    setClearing(true);
+    try {
+      const res = await fetch('/api/ai/proposals/clear', { method: 'POST', credentials: 'include', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) {
+        let errorMessage = 'Failed to clear history';
+        if (res.status === 404) {
+          errorMessage = 'Clear history API endpoint not found. Please ensure the server-side route exists.';
+        } else {
+          try {
+            const data = await res.json();
+            errorMessage = data.error || errorMessage;
+          } catch {
+            errorMessage = `Server error (${res.status})`;
+          }
+        }
+        showFeedback('error', errorMessage);
+      } else {
+        showFeedback('success', 'History cleared.');
+        await fetchProposals();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to clear history.';
+      showFeedback('error', msg);
+    } finally {
+      setClearing(false);
+    }
   };
 
   const handleBatchAction = async (action: 'approve' | 'reject') => {
@@ -354,6 +513,7 @@ export default function AiSuggestionsPage() {
   };
 
   const pendingCount = proposals.filter((p) => p.status === 'pending').length;
+  const hasHistory = proposals.some((p) => p.status !== 'pending');
   const allPendingIds = proposals.filter((p) => p.status === 'pending').map((p) => p.id);
 
   return (
@@ -418,12 +578,43 @@ export default function AiSuggestionsPage() {
             )}
             <div className="flex-1 text-sm text-foreground">
               {(analyzing || savedStatus?.status === 'running') ? (
-                <>
+                <div className="space-y-1">
                   <p className="font-medium">AI analysis in progress</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    You can navigate away — the analysis continues in the background. New proposals will appear here automatically.
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1" title="Transactions to analyze">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Txns Sent: {totalToAnalyze ?? '...'}
+                    </span>
+                    <span className="flex items-center gap-1" title="Categorization suggestions">
+                      <Tag className="h-3.5 w-3.5" />
+                      Categorized: {newTxnsCount}
+                    </span>
+                    <span className="flex items-center gap-1" title="Category suggestions">
+                      <FileText className="h-3.5 w-3.5" />
+                      Categories: {newCategoriesCount}
+                    </span>
+                    <span className="flex items-center gap-1" title="Rule suggestions">
+                      <Brain className="h-3.5 w-3.5" />
+                      Rules: {newRulesCount}
+                    </span>
+                    <span className="flex items-center gap-1" title="Number of transactions processed per AI call">
+                      <Layers className="h-3.5 w-3.5" />
+                      Batch: {batchSize || 25}
+                    </span>
+                    {lastBatchDuration !== null && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        Last batch: {lastBatchDuration}s
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1 font-mono">
+                      Elapsed: {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground opacity-70">
+                    The analysis continues in the background even if you navigate away. New proposals will appear here automatically.
                   </p>
-                </>
+                </div>
               ) : savedStatus?.status === 'error' ? (
                 <>
                   <p className="font-medium text-destructive">{savedStatus.message}</p>
@@ -438,6 +629,15 @@ export default function AiSuggestionsPage() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {(analyzing || savedStatus?.status === 'running') && (
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
+                >
+                  <X className="h-3 w-3" />
+                  Cancel
+                </button>
+              )}
               {savedStatus?.status === 'error' && savedStatus.message.includes('timed out') && (
                 <button
                   onClick={handleAnalyze}
@@ -448,13 +648,15 @@ export default function AiSuggestionsPage() {
                   Retry
                 </button>
               )}
-              <button
-                onClick={dismissStatus}
-                className="text-muted-foreground hover:text-foreground"
-                title="Dismiss"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {!(analyzing || savedStatus?.status === 'running') && (
+                <button
+                  onClick={dismissStatus}
+                  className="text-muted-foreground hover:text-foreground"
+                  title="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -494,6 +696,20 @@ export default function AiSuggestionsPage() {
             ))}
           </div>
         </div>
+
+        {/* Clear History button */}
+        {hasHistory && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleClearHistory}
+              disabled={clearing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {clearing ? 'Clearing...' : 'Clear History'}
+            </button>
+          </div>
+        )}
 
         {/* Batch actions */}
         {selectedIds.size > 0 && (

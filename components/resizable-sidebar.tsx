@@ -42,6 +42,7 @@ export default function ResizableSidebar() {
   const { sidebarWidth, isHovering, handleNavResizeDown, handleMouseEnter, handleMouseLeave } = useSidebar()
   const [isResizing, setIsResizing] = useState(false)
   const { data: session } = useSession()
+  const [mounted, setMounted] = useState(false)
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
@@ -53,6 +54,10 @@ export default function ResizableSidebar() {
     transactions: number
   } | null>(null)
   const [pendingAiCount, setPendingAiCount] = useState<number>(0)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -101,6 +106,9 @@ export default function ResizableSidebar() {
 
   const isActive = (href: string) => pathname === href
   const isCollapsed = sidebarWidth === COLLAPSED_WIDTH
+
+  // Return null or a simple skeleton on server/initial hydration to avoid mismatch
+  if (!mounted) return null
 
   return (
     <>

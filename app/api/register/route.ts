@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
 import { seedUserCategories } from '@/lib/db/seed-categories';
 import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
+import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     await createUserEncryptionKeys(username, password);
     await seedUserCategories(username);
     await seedUserDefaultRules(username);
+    await seedUserAiProviders(username);
     logger.info('Register API: user created', { username })
     return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
   } catch (error) {

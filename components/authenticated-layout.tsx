@@ -7,7 +7,7 @@ import { useSidebar, SidebarProvider } from '@/components/sidebar-context';
 import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -39,7 +39,16 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 
 function AuthenticatedLayoutContent({ children, isSettingsPage }: { children: ReactNode; isSettingsPage: boolean }) {
   const { accountsWidth, accountsCollapsed } = useSidebar();
-  const marginLeft = isSettingsPage ? '64px' : accountsCollapsed ? '64px' : `${64 + accountsWidth}px`;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Use a stable default (e.g., collapsed) during hydration to match server expectations
+  const marginLeft = (!mounted || isSettingsPage || accountsCollapsed) 
+    ? '64px' 
+    : `${64 + accountsWidth}px`;
 
   return (
     <>
