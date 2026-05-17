@@ -34,6 +34,12 @@ services:
       - REGISTRATION_PIN=${REGISTRATION_PIN}  # PIN needed to register a new account, set to empty string to disable new registration
       - FRED_API_KEY=${FRED_API_KEY}
 
+      # Optional: Auto-seed AI provider for all users (all 4 required to create a provider)
+      - AI_PROVIDER_NAME=${AI_PROVIDER_NAME}        # Display name (e.g. "OpenAI", "Ollama")
+      - AI_PROVIDER_ENDPOINT=${AI_PROVIDER_ENDPOINT} # Base URL (e.g. "https://api.openai.com/v1")
+      - AI_PROVIDER_MODEL=${AI_PROVIDER_MODEL}      # Model identifier (e.g. "gpt-4o-mini")
+      - AI_PROVIDER_API_KEY=${AI_PROVIDER_API_KEY}  # API key (encrypted per-user)
+
       - DATABASE_URL=${DATABASE_URL}
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true

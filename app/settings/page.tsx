@@ -574,9 +574,9 @@ export default function SettingsPage() {
               )}
               {devMode === false && (
                 <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Logs are hidden.</p>
-      )}
-    </div>
-  </div>
+              )}
+            </div>
+          </div>
 
           {/* Navigation Visibility */}
           <div className="p-5 bg-card border border-border rounded-xl">
@@ -1185,10 +1185,11 @@ curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=ba
           </div>
         </div>
       )}
-    </div>
 
       {activeTab === 'ai' && (
-        <AiTab />
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <AiTab />
+        </div>
       )}
     </div>
 
@@ -1322,6 +1323,7 @@ curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=ba
     onClose={handleCloseAccountDrawer}
     onSuccess={handleAccountDrawerSuccess}
   />
+</div>
 </div>
 );
 }
