@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { calculateDecumulation, runMonteCarlo } from '@/lib/services/retirement';
 import { fetchRetirementPlan } from '@/lib/services/retirement-db';
+import { getSessionDEK } from '@/lib/crypto-context';
 import { logger } from '@/lib/logger';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +10,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const plan = await fetchRetirementPlan(session.user.id, id);
+  const dek = await getSessionDEK();
+  const plan = await fetchRetirementPlan(session.user.id, id, dek);
   if (!plan) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
   const projection = calculateDecumulation(plan);

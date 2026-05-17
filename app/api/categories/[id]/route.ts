@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { encryptRow } from '@/lib/crypto';
+import { decryptRow, encryptRow } from '@/lib/crypto';
 
 const UpdateCategorySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -60,8 +60,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .where(eq(categories.id, id))
     .returning();
 
+  const decrypted = updated ? await decryptRow('categories', updated, dek) : updated;
   logger.info('PATCH /api/categories/[id]', { userId, id, updatedFields: Object.keys(parsed.data) });
-  return NextResponse.json(updated);
+  return NextResponse.json(decrypted);
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

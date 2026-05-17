@@ -737,7 +737,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           accountId,
           userId,
           earliestTx,
-          toDateStr
+          toDateStr,
+          dek
         );
         if (result.syntheticCount > 0) {
           logger.info(`${LOG_TAG} Backfilled synthetic snapshots`, {
