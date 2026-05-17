@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
 import { accountSnapshots, transactions } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
+import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
@@ -110,7 +111,8 @@ export async function generateHistoricalAccountSnapshots(
   accountId: string,
   userId: string,
   fromDate: string,
-  toDate: string
+  toDate: string,
+  dek?: Uint8Array
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
   const startedAt = Date.now();
 
@@ -126,7 +128,7 @@ export async function generateHistoricalAccountSnapshots(
 
   if (latestReal) {
     effectiveFromDate = latestReal.date;
-    runningBalance = parseFloat(latestReal.balance);
+    runningBalance = parseFloat(dek ? await decryptField(latestReal.balance, dek) : latestReal.balance);
   } else if (earliestTxDate) {
     effectiveFromDate = earliestTxDate;
     runningBalance = 0;
@@ -162,7 +164,8 @@ export async function generateHistoricalAccountSnapshots(
   for (const tx of txs) {
     const txDate = String(tx.postedDate ?? tx.date);
     const existing = txByDate.get(txDate) ?? 0;
-    txByDate.set(txDate, existing + parseFloat(tx.amount));
+    const amount = dek ? parseFloat(await decryptField(tx.amount, dek)) : parseFloat(tx.amount);
+    txByDate.set(txDate, existing + amount);
   }
 
   // Batch-fetch all existing real snapshots for the full date range
@@ -194,7 +197,7 @@ export async function generateHistoricalAccountSnapshots(
     const realBal = realByDate.get(dateStr);
 
     if (realBal !== undefined) {
-      runningBalance = parseFloat(realBal);
+      runningBalance = parseFloat(dek ? await decryptField(realBal, dek) : realBal);
       skippedReal++;
     } else {
       const dailyChange = txByDate.get(dateStr) ?? 0;

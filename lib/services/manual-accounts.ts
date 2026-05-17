@@ -170,12 +170,24 @@ export async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): 
   let lastError: string | null = null;
   let btcAmount: number | null = null;
 
-  const hasCustomXpubUrl = apiConfig?.btcXpubApiUrl && !apiConfig.btcXpubApiUrl.includes('{host}');
-  const hostList = hasCustomXpubUrl
-    ? [new URL(apiConfig.btcXpubApiUrl).hostname]
-    : TREZOR_HOSTS;
+  let baseUrlTemplate = apiConfig?.btcXpubApiUrl || 'https://{host}/api/v2/xpub/{xpub}?details=basic';
 
-  const baseUrlTemplate = apiConfig?.btcXpubApiUrl || 'https://{host}/api/v2/xpub/{xpub}?details=basic';
+  let hostList: string[];
+  if (apiConfig?.btcXpubApiUrl && !apiConfig.btcXpubApiUrl.includes('{host}')) {
+    const parsed = new URL(apiConfig.btcXpubApiUrl);
+    const customHost = parsed.hostname;
+    if (customHost === 'host') {
+      // User entered literal "host" instead of template "{host}" — fall back to defaults
+      logger.warn(`${LOG_TAG} btcXpubApiUrl contains literal 'host' instead of template '{host}'. Falling back to default Trezor configuration.`);
+      baseUrlTemplate = DEFAULT_API_CONFIG.btcXpubApiUrl;
+      hostList = TREZOR_HOSTS;
+    } else {
+      // Custom URL without {host} — use the hostname from the URL directly
+      hostList = [customHost];
+    }
+  } else {
+    hostList = TREZOR_HOSTS;
+  }
 
   for (const fmt of xpubFormats) {
     for (const host of hostList) {
@@ -333,7 +345,7 @@ export async function createManualAccount(input: CreateManualAccountInput, dek?:
   const hasPurchaseHistory = !!meta.purchaseDate && (!!meta.purchasePrice || accountType === 'metals');
   if (hasPurchaseHistory) {
     try {
-      await generateAssetHistorySnapshots(account.id, input.userId, input.type, meta, input.apiConfig);
+      await generateAssetHistorySnapshots(account.id, input.userId, input.type, meta, input.apiConfig, dek);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to generate history snapshots for ${account.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -444,7 +456,7 @@ export async function syncManualAccount(
     await db.insert(transactions).values(encryptedTxn);
   }
 
-  await createAccountSnapshotsForUser(userId);
+  await createAccountSnapshotsForUser(userId, dek);
   await updateNetWorthSnapshot(userId, dek);
 
   // Regenerate synthetic history for real estate to keep HPI curve aligned
@@ -460,7 +472,7 @@ export async function syncManualAccount(
         rawMeta = account.metadata || {};
       }
       const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) as Record<string, unknown>;
-      await generateAssetHistorySnapshots(accountId, userId, account.type, meta, apiConfig);
+      await generateAssetHistorySnapshots(accountId, userId, account.type, meta, apiConfig, dek);
     } catch (err) {
       logger.warn(`${LOG_TAG} Failed to regenerate history for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -559,7 +571,7 @@ export async function adjustManualAccountValue(
     await db.insert(transactions).values(encryptedTxn);
   }
 
-  await createAccountSnapshotsForUser(userId);
+  await createAccountSnapshotsForUser(userId, dek);
   await updateNetWorthSnapshot(userId, dek);
 
   const changed = Math.abs(delta) > 0.0001;
@@ -576,7 +588,8 @@ export async function adjustManualAccountValue(
 export async function deleteManualAccount(
   accountId: string,
   userId: string,
-  keepData?: boolean
+  keepData?: boolean,
+  dek?: Uint8Array
 ): Promise<void> {
   const db = getDb();
   const [account] = await db
@@ -596,13 +609,13 @@ export async function deleteManualAccount(
     logger.info(`${LOG_TAG} Account hidden (data kept)`, { accountId, name: account.name, type: account.type });
   } else {
     await db.delete(accounts).where(eq(accounts.id, accountId));
-    await createAccountSnapshotsForUser(userId);
-    await updateNetWorthSnapshot(userId);
+    await createAccountSnapshotsForUser(userId, dek);
+    await updateNetWorthSnapshot(userId, dek);
     logger.info(`${LOG_TAG} Account deleted`, { accountId, name: account.name, type: account.type });
   }
 }
 
-async function createAccountSnapshotsForUser(userId: string) {
+async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
   const db = getDb();
   const userAccounts = await db
     .select()
@@ -615,7 +628,7 @@ async function createAccountSnapshotsForUser(userId: string) {
 
   const today = nowISO();
   for (const acc of userAccounts) {
-    const balance = acc.balance;
+    const balance = dek ? await decryptField(acc.balance, dek) : acc.balance;
     await db.insert(accountSnapshots).values({
       userId,
       accountId: acc.id,

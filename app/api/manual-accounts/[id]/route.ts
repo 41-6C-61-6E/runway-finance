@@ -108,6 +108,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   if (request.headers.get('X-Confirm-Delete') !== 'true') {
@@ -117,7 +118,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  await deleteManualAccount(id, userId, false);
+  await deleteManualAccount(id, userId, false, dek);
 
   logger.info('DELETE /api/manual-accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });

@@ -352,6 +352,9 @@ export default function SettingsPage() {
         <div className="max-w-2xl w-full space-y-6">
           <h1 className="text-xl font-semibold text-foreground">Settings</h1>
 
+          {/* Setup Checklist */}
+          <OnboardingChecklist />
+
           {/* Tab Bar */}
           <div className="flex rounded-lg bg-card border border-border overflow-hidden">
             <button
@@ -406,9 +409,6 @@ export default function SettingsPage() {
 
           {activeTab === 'general' && (
           <>
-
-          {/* Setup Checklist */}
-          <OnboardingChecklist />
 
           {/* Combined Settings */}
           <div className="p-5 bg-card border border-border rounded-xl">

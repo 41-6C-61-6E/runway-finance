@@ -1,5 +1,6 @@
 import { accountSnapshots } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
 import type { AmortizationParams } from '@/lib/utils/amortization';
@@ -300,7 +301,8 @@ export async function generateAssetHistorySnapshots(
   userId: string,
   accountType: string,
   metadata: Record<string, unknown>,
-  apiConfig?: ApiConfig
+  apiConfig?: ApiConfig,
+  dek?: Uint8Array
 ): Promise<number> {
   const { getDb } = await import(/* @vite-ignore */ '@/lib/db');
   const db = getDb();
@@ -313,7 +315,7 @@ export async function generateAssetHistorySnapshots(
       const purchasePrice = metadata.purchasePrice as number ?? 0;
       const purchaseDate = metadata.purchaseDate as string ?? today;
       const zipCode = metadata.zipCode as string | undefined;
-      const currentValue = metadata.manualValue as number ?? await getAccountCurrentBalance(accountId);
+      const currentValue = metadata.manualValue as number ?? await getAccountCurrentBalance(accountId, dek);
 
       if (purchasePrice > 0 && purchaseDate < today) {
         snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode, apiConfig);
@@ -348,7 +350,7 @@ export async function generateAssetHistorySnapshots(
       const termMonths = metadata.termMonths as number ?? 360;
       const monthlyPayment = metadata.monthlyPayment as number ?? 0;
       const startDate = metadata.purchaseDate as string ?? metadata.startDate as string ?? today;
-      const currentBalance = await getAccountCurrentBalance(accountId);
+      const currentBalance = await getAccountCurrentBalance(accountId, dek);
 
       if (originalLoanAmount > 0 && interestRate > 0) {
         const history = generateMortgagePaydownHistory(
@@ -391,7 +393,7 @@ export async function generateAssetHistorySnapshots(
   return inserted;
 }
 
-async function getAccountCurrentBalance(accountId: string): Promise<number> {
+async function getAccountCurrentBalance(accountId: string, dek?: Uint8Array): Promise<number> {
   try {
     const { getDb } = await import('@/lib/db');
     const db = getDb();
@@ -401,7 +403,9 @@ async function getAccountCurrentBalance(accountId: string): Promise<number> {
       .from(accounts)
       .where(eq(accounts.id, accountId))
       .limit(1);
-    return result ? parseFloat(result.balance.toString()) : 0;
+    if (!result) return 0;
+    const balance = result.balance.toString();
+    return parseFloat(dek ? await decryptField(balance, dek) : balance);
   } catch {
     return 0;
   }
