@@ -198,7 +198,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
         totalIncome: String(data.income),
         totalExpenses: String(data.expenses),
         netCashFlow: String(netCashFlow),
-        transactionCount: data.count,
+        transactionCount: String(data.count),
       })
       .onConflictDoUpdate({
         target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
@@ -206,7 +206,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
           totalIncome: String(data.income),
           totalExpenses: String(data.expenses),
           netCashFlow: String(netCashFlow),
-          transactionCount: data.count,
+          transactionCount: String(data.count),
           updatedAt: new Date(),
         },
       });
@@ -299,13 +299,13 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
           amount: String(catData.amount),
-          transactionCount: catData.count,
+          transactionCount: String(catData.count),
         })
         .onConflictDoUpdate({
           target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
           set: {
             amount: String(catData.amount),
-            transactionCount: catData.count,
+            transactionCount: String(catData.count),
             updatedAt: new Date(),
           },
         });
@@ -399,13 +399,13 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
           categoryId: catData.categoryId as any,
           yearMonth: catData.yearMonth,
           amount: String(catData.amount),
-          transactionCount: catData.count,
+          transactionCount: String(catData.count),
         })
         .onConflictDoUpdate({
           target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.yearMonth],
           set: {
             amount: String(catData.amount),
-            transactionCount: catData.count,
+            transactionCount: String(catData.count),
             updatedAt: new Date(),
           },
         });
@@ -439,9 +439,9 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       userId,
       connectionId,
       status: 'running',
-      accountsSynced: 0,
-      transactionsFetched: 0,
-      transactionsNew: 0,
+      accountsSynced: String(0),
+      transactionsFetched: String(0),
+      transactionsNew: String(0),
       startedAt: new Date(),
     })
     .returning();
@@ -727,10 +727,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .set({
         status: 'success',
         completedAt: now,
-        accountsSynced,
-        transactionsFetched,
-        transactionsNew,
-        durationMs: Date.now() - log.startedAt.getTime(),
+        accountsSynced: String(accountsSynced),
+        transactionsFetched: String(transactionsFetched),
+        transactionsNew: String(transactionsNew),
+        durationMs: String(Date.now() - log.startedAt.getTime()),
       })
       .where(eq(syncLogs.id, log.id));
 
@@ -806,7 +806,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         status: 'error',
         completedAt: new Date(),
         errorMessage,
-        durationMs: Date.now() - log.startedAt.getTime(),
+        durationMs: String(Date.now() - log.startedAt.getTime()),
       })
       .where(eq(syncLogs.id, log.id));
 
