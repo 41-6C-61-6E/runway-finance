@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 
@@ -13,6 +13,7 @@ type Category = {
   color: string;
   isIncome: boolean;
   isSystem: boolean;
+  createdByAi: boolean;
   excludeFromReports: boolean;
   displayOrder: number;
 };
@@ -200,6 +201,9 @@ export default function CategoriesTab() {
                   {parent.isSystem && (
                     <span className="text-[10px] text-muted-foreground">System</span>
                   )}
+                  {parent.createdByAi && (
+                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
+                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
@@ -223,6 +227,9 @@ export default function CategoriesTab() {
                         <span className="text-foreground/80 text-sm truncate">{child.name}</span>
                         {child.isSystem && (
                           <span className="text-[10px] text-muted-foreground">System</span>
+                        )}
+                        {child.createdByAi && (
+                          <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
                         )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">

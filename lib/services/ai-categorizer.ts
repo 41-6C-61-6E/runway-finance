@@ -447,6 +447,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
         color: payload.color ?? '#6366f1',
         isIncome: payload.isIncome ?? false,
         isSystem: false,
+        createdByAi: true,
         displayOrder: 999,
       })
       .returning();
@@ -506,6 +507,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
             conditionCaseSensitive: payload.conditionCaseSensitive ?? false,
             setCategoryId,
             isSystem: false,
+            createdByAi: true,
           })
           .returning();
         logger.info(`${LOG_TAG} Created rule "${payload.ruleName}"`, { userId });

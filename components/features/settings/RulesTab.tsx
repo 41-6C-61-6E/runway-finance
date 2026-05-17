@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Play, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Play, Search, Sparkles } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 
@@ -11,6 +11,7 @@ type Rule = {
   priority: number;
   isActive: boolean;
   isSystem: boolean;
+  createdByAi: boolean;
   conditionField: string;
   conditionOperator: string;
   conditionValue: string;
@@ -431,6 +432,9 @@ export default function RulesTab() {
                   <span className="text-foreground text-sm font-medium truncate">{rule.name}</span>
                   {rule.isSystem && (
                     <span className="text-[10px] text-muted-foreground shrink-0">System</span>
+                  )}
+                  {rule.createdByAi && (
+                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

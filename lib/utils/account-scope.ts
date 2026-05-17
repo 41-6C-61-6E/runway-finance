@@ -11,7 +11,29 @@ export const ASSET_ACCOUNT_TYPES = [
   'metals',
   'otherAsset',
   'otherasset',
+  'primaryhome',
+  'secondaryhome',
+  'rentalproperty',
+  'commercial',
+  'land',
+  'otherrealestate',
+  'otherinvestment',
+  'otherInvestment',
+  'rothira',
+  'traditionalira',
+  '401k',
+  '403b',
+  'sepira',
+  'simpleira',
+  '529',
 ];
+
+export const INVESTMENT_ACCOUNT_TYPES = [
+  'investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
+  'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529'
+];
+
+export const isInvestmentAccount = (type: string) => INVESTMENT_ACCOUNT_TYPES.includes(type.toLowerCase());
 
 export const LIABILITY_ACCOUNT_TYPES = [
   'credit',

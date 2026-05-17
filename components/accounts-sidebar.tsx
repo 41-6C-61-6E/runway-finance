@@ -26,15 +26,28 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
   savings:    { group: 'Banking',       subGroup: 'Savings' },
   other:      { group: 'Banking',       subGroup: 'Cash & Checking' },
   credit:     { group: 'Credit',        subGroup: 'Credit Cards' },
-  investment: { group: 'Investments',   subGroup: 'Brokerage' },
-  brokerage:  { group: 'Investments',   subGroup: 'Brokerage' },
+  investment: { group: 'Investments',   subGroup: 'Taxable Brokerage' },
+  brokerage:  { group: 'Investments',   subGroup: 'Taxable Brokerage' },
   retirement: { group: 'Investments',   subGroup: 'Retirement' },
+  otherinvestment: { group: 'Investments', subGroup: 'Other Investments' },
+  rothira:        { group: 'Investments',   subGroup: 'Roth IRA' },
+  traditionalira: { group: 'Investments',   subGroup: 'Traditional IRA' },
+  '401k':         { group: 'Investments',   subGroup: '401(k)' },
+  '403b':         { group: 'Investments',   subGroup: '403(b)' },
+  sepira:         { group: 'Investments',   subGroup: 'SEP IRA' },
+  simpleira:      { group: 'Investments',   subGroup: 'Simple IRA' },
   529:        { group: 'Investments',   subGroup: '529 Account' },
   otherAsset: { group: 'Assets',        subGroup: 'Other Assets' },
   vehicle:    { group: 'Assets',        subGroup: 'Vehicles' },
   crypto:     { group: 'Assets',        subGroup: 'Crypto Currency' },
   metals:     { group: 'Assets',        subGroup: 'Metals' },
-  realestate: { group: 'Assets',        subGroup: 'Real Estate' },
+  realestate: { group: 'Real Estate',   subGroup: 'Real Estate' },
+  primaryhome: { group: 'Real Estate',  subGroup: 'Primary Home' },
+  secondaryhome: { group: 'Real Estate', subGroup: 'Secondary Home' },
+  rentalproperty: { group: 'Real Estate', subGroup: 'Rental Property' },
+  commercial:   { group: 'Real Estate', subGroup: 'Commercial' },
+  land:         { group: 'Real Estate', subGroup: 'Land' },
+  otherrealestate: { group: 'Real Estate', subGroup: 'Other Real Estate' },
   hsa:        { group: 'Health',        subGroup: 'Health Accounts' },
   health:     { group: 'Health',        subGroup: 'Health Accounts' },
   loan:       { group: 'Loans',         subGroup: 'Loans' },
@@ -42,7 +55,7 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities' },
 };
 
-const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities', 'Assets'];
+const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Real Estate', 'Health', 'Loans', 'Liabilities', 'Assets'];
 
 const SUB_GROUP_TO_TYPES: Record<string, string[]> = {};
 const GROUP_TO_TYPES: Record<string, string[]> = {};

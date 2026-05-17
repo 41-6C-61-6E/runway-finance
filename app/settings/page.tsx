@@ -10,6 +10,7 @@ import { Check } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
+import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
@@ -893,7 +894,7 @@ export default function SettingsPage() {
                                   account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
                                   account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
                                   account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
-                                  account.type === 'investment' ? 'bg-chart-3/20 text-chart-3' :
+                                  isInvestmentAccount(account.type) ? 'bg-chart-3/20 text-chart-3' :
                                   account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
                                   'bg-muted text-muted-foreground'
                                 }`}>
@@ -1191,139 +1192,139 @@ curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=ba
           <AiTab />
         </div>
       )}
-    </div>
 
-  {/* Connection Details Dialog */}
-  <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
-    <DialogContent className="max-w-md">
-      <DialogHeader>
-        <DialogTitle>Connection Details</DialogTitle>
-        <DialogDescription>View and manage your SimpleFIN connection.</DialogDescription>
-      </DialogHeader>
-      {detailsConn && (
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-muted-foreground">Label</label>
-            <Input
-              value={detailsLabel}
-              onChange={(e) => setDetailsLabel(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Status</label>
-            <div className="mt-1 flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${
-                detailsConn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
-                detailsConn.lastSyncStatus === 'error' ? 'bg-destructive' :
-                'bg-muted-foreground/50'
-              }`} />
-              <span className="text-foreground text-sm">
-                {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-              </span>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Last Sync</label>
-            <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Created</label>
-            <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Access URL</label>
-            <div className="mt-1 text-muted-foreground text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
-          </div>
-          {detailsConn.lastSyncError && (
-            <div>
-              <label className="text-sm text-destructive">Last Error</label>
-              <div className="mt-1 text-destructive text-sm">{detailsConn.lastSyncError}</div>
-            </div>
-          )}
+          {/* Connection Details Dialog */}
+          <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Connection Details</DialogTitle>
+                <DialogDescription>View and manage your SimpleFIN connection.</DialogDescription>
+              </DialogHeader>
+              {detailsConn && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-muted-foreground">Label</label>
+                    <Input
+                      value={detailsLabel}
+                      onChange={(e) => setDetailsLabel(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Status</label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${
+                        detailsConn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
+                        detailsConn.lastSyncStatus === 'error' ? 'bg-destructive' :
+                        'bg-muted-foreground/50'
+                      }`} />
+                      <span className="text-foreground text-sm">
+                        {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Last Sync</label>
+                    <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Created</label>
+                    <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Access URL</label>
+                    <div className="mt-1 text-muted-foreground text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
+                  </div>
+                  {detailsConn.lastSyncError && (
+                    <div>
+                      <label className="text-sm text-destructive">Last Error</label>
+                      <div className="mt-1 text-destructive text-sm">{detailsConn.lastSyncError}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <button
+                  onClick={() => setDetailsConn(null)}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation */}
+          <AlertDialog open={!!deleteConn} onOpenChange={(open) => !open && setDeleteConn(null)}>
+            <AlertDialogContent className="max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Connection</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete <strong>{deleteConn?.label}</strong>?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <div className="space-y-3 py-2">
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
+                  <input
+                    type="radio"
+                    name="deleteData"
+                    checked={!deleteKeepData}
+                    onChange={() => setDeleteKeepData(false)}
+                    className="mt-0.5 accent-destructive"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-foreground">Delete all data</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Permanently remove this connection and all linked accounts and transactions.
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
+                  <input
+                    type="radio"
+                    name="deleteData"
+                    checked={deleteKeepData}
+                    onChange={() => setDeleteKeepData(true)}
+                    className="mt-0.5 accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-foreground">Keep existing data</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Remove the bridge connection only. All accounts, transactions, and history will be preserved.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {deleteLoading ? 'Deleting...' : deleteKeepData ? 'Remove Connection' : 'Delete All'}
+                </button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Account Detail Drawer */}
+          <AccountDetailDrawer
+            account={selectedAccount}
+            open={accountDrawerOpen}
+            onClose={handleCloseAccountDrawer}
+            onSuccess={handleAccountDrawerSuccess}
+          />
         </div>
-      )}
-      <DialogFooter>
-        <button
-          onClick={() => setDetailsConn(null)}
-          className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-        >
-          Close
-        </button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-
-  {/* Delete Confirmation */}
-  <AlertDialog open={!!deleteConn} onOpenChange={(open) => !open && setDeleteConn(null)}>
-    <AlertDialogContent className="max-w-sm">
-      <AlertDialogHeader>
-        <AlertDialogTitle>Delete Connection</AlertDialogTitle>
-        <AlertDialogDescription>
-          Are you sure you want to delete <strong>{deleteConn?.label}</strong>?
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-
-      <div className="space-y-3 py-2">
-        <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
-          <input
-            type="radio"
-            name="deleteData"
-            checked={!deleteKeepData}
-            onChange={() => setDeleteKeepData(false)}
-            className="mt-0.5 accent-destructive"
-          />
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-foreground">Delete all data</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Permanently remove this connection and all linked accounts and transactions.
-            </p>
-          </div>
-        </label>
-        <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted">
-          <input
-            type="radio"
-            name="deleteData"
-            checked={deleteKeepData}
-            onChange={() => setDeleteKeepData(true)}
-            className="mt-0.5 accent-primary"
-          />
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-foreground">Keep existing data</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Remove the bridge connection only. All accounts, transactions, and history will be preserved.
-            </p>
-          </div>
-        </label>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      <AlertDialogFooter>
-        <AlertDialogCancel>Cancel</AlertDialogCancel>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleteLoading}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-        >
-          {deleteLoading ? 'Deleting...' : deleteKeepData ? 'Remove Connection' : 'Delete All'}
-        </button>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
-
-  {/* Account Detail Drawer */}
-  <AccountDetailDrawer
-    account={selectedAccount}
-    open={accountDrawerOpen}
-    onClose={handleCloseAccountDrawer}
-    onSuccess={handleAccountDrawerSuccess}
-  />
-</div>
-</div>
-);
+    </div>
+  );
 }
