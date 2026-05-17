@@ -150,10 +150,17 @@
       "breakpoints": true
     },
     {
-      "idx": 21,
+      "idx": 22,
       "version": "7",
-      "when": 1747350000001,
-      "tag": "0021_ai_proposals_and_settings",
+      "when": 1747350000002,
+      "tag": "0022_ai_providers",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1747350000003,
+      "tag": "0023_categorized_by_ai",
       "breakpoints": true
     }
   ]

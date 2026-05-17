@@ -1,43 +1,29 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getDb } from '@/lib/db';
-import { userSettings } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
-import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptField } from '@/lib/crypto';
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  const userId = session.user.id;
-
-  const settings = await getDb()
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
-
-  if (!settings.length || !settings[0].aiEndpoint) {
-    return NextResponse.json({ error: 'AI endpoint not configured' }, { status: 400 });
+  let body: { endpoint?: string; model?: string; apiKey?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, message: 'Invalid request body.' });
   }
 
-  const endpoint = settings[0].aiEndpoint.replace(/\/$/, '');
-  const model = settings[0].aiModel || 'unknown';
+  const endpoint = body.endpoint?.replace(/\/$/, '');
+  const model = body.model || 'unknown';
+  const apiKey = body.apiKey || '';
 
-  // Decrypt API key
-  const dek = await getSessionDEK();
-  let apiKey = '';
-  if (settings[0].apiKeys) {
-    try {
-      const decrypted = await decryptField(settings[0].apiKeys, dek);
-      const parsed = JSON.parse(decrypted);
-      apiKey = parsed.aiApiKey ?? '';
-    } catch { /* no key */ }
+  if (!endpoint) {
+    return NextResponse.json({ ok: false, message: 'No endpoint provided. Enter the URL and try again.' });
   }
+
+  logger.info('Testing AI connection', { endpoint, model, hasKey: !!apiKey });
 
   try {
     const headers: Record<string, string> = {
@@ -47,6 +33,7 @@ export async function POST() {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
+    const startTime = Date.now();
     const res = await fetch(`${endpoint}/chat/completions`, {
       method: 'POST',
       headers,
@@ -56,19 +43,34 @@ export async function POST() {
         max_tokens: 10,
       }),
     });
+    const elapsed = Date.now() - startTime;
 
     if (!res.ok) {
       const text = await res.text();
+      let detail = text.slice(0, 300);
+      try {
+        const json = JSON.parse(text);
+        detail = json.error?.message || json.error || json.message || detail;
+      } catch {}
       return NextResponse.json({
         ok: false,
-        message: `API returned ${res.status}: ${text.slice(0, 200)}`,
+        message: `API returned ${res.status} after ${elapsed}ms: ${detail}`,
       });
     }
 
-    return NextResponse.json({ ok: true, message: `Connected to ${model} at ${endpoint}` });
+    return NextResponse.json({ ok: true, message: `Connected to ${model} at ${endpoint} (${elapsed}ms)` });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Connection failed';
-    logger.error('AI connection test failed', { userId, endpoint, error: message });
-    return NextResponse.json({ ok: false, message });
+    logger.error('AI connection test failed', { endpoint, error: message });
+
+    let userMessage = message;
+    if (message.includes('ENOTFOUND') || message.includes('ECONNREFUSED') || message.includes('fetch')) {
+      userMessage = `Cannot reach ${endpoint}. Check that the server is running and the URL is correct.`;
+    } else if (message.includes('aborted')) {
+      userMessage = 'Request timed out. Check that the endpoint is correct and responsive.';
+    } else if (message.includes('401') || message.includes('Unauthorized')) {
+      userMessage = 'Authentication failed. Check the API key.';
+    }
+    return NextResponse.json({ ok: false, message: userMessage });
   }
 }

@@ -100,12 +100,11 @@ export const userSettings = pgTable('user_settings', {
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
   showMathEnabled: boolean('show_math_enabled').notNull().default(false),
-  aiEndpoint: text('ai_endpoint'),
-  aiModel: text('ai_model'),
   aiSystemPrompt: text('ai_system_prompt'),
   aiAutoAnalyze: boolean('ai_auto_analyze').notNull().default(false),
   aiAutoApproveThreshold: integer('ai_auto_approve_threshold').notNull().default(95),
   aiBatchSize: integer('ai_batch_size').notNull().default(25),
+  aiActiveProviderId: uuid('ai_active_provider_id'),
   apiKeys: text('api_keys'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -128,6 +127,19 @@ export type AiProposalPayload =
   | { type: 'categorize'; transactionId: string; transactionDescription: string; proposedCategoryId: string | null; proposedCategoryName: string; newCategoryProposalIndex?: number }
   | { type: 'create_category'; name: string; parentName: string | null; parentId: string | null; color: string; isIncome: boolean }
   | { type: 'create_rule'; ruleName: string; conditionField: string; conditionOperator: string; conditionValue: string; conditionCaseSensitive: boolean; setCategoryId: string | null; setCategoryName: string | null };
+
+// ── AI Providers ────────────────────────────────────────────────────────────
+export const aiProviders = pgTable('ai_providers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  endpoint: text('endpoint').notNull(),
+  model: text('model').notNull(),
+  apiKeyEncrypted: text('api_key_encrypted'),
+  isActive: boolean('is_active').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ── SimpleFIN Connections ────────────────────────────────────────────────────
 export const simplifinConnections = pgTable('simplefin_connections', {
@@ -203,6 +215,7 @@ export const transactions = pgTable(
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     notes: text('notes'),
     reviewed: boolean('reviewed').notNull().default(false),
+    categorizedByAi: boolean('categorized_by_ai').notNull().default(false),
     ignored: boolean('ignored').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
