@@ -77,8 +77,13 @@ function TransactionsContent() {
     if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
     if (filters.sort !== 'date') params.set('sort', filters.sort);
     if (filters.order !== 'desc') params.set('order', filters.order);
-    router.push(`?${params.toString()}`, { scroll: false });
-  }, [filters, router]);
+
+    const newUrl = `?${params.toString()}`;
+    const currentUrl = `?${searchParams.toString()}`;
+    if (newUrl !== currentUrl) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [filters, router, searchParams]);
 
   const spAccountId = searchParams.get('accountId');
   const spAccountIds = searchParams.get('accountIds');

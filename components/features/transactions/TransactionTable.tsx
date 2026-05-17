@@ -30,6 +30,7 @@ import {
   Check,
   GripVertical,
   Search,
+  Sparkles,
 } from 'lucide-react';
 
 type Transaction = {
@@ -45,6 +46,7 @@ type Transaction = {
   categoryColor: string | null;
   accountName: string | null;
   reviewed: boolean | null;
+  categorizedByAi: boolean;
 };
 
 type Category = {
@@ -458,6 +460,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                       color: tx.categoryColor || 'var(--color-primary)',
                     }}
                   >
+                    {tx.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60" />}
                     {tx.categoryName}
                     <ChevronDown className="h-3 w-3 opacity-0 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
                   </span>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, SlidersHorizontal } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical } from 'lucide-react';
 
 type AiProposal = {
   id: string;
@@ -130,6 +130,16 @@ export default function AiSuggestionsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const analyzingRef = useRef(false);
+
+  const STATUS_KEY = 'ai_analysis_status';
+
+  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string } | null;
+
+  const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -153,36 +163,110 @@ export default function AiSuggestionsPage() {
 
   useEffect(() => {
     fetchProposals();
+    // Restore analysis status from sessionStorage (survives navigation)
+    try {
+      const raw = sessionStorage.getItem(STATUS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as NonNullable<AnalysisStatus>;
+        setSavedStatus(parsed);
+        if (parsed.status === 'running') {
+          setAnalyzing(true);
+        }
+      }
+    } catch { /* ignore */ }
   }, [fetchProposals]);
+
+  // Poll for new proposals while analysis is running
+  useEffect(() => {
+    if (!analyzing) return;
+    const interval = setInterval(() => {
+      fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setProposals((prev) => {
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newOnes = data.filter((p: AiProposal) => !existingIds.has(p.id));
+              if (newOnes.length > 0) return [...newOnes, ...prev];
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [analyzing]);
+
+  const persistStatus = (status: AnalysisStatus) => {
+    setSavedStatus(status);
+    if (status) {
+      sessionStorage.setItem(STATUS_KEY, JSON.stringify(status));
+    } else {
+      sessionStorage.removeItem(STATUS_KEY);
+    }
+  };
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
+    analyzingRef.current = true;
+    persistStatus({ status: 'running', message: 'Analysis started — you can navigate away, it will continue in the background.' });
     setFeedback(null);
     try {
-      const res = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const res = await fetch('/api/ai/analyze', { method: 'POST', credentials: 'include' });
       const data = await res.json();
+      let msg: string;
       if (data.errors?.length) {
-        showFeedback('error', `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`);
+        msg = `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`;
+        persistStatus({ status: 'error', message: msg });
       } else {
-        showFeedback('success', `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`);
+        msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
+        persistStatus({ status: 'completed', message: msg });
       }
+      showFeedback('success', msg);
       await fetchProposals();
     } catch {
-      showFeedback('error', 'Failed to run analysis.');
+      if (!analyzingRef.current) return;
+      const msg = 'Failed to run analysis.';
+      persistStatus({ status: 'error', message: msg });
+      showFeedback('error', msg);
     }
     setAnalyzing(false);
+    analyzingRef.current = false;
+  };
+
+  const dismissStatus = () => {
+    persistStatus(null);
+    setAnalyzing(false);
+  };
+
+  const handleTestProvider = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/ai/providers/test-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prompt: 'Write a haiku about money.' }),
+      });
+      const data = await res.json();
+      setTestResult({
+        ok: data.ok,
+        message: data.message || (data.ok ? 'Connected' : 'Failed'),
+        response: data.response,
+      });
+      setShowTestModal(true);
+    } catch {
+      setTestResult({ ok: false, message: 'Failed to reach server' });
+      setShowTestModal(true);
+    }
+    setTesting(false);
   };
 
   const handleApprove = async (id: string) => {
     setProcessing(id);
     try {
-      const res = await fetch(`/api/ai/proposals/${id}/approve`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const res = await fetch(`/api/ai/proposals/${id}/approve`, { method: 'POST', credentials: 'include' });
       if (!res.ok) {
         const data = await res.json();
         showFeedback('error', data.error || 'Failed to approve');
@@ -199,10 +283,7 @@ export default function AiSuggestionsPage() {
   const handleReject = async (id: string) => {
     setProcessing(id);
     try {
-      await fetch(`/api/ai/proposals/${id}/reject`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
       await fetchProposals();
     } catch {}
     setProcessing(null);
@@ -252,6 +333,20 @@ export default function AiSuggestionsPage() {
                 {feedback.message}
               </span>
             )}
+            {analyzing && (
+              <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap">
+                <Loader2 className="h-3 w-3 inline mr-1 animate-spin" />
+                Running...
+              </span>
+            )}
+            <button
+              onClick={handleTestProvider}
+              disabled={testing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all disabled:opacity-50"
+            >
+              <FlaskConical className="h-3.5 w-3.5" />
+              {testing ? 'Testing...' : 'Test Provider'}
+            </button>
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
@@ -266,6 +361,40 @@ export default function AiSuggestionsPage() {
             </button>
           </div>
         </div>
+
+        {/* Persistent analysis status banner — survives navigation */}
+        {(analyzing || savedStatus) && (
+          <div className={`p-3 rounded-lg flex items-center gap-3 border ${
+            savedStatus?.status === 'completed' ? 'bg-chart-2/10 border-chart-2/30' :
+            savedStatus?.status === 'error' ? 'bg-destructive/10 border-destructive/30' :
+            'bg-primary/5 border-primary/20'
+          }`}>
+            {(analyzing || savedStatus?.status === 'running') ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+            ) : (
+              <div className="h-4 w-4 shrink-0" />
+            )}
+            <div className="flex-1 text-sm text-foreground">
+              {(analyzing || savedStatus?.status === 'running') ? (
+                <>
+                  <p className="font-medium">AI analysis in progress</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    You can navigate away — the analysis continues in the background. New proposals will appear here automatically.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm">{savedStatus?.message}</p>
+              )}
+            </div>
+            <button
+              onClick={dismissStatus}
+              className="text-muted-foreground hover:text-foreground shrink-0"
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex items-center gap-3">
@@ -391,6 +520,43 @@ export default function AiSuggestionsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Test Provider Modal */}
+        {showTestModal && testResult && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTestModal(false)}>
+            <div
+              className="bg-card border border-border rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-foreground">
+                  {testResult.ok ? 'Test Successful' : 'Test Failed'}
+                </h2>
+                <button
+                  onClick={() => setShowTestModal(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className={`text-xs mb-3 ${testResult.ok ? 'text-chart-2' : 'text-destructive'}`}>
+                {testResult.message}
+              </p>
+              {testResult.response && (
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">AI Response:</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap font-mono">{testResult.response}</p>
+                </div>
+              )}
+              <button
+                onClick={() => setShowTestModal(false)}
+                className="mt-4 w-full px-3 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
       </div>

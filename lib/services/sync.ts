@@ -698,7 +698,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .where(eq(userSettings.userId, userId))
             .limit(1);
 
-          if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze && userSettingsRow[0].aiEndpoint) {
+          if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze && userSettingsRow[0].aiActiveProviderId) {
             logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId });
             analyzeUncategorized(userId).catch((err) => {
               logger.error(`${LOG_TAG} AI analysis failed (non-fatal)`, { connectionId, userId, error: String(err) });

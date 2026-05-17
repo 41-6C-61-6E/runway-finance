@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts } from '@/lib/db/schema';
+import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -62,21 +62,35 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
     }
 
     const settings = userSettingsRow[0];
-    if (!settings.aiEndpoint || !settings.aiModel) {
-      return { proposalsCreated: 0, autoApproved: 0, errors: ['AI endpoint or model not configured'] };
-    }
-
     const dek = await getSessionDEK();
+
+    // Read provider config from active provider
+    let endpoint: string;
+    let model: string;
     let apiKey = '';
-    if (settings.apiKeys) {
-      try {
-        const decrypted = await decryptField(settings.apiKeys, dek);
-        const parsed = JSON.parse(decrypted);
-        apiKey = parsed.aiApiKey ?? '';
-      } catch { /* no api key */ }
+
+    if (settings.aiActiveProviderId) {
+      const providerRows = await db
+        .select()
+        .from(aiProviders)
+        .where(eq(aiProviders.id, settings.aiActiveProviderId))
+        .limit(1);
+      if (providerRows.length && providerRows[0].endpoint && providerRows[0].model) {
+        endpoint = providerRows[0].endpoint;
+        model = providerRows[0].model;
+        if (providerRows[0].apiKeyEncrypted) {
+          try {
+            apiKey = await decryptField(providerRows[0].apiKeyEncrypted, dek);
+          } catch { /* no api key */ }
+        }
+      } else {
+        return { proposalsCreated: 0, autoApproved: 0, errors: ['Active AI provider not found or misconfigured'] };
+      }
+    } else {
+      return { proposalsCreated: 0, autoApproved: 0, errors: ['No active AI provider configured'] };
     }
 
-    // 2. Fetch categories
+    // 2. Fetch categories (needed for all batches)
     const categoryRows = await db
       .select()
       .from(categoriesTable)
@@ -120,93 +134,107 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
       };
     });
 
-    // 4. Fetch uncategorized transactions
+    // 4. Batch loop: process pages of uncategorized transactions
     const batchSize = settings.aiBatchSize ?? 25;
-    const txnRows = await db
-      .select({
-        transaction: transactions,
-        account: accounts,
-      })
-      .from(transactions)
-      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-      .where(and(
-        eq(transactions.userId, userId),
-        isNull(transactions.categoryId),
-      ))
-      .orderBy(asc(transactions.date))
-      .limit(batchSize);
-
-    if (txnRows.length === 0) {
-      logger.info(`${LOG_TAG} No uncategorized transactions found`, { userId });
-      return { proposalsCreated: 0, autoApproved: 0, errors: [] };
-    }
-
-    // 5. Decrypt transactions
-    const decryptedTxns: TransactionInfo[] = [];
-    for (let i = 0; i < txnRows.length; i++) {
-      const row = txnRows[i];
-      const tx = await decryptRow('transactions', row.transaction, dek);
-      let accountType: string | null = null;
-      if (row.account?.type) {
-        accountType = await decryptField(row.account.type, dek);
-      }
-      decryptedTxns.push({
-        index: i,
-        id: tx.id,
-        description: tx.description,
-        payee: tx.payee,
-        memo: tx.memo,
-        amount: tx.amount,
-        date: tx.date,
-        accountType,
-      });
-    }
-
-    // 6. Build prompt
-    const prompt = buildPrompt(categories, rules, decryptedTxns);
-
-    // 7. Call AI API
-    const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
-    logger.info(`${LOG_TAG} Calling AI API`, { userId, endpoint: settings.aiEndpoint, model: settings.aiModel, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
-    const aiResponse = await callAiApi(settings.aiEndpoint, settings.aiModel, apiKey, prompt, systemPrompt);
-
-    // 8. Parse and validate suggestions
-    const { suggestions } = aiResponse;
-    logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI`, { userId });
-
-    // 9. Create proposals
+    const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
     let proposalsCreated = 0;
     let autoApproved = 0;
-    const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
+    let offset = 0;
+    let hasMore = true;
 
-    // First pass: create all proposals
-    for (const suggestion of suggestions) {
-      const payload = buildPayload(suggestion, decryptedTxns, categories);
-      if (!payload) {
-        errors.push(`Invalid suggestion: ${JSON.stringify(suggestion).slice(0, 200)}`);
-        continue;
+    while (hasMore) {
+      const txnRows = await db
+        .select({
+          transaction: transactions,
+          account: accounts,
+        })
+        .from(transactions)
+        .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+        .where(and(
+          eq(transactions.userId, userId),
+          isNull(transactions.categoryId),
+        ))
+        .orderBy(asc(transactions.date))
+        .limit(batchSize)
+        .offset(offset);
+
+      if (txnRows.length === 0) {
+        break;
       }
 
-      const shouldAutoApprove = (suggestion.confidence * 100) >= autoApproveThreshold;
-      const status = shouldAutoApprove ? 'approved' : 'pending';
-      const confidenceStr = String(Math.round(suggestion.confidence * 100));
+      // 5. Decrypt transactions in this batch
+      const decryptedTxns: TransactionInfo[] = [];
+      for (let i = 0; i < txnRows.length; i++) {
+        const row = txnRows[i];
+        const tx = await decryptRow('transactions', row.transaction, dek);
+        let accountType: string | null = null;
+        if (row.account?.type) {
+          accountType = await decryptField(row.account.type, dek);
+        }
+        decryptedTxns.push({
+          index: i,
+          id: tx.id,
+          description: tx.description,
+          payee: tx.payee,
+          memo: tx.memo,
+          amount: tx.amount,
+          date: tx.date,
+          accountType,
+        });
+      }
 
-      await db.insert(aiProposals).values({
-        userId,
-        type: suggestion.type,
-        status,
-        confidence: confidenceStr,
-        payload: payload as any,
-        explanation: suggestion.explanation,
-      });
+      // 6. Build prompt for this batch
+      const prompt = buildPrompt(categories, rules, decryptedTxns);
 
-      proposalsCreated++;
-      if (shouldAutoApprove) autoApproved++;
-    }
+      // 7. Call AI API
+      const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
+      logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
+      const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt);
 
-    // Second pass: apply auto-approved proposals
-    if (autoApproved > 0) {
-      await applyApprovedProposals(userId, dek);
+      // 8. Parse and validate suggestions
+      const { suggestions } = aiResponse;
+      logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
+
+      // 9. Create proposals from this batch
+      let batchProposals = 0;
+      let batchAutoApproved = 0;
+
+      for (const suggestion of suggestions) {
+        const payload = buildPayload(suggestion, decryptedTxns, categories);
+        if (!payload) {
+          errors.push(`Invalid suggestion: ${JSON.stringify(suggestion).slice(0, 200)}`);
+          continue;
+        }
+
+        const shouldAutoApprove = (suggestion.confidence * 100) >= autoApproveThreshold;
+        const status = shouldAutoApprove ? 'approved' : 'pending';
+        const confidenceStr = String(Math.round(suggestion.confidence * 100));
+
+        await db.insert(aiProposals).values({
+          userId,
+          type: suggestion.type,
+          status,
+          confidence: confidenceStr,
+          payload: payload as any,
+          explanation: suggestion.explanation,
+        });
+
+        batchProposals++;
+        if (shouldAutoApprove) batchAutoApproved++;
+      }
+
+      proposalsCreated += batchProposals;
+      autoApproved += batchAutoApproved;
+
+      // Apply auto-approved proposals from this batch immediately
+      if (batchAutoApproved > 0) {
+        await applyApprovedProposals(userId, dek);
+      }
+
+      logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
+
+      offset += txnRows.length;
+      hasMore = txnRows.length >= batchSize;
     }
 
     logger.info(`${LOG_TAG} Analysis complete`, { userId, proposalsCreated, autoApproved, errors: errors.length });
@@ -441,7 +469,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
         if (categoryId) {
           await db
             .update(transactions)
-            .set({ categoryId, reviewed: true, updatedAt: new Date() })
+            .set({ categoryId, reviewed: true, categorizedByAi: true, updatedAt: new Date() })
             .where(eq(transactions.id, payload.transactionId));
           logger.info(`${LOG_TAG} Categorized transaction ${payload.transactionId}`, { userId, categoryId });
         }

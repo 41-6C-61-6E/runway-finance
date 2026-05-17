@@ -214,18 +214,22 @@ export async function generateHistoricalAccountSnapshots(
     current.setDate(current.getDate() + 1);
   }
 
-  // Batch insert all synthetic snapshots
+  // Batch insert all synthetic snapshots in chunks to avoid PostgreSQL parameter limits
+  const BATCH_SIZE = 100;
   let syntheticCount = 0;
   if (toInsert.length > 0) {
-    const results = await getDb()
-      .insert(accountSnapshots)
-      .values(toInsert)
-      .onConflictDoUpdate({
-        target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-        set: { balance: sql`EXCLUDED.balance`, isSynthetic: true },
-      })
-      .returning({ id: accountSnapshots.id });
-    syntheticCount = results.length;
+    for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+      const chunk = toInsert.slice(i, i + BATCH_SIZE);
+      const results = await getDb()
+        .insert(accountSnapshots)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
+          set: { balance: sql`EXCLUDED.balance`, isSynthetic: true },
+        })
+        .returning({ id: accountSnapshots.id });
+      syntheticCount += results.length;
+    }
   }
 
   logger.debug(`${LOG_TAG} Backfill complete`, {
