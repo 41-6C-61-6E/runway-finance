@@ -136,8 +136,9 @@ export default function AiSuggestionsPage() {
   const analyzingRef = useRef(false);
 
   const STATUS_KEY = 'ai_analysis_status';
+  const ANALYSIS_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
-  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string } | null;
+  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number } | null;
 
   const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
 
@@ -168,6 +169,19 @@ export default function AiSuggestionsPage() {
       const raw = sessionStorage.getItem(STATUS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as NonNullable<AnalysisStatus>;
+        
+        // Check if analysis has timed out
+        if (parsed.status === 'running' && parsed.startedAt) {
+          const elapsed = Date.now() - parsed.startedAt;
+          if (elapsed > ANALYSIS_TIMEOUT) {
+            // Analysis has been running too long, mark as failed
+            const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
+            setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
+            sessionStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
+            return;
+          }
+        }
+        
         setSavedStatus(parsed);
         if (parsed.status === 'running') {
           setAnalyzing(true);
@@ -176,7 +190,21 @@ export default function AiSuggestionsPage() {
     } catch { /* ignore */ }
   }, [fetchProposals]);
 
-  // Poll for new proposals while analysis is running
+  // Check for analysis timeout periodically
+  useEffect(() => {
+    if (!analyzing || !savedStatus?.startedAt) return;
+    const checkTimeout = setInterval(() => {
+      const elapsed = Date.now() - (savedStatus.startedAt || 0);
+      if (elapsed > ANALYSIS_TIMEOUT) {
+        const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
+        persistStatus({ status: 'error', message: timeoutMsg, startedAt: savedStatus.startedAt });
+        setAnalyzing(false);
+        showFeedback('error', timeoutMsg);
+        clearInterval(checkTimeout);
+      }
+    }, 30000); // Check every 30 seconds
+    return () => clearInterval(checkTimeout);
+  }, [analyzing, savedStatus?.startedAt]);
   useEffect(() => {
     if (!analyzing) return;
     const interval = setInterval(() => {
@@ -200,7 +228,11 @@ export default function AiSuggestionsPage() {
   const persistStatus = (status: AnalysisStatus) => {
     setSavedStatus(status);
     if (status) {
-      sessionStorage.setItem(STATUS_KEY, JSON.stringify(status));
+      // Add timestamp when status is running
+      const statusWithTimestamp = status.status === 'running' && !status.startedAt
+        ? { ...status, startedAt: Date.now() }
+        : status;
+      sessionStorage.setItem(STATUS_KEY, JSON.stringify(statusWithTimestamp));
     } else {
       sessionStorage.removeItem(STATUS_KEY);
     }
@@ -214,6 +246,16 @@ export default function AiSuggestionsPage() {
     try {
       const res = await fetch('/api/ai/analyze', { method: 'POST', credentials: 'include' });
       const data = await res.json();
+      
+      if (!res.ok) {
+        const msg = data.error || 'Failed to run analysis. Please check your AI provider configuration.';
+        persistStatus({ status: 'error', message: msg });
+        showFeedback('error', msg);
+        setAnalyzing(false);
+        analyzingRef.current = false;
+        return;
+      }
+      
       let msg: string;
       if (data.errors?.length) {
         msg = `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`;
@@ -224,9 +266,9 @@ export default function AiSuggestionsPage() {
       }
       showFeedback('success', msg);
       await fetchProposals();
-    } catch {
+    } catch (err) {
       if (!analyzingRef.current) return;
-      const msg = 'Failed to run analysis.';
+      const msg = 'Failed to run analysis. Please try again or check your connection.';
       persistStatus({ status: 'error', message: msg });
       showFeedback('error', msg);
     }
@@ -382,17 +424,38 @@ export default function AiSuggestionsPage() {
                     You can navigate away — the analysis continues in the background. New proposals will appear here automatically.
                   </p>
                 </>
+              ) : savedStatus?.status === 'error' ? (
+                <>
+                  <p className="font-medium text-destructive">{savedStatus.message}</p>
+                  {savedStatus.message.includes('timed out') && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      The analysis took longer than expected. Try running it again, or check your AI provider settings.
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-sm">{savedStatus?.message}</p>
               )}
             </div>
-            <button
-              onClick={dismissStatus}
-              className="text-muted-foreground hover:text-foreground shrink-0"
-              title="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {savedStatus?.status === 'error' && savedStatus.message.includes('timed out') && (
+                <button
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Retry
+                </button>
+              )}
+              <button
+                onClick={dismissStatus}
+                className="text-muted-foreground hover:text-foreground"
+                title="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
 

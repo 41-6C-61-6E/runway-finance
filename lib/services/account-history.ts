@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 import { accountSnapshots, transactions } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
-import { decryptField } from '@/lib/crypto';
+import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
@@ -23,7 +23,8 @@ export interface SyntheticSnapshotResult {
 export async function getLatestRealSnapshot(
   accountId: string,
   userId: string,
-  onOrBeforeDate: string
+  onOrBeforeDate: string,
+  dek?: Uint8Array
 ): Promise<{ date: string; balance: string } | null> {
   const [snapshot] = await getDb()
     .select({
@@ -43,7 +44,8 @@ export async function getLatestRealSnapshot(
     .limit(1);
 
   if (!snapshot) return null;
-  return { date: String(snapshot.date), balance: String(snapshot.balance) };
+  const decryptedBalance = dek ? await decryptField(snapshot.balance, dek) : snapshot.balance;
+  return { date: String(snapshot.date), balance: String(decryptedBalance) };
 }
 
 /**
@@ -119,7 +121,7 @@ export async function generateHistoricalAccountSnapshots(
   const from = fromDate;
   const to = toDate;
 
-  const latestReal = await getLatestRealSnapshot(accountId, userId, from);
+  const latestReal = await getLatestRealSnapshot(accountId, userId, from, dek);
 
   const earliestTxDate = await getEarliestTransactionDate(accountId);
 
@@ -141,18 +143,20 @@ export async function generateHistoricalAccountSnapshots(
 
   if (txs.length === 0) {
     if (effectiveFromDate === from) {
+      const encryptedBalance = dek ? await encryptField(String(runningBalance), dek) : String(runningBalance);
+      
       await getDb()
         .insert(accountSnapshots)
         .values({
           userId,
           accountId,
           snapshotDate: from,
-          balance: String(runningBalance),
+          balance: encryptedBalance,
           isSynthetic: true,
         })
         .onConflictDoUpdate({
           target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-          set: { balance: String(runningBalance), isSynthetic: true },
+          set: { balance: encryptedBalance, isSynthetic: true },
         });
       logger.debug(`${LOG_TAG} Single synthetic snapshot inserted`, { accountId, date: from, balance: runningBalance });
       return { syntheticCount: 1, skippedRealCount: 0 };
@@ -202,11 +206,13 @@ export async function generateHistoricalAccountSnapshots(
     } else {
       const dailyChange = txByDate.get(dateStr) ?? 0;
       runningBalance += dailyChange;
+      const encryptedBalance = dek ? await encryptField(String(runningBalance), dek) : String(runningBalance);
+      
       toInsert.push({
         userId,
         accountId,
         snapshotDate: dateStr,
-        balance: String(runningBalance),
+        balance: encryptedBalance,
         isSynthetic: true,
       });
     }

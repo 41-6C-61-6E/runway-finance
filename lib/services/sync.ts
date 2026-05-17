@@ -99,19 +99,21 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
   for (const acc of decrypted) {
+    const encryptedBalance = await encryptField(acc.balance, dek);
+    
     await getDb()
       .insert(accountSnapshots)
       .values({
         userId,
         accountId: acc.id,
         snapshotDate,
-        balance: acc.balance,
+        balance: encryptedBalance,
         isSynthetic: false,
       })
       .onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
         set: {
-          balance: acc.balance,
+          balance: encryptedBalance,
           isSynthetic: false,
         },
       });

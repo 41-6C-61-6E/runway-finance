@@ -628,16 +628,18 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
 
   const today = nowISO();
   for (const acc of userAccounts) {
-    const balance = dek ? await decryptField(acc.balance, dek) : acc.balance;
+    const decryptedBalance = dek ? await decryptField(acc.balance, dek) : acc.balance;
+    const encryptedBalance = dek ? await encryptField(decryptedBalance, dek) : decryptedBalance;
+    
     await db.insert(accountSnapshots).values({
       userId,
       accountId: acc.id,
       snapshotDate: today,
-      balance,
+      balance: encryptedBalance,
       isSynthetic: false,
     }).onConflictDoUpdate({
       target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-      set: { balance, isSynthetic: false },
+      set: { balance: encryptedBalance, isSynthetic: false },
     });
   }
 }
