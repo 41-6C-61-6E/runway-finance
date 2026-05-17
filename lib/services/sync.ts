@@ -2,6 +2,8 @@ import { getDb } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
+import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
+import { userSettings } from '@/lib/db/schema';
 import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
@@ -685,6 +687,24 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         }
       } else {
         logger.debug(`${LOG_TAG} No uncategorized transactions to apply rules to`, { connectionId });
+      }
+
+      // Auto-trigger AI analysis if user has it enabled (only for user-initiated syncs)
+      if (!dekOverride && uncategorized.length > 0) {
+        try {
+          const userSettingsRow = await getDb()
+            .select()
+            .from(userSettings)
+            .where(eq(userSettings.userId, userId))
+            .limit(1);
+
+          if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze && userSettingsRow[0].aiEndpoint) {
+            logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId });
+            analyzeUncategorized(userId).catch((err) => {
+              logger.error(`${LOG_TAG} AI analysis failed (non-fatal)`, { connectionId, userId, error: String(err) });
+            });
+          }
+        } catch { /* non-fatal: AI analysis is optional */ }
       }
     }
 

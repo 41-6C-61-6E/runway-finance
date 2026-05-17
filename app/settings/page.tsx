@@ -16,6 +16,7 @@ import RulesTab from '@/components/features/settings/RulesTab';
 import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
 import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
+import AiTab from '@/components/features/settings/AiTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
@@ -79,7 +80,7 @@ export default function SettingsPage() {
   const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'apis'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'apis' | 'ai'>('general');
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -405,6 +406,14 @@ export default function SettingsPage() {
             >
               APIs
             </button>
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              AI
+            </button>
           </div>
 
           {activeTab === 'general' && (
@@ -565,9 +574,9 @@ export default function SettingsPage() {
               )}
               {devMode === false && (
                 <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Logs are hidden.</p>
-              )}
-            </div>
-          </div>
+      )}
+    </div>
+  </div>
 
           {/* Navigation Visibility */}
           <div className="p-5 bg-card border border-border rounded-xl">
@@ -1177,7 +1186,11 @@ curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=ba
         </div>
       )}
     </div>
-  </div>
+
+      {activeTab === 'ai' && (
+        <AiTab />
+      )}
+    </div>
 
   {/* Connection Details Dialog */}
   <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>

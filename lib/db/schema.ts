@@ -100,10 +100,34 @@ export const userSettings = pgTable('user_settings', {
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
   showMathEnabled: boolean('show_math_enabled').notNull().default(false),
+  aiEndpoint: text('ai_endpoint'),
+  aiModel: text('ai_model'),
+  aiSystemPrompt: text('ai_system_prompt'),
+  aiAutoAnalyze: boolean('ai_auto_analyze').notNull().default(false),
+  aiAutoApproveThreshold: integer('ai_auto_approve_threshold').notNull().default(95),
+  aiBatchSize: integer('ai_batch_size').notNull().default(25),
   apiKeys: text('api_keys'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── AI Proposals ─────────────────────────────────────────────────────────────
+export const aiProposals = pgTable('ai_proposals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  type: text('type').notNull(), // 'categorize' | 'create_category' | 'create_rule'
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  confidence: text('confidence'),
+  payload: jsonb('payload').notNull().$type<AiProposalPayload>(),
+  explanation: text('explanation'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type AiProposalPayload =
+  | { type: 'categorize'; transactionId: string; transactionDescription: string; proposedCategoryId: string | null; proposedCategoryName: string; newCategoryProposalIndex?: number }
+  | { type: 'create_category'; name: string; parentName: string | null; parentId: string | null; color: string; isIncome: boolean }
+  | { type: 'create_rule'; ruleName: string; conditionField: string; conditionOperator: string; conditionValue: string; conditionCaseSensitive: boolean; setCategoryId: string | null; setCategoryName: string | null };
 
 // ── SimpleFIN Connections ────────────────────────────────────────────────────
 export const simplifinConnections = pgTable('simplefin_connections', {
