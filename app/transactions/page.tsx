@@ -2,6 +2,8 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
@@ -50,6 +52,14 @@ function TransactionsContent() {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingAiCount, setPendingAiCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -177,7 +187,18 @@ function TransactionsContent() {
       <div className="relative z-10">
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
-            <h1 className="text-xl font-semibold text-foreground mb-4">Transactions</h1>
+            <div className="flex items-center gap-3 mb-4">
+              <h1 className="text-xl font-semibold text-foreground">Transactions</h1>
+              {pendingAiCount > 0 && (
+                <Link
+                  href="/ai-suggestions"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}
+                </Link>
+              )}
+            </div>
 
             <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
 

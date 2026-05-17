@@ -44,6 +44,12 @@ export async function GET() {
       reduceTransparency: created?.reduceTransparency ?? false,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? false,
       showMathEnabled: created?.showMathEnabled ?? false,
+      aiEndpoint: created?.aiEndpoint ?? null,
+      aiModel: created?.aiModel ?? null,
+      aiSystemPrompt: created?.aiSystemPrompt ?? null,
+      aiAutoAnalyze: created?.aiAutoAnalyze ?? false,
+      aiAutoApproveThreshold: created?.aiAutoApproveThreshold ?? 95,
+      aiBatchSize: created?.aiBatchSize ?? 25,
       apiKeys: created?.apiKeys ?? {},
     });
   }
@@ -71,6 +77,12 @@ export async function GET() {
     reduceTransparency: settings[0].reduceTransparency ?? false,
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? false,
     showMathEnabled: settings[0].showMathEnabled ?? false,
+    aiEndpoint: settings[0].aiEndpoint ?? null,
+    aiModel: settings[0].aiModel ?? null,
+    aiSystemPrompt: settings[0].aiSystemPrompt ?? null,
+    aiAutoAnalyze: settings[0].aiAutoAnalyze ?? false,
+    aiAutoApproveThreshold: settings[0].aiAutoApproveThreshold ?? 95,
+    aiBatchSize: settings[0].aiBatchSize ?? 25,
     apiKeys,
   });
 }
@@ -95,8 +107,14 @@ export async function PATCH(request: Request) {
   const defaultChartType = body.defaultChartType;
   const reduceTransparency = body.reduceTransparency;
   const hideAccountSubheadings = body.hideAccountSubheadings;
-  const showMathEnabled = body.showMathEnabled;
-  const apiKeys = body.apiKeys;
+	const showMathEnabled = body.showMathEnabled;
+	const aiEndpoint = body.aiEndpoint;
+	const aiModel = body.aiModel;
+	const aiSystemPrompt = body.aiSystemPrompt;
+	const aiAutoAnalyze = body.aiAutoAnalyze;
+	const aiAutoApproveThreshold = body.aiAutoApproveThreshold;
+	const aiBatchSize = body.aiBatchSize;
+	const apiKeys = body.apiKeys;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -166,11 +184,35 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
   }
 
-  if (showMathEnabled !== undefined && typeof showMathEnabled !== 'boolean') {
-    return Response.json({ error: 'Invalid showMathEnabled value' }, { status: 400 });
-  }
+	if (showMathEnabled !== undefined && typeof showMathEnabled !== 'boolean') {
+		return Response.json({ error: 'Invalid showMathEnabled value' }, { status: 400 });
+	}
 
-  const db = getDb();
+	if (aiEndpoint !== undefined && typeof aiEndpoint !== 'string') {
+		return Response.json({ error: 'Invalid aiEndpoint value' }, { status: 400 });
+	}
+
+	if (aiModel !== undefined && typeof aiModel !== 'string') {
+		return Response.json({ error: 'Invalid aiModel value' }, { status: 400 });
+	}
+
+	if (aiSystemPrompt !== undefined && typeof aiSystemPrompt !== 'string') {
+		return Response.json({ error: 'Invalid aiSystemPrompt value' }, { status: 400 });
+	}
+
+	if (aiAutoAnalyze !== undefined && typeof aiAutoAnalyze !== 'boolean') {
+		return Response.json({ error: 'Invalid aiAutoAnalyze value' }, { status: 400 });
+	}
+
+	if (aiAutoApproveThreshold !== undefined && (typeof aiAutoApproveThreshold !== 'number' || aiAutoApproveThreshold < 0 || aiAutoApproveThreshold > 100)) {
+		return Response.json({ error: 'Invalid aiAutoApproveThreshold value (must be 0-100)' }, { status: 400 });
+	}
+
+	if (aiBatchSize !== undefined && (typeof aiBatchSize !== 'number' || aiBatchSize < 1 || aiBatchSize > 200)) {
+		return Response.json({ error: 'Invalid aiBatchSize value (must be 1-200)' }, { status: 400 });
+	}
+
+	const db = getDb();
 
   let settings = await db
     .select()
@@ -223,8 +265,14 @@ export async function PATCH(request: Request) {
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
-  if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
-  if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
+	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
+	if (aiEndpoint !== undefined) updates.aiEndpoint = aiEndpoint;
+	if (aiModel !== undefined) updates.aiModel = aiModel;
+	if (aiSystemPrompt !== undefined) updates.aiSystemPrompt = aiSystemPrompt;
+	if (aiAutoAnalyze !== undefined) updates.aiAutoAnalyze = aiAutoAnalyze;
+	if (aiAutoApproveThreshold !== undefined) updates.aiAutoApproveThreshold = aiAutoApproveThreshold;
+	if (aiBatchSize !== undefined) updates.aiBatchSize = aiBatchSize;
+	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -255,6 +303,12 @@ export async function PATCH(request: Request) {
     reduceTransparency: updated.reduceTransparency ?? false,
     hideAccountSubheadings: updated.hideAccountSubheadings ?? false,
     showMathEnabled: updated.showMathEnabled ?? false,
+    aiEndpoint: updated.aiEndpoint ?? null,
+    aiModel: updated.aiModel ?? null,
+    aiSystemPrompt: updated.aiSystemPrompt ?? null,
+    aiAutoAnalyze: updated.aiAutoAnalyze ?? false,
+    aiAutoApproveThreshold: updated.aiAutoApproveThreshold ?? 95,
+    aiBatchSize: updated.aiBatchSize ?? 25,
     apiKeys: updatedApiKeys,
   });
 }

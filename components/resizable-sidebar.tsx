@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
@@ -21,7 +21,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
-  { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
+  { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
   { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
 ]
 
@@ -52,6 +52,7 @@ export default function ResizableSidebar() {
     accounts: number
     transactions: number
   } | null>(null)
+  const [pendingAiCount, setPendingAiCount] = useState<number>(0)
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -79,6 +80,11 @@ export default function ResizableSidebar() {
       }
     }
     fetchStatus()
+    // Also check for pending AI proposals
+    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
   }, [])
 
   const formatRelativeTime = (dateStr: string | null) => {
@@ -145,6 +151,15 @@ export default function ResizableSidebar() {
                 >
                   <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
                   {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
+                  {item.href === '/ai-suggestions' && pendingAiCount > 0 && (
+                    isCollapsed ? (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />
+                    ) : (
+                      <span className="ml-auto px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full">
+                        {pendingAiCount}
+                      </span>
+                    )
+                  )}
                 </a>
               </SimpleTooltip>
             )
