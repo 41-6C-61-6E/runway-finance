@@ -9,19 +9,17 @@
 
 ## NEW FEATUES:
 - explore the idea of transfer categories
-- AI categorization
 - FI number and year-by-year projection using live burn rate data.
 - Better PWA support
 - AI Financial fitness evaluation
 - backup and restore
-- per user encryption
 - Vuln patch
 
 
 ## BUGS:
 - some charts include excluded accounts (snakey, spending breakdown at the least)
-- cash flow forecast should only include banking accounts
 - idea of tags
+- logs dev mode brokn
 
 
 

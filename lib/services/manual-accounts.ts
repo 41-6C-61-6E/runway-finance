@@ -635,11 +635,11 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
       userId,
       accountId: acc.id,
       snapshotDate: today,
-      balance: encryptedBalance,
+      balance: String(encryptedBalance),
       isSynthetic: false,
     }).onConflictDoUpdate({
       target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-      set: { balance: encryptedBalance, isSynthetic: false },
+      set: { balance: String(encryptedBalance), isSynthetic: false },
     });
   }
 }
