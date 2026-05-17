@@ -192,6 +192,7 @@ export const categories = pgTable('categories', {
   isSystem: boolean('is_system').notNull().default(false),
   excludeFromReports: boolean('exclude_from_reports').notNull().default(false),
   displayOrder: integer('display_order').notNull().default(0),
+  createdByAi: boolean('created_by_ai').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -253,6 +254,7 @@ export const categoryRules = pgTable('category_rules', {
   setPayee: text('set_payee'),
   setReviewed: boolean('set_reviewed'),
   isSystem: boolean('is_system').notNull().default(false),
+  createdByAi: boolean('created_by_ai').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

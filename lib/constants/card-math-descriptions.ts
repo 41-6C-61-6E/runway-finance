@@ -3,7 +3,7 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
   netWorthSummary: {
     title: 'Net Worth Summary',
     description:
-      'Total Assets = sum of all account balances where type is checking, savings, investment, brokerage, retirement, real estate, vehicle, crypto, metals, or other asset. Total Liabilities = sum of absolute balances where type is credit, loan, or mortgage. Net Worth = Total Assets − Total Liabilities. Period-over-period change compares the last two chart snapshots: (current − previous) / previous × 100.',
+      'Total Assets = sum of all asset account balances (checking, savings, investments, real estate, etc.). Total Liabilities = sum of absolute balances of liability accounts (credit, loans, mortgages). Net Worth = Total Assets − Total Liabilities. Period-over-period change compares the last two chart snapshots: (current − previous) / previous × 100.',
   },
   netWorthChart: {
     title: 'Net Worth Line Chart',

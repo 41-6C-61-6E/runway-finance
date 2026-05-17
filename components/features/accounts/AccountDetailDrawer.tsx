@@ -17,6 +17,72 @@ type Account = {
   metadata?: Record<string, unknown> | null;
 };
 
+const MAJOR_TYPE_OPTIONS = [
+  { value: 'banking', label: 'Banking' },
+  { value: 'credit', label: 'Credit Card' },
+  { value: 'investment', label: 'Investment' },
+  { value: 'realestate', label: 'Real Estate' },
+  { value: 'loan', label: 'Loan / Liability' },
+  { value: 'asset', label: 'Other Asset' },
+  { value: 'health', label: 'Health' },
+];
+
+const SUB_TYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  banking: [
+    { value: 'checking', label: 'Checking' },
+    { value: 'savings', label: 'Savings' },
+    { value: 'other', label: 'Other Banking / Cash' },
+  ],
+  credit: [
+    { value: 'credit', label: 'Credit Card' },
+  ],
+  investment: [
+    { value: 'investment', label: 'Taxable Brokerage' },
+    { value: 'brokerage', label: 'Brokerage' },
+    { value: 'retirement', label: 'Retirement (General)' },
+    { value: 'rothira', label: 'Roth IRA' },
+    { value: 'traditionalira', label: 'Traditional IRA' },
+    { value: '401k', label: '401(k)' },
+    { value: '403b', label: '403(b)' },
+    { value: 'sepira', label: 'SEP IRA' },
+    { value: 'simpleira', label: 'Simple IRA' },
+    { value: '529', label: '529 Account' },
+    { value: 'otherinvestment', label: 'Other Investment' },
+  ],
+  realestate: [
+    { value: 'primaryhome', label: 'Primary Residence' },
+    { value: 'secondaryhome', label: 'Secondary / Vacation Home' },
+    { value: 'rentalproperty', label: 'Rental Property' },
+    { value: 'commercial', label: 'Commercial Property' },
+    { value: 'land', label: 'Land / Undeveloped' },
+    { value: 'otherrealestate', label: 'Other Real Estate' },
+    { value: 'realestate', label: 'Real Estate (Other)' },
+  ],
+  loan: [
+    { value: 'loan', label: 'Loan' },
+    { value: 'mortgage', label: 'Mortgage' },
+    { value: 'otherLiability', label: 'Other Liability' },
+  ],
+  asset: [
+    { value: 'vehicle', label: 'Vehicle' },
+    { value: 'crypto', label: 'Bitcoin / Crypto' },
+    { value: 'metals', label: 'Metals' },
+    { value: 'otherAsset', label: 'Other Asset' },
+  ],
+  health: [
+    { value: 'hsa', label: 'HSA' },
+    { value: 'health', label: 'Health Account' },
+  ],
+};
+
+function findMajorType(type: string): string {
+  const normalized = type?.toLowerCase() || '';
+  for (const [major, subs] of Object.entries(SUB_TYPE_OPTIONS)) {
+    if (subs.some(s => s.value.toLowerCase() === normalized)) return major;
+  }
+  return 'banking';
+}
+
 interface AccountDetailDrawerProps {
   account: Account | null;
   open: boolean;
@@ -29,6 +95,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
+  const [majorType, setMajorType] = useState('banking');
   const [isHidden, setIsHidden] = useState(account.isHidden);
   const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account.isExcludedFromNetWorth);
   const [saving, setSaving] = useState(false);
@@ -36,6 +103,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   useEffect(() => {
     setName(account.name);
     setType(account.type);
+    setMajorType(findMajorType(account.type));
     setIsHidden(account.isHidden);
     setIsExcludedFromNetWorth(account.isExcludedFromNetWorth);
   }, [account]);
@@ -54,6 +122,12 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       setSaving(false);
     }
   }, [account.id, name, type, isHidden, isExcludedFromNetWorth, onSuccess]);
+
+  const handleMajorTypeChange = (newMajor: string) => {
+    setMajorType(newMajor);
+    const firstSub = SUB_TYPE_OPTIONS[newMajor]?.[0]?.value || 'other';
+    setType(firstSub);
+  };
 
   const formatBalance = (balance: string, currency: string) => {
     const num = parseFloat(balance);
@@ -94,26 +168,31 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-                <option value="credit">Credit Card</option>
-                <option value="investment">Investment</option>
-                <option value="loan">Loan</option>
-                <option value="mortgage">Mortgage</option>
-                <option value="realestate">Real Estate</option>
-                <option value="vehicle">Vehicle</option>
-                <option value="crypto">Bitcoin / Crypto</option>
-                <option value="metals">Metals</option>
-                <option value="otherAsset">Other Asset</option>
-                <option value="other">Other</option>
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Group</label>
+                <select
+                  value={majorType}
+                  onChange={(e) => handleMajorTypeChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {MAJOR_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Type</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {SUB_TYPE_OPTIONS[majorType]?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Info fields (read-only) */}

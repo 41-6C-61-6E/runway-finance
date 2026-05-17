@@ -21,18 +21,33 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: st
   savings:    { group: 'Banking',       subGroup: 'Savings',          icon: '🏦' },
   other:      { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
   credit:     { group: 'Credit',        subGroup: 'Credit Cards',     icon: '💳' },
-  investment: { group: 'Investments',   subGroup: 'Brokerage',        icon: '📈' },
-  brokerage:  { group: 'Investments',   subGroup: 'Brokerage',        icon: '📈' },
+  investment: { group: 'Investments',   subGroup: 'Taxable Brokerage', icon: '📈' },
+  brokerage:  { group: 'Investments',   subGroup: 'Taxable Brokerage', icon: '📈' },
   retirement: { group: 'Investments',   subGroup: 'Retirement',       icon: '📈' },
+  otherinvestment: { group: 'Investments', subGroup: 'Other Investments', icon: '📈' },
+  rothira:        { group: 'Investments',   subGroup: 'Roth IRA',         icon: '📈' },
+  traditionalira: { group: 'Investments',   subGroup: 'Traditional IRA',  icon: '📈' },
+  '401k':         { group: 'Investments',   subGroup: '401(k)',           icon: '📈' },
+  '403b':         { group: 'Investments',   subGroup: '403(b)',           icon: '📈' },
+  sepira:         { group: 'Investments',   subGroup: 'SEP IRA',          icon: '📈' },
+  simpleira:      { group: 'Investments',   subGroup: 'Simple IRA',       icon: '📈' },
+  '529':          { group: 'Investments',   subGroup: '529 Account',      icon: '📈' },
   otherAsset: { group: 'Investments',   subGroup: 'Other Assets',     icon: '📈' },
   hsa:        { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
   health:     { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
   loan:       { group: 'Loans',         subGroup: 'Loans',            icon: '📋' },
   mortgage:   { group: 'Loans',         subGroup: 'Mortgages',        icon: '📋' },
+  realestate: { group: 'Real Estate',   subGroup: 'Real Estate',      icon: '🏠' },
+  primaryhome: { group: 'Real Estate',  subGroup: 'Primary Home',     icon: '🏠' },
+  secondaryhome: { group: 'Real Estate', subGroup: 'Secondary Home',   icon: '🏠' },
+  rentalproperty: { group: 'Real Estate', subGroup: 'Rental Property', icon: '🏠' },
+  commercial:   { group: 'Real Estate', subGroup: 'Commercial',        icon: '🏢' },
+  land:         { group: 'Real Estate', subGroup: 'Land',              icon: '🌳' },
+  otherrealestate: { group: 'Real Estate', subGroup: 'Other Real Estate', icon: '🏠' },
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities',    icon: '⚠️' },
 };
 
-const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Health', 'Loans', 'Liabilities'];
+const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Real Estate', 'Health', 'Loans', 'Liabilities'];
 
 function getHierarchy(accountType: string) {
   return TYPE_HIERARCHY[accountType] ?? { group: 'Other', subGroup: 'Other', icon: '📁' };

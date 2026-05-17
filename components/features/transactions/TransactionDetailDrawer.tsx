@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -20,6 +20,7 @@ type Transaction = {
   reviewed: boolean | null;
   ignored: boolean | null;
   pending: boolean;
+  categorizedByAi: boolean;
 };
 
 type Category = {
@@ -158,6 +159,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                   <>
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
                     <span>{selectedCat.name}</span>
+                    {transaction.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
                   </>
                 ) : (
                   <span className="text-muted-foreground">Uncategorized</span>

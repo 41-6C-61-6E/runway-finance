@@ -134,6 +134,14 @@ export default function AiSuggestionsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    actionLabel: string;
+    isDestructive?: boolean;
+  } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [newProposalsCount, setNewProposalsCount] = useState(0);
   const [newTxnsCount, setNewTxnsCount] = useState(0);
@@ -171,7 +179,8 @@ export default function AiSuggestionsPage() {
       const params = new URLSearchParams();
       if (filterStatus !== 'all') params.set('status', filterStatus);
       if (filterType !== 'all') params.set('type', filterType);
-      const res = await fetch(`/api/ai/proposals?${params}`, { credentials: 'include' });
+      params.set('_t', Date.now().toString()); // Cache busting
+      const res = await fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
       const data = await res.json();
       setProposals(Array.isArray(data) ? data : []);
     } catch {
@@ -246,7 +255,12 @@ export default function AiSuggestionsPage() {
   useEffect(() => {
     if (!analyzing) return;
     const interval = setInterval(() => {
-      fetch('/api/ai/proposals', { credentials: 'include' })
+      const params = new URLSearchParams();
+      if (filterStatus !== 'all') params.set('status', filterStatus);
+      if (filterType !== 'all') params.set('type', filterType);
+      params.set('_t', Date.now().toString());
+
+      fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
@@ -273,11 +287,13 @@ export default function AiSuggestionsPage() {
             }
 
             setProposals((prev) => {
-              const existingIds = new Set(prev.map((p) => p.id));
-              const newOnes = displayData.filter((p: AiProposal) => !existingIds.has(p.id));
-              if (newOnes.length > 0) {
-                const merged = [...newOnes, ...prev];
-                return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              const prevIds = new Set(prev.map((p) => p.id));
+              const currentIds = new Set(displayData.map((p: any) => p.id));
+              const hasChanges = displayData.length !== prev.length || 
+                                displayData.some((p: any) => !prevIds.has(p.id)) ||
+                                prev.some(p => !currentIds.has(p.id));
+              if (hasChanges) {
+                return [...displayData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               }
               return prev;
             });
@@ -387,19 +403,30 @@ export default function AiSuggestionsPage() {
     setLastBatchDuration(null);
   };
 
+  const confirmAction = (config: { title: string; description: string; actionLabel: string; onConfirm: () => void; isDestructive?: boolean }) => {
+    setConfirmModalConfig(config);
+    setShowConfirmModal(true);
+  };
+
   const handleCancel = async () => {
-    if (!confirm('Are you sure you want to stop the current analysis? Suggestions created so far will remain.')) return;
-    
-    analyzingRef.current = false;
-    try {
-      // Signal the backend to abort the background process
-      await fetch('/api/ai/cancel', { method: 'POST', credentials: 'include' });
-    } catch {
-      // Fallback if endpoint not found, we still want to stop local state
-    } finally {
-      dismissStatus();
-      showFeedback('success', 'Analysis stopped.');
-    }
+    confirmAction({
+      title: 'Stop Analysis',
+      description: 'Are you sure you want to stop the current analysis? Suggestions created so far will remain.',
+      actionLabel: 'Stop Analysis',
+      isDestructive: true,
+      onConfirm: async () => {
+        analyzingRef.current = false;
+        try {
+          // Signal the backend to abort the background process
+          await fetch('/api/ai/cancel', { method: 'POST', credentials: 'include' });
+        } catch {
+          // Fallback if endpoint not found, we still want to stop local state
+        } finally {
+          dismissStatus();
+          showFeedback('success', 'Analysis stopped.');
+        }
+      }
+    });
   };
 
   const handleTestProvider = async () => {
@@ -427,89 +454,127 @@ export default function AiSuggestionsPage() {
   };
 
   const handleApprove = async (id: string) => {
-    setProcessing(id);
-    try {
-      const res = await fetch(`/api/ai/proposals/${id}/approve`, { method: 'POST', credentials: 'include' });
-      if (!res.ok) {
-        const data = await res.json();
-        showFeedback('error', data.error || 'Failed to approve suggestion');
-      } else {
-        showFeedback('success', 'Approved.');
+    confirmAction({
+      title: 'Approve Suggestion',
+      description: 'Are you sure you want to approve this AI suggestion? This will apply the change to your financial data.',
+      actionLabel: 'Approve',
+      onConfirm: async () => {
+        setProcessing(id);
+        try {
+          const res = await fetch(`/api/ai/proposals/${id}/approve`, { method: 'POST', credentials: 'include' });
+          if (!res.ok) {
+            const data = await res.json();
+            showFeedback('error', data.error || 'Failed to approve suggestion');
+          } else {
+            showFeedback('success', 'Approved.');
+          }
+          await fetchProposals();
+        } catch {
+          showFeedback('error', 'Failed to approve.');
+        } finally {
+          setProcessing(null);
+        }
       }
-      await fetchProposals();
-    } catch {
-      showFeedback('error', 'Failed to approve.');
-    } finally {
-      setProcessing(null);
-    }
+    });
   };
 
   const handleReject = async (id: string) => {
-    setProcessing(id);
-    try {
-      const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
-      if (!res.ok) {
-        const data = await res.json();
-        showFeedback('error', data.error || 'Failed to reject suggestion');
+    confirmAction({
+      title: 'Reject Suggestion',
+      description: 'Are you sure you want to reject this suggestion? It will be hidden and moved to your history.',
+      actionLabel: 'Reject',
+      isDestructive: true,
+      onConfirm: async () => {
+        setProcessing(id);
+        try {
+          const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
+          if (!res.ok) {
+            const data = await res.json();
+            showFeedback('error', data.error || 'Failed to reject suggestion');
+          }
+          await fetchProposals();
+        } catch {
+          showFeedback('error', 'Failed to reject suggestion.');
+        } finally {
+          setProcessing(null);
+        }
       }
-      await fetchProposals();
-    } catch {
-      showFeedback('error', 'Failed to reject suggestion.');
-    } finally {
-      setProcessing(null);
-    }
+    });
   };
 
   const handleClearHistory = async () => {
-    if (!confirm('Are you sure you want to clear all approved and rejected suggestions? This cannot be undone.')) return;
-    setClearing(true);
-    try {
-      const res = await fetch('/api/ai/proposals/clear', { method: 'POST', credentials: 'include', headers: { 'Accept': 'application/json' } });
-      if (!res.ok) {
-        let errorMessage = 'Failed to clear history';
-        if (res.status === 404) {
-          errorMessage = 'Clear history API endpoint not found. Please ensure the server-side route exists.';
-        } else {
-          try {
-            const data = await res.json();
-            errorMessage = data.error || errorMessage;
-          } catch {
-            errorMessage = `Server error (${res.status})`;
+    confirmAction({
+      title: 'Clear Suggestion History',
+      description: 'Are you sure you want to clear all approved and rejected suggestions? This cannot be undone.',
+      actionLabel: 'Clear History',
+      isDestructive: true,
+      onConfirm: async () => {
+        setClearing(true);
+        try {
+          // Try the most likely endpoints: /api/ai/proposals/clear or DELETE on /api/ai/proposals
+          const res = await fetch('/api/ai/proposals/clear', {
+            method: 'POST',
+            credentials: 'include', 
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } 
+          });
+
+          if (!res.ok) {
+            let errorMessage = 'Failed to clear history';
+            if (res.status === 404) {
+              errorMessage = 'Clear history API endpoint not found (/api/ai/proposals/clear). Please ensure the server-side route exists.';
+            } else {
+              try {
+                const data = await res.json();
+                errorMessage = data.error || errorMessage;
+              } catch {
+                errorMessage = `Server error (${res.status})`;
+              }
+            }
+            showFeedback('error', errorMessage);
+          } else {
+            // Clear locally immediately for better UX
+            setProposals(prev => prev.filter(p => p.status === 'pending'));
+            setSelectedIds(new Set());
+            showFeedback('success', 'History cleared.');
           }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Failed to clear history.';
+          showFeedback('error', msg);
+        } finally {
+          setClearing(false);
         }
-        showFeedback('error', errorMessage);
-      } else {
-        showFeedback('success', 'History cleared.');
-        await fetchProposals();
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to clear history.';
-      showFeedback('error', msg);
-    } finally {
-      setClearing(false);
-    }
+    });
   };
 
   const handleBatchAction = async (action: 'approve' | 'reject') => {
     if (selectedIds.size === 0) return;
-    try {
-      const res = await fetch('/api/ai/proposals/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ ids: Array.from(selectedIds), action }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        showFeedback('error', data.error || 'Batch action failed');
-      } else {
-        showFeedback('success', `${action === 'approve' ? 'Approved' : 'Rejected'} ${selectedIds.size} proposal(s).`);
-        setSelectedIds(new Set());
+    confirmAction({
+      title: action === 'approve' ? 'Batch Approve' : 'Batch Reject',
+      description: `Are you sure you want to ${action} all ${selectedIds.size} selected suggestion(s)?`,
+      actionLabel: action === 'approve' ? 'Approve All' : 'Reject All',
+      isDestructive: action === 'reject',
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/ai/proposals/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ids: Array.from(selectedIds), action }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            showFeedback('error', data.error || 'Batch action failed');
+          } else {
+            showFeedback('success', `${action === 'approve' ? 'Approved' : 'Rejected'} ${selectedIds.size} proposal(s).`);
+            setSelectedIds(new Set());
+          }
+          await fetchProposals();
+        } catch {
+          showFeedback('error', 'Batch action failed.');
+        }
       }
-      await fetchProposals();
-    } catch {
-      showFeedback('error', 'Batch action failed.');
-    }
+    });
   };
 
   const pendingCount = proposals.filter((p) => p.status === 'pending').length;
@@ -835,6 +900,42 @@ export default function AiSuggestionsPage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {showConfirmModal && confirmModalConfig && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowConfirmModal(false)}>
+            <div
+              className="bg-card border border-border rounded-xl p-6 max-w-sm w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-base font-semibold text-foreground mb-2">
+                {confirmModalConfig.title}
+              </h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                {confirmModalConfig.description}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 px-3 py-2 text-sm font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    confirmModalConfig.onConfirm();
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm font-medium text-white rounded-lg transition-all ${
+                    confirmModalConfig.isDestructive ? 'bg-destructive hover:opacity-90' : 'bg-primary hover:opacity-90'
+                  }`}
+                >
+                  {confirmModalConfig.actionLabel}
+                </button>
+              </div>
             </div>
           </div>
         )}
