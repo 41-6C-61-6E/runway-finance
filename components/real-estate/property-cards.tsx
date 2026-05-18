@@ -221,7 +221,7 @@ export function PropertyCards() {
             property={property}
             onLinkMortgage={setLinkingPropertyId}
             onUnlinkMortgage={(mortgageId) => handleUnlinkMortgage(property.id, mortgageId)}
-            onOverrideValue={(value) => handleOverrideValue(property.id, value)}
+            onOverrideValue={handleOverrideValue}
             onEditMortgage={(mortgage) => openEditMortgage(mortgage, mortgage.id)}
           />
         ))}
