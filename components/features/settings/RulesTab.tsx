@@ -434,7 +434,7 @@ export default function RulesTab() {
                     <span className="text-[10px] text-muted-foreground shrink-0">System</span>
                   )}
                   {rule.createdByAi && (
-                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
+                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

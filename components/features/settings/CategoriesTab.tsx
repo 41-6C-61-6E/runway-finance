@@ -202,7 +202,7 @@ export default function CategoriesTab() {
                     <span className="text-[10px] text-muted-foreground">System</span>
                   )}
                   {parent.createdByAi && (
-                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
+                    <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -229,7 +229,7 @@ export default function CategoriesTab() {
                           <span className="text-[10px] text-muted-foreground">System</span>
                         )}
                         {child.createdByAi && (
-                          <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" title="Created by AI" />
+                          <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                         )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
