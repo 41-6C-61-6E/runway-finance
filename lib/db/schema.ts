@@ -11,6 +11,14 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+// ── Users (credential store) ─────────────────────────────────────────────────
+export const users = pgTable('users', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  email: text('email'),
+});
+
 // ── User Encryption Keys ──────────────────────────────────────────────────────
 export const userEncryptionKeys = pgTable('user_encryption_keys', {
   userId: text('user_id').primaryKey(),
@@ -105,6 +113,7 @@ export const userSettings = pgTable('user_settings', {
   aiAutoApprove: boolean('ai_auto_approve').notNull().default(false),
   aiAutoApproveThreshold: integer('ai_auto_approve_threshold').notNull().default(95),
   aiBatchSize: integer('ai_batch_size').notNull().default(25),
+  aiAnalysisTimeoutSeconds: integer('ai_analysis_timeout_seconds').notNull().default(600),
   aiActiveProviderId: uuid('ai_active_provider_id'),
   apiKeys: text('api_keys'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
