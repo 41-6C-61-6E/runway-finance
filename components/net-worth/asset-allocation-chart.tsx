@@ -198,14 +198,15 @@ export function AssetAllocationChart() {
             indexBy="type"
             layout="horizontal"
             groupMode="grouped"
-            margin={{ top: 5, right: 80, left: 100, bottom: 5 }}
+            margin={{ top: 5, right: 80, left: 100, bottom: 45 }}
             padding={0.2}
             colors={['var(--color-chart-1)', 'var(--color-destructive)']}
             borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
             enableLabel={false}
             axisLeft={{ tickSize: 0, tickPadding: 8 }}
             axisBottom={{
-              tickSize: 0, tickPadding: 8,
+              tickSize: 6, tickPadding: 8, tickRotation: -30,
+              tickValues: 5,
               format: (v: number) => {
                 if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
                 if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;

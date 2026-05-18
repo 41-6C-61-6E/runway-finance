@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -89,11 +89,28 @@ export async function GET(request: Request) {
       )
       .orderBy(accountSnapshots.snapshotDate);
 
-    // Decrypt snapshot balances
-    const decryptedSnapshots = await Promise.all(accountSnapshotsInRange.map(async (snap) => ({
-      ...snap,
-      balance: parseFloat(await decryptField(snap.balance, dek)),
-    })));
+    // Decrypt snapshot balances with error handling
+    const decryptedSnapshots = await Promise.all(accountSnapshotsInRange.map(async (snap) => {
+      let balance = 0;
+      try {
+        // Handle both plaintext numbers and encrypted strings
+        const decrypted = await decryptField(snap.balance, dek);
+        balance = parseFloat(decrypted);
+        if (isNaN(balance)) {
+          logger.warn('Invalid balance value after decryption', { accountId: snap.accountId, decrypted, originalBalance: snap.balance });
+          balance = 0;
+        }
+      } catch (error) {
+        logger.error('Failed to decrypt snapshot balance', { 
+          accountId: snap.accountId, 
+          date: snap.snapshotDate,
+          originalBalance: snap.balance,
+          error: error instanceof Error ? error.message : String(error) 
+        });
+        balance = 0;
+      }
+      return { ...snap, balance };
+    }));
 
     // Group snapshots by date for forward-fill
     const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean }>>();

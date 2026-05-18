@@ -5,7 +5,7 @@ import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
-import { Check, Calculator } from 'lucide-react';
+import { Check, Calculator, RefreshCw } from 'lucide-react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
@@ -40,11 +40,38 @@ const MODULES = [
   },
 ];
 
+import { useState } from 'react';
+
 export default function AnalyticsTab() {
   const { visibility, loading: visLoading, updateVisibility } = useChartVisibility();
   const { settings, loading: synthLoading, isEnabled, updateSettings } = useSyntheticData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalcResult, setRecalcResult] = useState<{
+    success: boolean;
+    message: string;
+    stats?: {
+      accountsProcessed: number;
+      syntheticSnapshotsCreated: number;
+      skippedRealSnapshots: number;
+      errorsEncountered: number;
+    };
+  } | null>(null);
+
+  const handleRecalculate = async () => {
+    setRecalculating(true);
+    setRecalcResult(null);
+    try {
+      const res = await fetch('/api/analytics/recalculate-snapshots', { method: 'POST' });
+      const data = await res.json();
+      setRecalcResult(data);
+    } catch (error: any) {
+      setRecalcResult({ success: false, message: error.message || 'Failed to recalculate snapshots' });
+    } finally {
+      setRecalculating(false);
+    }
+  };
 
   const loading = visLoading || synthLoading || defaultsLoading || mathLoading;
 
@@ -138,6 +165,39 @@ export default function AnalyticsTab() {
               </div>
             );
           })}
+        </div>
+
+        {/* Recalculate Button */}
+        <div className="mt-4">
+          <button
+            type="button"
+            disabled={recalculating}
+            onClick={handleRecalculate}
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin' : ''}`} />
+            {recalculating ? 'Recalculating...' : 'Recalculate Synthetic & Estimated Data'}
+          </button>
+
+          {recalcResult && (
+            <div className={`mt-3 p-3 rounded-lg border text-xs ${
+              recalcResult.success
+                ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
+                : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
+            }`}>
+              <p className="font-medium">{recalcResult.message}</p>
+              {recalcResult.stats && (
+                <ul className="mt-1 space-y-0.5">
+                  <li>Accounts processed: {recalcResult.stats.accountsProcessed}</li>
+                  <li>Synthetic snapshots created: {recalcResult.stats.syntheticSnapshotsCreated}</li>
+                  <li>Real snapshots skipped: {recalcResult.stats.skippedRealSnapshots}</li>
+                  {recalcResult.stats.errorsEncountered > 0 && (
+                    <li className="text-red-600 dark:text-red-400">Errors: {recalcResult.stats.errorsEncountered}</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

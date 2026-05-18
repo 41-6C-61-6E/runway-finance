@@ -71,17 +71,22 @@ export default function DevLogPane() {
     }
   }, [])
 
+  const prevDevModeRef = useRef(devModeEnabled)
+
   useEffect(() => {
     checkDevMode()
-    const interval = setInterval(checkDevMode, 5000)
+    const interval = setInterval(checkDevMode, 2000)
     return () => clearInterval(interval)
   }, [checkDevMode])
 
-  // Hide pane if dev mode is disabled
+  // Auto-open panel when dev mode is enabled; close when disabled
   useEffect(() => {
     if (!devModeEnabled) {
       setIsOpen(false)
+    } else if (!prevDevModeRef.current) {
+      setIsOpen(true)
     }
+    prevDevModeRef.current = devModeEnabled
   }, [devModeEnabled])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

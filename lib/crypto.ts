@@ -124,22 +124,34 @@ export async function encryptField(plaintext: string, key: Uint8Array): Promise<
   return JSON.stringify({ ct: p.ciphertext, iv: p.iv });
 }
 
-export async function decryptField(payload: string, key: Uint8Array): Promise<string> {
-  if (typeof payload !== 'string') {
-    // Non-string payloads (e.g., jsonb objects from the database) should not be passed here.
-    // Return empty string to signal that decryption is not applicable.
+export async function decryptField(payload: string | number, key: Uint8Array): Promise<string> {
+  // Convert numbers to strings (plaintext numeric values from database)
+  const payloadStr = typeof payload === 'number' ? String(payload) : String(payload ?? '');
+  
+  if (!payloadStr) {
     return '';
   }
+  
   let parsed: any;
   try {
-    parsed = JSON.parse(payload);
+    parsed = JSON.parse(payloadStr);
   } catch {
-    return payload;
+    // Not JSON - return as-is (plaintext value)
+    return payloadStr;
   }
+  
+  // Check if it's encrypted JSON format with ct and iv fields
   if (typeof parsed !== 'object' || !parsed?.ct || !parsed?.iv) {
-    return payload;
+    // Valid JSON but not encrypted format - return stringified
+    return typeof payload === 'string' ? payloadStr : String(payload);
   }
-  return decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
+  
+  try {
+    return decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
+  } catch {
+    // Return empty string if decryption fails (corrupted data or wrong key)
+    return '';
+  }
 }
 
 // ── Row-level helpers ──────────────────────────────────────────────────
@@ -190,7 +202,14 @@ export async function decryptRow<T extends Record<string, any>>(table: string, r
   for (const field of fields) {
     const val = result[field];
     if (val != null && val !== '') {
-      result[field] = await decryptField(String(val), key);
+      const decrypted = await decryptField(String(val), key);
+      // Fields that store JSON objects were stringified before encryption;
+      // parse them back so the caller receives the original type.
+      try {
+        result[field] = JSON.parse(decrypted);
+      } catch {
+        result[field] = decrypted;
+      }
     }
   }
   return result as T;

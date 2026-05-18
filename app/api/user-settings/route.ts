@@ -49,6 +49,7 @@ export async function GET() {
       aiAutoApprove: created?.aiAutoApprove ?? false,
       aiAutoApproveThreshold: created?.aiAutoApproveThreshold ?? 95,
       aiBatchSize: created?.aiBatchSize ?? 25,
+      aiAnalysisTimeoutSeconds: created?.aiAnalysisTimeoutSeconds ?? 600,
       aiActiveProviderId: created?.aiActiveProviderId ?? null,
       apiKeys: created?.apiKeys ?? {},
     });
@@ -82,6 +83,7 @@ export async function GET() {
     aiAutoApprove: settings[0].aiAutoApprove ?? false,
     aiAutoApproveThreshold: settings[0].aiAutoApproveThreshold ?? 95,
     aiBatchSize: settings[0].aiBatchSize ?? 25,
+    aiAnalysisTimeoutSeconds: settings[0].aiAnalysisTimeoutSeconds ?? 600,
     aiActiveProviderId: settings[0].aiActiveProviderId ?? null,
     apiKeys,
   });
@@ -113,6 +115,7 @@ export async function PATCH(request: Request) {
 	const aiAutoApprove = body.aiAutoApprove;
 	const aiAutoApproveThreshold = body.aiAutoApproveThreshold;
 	const aiBatchSize = body.aiBatchSize;
+	const aiAnalysisTimeoutSeconds = body.aiAnalysisTimeoutSeconds;
 	const aiActiveProviderId = body.aiActiveProviderId;
 	const apiKeys = body.apiKeys;
 
@@ -208,6 +211,10 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid aiBatchSize value (must be 1-200)' }, { status: 400 });
 	}
 
+	if (aiAnalysisTimeoutSeconds !== undefined && (typeof aiAnalysisTimeoutSeconds !== 'number' || aiAnalysisTimeoutSeconds < 30 || aiAnalysisTimeoutSeconds > 600)) {
+		return Response.json({ error: 'Invalid aiAnalysisTimeoutSeconds value (must be 30-600)' }, { status: 400 });
+	}
+
 	if (aiActiveProviderId !== undefined && aiActiveProviderId !== null && typeof aiActiveProviderId !== 'string') {
 		return Response.json({ error: 'Invalid aiActiveProviderId value' }, { status: 400 });
 	}
@@ -271,6 +278,7 @@ export async function PATCH(request: Request) {
 	if (aiAutoApprove !== undefined) updates.aiAutoApprove = aiAutoApprove;
 	if (aiAutoApproveThreshold !== undefined) updates.aiAutoApproveThreshold = aiAutoApproveThreshold;
 	if (aiBatchSize !== undefined) updates.aiBatchSize = aiBatchSize;
+	if (aiAnalysisTimeoutSeconds !== undefined) updates.aiAnalysisTimeoutSeconds = aiAnalysisTimeoutSeconds;
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
 	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
   updates.updatedAt = new Date();
@@ -308,6 +316,7 @@ export async function PATCH(request: Request) {
     aiAutoApprove: updated.aiAutoApprove ?? false,
     aiAutoApproveThreshold: updated.aiAutoApproveThreshold ?? 95,
     aiBatchSize: updated.aiBatchSize ?? 25,
+    aiAnalysisTimeoutSeconds: updated.aiAnalysisTimeoutSeconds ?? 600,
     aiActiveProviderId: updated.aiActiveProviderId ?? null,
     apiKeys: updatedApiKeys,
   });

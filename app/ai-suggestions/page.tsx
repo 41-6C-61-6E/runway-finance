@@ -123,6 +123,11 @@ function ProposalCard({
   );
 }
 
+const STATUS_KEY = 'ai_analysis_status';
+const ANALYSIS_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number; totalToAnalyze?: number | null } | null;
+
 export default function AiSuggestionsPage() {
   const [proposals, setProposals] = useState<AiProposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,11 +163,6 @@ export default function AiSuggestionsPage() {
   const [lastBatchAt, setLastBatchAt] = useState<number | null>(null);
   const [lastBatchDuration, setLastBatchDuration] = useState<number | null>(null);
   const analyzingRef = useRef(false);
-
-  const STATUS_KEY = 'ai_analysis_status';
-  const ANALYSIS_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-
-  type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number; totalToAnalyze?: number | null } | null;
 
   const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
 
@@ -206,7 +206,7 @@ export default function AiSuggestionsPage() {
         // Check if analysis has timed out
         if (parsed.status === 'running' && parsed.startedAt) {
           const elapsed = Date.now() - parsed.startedAt;
-          if (elapsed > ANALYSIS_TIMEOUT) {
+          if (elapsed > ANALYSIS_TIMEOUT_MS) {
             // Analysis has been running too long, mark as failed
             const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
             setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
@@ -235,7 +235,7 @@ export default function AiSuggestionsPage() {
     if (!analyzing || !savedStatus?.startedAt) return;
     const checkTimeout = setInterval(() => {
       const elapsed = Date.now() - (savedStatus.startedAt || 0);
-      if (elapsed > ANALYSIS_TIMEOUT) {
+      if (elapsed > ANALYSIS_TIMEOUT_MS) {
         const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
         persistStatus({ status: 'error', message: timeoutMsg, startedAt: savedStatus.startedAt });
         setAnalyzing(false);

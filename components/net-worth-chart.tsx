@@ -253,7 +253,8 @@ export function NetWorthChart() {
           axisBottom={{
             tickSize: 0,
             tickPadding: 8,
-            tickValues: chartData.length > 30 ? Math.max(3, Math.min(Math.floor(chartData.length / 6), 15)) : undefined,
+            tickValues: Math.min(6, Math.max(3, Math.floor(chartData.length / 15))),
+            tickRotation: timeframe === '1m' ? 0 : -45,
           }}
           enableGridY={true}
           enableGridX={false}
@@ -292,8 +293,8 @@ export function NetWorthChart() {
         axisBottom={{
           tickSize: 0,
           tickPadding: 8,
-          tickValues: chartData.length > 30 ? Math.max(4, Math.floor(chartData.length / 10)) : undefined,
-          format: '%b %y',
+          tickValues: Math.min(6, Math.max(3, Math.floor(chartData.length / 15))),
+          format: timeframe === '1m' ? '%b %d' : '%b %y',
         }}
         axisLeft={{
           tickSize: 0,

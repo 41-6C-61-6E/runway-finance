@@ -44,7 +44,22 @@ export async function getLatestRealSnapshot(
     .limit(1);
 
   if (!snapshot) return null;
-  return { date: String(snapshot.date), balance: String(snapshot.balance) };
+
+  // Decrypt balance if DEK is available (encrypted snapshots store JSON {ct, iv})
+  let balanceStr = String(snapshot.balance);
+  if (dek) {
+    try {
+      const decrypted = await decryptField(snapshot.balance, dek);
+      // Only use decrypted value if it's non-empty (decryptField returns '' on failure)
+      if (decrypted) balanceStr = decrypted;
+      // If decryption returned empty and raw value looks like JSON, default to 0
+      else if (balanceStr.startsWith('{')) balanceStr = '0';
+    } catch {
+      // Fallback: keep raw value if decryption fails
+    }
+  }
+
+  return { date: String(snapshot.date), balance: balanceStr };
 }
 
 /**
@@ -130,6 +145,7 @@ export async function generateHistoricalAccountSnapshots(
   if (latestReal) {
     effectiveFromDate = latestReal.date;
     runningBalance = parseFloat(latestReal.balance);
+    if (isNaN(runningBalance)) runningBalance = 0;
   } else if (earliestTxDate) {
     effectiveFromDate = earliestTxDate;
     runningBalance = 0;
@@ -142,6 +158,7 @@ export async function generateHistoricalAccountSnapshots(
 
   if (txs.length === 0) {
     if (effectiveFromDate === from) {
+      if (isNaN(runningBalance)) runningBalance = 0;
       const pool = getPool();
       await pool.query(
         `INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
@@ -160,7 +177,17 @@ export async function generateHistoricalAccountSnapshots(
   for (const tx of txs) {
     const txDate = String(tx.postedDate ?? tx.date);
     const existing = txByDate.get(txDate) ?? 0;
-    const amount = parseFloat(tx.amount);
+    // Decrypt amount if DEK is available (amounts are encrypted JSON in the DB)
+    let amountStr = tx.amount;
+    if (dek) {
+      try {
+        const decrypted = await decryptField(tx.amount, dek);
+        if (decrypted) amountStr = decrypted;
+      } catch {
+        // Fallback: keep raw value
+      }
+    }
+    const amount = parseFloat(amountStr);
     txByDate.set(txDate, existing + amount);
   }
 
@@ -201,18 +228,39 @@ export async function generateHistoricalAccountSnapshots(
     const realBal = realByDate.get(dateStr);
 
     if (realBal !== undefined) {
-      runningBalance = parseFloat(realBal);
-      skippedReal++;
+      // Decrypt real balance if DEK is available (may be encrypted JSON)
+      let balValue = realBal;
+      if (dek) {
+        try {
+          const decrypted = await decryptField(realBal, dek);
+          // Only use decrypted value if it's non-empty
+          if (decrypted) balValue = decrypted;
+          // If decryption returned empty and raw value looks like JSON, default to 0
+          else if (realBal.startsWith('{')) balValue = '0';
+        } catch {
+          // Fallback: keep raw value
+        }
+      }
+      const parsedBalance = parseFloat(balValue);
+      if (isNaN(parsedBalance)) {
+        logger.warn(`${LOG_TAG} Real snapshot balance parsed as NaN, skipping update to running balance`, { date: dateStr, raw: realBal });
+      } else {
+        runningBalance = parsedBalance;
+        skippedReal++;
+      }
     } else {
       const dailyChange = txByDate.get(dateStr) ?? 0;
       runningBalance += dailyChange;
-      toInsert.push({
-        userId,
-        accountId,
-        snapshotDate: dateStr,
-        balance: String(runningBalance),
-        isSynthetic: true,
-      });
+      
+      if (!isNaN(runningBalance)) {
+        toInsert.push({
+          userId,
+          accountId,
+          snapshotDate: dateStr,
+          balance: String(runningBalance),
+          isSynthetic: true,
+        });
+      }
     }
 
     current.setUTCDate(current.getUTCDate() + 1);

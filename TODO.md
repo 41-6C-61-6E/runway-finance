@@ -4,12 +4,24 @@
 
 ## CHANGES:
 - get defaults right
-- transactions filteing needs improvement
+- [DONE] Fix Budget Actual logic:
+  - Resolved strict date comparison issue by using exclusive range (gte/lt) for timestamps and UTC period boundaries.
+  - Implemented recursive category roll-up to include sub-category spending in parent budgets (supporting multi-level budget mapping).
+  - Switched to live transaction querying with `force-dynamic` to ensure real-time budget updates.
+  - Decrypted category names in the API to fix UI display and matching issues.
+
+- [DONE] Searchable Budget Categories:
+  - Created `CategoryCombobox` to replace standard Select in budget creation.
+  - Integrated search and color visualization for category selection.
+
+- show the math needs to show example calculations with real data
+- Net worth display assets and liabilities doesnt do anyhting in bar chart mode. It should display opposing bars (assets up and liabilities down), with a line through the chart for net worth.
+- The spacing is wrong for liability accounts in the net worth "Asset Allocation" bar chart. chart also needs proper labels, legend, and filtering
+- The net worth "Asset Allocation" pie chart needs abels, legend, and filtering
 
 
 ## NEW FEATUES:
 - explore the idea of transfer categories
-- FI number and year-by-year projection using live burn rate data.
 - Better PWA support
 - AI Financial fitness evaluation
 - backup and restore
@@ -77,4 +89,3 @@
 [DONE] In FIRE > Forecaster > Portfolio Projection, the x axis labels overlap and are unreadable. 
 
 [DONE] In Settings > Accounts > Manual Accounts manually added mortgages need and Adjust options (like gold/silver) so the outstanding balance can be adjusted.
-

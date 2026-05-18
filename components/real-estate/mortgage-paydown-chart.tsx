@@ -55,16 +55,17 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
       if (!showProjection) {
         const standard = calculateAmortizationSchedule(amortParams);
         const last = standard[standard.length - 1];
+        const defaultDate = new Date().toISOString().split('T')[0];
         return {
           standard,
           accelerated: [],
           standardSummary: {
-            payoffDate: last.date,
+            payoffDate: last?.date ?? defaultDate,
             totalInterest: standard.reduce((s, r) => s + r.interest, 0),
             totalPayments: standard.length,
           },
           acceleratedSummary: {
-            payoffDate: last.date,
+            payoffDate: last?.date ?? defaultDate,
             totalInterest: 0,
             totalPayments: 0,
             interestSaved: 0,

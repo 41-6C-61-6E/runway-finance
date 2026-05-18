@@ -10,7 +10,13 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnSignin = nextUrl.pathname === "/signin";
+      const { pathname } = nextUrl;
+      const isOnSignin = pathname === "/signin";
+      
+      // Allow access to dev-mode and dev-log APIs without a session
+      if (pathname.startsWith("/api/dev-")) {
+        return true;
+      }
 
       if (isOnSignin) {
         if (isLoggedIn) {

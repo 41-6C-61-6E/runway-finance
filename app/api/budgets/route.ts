@@ -1,71 +1,60 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { budgets, categories, categorySpendingSummary, categoryIncomeSummary } from '@/lib/db/schema';
-import { eq, and, or, isNull, sql } from 'drizzle-orm';
+import { budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions } from '@/lib/db/schema';
+import { eq, and, or, isNull, sql, inArray, gte, lt } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
 
 function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
+  let start: Date;
+  let next: Date;
+  let yearMonth: string;
+
   if (periodKey) {
     if (periodType === 'monthly') {
       const [y, m] = periodKey.split('-').map(Number);
-      return {
-        yearMonth: periodKey,
-        startDate: `${periodKey}-01`,
-        endDate: new Date(y, m, 0).toISOString().split('T')[0],
-        label: periodKey,
-      };
+      start = new Date(Date.UTC(y, m - 1, 1));
+      next = new Date(Date.UTC(y, m, 1));
+      yearMonth = periodKey;
     }
-    if (periodType === 'quarterly') {
+    else if (periodType === 'quarterly') {
       const [y, q] = periodKey.split('-Q').map(Number);
-      const startMonth = (q - 1) * 3 + 1;
-      const endMonth = q * 3;
-      return {
-        yearMonth: `${y}-Q${q}`,
-        startDate: `${y}-${String(startMonth).padStart(2, '0')}-01`,
-        endDate: new Date(y, endMonth, 0).toISOString().split('T')[0],
-        label: periodKey,
-      };
+      start = new Date(Date.UTC(y, (q - 1) * 3, 1));
+      next = new Date(Date.UTC(y, q * 3, 1));
+      yearMonth = periodKey;
     }
-    if (periodType === 'yearly') {
-      return {
-        yearMonth: periodKey,
-        startDate: `${periodKey}-01-01`,
-        endDate: `${periodKey}-12-31`,
-        label: periodKey,
-      };
+    else { // yearly
+      const y = Number(periodKey);
+      start = new Date(Date.UTC(y, 0, 1));
+      next = new Date(Date.UTC(y + 1, 0, 1));
+      yearMonth = periodKey;
+    }
+  } else {
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    if (periodType === 'monthly') {
+      start = new Date(Date.UTC(y, m, 1));
+      next = new Date(Date.UTC(y, m + 1, 1));
+      yearMonth = `${y}-${String(m + 1).padStart(2, '0')}`;
+    } else if (periodType === 'quarterly') {
+      const q = Math.floor(m / 3);
+      start = new Date(Date.UTC(y, q * 3, 1));
+      next = new Date(Date.UTC(y, (q + 1) * 3, 1));
+      yearMonth = `${y}-Q${q + 1}`;
+    } else { // yearly
+      start = new Date(Date.UTC(y, 0, 1));
+      next = new Date(Date.UTC(y + 1, 0, 1));
+      yearMonth = String(y);
     }
   }
 
-  if (periodType === 'quarterly') {
-    const q = Math.floor(now.getMonth() / 3) + 1;
-    const y = now.getFullYear();
-    const startMonth = (q - 1) * 3;
-    return {
-      yearMonth: `${y}-Q${q}`,
-      startDate: `${y}-${String(startMonth + 1).padStart(2, '0')}-01`,
-      endDate: new Date(y, startMonth + 3, 0).toISOString().split('T')[0],
-      label: `${y}-Q${q}`,
-    };
-  }
-  if (periodType === 'yearly') {
-    const y = now.getFullYear();
-    return {
-      yearMonth: String(y),
-      startDate: `${y}-01-01`,
-      endDate: `${y}-12-31`,
-      label: String(y),
-    };
-  }
-
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   return {
-    yearMonth: ym,
-    startDate: `${ym}-01`,
-    endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
-    label: ym,
+    yearMonth,
+    startDate: start.toISOString().split('T')[0],
+    endDate: next.toISOString().split('T')[0], // Exclusive end date for LT comparison
+    label: yearMonth,
   };
 }
 
@@ -119,78 +108,106 @@ export async function GET(request: Request) {
     const decryptedBudgetRows = await Promise.all(budgetRows.map(async (row) => ({
       ...row,
       amount: await decryptField(row.amount, dek),
+      categoryName: row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized',
       notes: row.notes ? await decryptField(row.notes, dek).catch(() => row.notes) : null,
     })));
 
-    const categoryIds = budgetRows.map((b) => b.categoryId).filter(Boolean);
-    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean);
-    const expenseCategoryIds = decryptedBudgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean);
+    // Fetch all categories to handle sub-category roll-ups and provide to frontend
+    const allCategories = await db
+      .select({ 
+        id: categories.id, 
+        name: categories.name, 
+        color: categories.color, 
+        parentId: categories.parentId, 
+        isIncome: categories.isIncome 
+      })
+      .from(categories)
+      .where(eq(categories.userId, session.user.id));
 
-    async function fetchActuals(
-      table: typeof categorySpendingSummary | typeof categoryIncomeSummary,
-      catIds: string[],
-    ) {
+    // Helper to find all descendant IDs for a given category (recursive)
+    const getDescendantIds = (catId: string): string[] => {
+      const children = allCategories.filter(c => c.parentId === catId);
+      return [catId, ...children.flatMap(c => getDescendantIds(c.id))];
+    };
+
+    async function fetchActuals(catIds: string[]) {
       if (catIds.length === 0) return new Map<string, number>();
-      const idCol = 'categoryId' in table ? table.categoryId : categorySpendingSummary.categoryId;
-      const yearCol = 'yearMonth' in table ? table.yearMonth : categorySpendingSummary.yearMonth;
-      const amountCol = 'amount' in table ? table.amount : categorySpendingSummary.amount;
 
-      // Fetch individual monthly rows (no SUM at DB level since values are encrypted)
-      const rawRows = await db
+      // Map of every searchable category ID to an array of budget category IDs it contributes to
+      const catToBudgetsMap = new Map<string, string[]>();
+      const allSearchIds: string[] = [];
+      
+      for (const budgetCatId of catIds) {
+        const descendants = getDescendantIds(budgetCatId);
+        descendants.forEach(id => {
+          const budgets = catToBudgetsMap.get(id) || [];
+          if (!budgets.includes(budgetCatId)) budgets.push(budgetCatId);
+          catToBudgetsMap.set(id, budgets);
+          if (!allSearchIds.includes(id)) allSearchIds.push(id);
+        });
+      }
+
+      // Use exclusive end date comparison to capture timestamps correctly
+      // transactions.date < bounds.endDate captures up to 23:59:59.999 of the actual period end
+      const txRows = await db
         .select({
-          categoryId: idCol,
-          yearMonth: yearCol,
-          amount: amountCol,
+          categoryId: transactions.categoryId,
+          amount: transactions.amount,
         })
-        .from(table)
+        .from(transactions)
         .where(
           and(
-            eq(table.userId, session.user.id),
-            sql`${idCol} IN ${sql.raw(`(${catIds.map((c) => `'${c}'`).join(',')})`)}`,
+            eq(transactions.userId, session.user.id),
+            inArray(transactions.categoryId, allSearchIds),
+            gte(transactions.date, bounds.startDate),
+            lt(transactions.date, bounds.endDate)
           )
         );
 
       // Decrypt and aggregate in memory
       const totals = new Map<string, number>();
-      for (const row of rawRows) {
-        const ym = String(row.yearMonth);
-        // Filter by period in memory
-        if (periodType === 'quarterly') {
-          const qStart = bounds.startDate.slice(0, 7);
-          const qEnd = bounds.endDate.slice(0, 7);
-          if (ym < qStart || ym > qEnd) continue;
-        } else if (periodType === 'yearly') {
-          if (!ym.startsWith(bounds.yearMonth)) continue;
-        } else {
-          if (ym !== bounds.yearMonth) continue;
-        }
-
+      for (const row of txRows) {
+        if (!row.categoryId) continue;
         const decrypted = await decryptField(String(row.amount), dek);
-        const prev = totals.get(row.categoryId) || 0;
-        totals.set(row.categoryId, prev + parseFloat(decrypted));
+        const amount = parseFloat(decrypted);
+        if (isNaN(amount)) continue;
+
+        const budgetCatIds = catToBudgetsMap.get(row.categoryId);
+        if (budgetCatIds) {
+          for (const budgetCatId of budgetCatIds) {
+            const prev = totals.get(budgetCatId) || 0;
+            totals.set(budgetCatId, prev + amount);
+          }
+        }
+      }
+
+      // Final values for budgets should be positive (spending total or income total)
+      for (const [catId, total] of totals.entries()) {
+        totals.set(catId, Math.abs(total));
       }
 
       return totals;
     }
 
+    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean) as string[];
+    const expenseCategoryIds = decryptedBudgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean) as string[];
+
     const [expenseActualMap, incomeActualMap] = await Promise.all([
-      fetchActuals(categorySpendingSummary, expenseCategoryIds),
-      fetchActuals(categoryIncomeSummary, incomeCategoryIds),
+      fetchActuals(expenseCategoryIds),
+      fetchActuals(incomeCategoryIds),
     ]);
 
     const data = decryptedBudgetRows.map((row) => {
       const budgeted = parseFloat(row.amount);
       const isIncome = row.isIncome ?? false;
-      const actual = isIncome
-        ? incomeActualMap.get(row.categoryId) || 0
-        : expenseActualMap.get(row.categoryId) || 0;
+      const actual = (isIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
       const remaining = isIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
 
       return {
         id: row.id,
         categoryId: row.categoryId,
-        categoryName: row.categoryName || 'Uncategorized',
+        categoryName: row.categoryName,
         categoryColor: row.categoryColor || '#6366f1',
         periodType: row.periodType,
         isRecurring: row.isRecurring,
@@ -208,13 +225,14 @@ export async function GET(request: Request) {
     const result: Record<string, unknown> = { budgets: data, period: bounds };
 
     if (includeCategories) {
-      const allCategories = await db
-        .select({ id: categories.id, name: categories.name, color: categories.color })
-        .from(categories)
-        .where(eq(categories.userId, session.user.id));
-      result.categories = allCategories;
+      result.categories = await Promise.all(allCategories.map(async (c) => ({
+        id: c.id,
+        name: await decryptField(c.name || '', dek),
+        color: c.color,
+        isIncome: c.isIncome,
+        parentId: c.parentId,
+      })));
     }
-
     return NextResponse.json(result);
   } catch (error) {
     logger.error('Error fetching budgets', { error });

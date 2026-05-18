@@ -5,6 +5,7 @@ export type AnalysisSession = {
   totalCount: number | null;
   status: 'running' | 'completed' | 'error';
   error?: string;
+  log: string[];
 };
 
 export const activeAnalysisSessions = new Map<string, AnalysisSession>();
