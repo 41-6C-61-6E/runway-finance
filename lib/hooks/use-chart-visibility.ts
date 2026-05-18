@@ -18,7 +18,7 @@ export const CHARTS = {
     charts: {
       cashFlowSummary: 'Summary Cards',
       incomeExpenseChart: 'Income vs Expense Chart',
-      netIncomeAnalysis: 'Net Income Analysis',
+      netIncomeAnalysis: 'Expense Category Trend',
       budgetVsActual: 'Budget vs Actual',
       cashFlowSankey: 'Sankey Diagram',
       cashFlowForecast: 'Cash Flow Forecast',
@@ -41,6 +41,8 @@ export const CHARTS = {
       fireProgressRing: 'Progress Ring',
       whatIfAnalysis: 'What-If Analysis',
       fireScenarios: 'Scenarios',
+      retirementAccountAllocation: 'Investment Account Allocation',
+      withdrawalRateSensitivity: 'Withdrawal Rate Sensitivity',
     },
   },
   retirement: {

@@ -43,12 +43,19 @@ export interface ProjectionResult {
   totalIncome: number;
 }
 
+export interface HistogramBin {
+  min: number;
+  max: number;
+  count: number;
+}
+
 export interface MonteCarloResult {
   successRate: number;
   medianPath: { age: number; balance: number }[];
   p10Path: { age: number; balance: number }[];
   p90Path: { age: number; balance: number }[];
   simulations: number;
+  histogram: HistogramBin[];
 }
 
 export function calculateDecumulation(plan: RetirementPlan): ProjectionResult {
@@ -185,12 +192,26 @@ export function runMonteCarlo(
   const p10Idx = Math.floor(sortedByFinal.length * 0.1);
   const p90Idx = Math.floor(sortedByFinal.length * 0.9);
 
+  const finalBalances = allPaths.map((p) => p[p.length - 1]).filter((b) => b >= 0);
+  const maxBal = Math.max(...finalBalances, 1);
+  const numBins = 20;
+  const binSize = maxBal / numBins;
+  const histogramBins: HistogramBin[] = [];
+  for (let i = 0; i < numBins; i++) {
+    const binMin = i * binSize;
+    const binMax = (i + 1) * binSize;
+    const count = finalBalances.filter((b) => b >= binMin && b < binMax).length;
+    histogramBins.push({ min: Math.round(binMin), max: Math.round(binMax), count });
+  }
+  histogramBins[histogramBins.length - 1].max = Math.round(maxBal);
+
   return {
     successRate: Math.round((successes / simulations) * 100),
     medianPath: ages.map((age, i) => ({ age, balance: Math.round(sortedByFinal[medianIdx]?.[i] ?? 0) })),
     p10Path: ages.map((age, i) => ({ age, balance: Math.round(sortedByFinal[p10Idx]?.[i] ?? 0) })),
     p90Path: ages.map((age, i) => ({ age, balance: Math.round(sortedByFinal[p90Idx]?.[i] ?? 0) })),
     simulations,
+    histogram: histogramBins,
   };
 }
 

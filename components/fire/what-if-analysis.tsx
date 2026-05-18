@@ -1,7 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ResponsiveBar } from '@nivo/bar';
 import { formatCurrency } from '@/lib/utils/format';
+import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
 interface FireScenario {
   currentAge: number;
@@ -31,7 +35,7 @@ function calculateYearsToFI(
 }
 
 export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario }) {
-  const rows = useMemo(() => {
+  const { rows, baseline } = useMemo(() => {
     const fireNumber = baseScenario.safeWithdrawalRate > 0
       ? baseScenario.targetAnnualExpenses / baseScenario.safeWithdrawalRate
       : 0;
@@ -44,9 +48,10 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
       fireNumber,
     );
 
-    const scenarios: { label: string; years: number }[] = [
+    const scenarios: { label: string; id: string; years: number }[] = [
       {
-        label: 'Save $500 more / month',
+        label: 'Save $500 more/mo',
+        id: 'save500',
         years: calculateYearsToFI(
           baseScenario.currentInvestableAssets,
           baseScenario.annualContributions + 500 * 12,
@@ -55,7 +60,8 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
         ),
       },
       {
-        label: 'Save $1,000 more / month',
+        label: 'Save $1,000 more/mo',
+        id: 'save1000',
         years: calculateYearsToFI(
           baseScenario.currentInvestableAssets,
           baseScenario.annualContributions + 1000 * 12,
@@ -65,6 +71,7 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
       },
       {
         label: '1% higher returns',
+        id: 'higherRet',
         years: calculateYearsToFI(
           baseScenario.currentInvestableAssets,
           baseScenario.annualContributions,
@@ -74,6 +81,7 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
       },
       {
         label: '1% lower returns',
+        id: 'lowerRet',
         years: calculateYearsToFI(
           baseScenario.currentInvestableAssets,
           baseScenario.annualContributions,
@@ -83,6 +91,7 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
       },
       {
         label: 'Retire with $10k less/yr',
+        id: 'lessExpense',
         years: calculateYearsToFI(
           baseScenario.currentInvestableAssets,
           baseScenario.annualContributions,
@@ -92,46 +101,79 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
       },
     ];
 
-    return scenarios.map((s) => ({
-      ...s,
-      diff: s.years === Infinity || baseline === Infinity
-        ? 0
-        : baseline - s.years,
-    }));
+    return { rows: scenarios, baseline };
   }, [baseScenario]);
+
+  const chartData = rows.map((r) => ({
+    scenario: r.label,
+    id: r.id,
+    years: r.years === Infinity ? 999 : r.years,
+    isFaster: r.years !== Infinity && r.years < baseline ? 1 : 0,
+    diff: r.years === Infinity || baseline === Infinity ? 0 : baseline - r.years,
+  }));
+
+  const maxY = Math.max(...chartData.map((d) => d.years), baseline, 10);
+
+  if (chartData.length === 0 || maxY >= 999) {
+    return (
+      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-3">What-If Analysis</h3>
+        <ChartEmptyState variant="nodata" description="Adjust scenario inputs to see what-if analysis" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm p-5">
       <h3 className="text-sm font-semibold text-foreground mb-4">What-If Analysis</h3>
-      {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No analysis available</p>
-      ) : (
-        <div className="space-y-3">
-          {rows.map((row) => (
-            <div
-              key={row.label}
-              className="flex items-center justify-between py-2 border-b border-border last:border-0"
-            >
-              <span className="text-sm text-foreground">{row.label}</span>
-              <div className="text-right">
-                <span className="text-sm font-medium text-foreground">
-                  {row.years === Infinity ? '∞' : `${row.years.toFixed(1)} yrs`}
-                </span>
-                <span
-                  className={`ml-2 text-xs font-semibold ${
-                    row.diff > 0 ? 'text-chart-1' : row.diff < 0 ? 'text-destructive' : 'text-muted-foreground'
-                  }`}
-                >
-                  {row.diff > 0 ? '-' : row.diff < 0 ? '+' : ''}
-                  {row.diff === Infinity || isNaN(row.diff)
-                    ? '—'
-                    : `${Math.abs(row.diff).toFixed(1)} yrs`}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <p className="text-xs text-muted-foreground mb-4">
+        Baseline: {baseline === Infinity ? '∞' : `${baseline.toFixed(1)} yrs`} to FI
+      </p>
+      <div className="h-[280px]">
+        <ResponsiveBar
+          data={chartData as any}
+          keys={['years']}
+          indexBy="scenario"
+          margin={{ top: 10, right: 80, left: 110, bottom: 40 }}
+          padding={0.3}
+          borderRadius={2}
+          layout="horizontal"
+          colors={({ data: d }) =>
+            (d as unknown as { isFaster: number }).isFaster
+              ? 'var(--color-chart-1)'
+              : 'var(--color-destructive)'
+          }
+          axisLeft={{
+            tickSize: 0, tickPadding: 8,
+            format: (v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v,
+          }}
+          axisBottom={{
+            tickSize: 0, tickPadding: 8,
+            legend: 'Years to FI',
+            legendPosition: 'middle',
+            legendOffset: 30,
+          }}
+          enableGridY={false}
+          enableGridX={true}
+          theme={nivoTheme}
+          tooltip={({ indexValue, value, data: d }) => {
+            const barData = d as unknown as { diff: number; isFaster: boolean };
+            return (
+              <ChartTooltip>
+                <TooltipHeader>{String(indexValue)}</TooltipHeader>
+                <TooltipRow label="Years to FI" value={`${value.toFixed(1)} yrs`} />
+                {barData.isFaster ? (
+                  <TooltipRow label="vs Baseline" value={`-${barData.diff.toFixed(1)} yrs`} color="var(--color-chart-1)" />
+                ) : !barData.diff ? (
+                  <TooltipRow label="vs Baseline" value="Same" color="var(--color-muted-foreground)" />
+                ) : (
+                  <TooltipRow label="vs Baseline" value={`+${Math.abs(barData.diff).toFixed(1)} yrs`} color="var(--color-destructive)" />
+                )}
+              </ChartTooltip>
+            );
+          }}
+        />
+      </div>
     </div>
   );
 }

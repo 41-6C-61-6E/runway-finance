@@ -171,6 +171,7 @@ function TransactionsContent() {
 
   const handleBulkActionComplete = useCallback(() => {
     setSelectedIds(new Set());
+    setRefreshKey((k) => k + 1);
   }, []);
 
   const handleTransactionClick = useCallback((tx: any) => {
@@ -188,10 +189,10 @@ function TransactionsContent() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full overflow-visible">
       <div className="relative z-10">
         <ContentWrapper>
-          <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
+          <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px] overflow-visible">
             <div className="flex items-center gap-3 mb-4">
               <h1 className="text-xl font-semibold text-foreground">Transactions</h1>
               {pendingAiCount > 0 && (
@@ -210,8 +211,7 @@ function TransactionsContent() {
             <div className="min-w-0">
               {selectedIds.size > 0 && (
                 <BulkActionsToolbar
-                  count={selectedIds.size}
-                  onSelectAll={handleSelectAll}
+                  selectedIds={Array.from(selectedIds)}
                   onClear={handleBulkActionComplete}
                 />
               )}

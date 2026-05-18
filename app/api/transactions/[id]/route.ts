@@ -117,12 +117,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const { categoryId, payee, notes, reviewed, ignored } = parsed.data;
+  const { categoryId, payee, notes, memo, reviewed, ignored } = parsed.data;
 
   const changedFields: string[] = [];
   if (categoryId !== undefined) changedFields.push('categoryId');
   if (payee !== undefined) changedFields.push('payee');
   if (notes !== undefined) changedFields.push('notes');
+  if (memo !== undefined) changedFields.push('memo');
   if (reviewed !== undefined) changedFields.push('reviewed');
   if (ignored !== undefined) changedFields.push('ignored');
   logger.info('Updating transaction', { transactionId: id, changedFields });
@@ -132,6 +133,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (categoryId !== undefined) updateData.categoryId = categoryId;
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
   if (notes !== undefined) updateData.notes = sanitizeText(notes, 2000);
+  if (memo !== undefined) updateData.memo = sanitizeText(memo, 500);
   if (reviewed !== undefined) updateData.reviewed = reviewed;
   if (ignored !== undefined) updateData.ignored = ignored;
 

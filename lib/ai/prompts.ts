@@ -53,3 +53,6 @@ For "create_rule" suggestions:
 - "setCategoryName" must reference an existing category name or a newly proposed category name.
 - Only suggest rules for clear, repetitive patterns.
 - Condition operators: "contains" (substring match), "equals" (exact), "starts_with" (prefix), "ends_with" (suffix), "regex" (regular expression).`;
+
+export const DEFAULT_TEST_PROMPT = 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
+export const TEST_PROMPT_STORAGE_KEY = 'ai_test_prompt';

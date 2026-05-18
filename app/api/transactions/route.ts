@@ -190,12 +190,16 @@ export async function GET(request: Request) {
   }
 
   const total = filtered.length;
+  const totalAmount = filtered.reduce(
+    (sum: number, t: any) => sum + Math.abs(parseFloat(t.amount) || 0),
+    0
+  );
 
   // Paginate
   const sliced = filtered.slice(filters.offset, filters.offset + filters.limit);
 
   logger.info('Transactions fetched', { total, returned: sliced.length });
-  return NextResponse.json({ data: sliced, total, limit: filters.limit, offset: filters.offset });
+  return NextResponse.json({ data: sliced, total, totalAmount, limit: filters.limit, offset: filters.offset });
 }
 
 export async function PATCH(request: Request) {

@@ -7,6 +7,8 @@ import { FireProgressRing } from '@/components/fire/fire-progress-ring';
 import { FireCalculator } from '@/components/fire/fire-calculator';
 import { WhatIfAnalysis } from '@/components/fire/what-if-analysis';
 import { FireScenarios } from '@/components/fire/fire-scenarios';
+import { RetirementAccountAllocation } from '@/components/fire/retirement-account-allocation';
+import { WithdrawalRateSensitivity } from '@/components/fire/withdrawal-rate-sensitivity';
 import { RetirementPlanner } from '@/components/fire/retirement/retirement-planner';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -129,6 +131,13 @@ function FireContent() {
                     </div>
                   </Suspense>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+                <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
+                  <RetirementAccountAllocation />
+                </Suspense>
+                <WithdrawalRateSensitivity scenario={scenario} />
               </div>
 
               {isVisible('fireScenarios') && (

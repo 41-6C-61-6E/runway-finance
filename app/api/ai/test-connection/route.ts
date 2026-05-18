@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; model?: string; apiKey?: string };
+  let body: { endpoint?: string; model?: string; apiKey?: string; prompt?: string };
   try {
     body = await request.json();
   } catch {
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   const endpoint = body.endpoint?.replace(/\/$/, '');
   const model = body.model || 'unknown';
   const apiKey = body.apiKey || '';
+  const userPrompt = body.prompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
 
   if (!endpoint) {
     return NextResponse.json({ ok: false, message: 'No endpoint provided. Enter the URL and try again.' });
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: 'Reply with "ok" if you receive this message.' }],
+        messages: [{ role: 'user', content: userPrompt }],
         max_tokens: 10,
       }),
     });

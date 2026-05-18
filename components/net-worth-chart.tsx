@@ -283,7 +283,7 @@ export function NetWorthChart() {
         data={displaySeries}
         margin={{ top: 10, right: 60, left: 60, bottom: 30 }}
         xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-        yScale={{ type: 'linear', min: 0, max: maxVal * 1.1 }}
+        yScale={{ type: 'linear', min: 'auto', max: maxVal * 1.1 }}
         curve="monotoneX"
         colors={['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-destructive)']}
         enablePoints={false}
@@ -403,12 +403,6 @@ export function NetWorthChart() {
                   <p className="text-xs text-muted-foreground mb-0.5">Total Assets</p>
                   <p className="text-sm font-semibold text-foreground blur-number">
                     {lastPoint ? formatCurrency(lastPoint.totalAssets) : '$0'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Avg Change</p>
-                  <p className="text-sm font-semibold text-foreground blur-number">
-                    {formatCurrency(data.length > 0 ? summary.change / data.length : 0)}
                   </p>
                 </div>
               </>

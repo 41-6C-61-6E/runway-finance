@@ -12,28 +12,44 @@ export async function POST() {
 
     const userId = session.user.id;
 
-    // Prevent multiple concurrent runs for the same user
     if (activeAnalysisSessions.has(userId)) {
       return NextResponse.json({ error: 'Analysis already running' }, { status: 409 });
     }
 
     const abortController = new AbortController();
-    // Register the session in the shared state so it can be cancelled
-    activeAnalysisSessions.set(userId, { abortController, timeoutId: null });
+    activeAnalysisSessions.set(userId, {
+      abortController,
+      timeoutId: null,
+      processedCount: 0,
+      totalCount: null,
+      status: 'running',
+    });
 
     try {
-      // Call the actual analysis service
-      const result = await analyzeUncategorized(userId);
-      
-      return NextResponse.json({ 
-        success: true, 
+      const result = await analyzeUncategorized(userId, (processedCount, totalCount) => {
+        const existing = activeAnalysisSessions.get(userId);
+        if (existing) {
+          existing.processedCount = processedCount;
+          existing.totalCount = totalCount;
+        }
+      });
+
+      const existing = activeAnalysisSessions.get(userId);
+      if (existing) {
+        existing.status = 'completed';
+        existing.processedCount = existing.totalCount ?? 0;
+      }
+
+      return NextResponse.json({
+        success: true,
         proposalsCreated: result.proposalsCreated,
         autoApproved: result.autoApproved,
-        errors: result.errors 
+        errors: result.errors,
       });
     } finally {
-      // Ensure we clean up the state when done
-      activeAnalysisSessions.delete(userId);
+      setTimeout(() => {
+        activeAnalysisSessions.delete(userId);
+      }, 5000);
     }
   } catch (error) {
     console.error('[AI_ANALYZE_ERROR]', error);
@@ -41,4 +57,4 @@ export async function POST() {
   }
 }
 
-export const maxDuration = 300; // 5 minute timeout for long-running AI tasks
+export const maxDuration = 300;

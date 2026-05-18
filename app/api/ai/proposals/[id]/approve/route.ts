@@ -46,6 +46,7 @@ export async function POST(
           .set({
             categoryId: payload.proposedCategoryId,
             reviewed: true,
+            categorizedByAi: true,
             updatedAt: new Date(),
           })
           .where(eq(transactions.id, payload.transactionId));

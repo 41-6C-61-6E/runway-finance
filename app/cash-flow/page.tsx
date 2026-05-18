@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { CashFlowSummary } from '@/components/cash-flow/cash-flow-summary';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
-import { NetIncomeAnalysis } from '@/components/cash-flow/net-income-analysis';
+import { ExpenseCategoryTrend } from '@/components/cash-flow/expense-category-trend';
 
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
@@ -39,9 +39,9 @@ function CashFlowContent() {
                 </Suspense>
               )}
               {isVisible('netIncomeAnalysis') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading analysis...</div>}>
+                <Suspense fallback={<div className="text-muted-foreground">Loading trend...</div>}>
                   <div>
-                    <NetIncomeAnalysis />
+                    <ExpenseCategoryTrend />
                     <MathDescription chartId="netIncomeAnalysis" />
                   </div>
                 </Suspense>

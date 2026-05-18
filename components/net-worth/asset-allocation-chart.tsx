@@ -11,12 +11,33 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
+const TYPE_COLORS: Record<string, string> = {
+  checking: 'var(--color-chart-1)', savings: 'var(--color-chart-2)',
+  investment: 'var(--color-chart-3)', brokerage: 'var(--color-chart-3)',
+  retirement: 'var(--color-chart-4)', rothira: 'var(--color-chart-4)',
+  traditionalira: 'var(--color-chart-4)', '401k': 'var(--color-chart-4)',
+  '403b': 'var(--color-chart-4)', sepira: 'var(--color-chart-4)',
+  simpleira: 'var(--color-chart-4)', realestate: 'var(--color-chart-5)',
+  vehicle: '#f97316', crypto: '#8b5cf6', metals: '#06b6d4',
+  otherAsset: '#6b7280', other: '#6b7280', credit: 'var(--color-destructive)',
+  loan: '#f97316', mortgage: '#eab308',
+  hsa: '#22c55e', '529': '#3b82f6',
+};
+
+function getTypeColor(type: string): string {
+  return TYPE_COLORS[type] || 'var(--color-chart-1)';
+}
+
 function formatTypeLabel(type: string): string {
   const map: Record<string, string> = {
     checking: 'Checking', savings: 'Savings', investment: 'Investment',
     brokerage: 'Brokerage', retirement: 'Retirement', realestate: 'Real Estate',
     vehicle: 'Vehicle', crypto: 'Crypto', metals: 'Metals', other: 'Other',
     otherAsset: 'Other Assets', credit: 'Credit', loan: 'Loan', mortgage: 'Mortgage',
+    rothira: 'Roth IRA', traditionalira: 'Traditional IRA',
+    '401k': '401(k)', '403b': '403(b)', sepira: 'SEP IRA', simpleira: 'Simple IRA',
+    hsa: 'HSA', '529': '529 Plan',
+    otherinvestment: 'Other Investments',
   };
   return map[type] || type.charAt(0).toUpperCase() + type.slice(1);
 }
@@ -82,10 +103,13 @@ export function AssetAllocationChart() {
   const totalAssetsAll = chartData.reduce((s, d) => s + d.assets, 0);
   const totalLiabilitiesAll = chartData.reduce((s, d) => s + d.liabilities, 0);
 
-  const pieData = chartData.flatMap((d) => [
-    d.assets > 0 ? { id: `${d.type} (Assets)`, value: d.assets, color: 'var(--color-chart-1)', type: d.rawType } : null,
-    d.liabilities > 0 ? { id: `${d.type} (Liabilities)`, value: d.liabilities, color: 'var(--color-destructive)', type: d.rawType } : null,
-  ].filter(Boolean) as { id: string; value: number; color: string; type: string }[]);
+  const pieData = chartData.flatMap((d) => {
+    const color = getTypeColor(d.rawType);
+    return [
+      d.assets > 0 ? { id: `${d.type}`, value: d.assets, color, type: d.rawType } : null,
+      d.liabilities > 0 ? { id: `${d.type} (Debt)`, value: d.liabilities, color: 'var(--color-destructive)', type: d.rawType } : null,
+    ].filter(Boolean) as { id: string; value: number; color: string; type: string }[];
+  });
 
   const handleClick = (accountType: string) => {
     router.push(`/transactions?accountTypes=${accountType}`);

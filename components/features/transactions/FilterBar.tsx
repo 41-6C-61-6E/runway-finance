@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { getTypesByGroup } from '@/lib/constants/account-types';
 
 type FilterState = {
   accountId: string | null;
@@ -38,30 +39,7 @@ type Category = {
   isIncome: boolean;
 };
 
-const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Checking' },
-  { value: 'savings', label: 'Savings' },
-  { value: 'credit', label: 'Credit' },
-  { value: 'loan', label: 'Loan' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'brokerage', label: 'Brokerage' },
-  { value: 'retirement', label: 'Retirement' },
-  { value: 'mortgage', label: 'Mortgage' },
-  { value: 'realestate', label: 'Real Estate (Gen)' },
-  { value: 'primaryhome', label: 'Primary Home' },
-  { value: 'secondaryhome', label: 'Secondary Home' },
-  { value: 'rentalproperty', label: 'Rental Property' },
-  { value: 'commercial', label: 'Commercial Prop' },
-  { value: 'land', label: 'Land' },
-  { value: 'otherrealestate', label: 'Other Real Estate' },
-  { value: 'vehicle', label: 'Vehicle' },
-  { value: 'crypto', label: 'Crypto' },
-  { value: 'metals', label: 'Metals' },
-  { value: 'hsa', label: 'HSA' },
-  { value: 'other', label: 'Other' },
-  { value: 'otherAsset', label: 'Other Asset' },
-  { value: 'otherLiability', label: 'Other Liability' },
-];
+
 
 function MultiSelectDropdown({
   label,
@@ -159,7 +137,7 @@ function MultiSelectDropdown({
 }
 
 export default function FilterBar({ filters, onChange, onClearAll }: FilterBarProps) {
-  const [datePreset, setDatePreset] = useState('custom');
+  const [datePreset, setDatePreset] = useState('all');
   const [search, setSearch] = useState(filters.search ?? '');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -187,7 +165,11 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
   }, []);
 
   useEffect(() => {
-    setDatePreset('custom');
+    if (filters.startDate || filters.endDate) {
+      setDatePreset('custom');
+    } else {
+      setDatePreset('all');
+    }
   }, [filters.startDate, filters.endDate]);
 
   useEffect(() => {
@@ -250,6 +232,10 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
         start = first.toISOString().split('T')[0];
         break;
       }
+      case 'all':
+        onChange('startDate', null);
+        onChange('endDate', null);
+        return;
       case 'custom':
         return;
     }
@@ -298,330 +284,412 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
   });
   categoryItems.unshift({ id: 'uncategorized', label: 'Uncategorized' });
 
-  const accountTypeItems = ACCOUNT_TYPES.map((t) => ({
-    value: t.value,
-    label: t.label,
-  }));
+  const groupedAccountTypes = getTypesByGroup();
 
   return (
-    <div className="mb-4 bg-card border border-border rounded-xl p-3.5 space-y-3">
-      {/* Search + Date Range Row */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search transactions..."
-            className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm">
+      {/* Primary Controls Section */}
+      <div className="p-4 border-b border-border/50">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          {/* Search Input */}
+          <div className="flex-1 min-w-[200px]">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by description, payee..."
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+          </div>
+
+          {/* Date Preset Selector */}
+          <div className="w-full sm:w-auto">
+            <select
+              value={datePreset}
+              onChange={(e) => applyDatePreset(e.target.value)}
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            >
+              <option value="all">All Time</option>
+              <option value="this-month">This Month</option>
+              <option value="last-month">Last Month</option>
+              <option value="last-3m">Last 3 Months</option>
+              <option value="last-6m">Last 6 Months</option>
+              <option value="this-year">This Year</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
         </div>
-        <div className="w-44">
-          <select
-            value={datePreset}
-            onChange={(e) => applyDatePreset(e.target.value)}
-            className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="this-month">This Month</option>
-            <option value="last-month">Last Month</option>
-            <option value="last-3m">Last 3 Months</option>
-            <option value="last-6m">Last 6 Months</option>
-            <option value="this-year">This Year</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
+
+        {/* Custom Date Range */}
         {datePreset === 'custom' && (
-          <>
-            <div className="w-32">
-              <input
-                type="date"
-                value={filters.startDate ?? ''}
-                onChange={(e) => onChange('startDate', e.target.value || null)}
-                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div className="w-32">
-              <input
-                type="date"
-                value={filters.endDate ?? ''}
-                onChange={(e) => onChange('endDate', e.target.value || null)}
-                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </>
+          <div className="mt-3 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+            <span className="text-xs font-medium text-muted-foreground mt-1">Date range:</span>
+            <input
+              type="date"
+              value={filters.startDate ?? ''}
+              onChange={(e) => onChange('startDate', e.target.value || null)}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+            <span className="hidden sm:inline text-xs text-muted-foreground">to</span>
+            <input
+              type="date"
+              value={filters.endDate ?? ''}
+              onChange={(e) => onChange('endDate', e.target.value || null)}
+              className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+          </div>
         )}
       </div>
 
-      {/* Multi-Select Filters Row */}
-      <div className="flex flex-wrap gap-3 items-center">
-        {/* Account Types */}
-        <div className="relative" ref={accountTypesRef}>
-          <button
-            type="button"
-            onClick={() => setAccountTypesOpen(!accountTypesOpen)}
-            className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-2 whitespace-nowrap"
-          >
-            <span>Type{selectedAccountTypes.length > 0 ? ` (${selectedAccountTypes.length})` : ''}</span>
-            <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountTypesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {accountTypesOpen && (
-            <div className="absolute top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg z-50 p-2 max-h-60 overflow-y-auto">
-              {ACCOUNT_TYPES.map((t) => (
-                <label
-                  key={t.value}
-                  className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer"
-                >
+      {/* Filter Controls Section */}
+      <div className="p-4 space-y-3">
+        {/* Dropdowns Row */}
+        <div className="flex flex-wrap gap-2 items-start">
+          {/* Account Types - Grouped */}
+          <div className="relative z-30" ref={accountTypesRef}>
+            <button
+              type="button"
+              onClick={() => setAccountTypesOpen(!accountTypesOpen)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                selectedAccountTypes.length > 0
+                  ? 'bg-primary/15 border border-primary text-primary'
+                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className="text-xs">Type</span>
+              {selectedAccountTypes.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary/25 text-primary rounded-full min-w-[20px] text-center">
+                  {selectedAccountTypes.length}
+                </span>
+              )}
+              <svg className={`h-3.5 w-3.5 transition-transform ${accountTypesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {accountTypesOpen && (
+              <div className="absolute top-full left-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                {groupedAccountTypes.map((group) => (
+                  <div key={group.group}>
+                    <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/20 border-b border-border/50">
+                      {group.group}
+                    </div>
+                    {group.types.map((t) => (
+                      <label
+                        key={t.value}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedAccountTypes.includes(t.value)}
+                          onChange={() => {
+                            const next = selectedAccountTypes.includes(t.value)
+                              ? selectedAccountTypes.filter((v) => v !== t.value)
+                              : [...selectedAccountTypes, t.value];
+                            handleAccountTypesChange(next);
+                          }}
+                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                        />
+                        <span className="text-sm">{t.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+                {groupedAccountTypes.length === 0 && (
+                  <div className="px-3 py-4 text-xs text-muted-foreground text-center">No account types</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Accounts Multi-Select */}
+          <div className="relative z-30" ref={accountIdsRef}>
+            <button
+              type="button"
+              onClick={() => { setAccountIdsOpen(!accountIdsOpen); if (!accountIdsOpen) setAccountSearch(''); }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                selectedAccountIds.length > 0
+                  ? 'bg-primary/15 border border-primary text-primary'
+                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className="text-xs">Accounts</span>
+              {selectedAccountIds.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary/25 text-primary rounded-full min-w-[20px] text-center">
+                  {selectedAccountIds.length}
+                </span>
+              )}
+              <svg className={`h-3.5 w-3.5 transition-transform ${accountIdsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {accountIdsOpen && (
+              <div className="absolute top-full left-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-96 flex flex-col">
+                <div className="p-2 border-b border-border/50">
                   <input
-                    type="checkbox"
-                    checked={selectedAccountTypes.includes(t.value)}
-                    onChange={() => {
-                      const next = selectedAccountTypes.includes(t.value)
-                        ? selectedAccountTypes.filter((v) => v !== t.value)
-                        : [...selectedAccountTypes, t.value];
-                      handleAccountTypesChange(next);
-                    }}
-                    className="rounded border-border bg-background text-primary focus:ring-ring"
+                    type="text"
+                    value={accountSearch}
+                    onChange={(e) => setAccountSearch(e.target.value)}
+                    placeholder="Search accounts..."
+                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
                   />
-                  {t.label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Accounts Multi-Select */}
-        <div className="relative" ref={accountIdsRef}>
-          <button
-            type="button"
-            onClick={() => { setAccountIdsOpen(!accountIdsOpen); if (!accountIdsOpen) setAccountSearch(''); }}
-            className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-2 whitespace-nowrap"
-          >
-            <span>Account{selectedAccountIds.length > 0 ? ` (${selectedAccountIds.length})` : ''}</span>
-            <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountIdsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {accountIdsOpen && (
-            <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-lg z-50 max-h-72 flex flex-col">
-              <div className="p-2 border-b border-border">
-                <input
-                  type="text"
-                  value={accountSearch}
-                  onChange={(e) => setAccountSearch(e.target.value)}
-                  placeholder="Search accounts..."
-                  className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-              <div className="overflow-y-auto flex-1 p-1">
-                {(() => {
-                  const filtered = accounts.filter(
-                    (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(accountSearch.toLowerCase()))
-                  );
-                  return (
-                    <>
-                      <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
-                        <input
-                          type="checkbox"
-                          checked={filtered.length > 0 && filtered.every((a) => selectedAccountIds.includes(a.id))}
-                          onChange={() => {
-                            if (filtered.every((a) => selectedAccountIds.includes(a.id))) {
-                              handleAccountIdsChange(selectedAccountIds.filter((id) => !filtered.some((a) => a.id === id)));
-                            } else {
-                              const existing = selectedAccountIds.filter((id) => !filtered.some((a) => a.id === id));
-                              handleAccountIdsChange([...existing, ...filtered.map((a) => a.id)]);
-                            }
-                          }}
-                          className="rounded border-border bg-background text-primary focus:ring-ring"
-                        />
-                        Select All
-                      </label>
-                      {filtered.map((a) => (
-                        <label
-                          key={a.id}
-                          className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer"
-                        >
+                </div>
+                <div className="overflow-y-auto flex-1 p-1">
+                  {(() => {
+                    const filtered = accounts.filter(
+                      (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(accountSearch.toLowerCase()))
+                    );
+                    return (
+                      <>
+                        <label className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
                           <input
                             type="checkbox"
-                            checked={selectedAccountIds.includes(a.id)}
+                            checked={filtered.length > 0 && filtered.every((a) => selectedAccountIds.includes(a.id))}
                             onChange={() => {
-                              const next = selectedAccountIds.includes(a.id)
-                                ? selectedAccountIds.filter((id) => id !== a.id)
-                                : [...selectedAccountIds, a.id];
-                              handleAccountIdsChange(next);
+                              if (filtered.every((a) => selectedAccountIds.includes(a.id))) {
+                                handleAccountIdsChange(selectedAccountIds.filter((id) => !filtered.some((a) => a.id === id)));
+                              } else {
+                                const existing = selectedAccountIds.filter((id) => !filtered.some((a) => a.id === id));
+                                handleAccountIdsChange([...existing, ...filtered.map((a) => a.id)]);
+                              }
                             }}
-                            className="rounded border-border bg-background text-primary focus:ring-ring"
+                            className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
                           />
-                          {a.name}{a.institution ? ` (${a.institution})` : ''}
+                          Select All
                         </label>
-                      ))}
-                    </>
-                  );
-                })()}
+                        {filtered.map((a) => (
+                          <label
+                            key={a.id}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedAccountIds.includes(a.id)}
+                              onChange={() => {
+                                const next = selectedAccountIds.includes(a.id)
+                                  ? selectedAccountIds.filter((id) => id !== a.id)
+                                  : [...selectedAccountIds, a.id];
+                                handleAccountIdsChange(next);
+                              }}
+                              className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                            />
+                            <span className="text-sm">
+                              {a.name}{a.institution ? ` (${a.institution})` : ''}
+                            </span>
+                          </label>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Categories Multi-Select */}
-        <div className="relative" ref={categoryIdsRef}>
-          <button
-            type="button"
-            onClick={() => { setCategoryIdsOpen(!categoryIdsOpen); if (!categoryIdsOpen) setCategorySearch(''); }}
-            className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-2 whitespace-nowrap"
-          >
-            <span>Category{selectedCategoryIds.length > 0 ? ` (${selectedCategoryIds.length})` : ''}</span>
-            <svg className={`h-3 w-3 transition-transform text-muted-foreground ${categoryIdsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {categoryIdsOpen && (
-            <div className="absolute top-full right-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 max-h-72 flex flex-col">
-              <div className="p-2 border-b border-border">
-                <input
-                  type="text"
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  placeholder="Search categories..."
-                  className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-              <div className="overflow-y-auto flex-1 p-1">
-                {(() => {
-                  const matches = (name: string) =>
-                    !categorySearch || name.toLowerCase().includes(categorySearch.toLowerCase());
-                  return (
-                    <>
-                      <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
-                        <input
-                          type="checkbox"
-                          checked={selectedCategoryIds.length === categoryItems.length && categoryItems.length > 0}
-                          onChange={() => {
-                            if (selectedCategoryIds.length === categoryItems.length) {
-                              handleCategoryIdsChange([]);
-                            } else {
-                              handleCategoryIdsChange(categoryItems.map((c) => c.id!));
-                            }
-                          }}
-                          className="rounded border-border bg-background text-primary focus:ring-ring"
-                        />
-                        Select All
-                      </label>
-                      {(!categorySearch || matches('uncategorized')) && (
-                        <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer">
+          {/* Categories Multi-Select */}
+          <div className="relative z-30" ref={categoryIdsRef}>
+            <button
+              type="button"
+              onClick={() => { setCategoryIdsOpen(!categoryIdsOpen); if (!categoryIdsOpen) setCategorySearch(''); }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                selectedCategoryIds.length > 0
+                  ? 'bg-primary/15 border border-primary text-primary'
+                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className="text-xs">Categories</span>
+              {selectedCategoryIds.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary/25 text-primary rounded-full min-w-[20px] text-center">
+                  {selectedCategoryIds.length}
+                </span>
+              )}
+              <svg className={`h-3.5 w-3.5 transition-transform ${categoryIdsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {categoryIdsOpen && (
+              <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-96 flex flex-col">
+                <div className="p-2 border-b border-border/50">
+                  <input
+                    type="text"
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    placeholder="Search categories..."
+                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                  />
+                </div>
+                <div className="overflow-y-auto flex-1 p-1">
+                  {(() => {
+                    const matches = (name: string) =>
+                      !categorySearch || name.toLowerCase().includes(categorySearch.toLowerCase());
+                    return (
+                      <>
+                        <label className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
                           <input
                             type="checkbox"
-                            checked={selectedCategoryIds.includes('uncategorized')}
+                            checked={selectedCategoryIds.length === categoryItems.length && categoryItems.length > 0}
                             onChange={() => {
-                              const next = selectedCategoryIds.includes('uncategorized')
-                                ? selectedCategoryIds.filter((id) => id !== 'uncategorized')
-                                : [...selectedCategoryIds, 'uncategorized'];
-                              handleCategoryIdsChange(next);
+                              if (selectedCategoryIds.length === categoryItems.length) {
+                                handleCategoryIdsChange([]);
+                              } else {
+                                handleCategoryIdsChange(categoryItems.map((c) => c.id!));
+                              }
                             }}
-                            className="rounded border-border bg-background text-primary focus:ring-ring"
+                            className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
                           />
-                          Uncategorized
+                          Select All
                         </label>
-                      )}
-                      {parents.map((parent) => {
-                        const children = getChildren(parent.id).filter(
-                          (child) => matches(child.name) || matches(parent.name)
-                        );
-                        if (!categorySearch && children.length === 0) {
-                          if (!matches(parent.name)) return null;
-                          return (
-                            <label
-                              key={parent.id}
-                              className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedCategoryIds.includes(parent.id)}
-                                onChange={() => {
-                                  const next = selectedCategoryIds.includes(parent.id)
-                                    ? selectedCategoryIds.filter((id) => id !== parent.id)
-                                    : [...selectedCategoryIds, parent.id];
-                                  handleCategoryIdsChange(next);
-                                }}
-                                className="rounded border-border bg-background text-primary focus:ring-ring"
-                              />
-                              <span
-                                className="w-2 h-2 rounded-full inline-block flex-shrink-0"
-                                style={{ backgroundColor: parent.color }}
-                              />
-                              {parent.name}
-                            </label>
+                        {(!categorySearch || matches('uncategorized')) && (
+                          <label className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategoryIds.includes('uncategorized')}
+                              onChange={() => {
+                                const next = selectedCategoryIds.includes('uncategorized')
+                                  ? selectedCategoryIds.filter((id) => id !== 'uncategorized')
+                                  : [...selectedCategoryIds, 'uncategorized'];
+                                handleCategoryIdsChange(next);
+                              }}
+                              className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                            />
+                            Uncategorized
+                          </label>
+                        )}
+                        {parents.map((parent) => {
+                          const children = getChildren(parent.id).filter(
+                            (child) => matches(child.name) || matches(parent.name)
                           );
-                        }
-                        if (children.length === 0) return null;
-                        return (
-                          <div key={parent.id}>
-                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                              {parent.name}
-                            </div>
-                            {children.map((child) => (
+                          if (!categorySearch && children.length === 0) {
+                            if (!matches(parent.name)) return null;
+                            return (
                               <label
-                                key={child.id}
-                                className="flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer ml-2"
+                                key={parent.id}
+                                className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
                               >
                                 <input
                                   type="checkbox"
-                                  checked={selectedCategoryIds.includes(child.id)}
+                                  checked={selectedCategoryIds.includes(parent.id)}
                                   onChange={() => {
-                                    const next = selectedCategoryIds.includes(child.id)
-                                      ? selectedCategoryIds.filter((id) => id !== child.id)
-                                      : [...selectedCategoryIds, child.id];
+                                    const next = selectedCategoryIds.includes(parent.id)
+                                      ? selectedCategoryIds.filter((id) => id !== parent.id)
+                                      : [...selectedCategoryIds, parent.id];
                                     handleCategoryIdsChange(next);
                                   }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring"
+                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
                                 />
                                 <span
-                                  className="w-2 h-2 rounded-full inline-block flex-shrink-0"
-                                  style={{ backgroundColor: child.color }}
+                                  className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                                  style={{ backgroundColor: parent.color }}
                                 />
-                                {child.name}
+                                {parent.name}
                               </label>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </>
-                  );
-                })()}
+                            );
+                          }
+                          if (children.length === 0) return null;
+                          return (
+                            <div key={parent.id}>
+                              <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/20">
+                                {parent.name}
+                              </div>
+                              {children.map((child) => (
+                                <label
+                                  key={child.id}
+                                  className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer ml-2 transition-colors border-b border-border/30 last:border-b-0"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCategoryIds.includes(child.id)}
+                                    onChange={() => {
+                                      const next = selectedCategoryIds.includes(child.id)
+                                        ? selectedCategoryIds.filter((id) => id !== child.id)
+                                        : [...selectedCategoryIds, child.id];
+                                      handleCategoryIdsChange(next);
+                                    }}
+                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                  />
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                                    style={{ backgroundColor: child.color }}
+                                  />
+                                  {child.name}
+                                </label>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Amount Row */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex gap-2 items-center">
-          <span className="text-xs text-muted-foreground">Amount:</span>
-          <input
-            type="number"
-            placeholder="Min"
-            value={filters.minAmount ?? ''}
-            onChange={(e) => onChange('minAmount', e.target.value || null)}
-            className="w-20 px-2.5 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <input
-            type="number"
-            placeholder="Max"
-            value={filters.maxAmount ?? ''}
-            onChange={(e) => onChange('maxAmount', e.target.value || null)}
-            className="w-20 px-2.5 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <button
-            onClick={onClearAll}
-            className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
-              hasActiveFilters
-                ? 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-                : 'border-transparent text-muted-foreground/30 cursor-default'
-            }`}
-          >
-            Clear All
-          </button>
+        {/* Status and Amount Filters Row */}
+        <div className="flex flex-wrap gap-2 items-center pt-1">
+          {/* Status Filter Group */}
+          <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status:</span>
+            <button
+              onClick={() => onChange('pending', filters.pending === 'true' ? null : 'true')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.pending === 'true'
+                  ? 'border border-chart-3 bg-chart-3/20 text-chart-3 shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => onChange('reviewed', filters.reviewed === 'true' ? null : 'true')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.reviewed === 'true'
+                  ? 'border border-primary bg-primary/20 text-primary shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Reviewed
+            </button>
+            <button
+              onClick={() => onChange('reviewed', filters.reviewed === 'false' ? null : 'false')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.reviewed === 'false'
+                  ? 'border border-muted-foreground/50 bg-muted text-foreground shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Unreviewed
+            </button>
+          </div>
+
+          {/* Amount Filter Group */}
+          <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount:</span>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.minAmount ?? ''}
+              onChange={(e) => onChange('minAmount', e.target.value || null)}
+              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.maxAmount ?? ''}
+              onChange={(e) => onChange('maxAmount', e.target.value || null)}
+              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+          </div>
+
+          {/* Clear All Button */}
+          {hasActiveFilters && (
+            <button
+              onClick={onClearAll}
+              className="ml-auto px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+            >
+              Clear All
+            </button>
+          )}
         </div>
       </div>
     </div>

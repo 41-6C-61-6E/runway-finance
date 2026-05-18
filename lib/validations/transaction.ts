@@ -23,6 +23,7 @@ export const PatchTransactionSchema = z.object({
   categoryId: z.string().uuid().nullable().optional(),
   payee: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
+  memo: z.string().max(500).optional(),
   reviewed: z.boolean().optional(),
   ignored: z.boolean().optional(),
 });

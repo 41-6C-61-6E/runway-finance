@@ -66,6 +66,7 @@ interface TransactionTableProps {
 const ALL_COLUMNS: string[] = [
   'select',
   'date',
+  'postedDate',
   'description',
   'account',
   'category',
@@ -75,6 +76,7 @@ const ALL_COLUMNS: string[] = [
 const COLUMN_LABELS: Record<string, string> = {
   select: '',
   date: 'Date',
+  postedDate: 'Posted',
   description: 'Description',
   account: 'Account',
   category: 'Category',
@@ -84,6 +86,7 @@ const COLUMN_LABELS: Record<string, string> = {
 const COLUMN_MIN_WIDTHS: Record<string, number> = {
   select: 40,
   date: 90,
+  postedDate: 90,
   description: 120,
   account: 80,
   category: 100,
@@ -124,6 +127,7 @@ function SortableHeader({
 export default function TransactionTable({ filters, onSelectAll, onTransactionClick }: TransactionTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
@@ -132,6 +136,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     select: true,
     account: true,
     category: true,
+    postedDate: false,
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -177,6 +182,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
 
     const flexRatios: Record<string, number> = {
       date: 1,
+      postedDate: 1,
       description: 2.5,
       account: 1.2,
       category: 1.5,
@@ -275,6 +281,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         categoryColor: tx.category?.color ?? null,
       })));
       setTotal(data.total ?? 0);
+      setTotalAmount(data.totalAmount ?? 0);
     } finally {
       setLoading(false);
     }
@@ -366,6 +373,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
             type="checkbox"
             checked={row.getIsSelected()}
             onChange={row.getToggleSelectedHandler()}
+            onClick={(e) => e.stopPropagation()}
             className="rounded border-border bg-background text-primary focus:ring-ring"
           />
         ),
@@ -394,6 +402,21 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                 </span>
               )}
             </div>
+          );
+        },
+      },
+      {
+        id: 'postedDate',
+        accessorKey: 'postedDate',
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Posted" />
+        ),
+        cell: ({ row }) => {
+          const val = row.getValue('postedDate') as string | null;
+          return (
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {val ? new Date(val).toLocaleDateString() : '—'}
+            </span>
           );
         },
       },
@@ -750,12 +773,17 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
-                <span className="text-xs text-muted-foreground">
-                  {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
-                </span>
+            {/* Pagination & Summary */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
+              <span className="text-xs text-muted-foreground">
+                {total > 0 ? `${page * limit + 1}–${Math.min((page + 1) * limit, total)} of ${total}` : '0 transactions'}
+                {totalAmount > 0 && (
+                  <span className="ml-3 pl-3 border-l border-border font-medium text-foreground">
+                    Total: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(totalAmount)}
+                  </span>
+                )}
+              </span>
+              {totalPages > 1 && (
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -772,8 +800,8 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                     Next
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>
