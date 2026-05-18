@@ -46,6 +46,7 @@ export async function GET() {
       showMathEnabled: created?.showMathEnabled ?? false,
       aiSystemPrompt: created?.aiSystemPrompt ?? null,
       aiAutoAnalyze: created?.aiAutoAnalyze ?? false,
+      aiAutoApprove: created?.aiAutoApprove ?? false,
       aiAutoApproveThreshold: created?.aiAutoApproveThreshold ?? 95,
       aiBatchSize: created?.aiBatchSize ?? 25,
       aiActiveProviderId: created?.aiActiveProviderId ?? null,
@@ -78,6 +79,7 @@ export async function GET() {
     showMathEnabled: settings[0].showMathEnabled ?? false,
     aiSystemPrompt: settings[0].aiSystemPrompt ?? null,
     aiAutoAnalyze: settings[0].aiAutoAnalyze ?? false,
+    aiAutoApprove: settings[0].aiAutoApprove ?? false,
     aiAutoApproveThreshold: settings[0].aiAutoApproveThreshold ?? 95,
     aiBatchSize: settings[0].aiBatchSize ?? 25,
     aiActiveProviderId: settings[0].aiActiveProviderId ?? null,
@@ -108,6 +110,7 @@ export async function PATCH(request: Request) {
 	const showMathEnabled = body.showMathEnabled;
 	const aiSystemPrompt = body.aiSystemPrompt;
 	const aiAutoAnalyze = body.aiAutoAnalyze;
+	const aiAutoApprove = body.aiAutoApprove;
 	const aiAutoApproveThreshold = body.aiAutoApproveThreshold;
 	const aiBatchSize = body.aiBatchSize;
 	const aiActiveProviderId = body.aiActiveProviderId;
@@ -193,6 +196,10 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid aiAutoAnalyze value' }, { status: 400 });
 	}
 
+	if (aiAutoApprove !== undefined && typeof aiAutoApprove !== 'boolean') {
+		return Response.json({ error: 'Invalid aiAutoApprove value' }, { status: 400 });
+	}
+
 	if (aiAutoApproveThreshold !== undefined && (typeof aiAutoApproveThreshold !== 'number' || aiAutoApproveThreshold < 0 || aiAutoApproveThreshold > 100)) {
 		return Response.json({ error: 'Invalid aiAutoApproveThreshold value (must be 0-100)' }, { status: 400 });
 	}
@@ -261,6 +268,7 @@ export async function PATCH(request: Request) {
 	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
 	if (aiSystemPrompt !== undefined) updates.aiSystemPrompt = aiSystemPrompt;
 	if (aiAutoAnalyze !== undefined) updates.aiAutoAnalyze = aiAutoAnalyze;
+	if (aiAutoApprove !== undefined) updates.aiAutoApprove = aiAutoApprove;
 	if (aiAutoApproveThreshold !== undefined) updates.aiAutoApproveThreshold = aiAutoApproveThreshold;
 	if (aiBatchSize !== undefined) updates.aiBatchSize = aiBatchSize;
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
@@ -297,6 +305,7 @@ export async function PATCH(request: Request) {
     showMathEnabled: updated.showMathEnabled ?? false,
     aiSystemPrompt: updated.aiSystemPrompt ?? null,
     aiAutoAnalyze: updated.aiAutoAnalyze ?? false,
+    aiAutoApprove: updated.aiAutoApprove ?? false,
     aiAutoApproveThreshold: updated.aiAutoApproveThreshold ?? 95,
     aiBatchSize: updated.aiBatchSize ?? 25,
     aiActiveProviderId: updated.aiActiveProviderId ?? null,

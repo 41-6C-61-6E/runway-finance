@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
+import AiTestProgress from '@/components/features/ai/AiTestProgress';
+import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers } from 'lucide-react';
 
 type AiProposal = {
@@ -135,6 +137,9 @@ export default function AiSuggestionsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showTestProgress, setShowTestProgress] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     title: string;
     description: string;
@@ -264,6 +269,8 @@ export default function AiSuggestionsPage() {
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
+            setPendingProposalsCount(data.filter((p: AiProposal) => p.status === 'pending').length);
+
             let displayData = data;
             if (filterStatus !== 'all') displayData = displayData.filter(p => p.status === filterStatus);
             if (filterType !== 'all') displayData = displayData.filter(p => p.type === filterType);
@@ -303,6 +310,24 @@ export default function AiSuggestionsPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, [analyzing, startTime, filterStatus, filterType]);
+
+  // Poll backend status for live progress (processedCount/totalCount)
+  useEffect(() => {
+    if (!analyzing) {
+      setProcessedCount(0);
+      return;
+    }
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/ai/status', { credentials: 'include' });
+        const data = await res.json();
+        if (data.status === 'running' || data.status === 'completed') {
+          setProcessedCount(data.processedCount ?? 0);
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [analyzing]);
 
   const persistStatus = (status: AnalysisStatus) => {
     setSavedStatus(status);
@@ -429,28 +454,8 @@ export default function AiSuggestionsPage() {
     });
   };
 
-  const handleTestProvider = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const res = await fetch('/api/ai/providers/test-active', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ prompt: 'Write a haiku about money.' }),
-      });
-      const data = await res.json();
-      setTestResult({
-        ok: data.ok,
-        message: data.message || (data.ok ? 'Connected' : 'Failed'),
-        response: data.response,
-      });
-      setShowTestModal(true);
-    } catch {
-      setTestResult({ ok: false, message: 'Failed to reach server' });
-      setShowTestModal(true);
-    }
-    setTesting(false);
+  const handleTestProvider = () => {
+    setShowTestProgress(true);
   };
 
   const handleApprove = async (id: string) => {
@@ -608,11 +613,11 @@ export default function AiSuggestionsPage() {
             )}
             <button
               onClick={handleTestProvider}
-              disabled={testing}
+              disabled={showTestProgress}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all disabled:opacity-50"
             >
               <FlaskConical className="h-3.5 w-3.5" />
-              {testing ? 'Testing...' : 'Test Provider'}
+              Test Provider
             </button>
             <button
               onClick={handleAnalyze}
@@ -643,24 +648,28 @@ export default function AiSuggestionsPage() {
             )}
             <div className="flex-1 text-sm text-foreground">
               {(analyzing || savedStatus?.status === 'running') ? (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <p className="font-medium">AI analysis in progress</p>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1" title="Transactions to analyze">
+                    <span className="flex items-center gap-1" title="Transactions prompted to the AI model so far">
                       <BarChart3 className="h-3.5 w-3.5" />
-                      Txns Sent: {totalToAnalyze ?? '...'}
+                      Prompted: {processedCount}{totalToAnalyze !== null ? ` / ${totalToAnalyze}` : ''}
                     </span>
-                    <span className="flex items-center gap-1" title="Categorization suggestions">
+                    <span className="flex items-center gap-1" title="Categorization suggestions created">
                       <Tag className="h-3.5 w-3.5" />
                       Categorized: {newTxnsCount}
                     </span>
-                    <span className="flex items-center gap-1" title="Category suggestions">
+                    <span className="flex items-center gap-1" title="Category suggestions created">
                       <FileText className="h-3.5 w-3.5" />
                       Categories: {newCategoriesCount}
                     </span>
-                    <span className="flex items-center gap-1" title="Rule suggestions">
+                    <span className="flex items-center gap-1" title="Rule suggestions created">
                       <Brain className="h-3.5 w-3.5" />
                       Rules: {newRulesCount}
+                    </span>
+                    <span className="flex items-center gap-1" title="Suggestions waiting for your review">
+                      <Layers className="h-3.5 w-3.5" />
+                      Pending: {pendingProposalsCount}
                     </span>
                     <span className="flex items-center gap-1" title="Number of transactions processed per AI call">
                       <Layers className="h-3.5 w-3.5" />
@@ -676,9 +685,15 @@ export default function AiSuggestionsPage() {
                       Elapsed: {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground opacity-70">
-                    The analysis continues in the background even if you navigate away. New proposals will appear here automatically.
-                  </p>
+                  <div className="text-[10px] text-muted-foreground space-y-0.5">
+                    <p>
+                      The AI is analyzing your uncategorized transactions in batches of {batchSize || 25},
+                      considering your existing categories and rules to suggest categorizations, new categories, and rules.
+                    </p>
+                    <p className="opacity-70">
+                      You can navigate away — analysis continues in the background. New proposals appear here automatically.
+                    </p>
+                  </div>
                 </div>
               ) : savedStatus?.status === 'error' ? (
                 <>
@@ -867,41 +882,31 @@ export default function AiSuggestionsPage() {
           </div>
         )}
 
-        {/* Test Provider Modal */}
-        {showTestModal && testResult && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTestModal(false)}>
-            <div
-              className="bg-card border border-border rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-foreground">
-                  {testResult.ok ? 'Test Successful' : 'Test Failed'}
-                </h2>
-                <button
-                  onClick={() => setShowTestModal(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <p className={`text-xs mb-3 ${testResult.ok ? 'text-chart-2' : 'text-destructive'}`}>
-                {testResult.message}
-              </p>
-              {testResult.response && (
-                <div className="bg-muted rounded-lg p-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">AI Response:</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap font-mono">{testResult.response}</p>
-                </div>
-              )}
-              <button
-                onClick={() => setShowTestModal(false)}
-                className="mt-4 w-full px-3 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+        {/* Test Provider Progress */}
+        {showTestProgress && (
+          <AiTestProgress
+            title="Test AI Provider"
+            testFn={async (signal) => {
+              let prompt: string | undefined;
+              try {
+                prompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined;
+              } catch { /* ignore */ }
+              const res = await fetch('/api/ai/providers/test-active', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: prompt ? JSON.stringify({ prompt }) : undefined,
+                signal,
+              });
+              const data = await res.json();
+              return {
+                ok: data.ok,
+                message: data.message || (data.ok ? 'Connected' : 'Failed'),
+                response: data.response,
+              };
+            }}
+            onClose={() => setShowTestProgress(false)}
+          />
         )}
 
         {/* Confirmation Modal */}

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import AiTestProgress from '@/components/features/ai/AiTestProgress';
+import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 
 const DEFAULT_SYSTEM_PROMPT = `You are a personal finance transaction categorizer. Your task is to analyze uncategorized bank transactions and suggest:
 
@@ -70,6 +72,7 @@ type Provider = {
 type AutomationSettings = {
   aiSystemPrompt: string | null;
   aiAutoAnalyze: boolean;
+  aiAutoApprove: boolean;
   aiAutoApproveThreshold: number;
   aiBatchSize: number;
   aiActiveProviderId: string | null;
@@ -85,11 +88,16 @@ export default function AiTab() {
   const [automation, setAutomation] = useState<AutomationSettings>({
     aiSystemPrompt: null,
     aiAutoAnalyze: false,
+    aiAutoApprove: false,
     aiAutoApproveThreshold: 95,
     aiBatchSize: 25,
     aiActiveProviderId: null,
   });
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const [testPromptExpanded, setTestPromptExpanded] = useState(false);
+  const [testPrompt, setTestPrompt] = useState<string>(() => {
+    try { return localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? ''; } catch { return ''; }
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
@@ -99,6 +107,8 @@ export default function AiTab() {
   const [formSetActive, setFormSetActive] = useState(false);
   const [formTesting, setFormTesting] = useState(false);
   const [formTestResult, setFormTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [showTestProgress, setShowTestProgress] = useState<string | null>(null);
+  const [testProgressFn, setTestProgressFn] = useState<((signal: AbortSignal) => Promise<{ ok: boolean; message: string; response?: string }>) | null>(null);
 
   const loadData = async () => {
     const [provRes, settingsRes] = await Promise.all([
@@ -114,6 +124,7 @@ export default function AiTab() {
       setAutomation({
         aiSystemPrompt: data.aiSystemPrompt ?? null,
         aiAutoAnalyze: data.aiAutoAnalyze ?? false,
+        aiAutoApprove: data.aiAutoApprove ?? false,
         aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
         aiBatchSize: data.aiBatchSize ?? 25,
         aiActiveProviderId: data.aiActiveProviderId ?? null,
@@ -181,27 +192,39 @@ export default function AiTab() {
     }
   };
 
-  const handleFormTest = async () => {
+  const handleFormTest = () => {
     if (!formEndpoint.trim()) return;
-    setFormTesting(true);
-    setFormTestResult(null);
-    try {
-      const res = await fetch('/api/ai/test-connection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          endpoint: formEndpoint.trim(),
-          model: formModel.trim(),
-          apiKey: formApiKey,
-        }),
-      });
-      const data = await res.json();
-      setFormTestResult({ ok: data.ok, message: data.message ?? (res.ok ? 'Connection successful' : 'Connection failed') });
-    } catch {
-      setFormTestResult({ ok: false, message: 'Failed to reach server' });
-    }
-    setFormTesting(false);
+    setTestProgressFn(() => async (signal) => {
+      setFormTesting(true);
+      setFormTestResult(null);
+      try {
+        let customPrompt: string | undefined;
+        try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
+        const res = await fetch('/api/ai/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            endpoint: formEndpoint.trim(),
+            model: formModel.trim(),
+            apiKey: formApiKey,
+            prompt: customPrompt,
+          }),
+          signal,
+        });
+        const data = await res.json();
+        const result = { ok: data.ok, message: data.message ?? (res.ok ? 'Connection successful' : 'Connection failed') };
+        setFormTestResult(result);
+        return result;
+      } catch {
+        const result = { ok: false, message: 'Failed to reach server' };
+        setFormTestResult(result);
+        return result;
+      } finally {
+        setFormTesting(false);
+      }
+    });
+    setShowTestProgress('form');
   };
 
   const handleDeleteProvider = async (id: string) => {
@@ -233,20 +256,30 @@ export default function AiTab() {
     }
   };
 
-  const handleTestProvider = async (provider: Provider) => {
-    setTestingId(provider.id);
-    setTestResults((r) => ({ ...r, [provider.id]: { ok: true, message: 'Testing...' } }));
-    try {
-      const res = await fetch(`/api/ai/providers/${provider.id}/test`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      setTestResults((r) => ({ ...r, [provider.id]: { ok: data.ok, message: data.message } }));
-    } catch {
-      setTestResults((r) => ({ ...r, [provider.id]: { ok: false, message: 'Failed to reach server' } }));
-    }
-    setTestingId(null);
+  const handleTestProvider = (provider: Provider) => {
+    setTestProgressFn(() => async (signal) => {
+      setTestingId(provider.id);
+      try {
+        let customPrompt: string | undefined;
+        try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
+        const res = await fetch(`/api/ai/providers/${provider.id}/test`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: customPrompt ? JSON.stringify({ prompt: customPrompt }) : undefined,
+          signal,
+        });
+        const data = await res.json();
+        setTestResults((r) => ({ ...r, [provider.id]: { ok: data.ok, message: data.message } }));
+        return { ok: data.ok, message: data.message, response: data.response };
+      } catch {
+        setTestResults((r) => ({ ...r, [provider.id]: { ok: false, message: 'Failed to reach server' } }));
+        return { ok: false, message: 'Failed to reach server' };
+      } finally {
+        setTestingId(null);
+      }
+    });
+    setShowTestProgress(provider.id);
   };
 
   const handleSaveAutomation = async () => {
@@ -481,6 +514,52 @@ export default function AiTab() {
         )}
       </div>
 
+      {/* Test Prompt Editor */}
+      <div className="p-5 bg-card border border-border rounded-xl">
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Test Prompt</h2>
+            <p className="text-xs text-muted-foreground">
+              Customize the message sent when testing a provider connection. A short prompt speeds up the test.
+            </p>
+          </div>
+          <button
+            onClick={() => setTestPromptExpanded(!testPromptExpanded)}
+            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+          >
+            {testPromptExpanded ? 'Collapse' : 'Edit'}
+          </button>
+        </div>
+
+        {testPromptExpanded && (
+          <div className="mt-3 space-y-2">
+            <textarea
+              value={testPrompt}
+              onChange={(e) => {
+                setTestPrompt(e.target.value);
+                try { localStorage.setItem(TEST_PROMPT_STORAGE_KEY, e.target.value); } catch { /* ignore */ }
+              }}
+              className="w-full h-20 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              placeholder={DEFAULT_TEST_PROMPT}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">
+                {testPrompt ? 'Custom test prompt active' : 'Using default test prompt'}
+              </span>
+              <button
+                onClick={() => {
+                  setTestPrompt('');
+                  try { localStorage.removeItem(TEST_PROMPT_STORAGE_KEY); } catch { /* ignore */ }
+                }}
+                className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
+              >
+                Reset to Default
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="p-5 bg-card border border-border rounded-xl">
         <h2 className="text-base font-semibold text-foreground mb-1">Automation</h2>
         <p className="text-xs text-muted-foreground mb-4">
@@ -498,6 +577,22 @@ export default function AiTab() {
                 type="checkbox"
                 checked={automation.aiAutoAnalyze}
                 onChange={(e) => setAutomation((s) => ({ ...s, aiAutoAnalyze: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm text-foreground">Auto-approve suggestions</span>
+              <p className="text-xs text-muted-foreground">Automatically approve suggestions above the confidence threshold</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={automation.aiAutoApprove}
+                onChange={(e) => setAutomation((s) => ({ ...s, aiAutoApprove: e.target.checked }))}
                 className="sr-only peer"
               />
               <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -551,6 +646,17 @@ export default function AiTab() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
+
+      {showTestProgress && testProgressFn && (
+        <AiTestProgress
+          title={showTestProgress === 'form' ? 'Test Connection' : `Test: ${providers.find(p => p.id === showTestProgress)?.name ?? 'Provider'}`}
+          testFn={testProgressFn}
+          onClose={() => {
+            setShowTestProgress(null);
+            setTestProgressFn(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ type Transaction = {
   postedDate: string | null;
   description: string;
   payee: string | null;
+  memo: string | null;
   amount: string;
   categoryId: string | null;
   categoryName: string | null;
@@ -40,7 +41,9 @@ interface TransactionDetailDrawerProps {
 
 export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess }: TransactionDetailDrawerProps) {
   const [payee, setPayee] = useState(transaction.payee ?? '');
+  const [memo, setMemo] = useState(transaction.memo ?? '');
   const [notes, setNotes] = useState(transaction.notes ?? '');
+  const [reviewed, setReviewed] = useState(!!transaction.reviewed);
   const [categoryId, setCategoryId] = useState(transaction.categoryId);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -48,7 +51,9 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   useEffect(() => {
     setPayee(transaction.payee ?? '');
+    setMemo(transaction.memo ?? '');
     setNotes(transaction.notes ?? '');
+    setReviewed(!!transaction.reviewed);
     setCategoryId(transaction.categoryId);
   }, [transaction]);
 
@@ -70,7 +75,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ payee, notes, categoryId }),
+        body: JSON.stringify({ payee, memo, notes, categoryId, reviewed }),
       });
       if (res.ok) {
         onSuccess();
@@ -81,14 +86,8 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     }
   }, [transaction.id, payee, notes, categoryId, onSuccess, onClose]);
 
-  const toggleField = async (field: 'reviewed' | 'ignored') => {
-    await fetch(`/api/transactions/${transaction.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ [field]: !transaction[field] }),
-    });
-    onSuccess();
+  const toggleReviewed = async () => {
+    setReviewed(!reviewed);
   };
 
   const formatAmount = (amount: string) => {
@@ -267,6 +266,16 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Memo</label>
+              <input
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                placeholder="Enter memo"
+              />
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
               <textarea
                 value={notes}
@@ -282,17 +291,15 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           <div className="space-y-4 pt-1">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground/80">Reviewed</span>
-              <Switch
-                checked={!!transaction.reviewed}
-                onCheckedChange={() => toggleField('reviewed')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground/80">Ignored</span>
-              <Switch
-                checked={!!transaction.ignored}
-                onCheckedChange={() => toggleField('ignored')}
-              />
+              <div className="text-right">
+                <Switch
+                  checked={reviewed}
+                  onCheckedChange={toggleReviewed}
+                />
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {reviewed ? 'Marked as reviewed' : 'Needs review'}
+                </div>
+              </div>
             </div>
             {transaction.pending && (
               <span className="text-xs text-chart-3">Pending transaction</span>

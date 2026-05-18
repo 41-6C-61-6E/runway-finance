@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
 import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
-import { eq, and, isNull, asc } from 'drizzle-orm';
+import { eq, and, isNull, asc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
@@ -45,12 +45,14 @@ type AiResponse = {
   suggestions: AiSuggestion[];
 };
 
-export async function analyzeUncategorized(userId: string): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
+export async function analyzeUncategorized(
+  userId: string,
+  onProgress?: (processedCount: number, totalCount: number | null) => void,
+): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
   const db = getDb();
   const errors: string[] = [];
 
   try {
-    // 1. Get user settings
     const userSettingsRow = await db
       .select()
       .from(userSettings)
@@ -64,7 +66,6 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
     const settings = userSettingsRow[0];
     const dek = await getSessionDEK();
 
-    // Read provider config from active provider
     let endpoint: string;
     let model: string;
     let apiKey = '';
@@ -90,7 +91,6 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
       return { proposalsCreated: 0, autoApproved: 0, errors: ['No active AI provider configured'] };
     }
 
-    // 2. Fetch categories (needed for all batches)
     const categoryRows = await db
       .select()
       .from(categoriesTable)
@@ -115,7 +115,6 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
       isIncome: c.isIncome,
     }));
 
-    // 3. Fetch existing rules (for context to avoid duplicates)
     const ruleRows = await db
       .select()
       .from(categoryRules)
@@ -134,7 +133,13 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
       };
     });
 
-    // 4. Batch loop: process pages of uncategorized transactions
+    const countResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions)
+      .where(and(eq(transactions.userId, userId), isNull(transactions.categoryId)));
+    const totalUncategorized = Number(countResult[0]?.count ?? 0);
+    onProgress?.(0, totalUncategorized);
+
     const batchSize = settings.aiBatchSize ?? 25;
     const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
     let proposalsCreated = 0;
@@ -162,7 +167,6 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
         break;
       }
 
-      // 5. Decrypt transactions in this batch
       const decryptedTxns: TransactionInfo[] = [];
       for (let i = 0; i < txnRows.length; i++) {
         const row = txnRows[i];
@@ -183,19 +187,15 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
         });
       }
 
-      // 6. Build prompt for this batch
       const prompt = buildPrompt(categories, rules, decryptedTxns);
 
-      // 7. Call AI API
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
       logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
       const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt);
 
-      // 8. Parse and validate suggestions
       const { suggestions } = aiResponse;
       logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
 
-      // 9. Create proposals from this batch
       let batchProposals = 0;
       let batchAutoApproved = 0;
 
@@ -206,7 +206,7 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
           continue;
         }
 
-        const shouldAutoApprove = (suggestion.confidence * 100) >= autoApproveThreshold;
+        const shouldAutoApprove = settings.aiAutoApprove && (suggestion.confidence * 100) >= autoApproveThreshold;
         const status = shouldAutoApprove ? 'approved' : 'pending';
         const confidenceStr = String(Math.round(suggestion.confidence * 100));
 
@@ -226,11 +226,11 @@ export async function analyzeUncategorized(userId: string): Promise<{ proposalsC
       proposalsCreated += batchProposals;
       autoApproved += batchAutoApproved;
 
-      // Apply auto-approved proposals from this batch immediately
       if (batchAutoApproved > 0) {
         await applyApprovedProposals(userId, dek);
       }
 
+      onProgress?.(offset + txnRows.length, totalUncategorized);
       logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
 
       offset += txnRows.length;
@@ -330,7 +330,6 @@ async function callAiApi(
   try {
     parsed = JSON.parse(content);
   } catch {
-    // Try to extract JSON from markdown code blocks
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
       parsed = JSON.parse(jsonMatch[1]);
@@ -343,7 +342,6 @@ async function callAiApi(
     throw new Error('AI response missing suggestions array');
   }
 
-  // Validate each suggestion has required fields
   for (const s of parsed.suggestions) {
     if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
       throw new Error(`Invalid suggestion type: ${s.type}`);
@@ -374,7 +372,6 @@ function buildPayload(
       };
     }
     case 'create_category': {
-      // Find parent ID by name if parentName is provided
       let parentId: string | null = null;
       if (suggestion.parentName) {
         const parent = categories.find((c) => c.name.toLowerCase() === suggestion.parentName!.toLowerCase() && !c.parentId);
@@ -390,7 +387,6 @@ function buildPayload(
       };
     }
     case 'create_rule': {
-      // Resolve setCategoryName to setCategoryId
       let setCategoryId: string | null = null;
       if (suggestion.setCategoryName) {
         const cat = categories.find((c) => c.name.toLowerCase() === suggestion.setCategoryName!.toLowerCase());
@@ -428,8 +424,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
 
   logger.info(`${LOG_TAG} Applying ${pending.length} approved proposals`, { userId });
 
-  // First pass: create all new categories
-  const categoryIdMap = new Map<string, string>(); // temp name -> real id
+  const categoryIdMap = new Map<string, string>();
 
   for (const proposal of pending) {
     if (proposal.type !== 'create_category') continue;
@@ -456,14 +451,12 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     logger.info(`${LOG_TAG} Created category "${payload.name}"`, { userId, categoryId: created.id });
   }
 
-  // Second pass: apply categorizations and create rules
   for (const proposal of pending) {
     const payload = proposal.payload as any;
 
     switch (proposal.type) {
       case 'categorize': {
         let categoryId = payload.proposedCategoryId;
-        // If referring to a newly created category by name
         if (!categoryId && payload.proposedCategoryName) {
           categoryId = categoryIdMap.get(payload.proposedCategoryName) ?? null;
         }
@@ -480,7 +473,6 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
         let setCategoryId = payload.setCategoryId;
         if (!setCategoryId && payload.setCategoryName) {
           setCategoryId = categoryIdMap.get(payload.setCategoryName) ?? null;
-          // Also try to find in existing categories
           if (!setCategoryId) {
             const existing = await db
               .select()

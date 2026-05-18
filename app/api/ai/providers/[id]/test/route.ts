@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const endpoint = provider.endpoint.replace(/\/$/, '');
   const model = provider.model;
-  const userPrompt = body.prompt || 'Reply with "ok" if you receive this message.';
+  const userPrompt = body.prompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
 
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: userPrompt }],
-        max_tokens: 200,
+        max_tokens: 10,
       }),
     });
     const elapsed = Date.now() - startTime;

@@ -125,25 +125,61 @@ const sankeyTheme = {
 };
 
 const FALLBACK_COLORS = [
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-  'var(--color-chart-5)',
+  '#c5d9f0',  // pastel blue
+  '#d9f0c5',  // pastel green
+  '#f0e6c5',  // pastel gold
+  '#f0c5c5',  // pastel red
+  '#dec5f0',  // pastel purple
 ];
 
-function boostColor(hex: string): string {
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [h, s, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  let r: number, g: number, b: number;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function pastelColor(hex: string): string {
+  if (!hex || hex.startsWith('var(')) return hex;
   const num = parseInt(hex.replace('#', ''), 16);
+  if (isNaN(num)) return hex;
   const r = (num >> 16) & 0xff;
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
-  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-  if (brightness >= 160) return hex;
-  const scale = Math.min(2, 160 / (brightness || 1));
-  const nr = Math.min(255, Math.round(r * scale));
-  const ng = Math.min(255, Math.round(g * scale));
-  const nb = Math.min(255, Math.round(b * scale));
-  return `#${((nr << 16) | (ng << 8) | nb).toString(16).padStart(6, '0')}`;
+  const [h] = rgbToHsl(r, g, b);
+  const [pr, pg, pb] = hslToRgb(h, 0.18, 0.82);
+  return `#${((pr << 16) | (pg << 8) | pb).toString(16).padStart(6, '0')}`;
 }
 
 function buildParentLookup(allCategoryInfo: CategoryInfo[]): Map<string, { parentId: string; parentName: string; parentColor: string }> {
@@ -179,6 +215,7 @@ function buildSankeyData(
   const incomeCategories = enriched.filter((c) => c.isIncome && c.amount > 0);
   const expenseCategories = enriched.filter((c) => !c.isIncome && c.amount > 0);
   const savings = Math.max(0, totalIncome - totalExpenses);
+  const deficit = totalExpenses > totalIncome ? totalExpenses - totalIncome : 0;
 
   const nodes: SankeyNode[] = [];
   const links: SankeyLink[] = [];
@@ -209,7 +246,7 @@ function buildSankeyData(
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Income',
-          color: boostColor(parentColor),
+          color: pastelColor(parentColor),
           categoryId: childIds,
         });
       }
@@ -220,7 +257,7 @@ function buildSankeyData(
         nodes.push({
           id: childNodeId,
           label: cat.categoryName,
-          color: boostColor(cat.categoryColor),
+          color: pastelColor(cat.categoryColor),
           categoryId: cat.categoryId,
         });
         links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
@@ -235,7 +272,7 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label: cat.categoryName,
-        color: boostColor(cat.categoryColor),
+        color: pastelColor(cat.categoryColor),
         categoryId: cat.categoryId,
       });
       links.push({ source: childNodeId, target: hubId, value: cat.amount });
@@ -247,7 +284,7 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label,
-        color: boostColor(cat.categoryColor),
+        color: pastelColor(cat.categoryColor),
         categoryId: cat.categoryId,
       });
       links.push({ source: childNodeId, target: hubId, value: cat.amount });
@@ -260,7 +297,7 @@ function buildSankeyData(
     links.push({ source: fallbackId, target: hubId, value: totalIncome });
   }
 
-  if (totalIncome > 0) {
+  if (incomeCategories.length > 0 || expenseCategories.length > 0) {
     nodes.push({ id: hubId, label: 'Available Funds', color: FALLBACK_COLORS[2] });
   }
 
@@ -288,7 +325,7 @@ function buildSankeyData(
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Expenses',
-          color: boostColor(parentColor),
+          color: pastelColor(parentColor),
           categoryId: childIds,
         });
       }
@@ -299,7 +336,7 @@ function buildSankeyData(
         nodes.push({
           id: childNodeId,
           label: cat.categoryName,
-          color: boostColor(cat.categoryColor),
+          color: pastelColor(cat.categoryColor),
           categoryId: cat.categoryId,
         });
         links.push({ source: parentNodeId, target: childNodeId, value: cat.amount });
@@ -314,7 +351,7 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label: cat.categoryName,
-        color: boostColor(cat.categoryColor),
+        color: pastelColor(cat.categoryColor),
         categoryId: cat.categoryId,
       });
       links.push({ source: hubId, target: childNodeId, value: cat.amount });
@@ -326,7 +363,7 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label,
-        color: boostColor(cat.categoryColor),
+        color: pastelColor(cat.categoryColor),
         categoryId: cat.categoryId,
       });
       links.push({ source: hubId, target: childNodeId, value: cat.amount });
@@ -343,6 +380,12 @@ function buildSankeyData(
     const savingsId = '__savings__';
     nodes.push({ id: savingsId, label: 'Savings', color: FALLBACK_COLORS[2] });
     links.push({ source: hubId, target: savingsId, value: savings });
+  }
+
+  if (deficit > 0) {
+    const deficitId = '__deficit__';
+    nodes.push({ id: deficitId, label: 'Deficit', color: 'var(--color-destructive)' });
+    links.push({ source: hubId, target: deficitId, value: deficit });
   }
 
   return { nodes, links };
@@ -478,7 +521,7 @@ export function CashFlowSankey() {
   };
 
   const handleNodeClick = (nodeId: string) => {
-    if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
+    if (nodeId === '__available_funds__' || nodeId === '__savings__' || nodeId === '__deficit__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) {
       navigateToTransactions(categoryId);

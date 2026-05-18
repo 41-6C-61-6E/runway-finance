@@ -175,32 +175,37 @@ export async function GET(request: Request) {
 
       const { total: uncategorizedTotal } = await fetchUncategorizedTotal(startMonth!, endMonth!, accountIdList);
 
-      // Decrypt summary data if not from transaction-direct mode
-      const data: any[] = [];
+      // Decrypt and aggregate by categoryId
+      const categoryMap = new Map<string, any>();
       if (accountIdList.length === 0) {
-        for (const r of rows) {
+        for (const r of [...rows, ...incomeRows]) {
           const decryptedAmt = await decryptField(r.amount, dek);
-          data.push({
-            categoryId: r.categoryId ?? '',
-            categoryName: r.categoryName || 'Uncategorized',
-            categoryColor: r.categoryColor || '#6366f1',
-            isIncome: r.isIncome || false,
-            amount: parseFloat(decryptedAmt),
-          });
-        }
-        for (const r of incomeRows) {
-          const decryptedAmt = await decryptField(r.amount, dek);
-          data.push({
-            categoryId: r.categoryId ?? '',
-            categoryName: r.categoryName || 'Uncategorized',
-            categoryColor: r.categoryColor || '#6366f1',
-            isIncome: true,
-            amount: parseFloat(decryptedAmt),
-          });
+          const catId = r.categoryId ?? '';
+          const existing = categoryMap.get(catId);
+          if (existing) {
+            existing.amount += parseFloat(decryptedAmt);
+          } else {
+            categoryMap.set(catId, {
+              categoryId: catId,
+              categoryName: r.categoryName || 'Uncategorized',
+              categoryColor: r.categoryColor || '#6366f1',
+              isIncome: r.isIncome || r === incomeRows.find((ir) => ir.categoryId === catId) || false,
+              amount: parseFloat(decryptedAmt),
+            });
+          }
         }
       } else {
-        data.push(...rows, ...incomeRows);
+        for (const r of [...rows, ...incomeRows]) {
+          const catId = r.categoryId ?? '';
+          const existing = categoryMap.get(catId);
+          if (existing) {
+            existing.amount += r.amount;
+          } else {
+            categoryMap.set(catId, { ...r, categoryId: catId });
+          }
+        }
       }
+      const data = Array.from(categoryMap.values());
 
       if (uncategorizedTotal !== 0) {
         data.push({

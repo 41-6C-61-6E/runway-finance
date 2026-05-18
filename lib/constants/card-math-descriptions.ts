@@ -161,6 +161,23 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
       'Tabular view of each budget item showing: budgeted amount, actual amount, remaining (budgeted − actual for expenses), and percent used (actual / budgeted × 100).',
   },
 
+  // ── Investment Allocation ─────────────────────────────────────
+  retirementAccountAllocation: {
+    title: 'Investment Account Allocation',
+    description:
+      'Groups investment accounts (401k, Roth IRA, Traditional IRA, Brokerage, HSA, 529, etc.) by sub-type. Each slice = sum of account balances in that group / total investable assets × 100.',
+  },
+  withdrawalRateSensitivity: {
+    title: 'Withdrawal Rate Sensitivity',
+    description:
+      'Runs the FIRE number and years-to-FI formula across 8 safe withdrawal rates (2.5%–6.0%). Bar shows years-to-FI at each rate. The current SWR is highlighted.',
+  },
+  expenseCategoryTrend: {
+    title: 'Top Expense Categories',
+    description:
+      'Plots the top 5 expense categories by total spending, showing their monthly amounts over the selected time range. Each line represents one category\'s spending trend.',
+  },
+
   // ── Financial Goals ───────────────────────────────────────────
   goalsSummary: {
     title: 'Goals Summary',

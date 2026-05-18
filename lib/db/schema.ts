@@ -102,6 +102,7 @@ export const userSettings = pgTable('user_settings', {
   showMathEnabled: boolean('show_math_enabled').notNull().default(false),
   aiSystemPrompt: text('ai_system_prompt'),
   aiAutoAnalyze: boolean('ai_auto_analyze').notNull().default(false),
+  aiAutoApprove: boolean('ai_auto_approve').notNull().default(false),
   aiAutoApproveThreshold: integer('ai_auto_approve_threshold').notNull().default(95),
   aiBatchSize: integer('ai_batch_size').notNull().default(25),
   aiActiveProviderId: uuid('ai_active_provider_id'),

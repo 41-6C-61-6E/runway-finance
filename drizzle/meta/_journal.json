@@ -162,6 +162,20 @@
       "when": 1747350000003,
       "tag": "0023_categorized_by_ai",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1747429200000,
+      "tag": "0024_add_created_by_ai_to_categories_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1747515600000,
+      "tag": "0025_add_ai_auto_approve",
+      "breakpoints": true
     }
   ]
 }

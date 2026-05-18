@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ResponsiveBar } from '@nivo/bar';
+import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import type { MonteCarloResult } from '@/lib/services/retirement';
 
 function getSuccessColor(rate: number): string {
@@ -17,12 +20,31 @@ function getGrade(rate: number): { label: string; color: string } {
   return { label: 'F', color: 'text-destructive' };
 }
 
+function formatCompact(value: number): string {
+  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
 export function RetirementMonteCarlo({
   monteCarlo,
 }: {
   monteCarlo: MonteCarloResult;
 }) {
   const grade = useMemo(() => getGrade(monteCarlo.successRate), [monteCarlo.successRate]);
+
+  const histData = useMemo(() => {
+    const maxCount = Math.max(...monteCarlo.histogram.map((b) => b.count), 1);
+    return monteCarlo.histogram.map((bin) => ({
+      id: `${formatCompact(bin.min)}-${formatCompact(bin.max)}`,
+      range: `${formatCompact(bin.min)}-${formatCompact(bin.max)}`,
+      count: bin.count,
+      pct: ((bin.count / monteCarlo.simulations) * 100).toFixed(1),
+      min: bin.min,
+      max: bin.max,
+    }));
+  }, [monteCarlo]);
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm p-5">
@@ -47,7 +69,7 @@ export function RetirementMonteCarlo({
         </div>
       </div>
 
-      <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+      <div className="w-full bg-muted rounded-full h-3 overflow-hidden mb-5">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -57,18 +79,12 @@ export function RetirementMonteCarlo({
         />
       </div>
 
-      <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5">
-        <span>0%</span>
-        <span>50%</span>
-        <span>100%</span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mt-5 pt-4 border-t border-border">
+      <div className="grid grid-cols-3 gap-4 mb-5">
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">P10 (Worst)</p>
           <p className="text-sm font-semibold text-destructive">
             {monteCarlo.p10Path.length > 0
-              ? `$${(monteCarlo.p10Path[monteCarlo.p10Path.length - 1].balance / 1000).toFixed(0)}K`
+              ? formatCompact(monteCarlo.p10Path[monteCarlo.p10Path.length - 1].balance)
               : '$0'}
           </p>
           <p className="text-[10px] text-muted-foreground">End balance at 10th percentile</p>
@@ -77,7 +93,7 @@ export function RetirementMonteCarlo({
           <p className="text-xs text-muted-foreground mb-0.5">Median (P50)</p>
           <p className="text-sm font-semibold text-foreground">
             {monteCarlo.medianPath.length > 0
-              ? `$${(monteCarlo.medianPath[monteCarlo.medianPath.length - 1].balance / 1000).toFixed(0)}K`
+              ? formatCompact(monteCarlo.medianPath[monteCarlo.medianPath.length - 1].balance)
               : '$0'}
           </p>
           <p className="text-[10px] text-muted-foreground">Median end balance</p>
@@ -86,10 +102,56 @@ export function RetirementMonteCarlo({
           <p className="text-xs text-muted-foreground mb-0.5">P90 (Best)</p>
           <p className="text-sm font-semibold text-chart-1">
             {monteCarlo.p90Path.length > 0
-              ? `$${(monteCarlo.p90Path[monteCarlo.p90Path.length - 1].balance / 1000).toFixed(0)}K`
+              ? formatCompact(monteCarlo.p90Path[monteCarlo.p90Path.length - 1].balance)
               : '$0'}
           </p>
           <p className="text-[10px] text-muted-foreground">End balance at 90th percentile</p>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-border">
+        <p className="text-xs font-semibold text-foreground mb-3">End Balance Distribution</p>
+        <div className="h-[200px]">
+          <ResponsiveBar
+            data={histData}
+            keys={['count']}
+            indexBy="id"
+            margin={{ top: 5, right: 10, left: 40, bottom: 30 }}
+            padding={0.15}
+            borderRadius={1}
+            colors={({ data: d }) => {
+              const bin = d as unknown as { min: number };
+              const legacyGoal = 0;
+              return bin.min >= legacyGoal
+                ? 'var(--color-chart-1)'
+                : 'var(--color-destructive)';
+            }}
+            enableLabel={false}
+            axisLeft={{
+              tickSize: 0, tickPadding: 6,
+              tickValues: 4,
+            }}
+            axisBottom={{
+              tickSize: 0, tickPadding: 6,
+              renderTick: () => null,
+            }}
+            enableGridY={true}
+            enableGridX={false}
+            theme={nivoTheme}
+            tooltip={({ indexValue, value, data: d }) => {
+              const bin = d as unknown as { range: string; pct: string };
+              return (
+                <ChartTooltip>
+                  <TooltipHeader>{bin.range}</TooltipHeader>
+                  <TooltipRow label="Simulations" value={`${value} (${bin.pct}%)`} />
+                </ChartTooltip>
+              );
+            }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+          <span>{formatCompact(monteCarlo.histogram[0]?.min ?? 0)}</span>
+          <span>{formatCompact(monteCarlo.histogram[monteCarlo.histogram.length - 1]?.max ?? 0)}</span>
         </div>
       </div>
     </div>
