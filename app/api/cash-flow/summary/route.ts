@@ -26,13 +26,42 @@ export async function GET() {
       and(eq(monthlyCashFlow.userId, session.user.id), eq(monthlyCashFlow.yearMonth, previousMonth))
     );
 
-    const income = current ? parseFloat(await decryptField(current.totalIncome, dek)) : 0;
-    const expenses = current ? parseFloat(await decryptField(current.totalExpenses, dek)) : 0;
+    let income = 0;
+    let expenses = 0;
+    if (current) {
+      try {
+        const incomeStr = await decryptField(current.totalIncome, dek);
+        income = parseFloat(incomeStr) || 0;
+      } catch (error) {
+        logger.warn('Failed to decrypt current income', { error: error instanceof Error ? error.message : String(error) });
+      }
+      try {
+        const expenseStr = await decryptField(current.totalExpenses, dek);
+        expenses = parseFloat(expenseStr) || 0;
+      } catch (error) {
+        logger.warn('Failed to decrypt current expenses', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    let prevIncome = 0;
+    let prevExpenses = 0;
+    if (previous) {
+      try {
+        const incomeStr = await decryptField(previous.totalIncome, dek);
+        prevIncome = parseFloat(incomeStr) || 0;
+      } catch (error) {
+        logger.warn('Failed to decrypt previous income', { error: error instanceof Error ? error.message : String(error) });
+      }
+      try {
+        const expenseStr = await decryptField(previous.totalExpenses, dek);
+        prevExpenses = parseFloat(expenseStr) || 0;
+      } catch (error) {
+        logger.warn('Failed to decrypt previous expenses', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
     const netIncome = income - expenses;
     const savingsRate = income > 0 ? (netIncome / income) * 100 : 0;
-
-    const prevIncome = previous ? parseFloat(await decryptField(previous.totalIncome, dek)) : 0;
-    const prevExpenses = previous ? parseFloat(await decryptField(previous.totalExpenses, dek)) : 0;
     const prevNet = prevIncome - prevExpenses;
 
     logger.info('GET /api/cash-flow/summary', { currentMonth, netIncome });

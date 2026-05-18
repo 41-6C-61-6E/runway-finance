@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useBudgetPeriod, type PeriodType } from './budget-period-selector';
+import { CategoryCombobox } from './category-combobox';
 
 interface Category {
   id: string;
   name: string;
-  color: string;
+  color?: string;
   isIncome?: boolean;
+  parentId?: string | null;
 }
 
 interface Account {
@@ -33,6 +35,7 @@ interface BudgetFormDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  categories: Category[];
   editBudget?: {
     id: string;
     categoryId: string;
@@ -45,9 +48,8 @@ interface BudgetFormDialogProps {
   };
 }
 
-export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: BudgetFormDialogProps) {
+export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBudget }: BudgetFormDialogProps) {
   const { periodKey } = useBudgetPeriod();
-  const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [form, setForm] = useState<BudgetFormData>({
     categoryId: '',
@@ -65,13 +67,9 @@ export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: Budge
   useEffect(() => {
     if (!open) return;
     const fetchData = async () => {
-      const [catRes, acctRes] = await Promise.all([
-        fetch('/api/categories', { credentials: 'include' }),
-        fetch('/api/accounts', { credentials: 'include' }),
-      ]);
-      if (catRes.ok) setCategories(await catRes.json());
-      if (acctRes.ok) {
-        const allAccts = await acctRes.json();
+      const res = await fetch('/api/accounts', { credentials: 'include' });
+      if (res.ok) {
+        const allAccts = await res.json();
         setAccounts(allAccts.filter((a: Account) => ['checking', 'savings'].includes(a.type)));
       }
     };
@@ -101,7 +99,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: Budge
       });
     }
     setError('');
-  }, [open, editBudget, periodKey]);
+  }, [open, editBudget, periodKey, categories]);
 
   const handleSave = async () => {
     if (!form.categoryId || !form.amount) {
@@ -161,18 +159,12 @@ export function BudgetFormDialog({ open, onClose, onSuccess, editBudget }: Budge
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Category</label>
-            <select
+            <CategoryCombobox
+              categories={categories}
               value={form.categoryId}
-              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name} {cat.isIncome ? '(Income)' : '(Expense)'}
-                </option>
-              ))}
-            </select>
+              onSelect={(id) => setForm((f) => ({ ...f, categoryId: id }))}
+              disabled={saving}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

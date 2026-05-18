@@ -142,6 +142,7 @@ export function calculateAmortizationWithExtraPayments(
 
   const lastStandard = standard[standard.length - 1];
   const lastAccelerated = accelerated[accelerated.length - 1];
+  const defaultDate = new Date().toISOString().split('T')[0];
 
   const standardTotalInterest = standard.reduce((s, r) => s + r.interest, 0);
   const acceleratedTotalInterest = accelerated.reduce((s, r) => s + r.interest, 0);
@@ -150,12 +151,12 @@ export function calculateAmortizationWithExtraPayments(
     standard,
     accelerated,
     standardSummary: {
-      payoffDate: lastStandard.date,
+      payoffDate: lastStandard?.date ?? defaultDate,
       totalInterest: Math.round(standardTotalInterest * 100) / 100,
       totalPayments: standard.length,
     },
     acceleratedSummary: {
-      payoffDate: lastAccelerated.date,
+      payoffDate: lastAccelerated?.date ?? defaultDate,
       totalInterest: Math.round(acceleratedTotalInterest * 100) / 100,
       totalPayments: accelerated.length,
       interestSaved: Math.round((standardTotalInterest - acceleratedTotalInterest) * 100) / 100,

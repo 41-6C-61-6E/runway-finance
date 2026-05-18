@@ -47,10 +47,8 @@ export async function DELETE() {
   return new Response(null, { status: 204 })
 }
 
-let devModePatched = false
 export async function ensureDevModePatched() {
-  if (devModePatched || !(await isDevMode())) return
-  devModePatched = true
+  if (!(await isDevMode())) return
   setDevMode(true)
   enableDevLogging()
   patchConsole()

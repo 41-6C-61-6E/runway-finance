@@ -277,10 +277,26 @@ export async function GET(request: Request) {
       .orderBy(accountSnapshots.snapshotDate);
 
     // Decrypt snapshot balances
-    const decryptedSnapshots = await Promise.all(snapshotRows.map(async (snap) => ({
-      ...snap,
-      balance: parseFloat(await decryptField(snap.balance, dek)),
-    })));
+    const decryptedSnapshots = await Promise.all(snapshotRows.map(async (snap) => {
+      let balance = 0;
+      try {
+        // Handle both plaintext numbers and encrypted strings
+        const decrypted = await decryptField(snap.balance, dek);
+        balance = parseFloat(decrypted);
+        if (isNaN(balance)) {
+          balance = 0;
+        }
+      } catch (error) {
+        logger.error('Failed to decrypt snapshot balance in forecast', { 
+          accountId: snap.accountId, 
+          date: snap.snapshotDate,
+          originalBalance: snap.balance,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        balance = 0;
+      }
+      return { ...snap, balance };
+    }));
 
     // Group snapshots by account and month (take last snapshot per month)
     const historicalByMonth = new Map<string, Map<string, number>>();

@@ -16,9 +16,10 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    status: 'running',
-    processedCount: 0,
-    totalCount: 0,
-    error: null,
+    status: existing.status,
+    processedCount: existing.processedCount ?? 0,
+    totalCount: existing.totalCount ?? 0,
+    error: existing.error ?? null,
+    log: existing.log ?? [],
   });
 }

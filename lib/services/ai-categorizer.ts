@@ -48,6 +48,7 @@ type AiResponse = {
 export async function analyzeUncategorized(
   userId: string,
   onProgress?: (processedCount: number, totalCount: number | null) => void,
+  onLog?: (message: string) => void,
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
   const db = getDb();
   const errors: string[] = [];
@@ -139,6 +140,7 @@ export async function analyzeUncategorized(
       .where(and(eq(transactions.userId, userId), isNull(transactions.categoryId)));
     const totalUncategorized = Number(countResult[0]?.count ?? 0);
     onProgress?.(0, totalUncategorized);
+    onLog?.(`Found ${totalUncategorized} uncategorized transaction(s)`);
 
     const batchSize = settings.aiBatchSize ?? 25;
     const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
@@ -187,13 +189,17 @@ export async function analyzeUncategorized(
         });
       }
 
+      const batchNum = Math.floor(offset / batchSize) + 1;
       const prompt = buildPrompt(categories, rules, decryptedTxns);
 
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
+      onLog?.(`Batch ${batchNum}: Sending ${decryptedTxns.length} transaction(s) to AI (${model})`); // This line was causing the error
+      const batchStart = Date.now();
       logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
       const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt);
 
       const { suggestions } = aiResponse;
+      onLog?.(`Batch ${batchNum}: AI returned ${suggestions.length} suggestion(s) in ${((Date.now() - batchStart) / 1000).toFixed(1)}s`);
       logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
 
       let batchProposals = 0;
@@ -231,12 +237,14 @@ export async function analyzeUncategorized(
       }
 
       onProgress?.(offset + txnRows.length, totalUncategorized);
+      onLog?.(`Batch ${batchNum}: ${batchProposals} proposal(s) saved${batchAutoApproved > 0 ? `, ${batchAutoApproved} auto-approved` : ''}`);
       logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
 
       offset += txnRows.length;
       hasMore = txnRows.length >= batchSize;
     }
 
+    onLog?.(`Done: ${proposalsCreated} proposal(s) created, ${autoApproved} auto-approved${errors.length > 0 ? `, ${errors.length} error(s)` : ''}`);
     logger.info(`${LOG_TAG} Analysis complete`, { userId, proposalsCreated, autoApproved, errors: errors.length });
     return { proposalsCreated, autoApproved, errors };
 

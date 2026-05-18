@@ -30,9 +30,18 @@ interface Account {
   name: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  isIncome?: boolean;
+  color?: string;
+  parentId?: string | null;
+}
+
 export function BudgetTable() {
   const { periodType, periodKey } = useBudgetPeriod();
   const [budgets, setBudgets] = useState<BudgetData[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +61,7 @@ export function BudgetTable() {
       if (!budgetRes.ok) throw new Error('Failed to fetch');
       const data = await budgetRes.json();
       setBudgets(data.budgets ?? []);
+      if (data.categories) setCategories(data.categories);
       if (acctRes.ok) setAccounts(await acctRes.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -157,10 +167,10 @@ export function BudgetTable() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className={`h-full ${isOver ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(b.percentUsed, 100)}%` }} />
+                            <div className={`h-full ${isOver ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                           </div>
                           <span className={`text-[10px] font-mono ${isOver ? 'text-chart-2' : 'text-muted-foreground'}`}>
-                            {b.percentUsed.toFixed(0)}%
+                            {(b.percentUsed || 0).toFixed(0)}%
                           </span>
                         </div>
                       </td>
@@ -219,10 +229,10 @@ export function BudgetTable() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(b.percentUsed, 100)}%` }} />
+                            <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                           </div>
                           <span className={`text-[10px] font-mono ${isOver ? 'text-destructive' : 'text-muted-foreground'}`}>
-                            {b.percentUsed.toFixed(0)}%
+                            {(b.percentUsed || 0).toFixed(0)}%
                           </span>
                         </div>
                       </td>
@@ -265,6 +275,7 @@ export function BudgetTable() {
         open={showForm}
         onClose={() => { setShowForm(false); setEditBudget(null); }}
         onSuccess={fetchBudgets}
+        categories={categories}
         editBudget={editBudget ? {
           id: editBudget.id,
           categoryId: editBudget.categoryId,

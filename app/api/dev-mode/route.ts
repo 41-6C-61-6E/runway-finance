@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
-import { logger } from '@/lib/logger'
+import { logger, setDevMode } from '@/lib/logger'
 import { cookies } from 'next/headers'
+import { enableDevLogging, disableDevLogging, patchConsole } from '@/lib/dev-logs'
 
 const DEV_MODE_COOKIE = 'runway_dev_mode'
 
@@ -36,6 +37,15 @@ export async function POST(request: Request) {
   const isSecure = request.url.startsWith('https://') || forwardedProto === 'https'
 
   logger.info('POST /api/dev-mode', { enabled })
+
+  if (enabled) {
+    setDevMode(true)
+    enableDevLogging()
+    patchConsole()
+  } else {
+    setDevMode(false)
+    disableDevLogging()
+  }
 
   const response = NextResponse.json({ devMode: enabled })
   response.cookies.set(DEV_MODE_COOKIE, String(enabled), {

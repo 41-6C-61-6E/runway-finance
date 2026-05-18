@@ -75,6 +75,7 @@ type AutomationSettings = {
   aiAutoApprove: boolean;
   aiAutoApproveThreshold: number;
   aiBatchSize: number;
+  aiAnalysisTimeoutSeconds: number;
   aiActiveProviderId: string | null;
 };
 
@@ -91,6 +92,7 @@ export default function AiTab() {
     aiAutoApprove: false,
     aiAutoApproveThreshold: 95,
     aiBatchSize: 25,
+    aiAnalysisTimeoutSeconds: 600,
     aiActiveProviderId: null,
   });
   const [promptExpanded, setPromptExpanded] = useState(false);
@@ -126,7 +128,8 @@ export default function AiTab() {
         aiAutoAnalyze: data.aiAutoAnalyze ?? false,
         aiAutoApprove: data.aiAutoApprove ?? false,
         aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
-        aiBatchSize: data.aiBatchSize ?? 25,
+         aiBatchSize: data.aiBatchSize ?? 25,
+         aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 600,
         aiActiveProviderId: data.aiActiveProviderId ?? null,
       });
     }
@@ -628,6 +631,20 @@ export default function AiTab() {
               className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <p className="text-xs text-muted-foreground mt-1">Number of transactions to analyze per API call</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Analysis timeout</label>
+            <input
+              type="number"
+              min={30}
+              max={600}
+              step={30}
+              value={automation.aiAnalysisTimeoutSeconds}
+              onChange={(e) => setAutomation((s) => ({ ...s, aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 600 }))}
+              className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Seconds before analysis auto-cancels (30–600s)</p>
           </div>
         </div>
       </div>
