@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 
 type ManualAccount = {
   id: string;
@@ -148,10 +149,25 @@ export default function ManualAccountsSection() {
         fetch('/api/accounts?type=realestate', { credentials: 'include' }),
         fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
       ]);
-      const data = await res.json();
-      setAccounts(Array.isArray(data) ? data : []);
+      const manualData = await res.json();
+      const mortgageData = mRes.ok ? await mRes.json() : [];
+      
+      // Merge manual accounts with SimpleFIN mortgages
+      // Manual accounts already include manually-created mortgages
+      // We need to add SimpleFIN mortgages that aren't already in manual accounts
+      const manualIds = new Set((Array.isArray(manualData) ? manualData : []).map((a: any) => a.id));
+      const simplefinMortgages = Array.isArray(mortgageData) 
+        ? mortgageData.filter((m: any) => !manualIds.has(m.id))
+        : [];
+      
+      const allAccounts = [
+        ...(Array.isArray(manualData) ? manualData : []),
+        ...simplefinMortgages,
+      ];
+      
+      setAccounts(allAccounts);
       if (reRes.ok) setRealEstateAccounts(await reRes.json());
-      if (mRes.ok) setAllMortgageAccounts(await mRes.json());
+      if (mRes.ok) setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
     } catch {
       setAccounts([]);
     } finally {
@@ -533,67 +549,7 @@ export default function ManualAccountsSection() {
         return (
           <>
             {linkedPropertyField(createMeta, setCreateMeta)}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Start Date (origination)</label>
-              <Input
-                type="date"
-                value={createMeta.purchaseDate || ''}
-                onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createMeta.originalLoanAmount || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
-                  placeholder="e.g., 300000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Interest Rate (%)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createMeta.interestRate || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, interestRate: e.target.value }))}
-                  placeholder="e.g., 6.5"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Term (months)</label>
-                <Input
-                  type="number"
-                  value={createMeta.termMonths || '360'}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, termMonths: e.target.value }))}
-                  placeholder="e.g., 360"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createMeta.monthlyPayment || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, monthlyPayment: e.target.value }))}
-                  placeholder="e.g., 2212"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Escrow (monthly, optional)</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={createMeta.escrowAmount || ''}
-                onChange={(e) => setCreateMeta((m) => ({ ...m, escrowAmount: e.target.value }))}
-                placeholder="e.g., 400"
-              />
-            </div>
+            <MortgageAttributesForm meta={createMeta} onChange={(m) => setCreateMeta(m)} />
           </>
         );
       case 'vehicle':
@@ -750,6 +706,7 @@ export default function ManualAccountsSection() {
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = account.type === 'mortgage';
+            const isSimpleFin = account.type === 'mortgage' && !account.metadata;
             return (
               <div
                 key={account.id}
@@ -770,6 +727,7 @@ export default function ManualAccountsSection() {
                       {getSubTypeLabel(account)}
                     </span>
                     {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
+                    {isSimpleFin && <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-1.5 py-0.5 rounded">SimpleFIN</span>}
                   </div>
                   <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
@@ -1017,62 +975,7 @@ export default function ManualAccountsSection() {
             {editAccount?.type === 'mortgage' && (
               <>
                 {linkedPropertyField(editMeta, (m) => setEditMeta(m))}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Start Date (origination)</label>
-                  <Input
-                    type="date"
-                    value={editMeta.purchaseDate || ''}
-                    onChange={(e) => setEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editMeta.originalLoanAmount || ''}
-                      onChange={(e) => setEditMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Interest Rate (%)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editMeta.interestRate || ''}
-                      onChange={(e) => setEditMeta((m) => ({ ...m, interestRate: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Term (months)</label>
-                    <Input
-                      type="number"
-                      value={editMeta.termMonths || '360'}
-                      onChange={(e) => setEditMeta((m) => ({ ...m, termMonths: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editMeta.monthlyPayment || ''}
-                      onChange={(e) => setEditMeta((m) => ({ ...m, monthlyPayment: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Escrow (monthly)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editMeta.escrowAmount || ''}
-                    onChange={(e) => setEditMeta((m) => ({ ...m, escrowAmount: e.target.value }))}
-                  />
-                </div>
+                <MortgageAttributesForm meta={editMeta} onChange={(m) => setEditMeta(m)} />
               </>
             )}
 

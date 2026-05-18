@@ -31,9 +31,10 @@ interface PropertyCardProps {
   onLinkMortgage: (propertyId: string) => void;
   onUnlinkMortgage: (mortgageId: string) => void;
   onOverrideValue: (propertyId: string, value: number) => void;
+  onEditMortgage?: (mortgage: MortgageInfo) => void;
 }
 
-export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue }: PropertyCardProps) {
+export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue, onEditMortgage }: PropertyCardProps) {
   const [editingValue, setEditingValue] = useState(false);
   const [newValue, setNewValue] = useState(String(property.value));
   const isWhollyOwned = property.linkedMortgages.length === 0;
@@ -139,7 +140,18 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                 </button>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-medium text-foreground">{m.name}</span>
-                  <span className="font-mono text-xs text-muted-foreground blur-number">{formatCurrency(Math.abs(m.balance))}</span>
+                  <div className="flex items-center gap-1">
+                    {onEditMortgage && (
+                      <button
+                        onClick={() => onEditMortgage(m)}
+                        className="p-0.5 rounded hover:bg-muted text-muted-foreground/30 hover:text-foreground transition-all"
+                        title="Edit attributes"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
+                    <span className="font-mono text-xs text-muted-foreground blur-number">{formatCurrency(Math.abs(m.balance))}</span>
+                  </div>
                 </div>
                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-1">
                   <div className="h-full bg-chart-2 rounded-full transition-all" style={{ width: `${Math.min(payoffProgress, 100)}%` }} />
