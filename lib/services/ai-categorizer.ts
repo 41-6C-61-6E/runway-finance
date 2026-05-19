@@ -317,49 +317,71 @@ async function callAiApi(
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  const MAX_RETRIES = 2;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`AI API error: ${response.status} ${text.slice(0, 500)}`);
-  }
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('AI API returned empty response');
-  }
+      if (!response.ok) {
+        const text = await response.text();
+        const isRetryable = response.status === 429 || response.status >= 500;
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delay = Math.pow(2, attempt) * 1000;
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new Error(`AI API error: ${response.status} ${text.slice(0, 500)}`);
+      }
 
-  let parsed: AiResponse;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[1]);
-    } else {
-      throw new Error('Failed to parse AI response as JSON');
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error('AI API returned empty response');
+      }
+
+      let parsed: AiResponse;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error('Failed to parse AI response as JSON');
+        }
+      }
+
+      if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) {
+        throw new Error('AI response missing suggestions array');
+      }
+
+      for (const s of parsed.suggestions) {
+        if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
+          throw new Error(`Invalid suggestion type: ${s.type}`);
+        }
+        if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 1) {
+          throw new Error(`Invalid confidence value: ${s.confidence}`);
+        }
+      }
+
+      return parsed;
+    } catch (err) {
+      const isNonRetryableHttp = err instanceof Error && /^AI API error: [4][0-9]{2}/.test(err.message);
+      if (attempt < MAX_RETRIES && !isNonRetryableHttp) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
     }
   }
 
-  if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) {
-    throw new Error('AI response missing suggestions array');
-  }
-
-  for (const s of parsed.suggestions) {
-    if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
-      throw new Error(`Invalid suggestion type: ${s.type}`);
-    }
-    if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 1) {
-      throw new Error(`Invalid confidence value: ${s.confidence}`);
-    }
-  }
-
-  return parsed;
+  throw new Error('AI API call failed after retries');
 }
 
 function buildPayload(
