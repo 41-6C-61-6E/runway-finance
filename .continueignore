@@ -1,0 +1,14 @@
+# Block the crawler from choking on Next.js dynamic bracket routes
+**/[id]/**
+**/[id]/
+**/[slug]/**
+
+# Ignore Next.js dynamic route folders that cause scanning issues
+app/**/[*
+**/[*
+
+# Standard hygiene ignores to keep the indexing engine lean
+.next/
+node_modules/
+.git/
+dist/

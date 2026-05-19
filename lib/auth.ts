@@ -8,6 +8,7 @@ import { userEncryptionKeys } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { authConfig } from "./auth.config";
+import { seedUserAiProviders } from "./db/seed-ai-providers";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -107,6 +108,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           } catch (err) {
             logger.error('Auth: DEK unwrap failed', { error: err instanceof Error ? err.message : String(err) });
             return null;
+          }
+
+          // Seed AI providers from environment variables for this user (idempotent)
+          try {
+            await seedUserAiProviders(user.username, dek);
+          } catch (err) {
+            logger.error('Auth: Failed to seed AI providers', { error: err instanceof Error ? err.message : String(err) });
+            // Don't fail the login if seeding fails, just log it
           }
 
           return {
