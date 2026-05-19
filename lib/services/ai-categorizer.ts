@@ -49,6 +49,7 @@ export async function analyzeUncategorized(
   userId: string,
   onProgress?: (processedCount: number, totalCount: number | null) => void,
   onLog?: (message: string) => void,
+  abortController?: AbortController,
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
   const db = getDb();
   const errors: string[] = [];
@@ -150,6 +151,11 @@ export async function analyzeUncategorized(
     let hasMore = true;
 
     while (hasMore) {
+      // Check if analysis has been aborted
+      if (abortController?.signal.aborted) {
+        onLog?.('Analysis cancelled by user');
+        break;
+      }
       const txnRows = await db
         .select({
           transaction: transactions,
@@ -193,10 +199,10 @@ export async function analyzeUncategorized(
       const prompt = buildPrompt(categories, rules, decryptedTxns);
 
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
-      onLog?.(`Batch ${batchNum}: Sending ${decryptedTxns.length} transaction(s) to AI (${model})`); // This line was causing the error
+      onLog?.(`Batch ${batchNum}: Sending ${decryptedTxns.length} transaction(s) to AI (${model})`);
       const batchStart = Date.now();
       logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
-      const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt);
+      const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, abortController?.signal);
 
       const { suggestions } = aiResponse;
       onLog?.(`Batch ${batchNum}: AI returned ${suggestions.length} suggestion(s) in ${((Date.now() - batchStart) / 1000).toFixed(1)}s`);
@@ -297,6 +303,7 @@ async function callAiApi(
   apiKey: string,
   prompt: string,
   systemPrompt: string,
+  signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
 
@@ -325,6 +332,7 @@ async function callAiApi(
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal,
       });
 
       if (!response.ok) {
@@ -471,10 +479,35 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
 
   const categoryIdMap = new Map<string, string>();
 
+  // First pass: Process all create_category proposals and check for duplicates
+  const categoryCreationQueue: { payload: any; proposal: typeof pending[0] }[] = [];
+  
   for (const proposal of pending) {
     if (proposal.type !== 'create_category') continue;
     const payload = proposal.payload as any;
+    
+    // Check if category already exists (case insensitive)
+    const existingCategory = await db
+      .select()
+      .from(categoriesTable)
+      .where(and(
+        eq(categoriesTable.userId, userId),
+        eq(categoriesTable.name, payload.name)
+      ))
+      .limit(1);
+    
+    if (existingCategory.length > 0) {
+      // Category already exists, map it to the existing ID
+      categoryIdMap.set(payload.name, existingCategory[0].id);
+      logger.info(`${LOG_TAG} Category "${payload.name}" already exists`, { userId, categoryId: existingCategory[0].id });
+    } else {
+      // Queue for creation
+      categoryCreationQueue.push({ payload, proposal });
+    }
+  }
 
+  // Create new categories that don't already exist
+  for (const { payload, proposal } of categoryCreationQueue) {
     const encrypted = await encryptField(payload.name, dek);
     const encryptedParentId = payload.parentId ? await encryptField(payload.parentId, dek) : null;
 
@@ -496,6 +529,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     logger.info(`${LOG_TAG} Created category "${payload.name}"`, { userId, categoryId: created.id });
   }
 
+  // Second pass: Process remaining proposals (categorize and create_rule)
   for (const proposal of pending) {
     const payload = proposal.payload as any;
 
