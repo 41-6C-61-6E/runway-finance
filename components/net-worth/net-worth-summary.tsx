@@ -201,8 +201,8 @@ export function NetWorthSummary() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {[1, 2].map((i) => (
           <div key={i} className="bg-card border border-border rounded-xl p-5 shadow-sm animate-pulse">
             <div className="h-4 bg-muted rounded w-24 mb-3"></div>
             <div className="h-8 bg-muted rounded w-32 mb-2"></div>
@@ -263,7 +263,7 @@ export function NetWorthSummary() {
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Assets</h3>
           {totalLabel('assets', totals.totalAssets, deltas.assets, deltas.pctAssets)}
@@ -271,10 +271,6 @@ export function NetWorthSummary() {
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Liabilities</h3>
           {totalLabel('liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities)}
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-1">Net Worth</h3>
-          {totalLabel('netWorth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth)}
         </div>
       </div>
     </div>

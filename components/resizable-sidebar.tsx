@@ -21,6 +21,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
+  { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
   { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
 ]

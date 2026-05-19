@@ -178,7 +178,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
     'expectedReturnRate', 'inflationRate', 'safeWithdrawalRate',
   ],
   simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
-  sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs'],
+  sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs', 'details'],
   user_settings: ['apiKeys'],
 };
 

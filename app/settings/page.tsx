@@ -65,7 +65,25 @@ export default function SettingsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncResult, setSyncResult] = useState<{ status: string; accountsSynced: number; transactionsFetched: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    status: string;
+    accountsSynced: number;
+    transactionsFetched: number;
+    transactionsNew: number;
+    transactionsUpdated: number;
+    durationMs: number;
+    details: Array<{
+      externalId: string;
+      name: string;
+      type: string;
+      currency: string;
+      balance: string;
+      transactionsFetched: number;
+      transactionsNew: number;
+      transactionsPending: number;
+      wasNewAccount: boolean;
+    }>;
+  } | null>(null);
   const [detailsConn, setDetailsConn] = useState<Connection | null>(null);
   const [detailsLabel, setDetailsLabel] = useState('');
   const [deleteConn, setDeleteConn] = useState<Connection | null>(null);
@@ -263,10 +281,14 @@ export default function SettingsPage() {
         status: data.status,
         accountsSynced: data.accountsSynced ?? 0,
         transactionsFetched: data.transactionsFetched ?? 0,
+        transactionsNew: data.transactionsNew ?? 0,
+        transactionsUpdated: data.transactionsUpdated ?? 0,
+        durationMs: data.durationMs ?? 0,
+        details: data.details ?? [],
       });
       if (res.ok) await fetchConnections();
     } catch {
-      setSyncResult({ status: 'error', accountsSynced: 0, transactionsFetched: 0 });
+      setSyncResult({ status: 'error', accountsSynced: 0, transactionsFetched: 0, transactionsNew: 0, transactionsUpdated: 0, durationMs: 0, details: [] });
     } finally {
       setSyncingId(null);
     }
@@ -729,18 +751,104 @@ export default function SettingsPage() {
                   ))}
 
                   {syncResult && (
-                    <div className={`p-3 rounded-lg border ${
+                    <div className={`p-4 rounded-lg border space-y-3 ${
                       syncResult.status === 'success'
                         ? 'bg-chart-1/10 border-chart-1/20'
                         : 'bg-destructive/10 border-destructive/20'
                     }`}>
-                      <p className={`text-xs font-medium ${
-                        syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'
-                      }`}>
-                        {syncResult.status === 'success'
-                          ? `Sync complete: ${syncResult.accountsSynced} accounts, ${syncResult.transactionsFetched} transactions`
-                          : 'Sync failed'}
-                      </p>
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold ${
+                            syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'
+                          }`}>
+                            {syncResult.status === 'success' ? 'Sync Complete' : 'Sync Failed'}
+                          </span>
+                          {syncResult.durationMs > 0 && (
+                            <span className={`text-[10px] ${
+                              syncResult.status === 'success' ? 'text-chart-1/70' : 'text-destructive/70'
+                            }`}>
+                              in {(syncResult.durationMs / 1000).toFixed(1)}s
+                            </span>
+                          )}
+                        </div>
+                        {syncResult.status === 'success' && (
+                          <span className={`text-[10px] ${
+                            syncResult.status === 'success' ? 'text-chart-1/70' : 'text-destructive/70'
+                          }`}>
+                            {syncResult.accountsSynced} account{syncResult.accountsSynced !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Summary */}
+                      {syncResult.status === 'success' && (
+                        <div className={`text-[10px] ${
+                          syncResult.status === 'success' ? 'text-chart-1/80' : 'text-destructive/80'
+                        }`}>
+                          {syncResult.transactionsFetched} transaction{syncResult.transactionsFetched !== 1 ? 's' : ''} fetched
+                          {syncResult.transactionsNew > 0 && <> · <span className="font-medium">{syncResult.transactionsNew} new</span></>}
+                          {syncResult.transactionsUpdated > 0 && <> · {syncResult.transactionsUpdated} updated</>}
+                          {syncResult.details.some((d: any) => d.transactionsPending > 0) && (
+                            <> · <span className="font-medium">{syncResult.details.reduce((s: number, d: any) => s + d.transactionsPending, 0)} pending</span></>
+                          )}
+                          {syncResult.details.some((d: any) => d.wasNewAccount) && (
+                            <> · <span className="font-medium">{syncResult.details.filter((d: any) => d.wasNewAccount).length} new account{syncResult.details.filter((d: any) => d.wasNewAccount).length !== 1 ? 's' : ''}</span></>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Per-account breakdown */}
+                      {syncResult.status === 'success' && syncResult.details.length > 0 && (
+                        <div className={`space-y-1 ${
+                          syncResult.status === 'success' ? '' : ''
+                        }`}>
+                          {syncResult.details.map((acct: any) => (
+                            <div
+                              key={acct.externalId}
+                              className={`flex items-center justify-between py-1.5 px-2 rounded ${
+                                syncResult.status === 'success' ? 'bg-chart-1/5' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`text-xs font-medium truncate ${
+                                  syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'
+                                }`}>
+                                  {acct.name}
+                                </span>
+                                <span className={`text-[10px] px-1 rounded ${
+                                  syncResult.status === 'success' ? 'bg-chart-1/10 text-chart-1/70' : ''
+                                }`}>
+                                  {acct.type}
+                                </span>
+                                {acct.wasNewAccount && (
+                                  <span className="text-[10px] font-semibold text-chart-1 bg-chart-1/15 px-1 rounded">
+                                    NEW
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-[10px] whitespace-nowrap ${
+                                syncResult.status === 'success' ? 'text-chart-1/70' : ''
+                              }`}>
+                                {acct.transactionsNew > 0 && (
+                                  <span className="font-medium">{acct.transactionsNew} new · </span>
+                                )}
+                                {acct.transactionsFetched} txns
+                                {acct.transactionsPending > 0 && (
+                                  <span className="text-chart-1/50"> · {acct.transactionsPending} pending</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Error message */}
+                      {syncResult.status === 'error' && (
+                        <p className="text-[10px] text-destructive/80">
+                          Sync could not be completed. Check the connection details for more information.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

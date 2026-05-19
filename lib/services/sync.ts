@@ -17,6 +17,18 @@ function ms(start: number): number {
   return Date.now() - start;
 }
 
+export type AccountSyncDetail = {
+  externalId: string;
+  name: string;
+  type: string;
+  currency: string;
+  balance: string;
+  transactionsFetched: number;
+  transactionsNew: number;
+  transactionsPending: number;
+  wasNewAccount: boolean;
+};
+
 export type SyncResult = {
   status: 'success' | 'error';
   accountsSynced: number;
@@ -24,6 +36,8 @@ export type SyncResult = {
   transactionsNew: number;
   transactionsUpdated: number;
   errorMessage?: string;
+  details?: AccountSyncDetail[];
+  durationMs?: number;
 };
 
 export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, snapshotDate: string) {
@@ -481,6 +495,16 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     const externalIdToAccountId = new Map<string, string>();
 
+    // Pre-fetch existing account external IDs for this connection to detect new accounts
+    const existingExternalIds = new Set<string>();
+    const existingAccts = await getDb()
+      .select({ externalId: accounts.externalId })
+      .from(accounts)
+      .where(eq(accounts.connectionId, connectionId));
+    for (const a of existingAccts) existingExternalIds.add(a.externalId);
+
+    const accountDetails: AccountSyncDetail[] = [];
+
     // Track plaintext transaction data for in-memory rule matching
     const rawTxData: Array<{
       externalId: string;
@@ -559,6 +583,19 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       externalIdToAccountId.set(sfAccount.id, upserted.id);
       accountsSynced++;
 
+      const wasNewAccount = !orphanedAccount && !existingExternalIds.has(sfAccount.id);
+      const acctDetail: AccountSyncDetail = {
+        externalId: sfAccount.id,
+        name: sfAccount.name,
+        type: inferAccountType(sfAccount),
+        currency: sfAccount.currency,
+        balance: sfAccount.balance,
+        transactionsFetched: sfAccount.transactions?.length ?? 0,
+        transactionsNew: 0,
+        transactionsPending: 0,
+        wasNewAccount,
+      };
+
       if (sfAccount.transactions) {
         for (const sfTx of sfAccount.transactions) {
           const amountNum = parseFloat(sfTx.amount);
@@ -595,6 +632,19 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             amount: String(amountNum),
           });
 
+          // Check if transaction already exists BEFORE upserting (matches unique constraint on accountId + externalId)
+          const [existingTx] = await getDb()
+            .select({ id: transactions.id })
+            .from(transactions)
+            .where(
+              and(
+                eq(transactions.userId, userId),
+                eq(transactions.accountId, accountId),
+                eq(transactions.externalId, sfTx.id)
+              )
+            )
+            .limit(1);
+
           await getDb()
             .insert(transactions)
             .values(txData)
@@ -609,19 +659,19 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               },
             });
 
-          const existing = await getDb()
-            .select({ id: transactions.id })
-            .from(transactions)
-            .where(eq(transactions.externalId, sfTx.id))
-            .limit(1);
-
-          if (existing.length === 0) {
-            transactionsNew++;
-          } else {
+          if (existingTx) {
             transactionsUpdated++;
+          } else {
+            transactionsNew++;
+            acctDetail.transactionsNew++;
+          }
+          if (sfTx.pending) {
+            acctDetail.transactionsPending++;
           }
         }
       }
+
+      accountDetails.push(acctDetail);
     }
 
     logger.info(`${LOG_TAG} Accounts and transactions processed`, {
@@ -722,6 +772,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       0
     );
 
+    const detailsEncrypted = await encryptField(JSON.stringify(accountDetails), dek);
+
     await getDb()
       .update(syncLogs)
       .set({
@@ -731,6 +783,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         transactionsFetched: String(transactionsFetched),
         transactionsNew: String(transactionsNew),
         durationMs: String(Date.now() - log.startedAt.getTime()),
+        details: detailsEncrypted,
       })
       .where(eq(syncLogs.id, log.id));
 
@@ -791,6 +844,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       transactionsFetched,
       transactionsNew,
       transactionsUpdated,
+      details: accountDetails,
+      durationMs: totalDurationMs,
     };
   } catch (err) {
     let errorMessage = err instanceof Error ? err.message : String(err);
@@ -831,6 +886,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       transactionsNew: 0,
       transactionsUpdated: 0,
       errorMessage,
+      details: [],
+      durationMs: Date.now() - startedAt,
     };
   }
 }
