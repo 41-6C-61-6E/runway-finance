@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   const endpoint = body.endpoint?.replace(/\/$/, '');
   const model = body.model || 'unknown';
   const apiKey = body.apiKey || '';
-  const userPrompt = body.prompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
+  const userPrompt = body.prompt || DEFAULT_TEST_PROMPT;
 
   if (!endpoint) {
     return NextResponse.json({ ok: false, message: 'No endpoint provided. Enter the URL and try again.' });
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: userPrompt }],
-        max_tokens: 10,
+        max_tokens: 200,
       }),
     });
     const elapsed = Date.now() - startTime;

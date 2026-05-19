@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 
@@ -81,10 +81,6 @@ type AutomationSettings = {
 
 export default function AiTab() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
-  const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [automation, setAutomation] = useState<AutomationSettings>({
     aiSystemPrompt: null,
@@ -135,7 +131,7 @@ export default function AiTab() {
         });
       }
     } catch {
-      setSaveResult({ ok: false, message: 'Failed to load AI settings' });
+      console.error('Failed to load AI settings');
     }
     setLoading(false);
   };
@@ -191,11 +187,11 @@ export default function AiTab() {
 
     if (res.ok) {
       setShowForm(false);
-      setSaveResult({ ok: true, message: editingId ? 'Provider updated.' : 'Provider added.' });
+      setFormTestResult(null);
       await loadData();
     } else {
       const data = await res.json().catch(() => ({}));
-      setSaveResult({ ok: false, message: data.error || data.message || 'Failed to save provider' });
+      setFormTestResult({ ok: false, message: data.error || data.message || 'Failed to save provider' });
     }
   };
 
@@ -207,20 +203,38 @@ export default function AiTab() {
       try {
         let customPrompt: string | undefined;
         try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
-        const res = await fetch('/api/ai/test-connection', {
+        const endpoint = formEndpoint.trim().replace(/\/$/, '');
+        const model = formModel.trim();
+        const apiKey = formApiKey;
+        
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+        const startTime = Date.now();
+        const res = await fetch(`${endpoint}/chat/completions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          headers,
           body: JSON.stringify({
-            endpoint: formEndpoint.trim(),
-            model: formModel.trim(),
-            apiKey: formApiKey,
-            prompt: customPrompt,
+            model,
+            messages: [{ role: 'user', content: customPrompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.' }],
+            max_tokens: 200,
           }),
           signal,
         });
+        const elapsed = Date.now() - startTime;
+        
+        if (!res.ok) {
+          const text = await res.text();
+          let detail = text.slice(0, 300);
+          try { const json = JSON.parse(text); detail = json.error?.message || json.error || json.message || detail; } catch {}
+          const result = { ok: false, message: `API returned ${res.status} after ${elapsed}ms: ${detail}`, response: '' };
+          setFormTestResult(result);
+          return result;
+        }
+
         const data = await res.json();
-        const result = { ok: data.ok, message: data.message ?? (res.ok ? 'Connection successful' : 'Connection failed') };
+        const responseContent = data.choices?.[0]?.message?.content || '(empty response)';
+        const result = { ok: true, message: `Connected to ${model} (${elapsed}ms)`, response: responseContent };
         setFormTestResult(result);
         return result;
       } catch {
@@ -241,10 +255,9 @@ export default function AiTab() {
       credentials: 'include',
     });
     if (res.ok) {
-      setSaveResult({ ok: true, message: 'Provider deleted.' });
       await loadData();
     } else {
-      setSaveResult({ ok: false, message: 'Failed to delete provider' });
+      console.error('Failed to delete provider');
     }
   };
 
@@ -256,16 +269,14 @@ export default function AiTab() {
       body: JSON.stringify({ isActive: true }),
     });
     if (res.ok) {
-      setSaveResult({ ok: true, message: 'Active provider updated.' });
       await loadData();
     } else {
-      setSaveResult({ ok: false, message: 'Failed to set active provider' });
+      console.error('Failed to set active provider');
     }
   };
 
   const handleTestProvider = (provider: Provider) => {
     setTestProgressFn(() => async (signal) => {
-      setTestingId(provider.id);
       try {
         let customPrompt: string | undefined;
         try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
@@ -277,42 +288,28 @@ export default function AiTab() {
           signal,
         });
         const data = await res.json();
-        setTestResults((r) => ({ ...r, [provider.id]: { ok: data.ok, message: data.message } }));
         return { ok: data.ok, message: data.message, response: data.response };
       } catch {
-        setTestResults((r) => ({ ...r, [provider.id]: { ok: false, message: 'Failed to reach server' } }));
         return { ok: false, message: 'Failed to reach server' };
-      } finally {
-        setTestingId(null);
       }
     });
     setShowTestProgress(provider.id);
   };
 
-  const handleSaveAutomation = async () => {
-    setSaving(true);
-    setSaveResult(null);
+  const saveSetting = useCallback(async (partial: Partial<AutomationSettings>) => {
     try {
-      const res = await fetch('/api/user-settings', {
+      await fetch('/api/user-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(automation),
+        body: JSON.stringify(partial),
       });
-      if (res.ok) {
-        setSaveResult({ ok: true, message: 'Settings saved.' });
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setSaveResult({ ok: false, message: data.error || data.message || `Save failed (${res.status})` });
-      }
-    } catch {
-      setSaveResult({ ok: false, message: 'Network error — could not reach server.' });
-    }
-    setSaving(false);
-  };
+    } catch { /* silent */ }
+  }, []);
 
   const handleResetPrompt = () => {
     setAutomation((s) => ({ ...s, aiSystemPrompt: null }));
+    saveSetting({ aiSystemPrompt: null });
   };
 
   if (loading) {
@@ -332,7 +329,7 @@ export default function AiTab() {
           </div>
           <button
             onClick={openAddForm}
-            className="px-3 py-1.5 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+            className="px-2 py-1.5 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
           >
             + Add Provider
           </button>
@@ -372,10 +369,9 @@ export default function AiTab() {
                   )}
                   <button
                     onClick={() => handleTestProvider(p)}
-                    disabled={testingId === p.id}
-                    className="px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
+                    className="px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
                   >
-                    {testingId === p.id ? 'Testing...' : 'Test'}
+                    Test
                   </button>
                   <button
                     onClick={() => openEditForm(p)}
@@ -391,11 +387,6 @@ export default function AiTab() {
                   </button>
                 </div>
               </div>
-              {testResults[p.id] && (
-                <div className={`mt-2 text-xs px-2 py-1 rounded-lg ${testResults[p.id].ok ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
-                  {testResults[p.id].message}
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -503,6 +494,12 @@ export default function AiTab() {
             <textarea
               value={automation.aiSystemPrompt ?? DEFAULT_SYSTEM_PROMPT}
               onChange={(e) => setAutomation((s) => ({ ...s, aiSystemPrompt: e.target.value }))}
+              onBlur={(e) => {
+                const v = e.target.value;
+                if (v !== DEFAULT_SYSTEM_PROMPT) {
+                  saveSetting({ aiSystemPrompt: v === DEFAULT_SYSTEM_PROMPT ? null : v });
+                }
+              }}
               className="w-full h-80 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-y"
               placeholder="Enter custom system prompt..."
             />
@@ -583,7 +580,11 @@ export default function AiTab() {
               <input
                 type="checkbox"
                 checked={automation.aiAutoAnalyze}
-                onChange={(e) => setAutomation((s) => ({ ...s, aiAutoAnalyze: e.target.checked }))}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setAutomation((s) => ({ ...s, aiAutoAnalyze: v }));
+                  saveSetting({ aiAutoAnalyze: v });
+                }}
                 className="sr-only peer"
               />
               <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -599,7 +600,11 @@ export default function AiTab() {
               <input
                 type="checkbox"
                 checked={automation.aiAutoApprove}
-                onChange={(e) => setAutomation((s) => ({ ...s, aiAutoApprove: e.target.checked }))}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setAutomation((s) => ({ ...s, aiAutoApprove: v }));
+                  saveSetting({ aiAutoApprove: v });
+                }}
                 className="sr-only peer"
               />
               <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -616,6 +621,8 @@ export default function AiTab() {
               max={100}
               value={automation.aiAutoApproveThreshold}
               onChange={(e) => setAutomation((s) => ({ ...s, aiAutoApproveThreshold: parseInt(e.target.value) }))}
+              onMouseUp={(e) => saveSetting({ aiAutoApproveThreshold: parseInt((e.target as HTMLInputElement).value) })}
+              onTouchEnd={(e) => saveSetting({ aiAutoApproveThreshold: parseInt((e.target as HTMLInputElement).value) })}
               className="w-full accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
@@ -632,6 +639,7 @@ export default function AiTab() {
               max={200}
               value={automation.aiBatchSize}
               onChange={(e) => setAutomation((s) => ({ ...s, aiBatchSize: parseInt(e.target.value) || 25 }))}
+              onBlur={(e) => saveSetting({ aiBatchSize: parseInt(e.target.value) || 25 })}
               className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <p className="text-xs text-muted-foreground mt-1">Number of transactions to analyze per API call</p>
@@ -646,6 +654,7 @@ export default function AiTab() {
               step={30}
               value={automation.aiAnalysisTimeoutSeconds}
               onChange={(e) => setAutomation((s) => ({ ...s, aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 600 }))}
+              onBlur={(e) => saveSetting({ aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 600 })}
               className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <p className="text-xs text-muted-foreground mt-1">Seconds before analysis auto-cancels (30–600s)</p>
@@ -653,20 +662,7 @@ export default function AiTab() {
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-3">
-        {saveResult && (
-          <span className={`text-xs px-2 py-1 rounded-lg ${saveResult.ok ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
-            {saveResult.message}
-          </span>
-        )}
-        <button
-          onClick={handleSaveAutomation}
-          disabled={saving}
-          className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </div>
+      <p className="text-[10px] text-muted-foreground text-right">Settings are saved automatically.</p>
 
       {showTestProgress && testProgressFn && (
         <AiTestProgress

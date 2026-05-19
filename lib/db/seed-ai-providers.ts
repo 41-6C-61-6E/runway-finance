@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { aiProviders } from '@/lib/db/schema';
+import { aiProviders, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
@@ -33,8 +33,9 @@ function readEnvProvider() {
 /**
  * Ensure the env-configured AI provider exists for the given user.
  * Idempotent — skips if a provider with the same name + endpoint already exists.
+ * @param dek Optional DEK for encrypting the API key. Falls back to getServerDEK if not provided.
  */
-export async function seedUserAiProviders(userId: string): Promise<void> {
+export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Promise<void> {
   const envProvider = readEnvProvider();
   if (!envProvider) {
     return;
@@ -63,20 +64,33 @@ export async function seedUserAiProviders(userId: string): Promise<void> {
     return;
   }
 
+  // Deactivate any previously active providers so only one is active
+  await db
+    .update(aiProviders)
+    .set({ isActive: false })
+    .where(eq(aiProviders.userId, userId));
+
   // Encrypt the API key using the server-wrapped DEK
-  const dek = await getServerDEK(userId);
+  if (!dek) {
+    dek = await getServerDEK(userId);
+  }
   const apiKeyEncrypted = await encryptField(envProvider.apiKey, dek);
 
-  await db.insert(aiProviders).values({
+  const [created] = await db.insert(aiProviders).values({
     userId,
     name: envProvider.name,
     endpoint: envProvider.endpoint,
     model: envProvider.model,
     apiKeyEncrypted,
-    isActive: false,
-  });
+    isActive: true,
+  }).returning();
 
-  logger.info('[seed-ai-providers] Seeded provider for user', {
+  await db
+    .update(userSettings)
+    .set({ aiActiveProviderId: created.id, updatedAt: new Date() })
+    .where(eq(userSettings.userId, userId));
+
+  logger.info('[seed-ai-providers] Seeded active provider for user', {
     userId,
     name: envProvider.name,
     endpoint: envProvider.endpoint,

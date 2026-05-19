@@ -16,6 +16,7 @@ type FilterState = {
   reviewed: string | null;
   minAmount: string | null;
   maxAmount: string | null;
+  categorizedByAi: string | null;
 };
 
 interface FilterBarProps {
@@ -658,6 +659,16 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               }`}
             >
               Unreviewed
+            </button>
+            <button
+              onClick={() => onChange('categorizedByAi', filters.categorizedByAi === 'true' ? null : 'true')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.categorizedByAi === 'true'
+                  ? 'border border-primary bg-primary/20 text-primary shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              AI Categorized
             </button>
           </div>
 

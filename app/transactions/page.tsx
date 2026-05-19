@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
@@ -23,6 +23,7 @@ type FilterState = {
   reviewed: string | null;
   minAmount: string | null;
   maxAmount: string | null;
+  categorizedByAi: string | null;
   sort: string;
   order: string;
 };
@@ -30,6 +31,8 @@ type FilterState = {
 function TransactionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
 
   const [filters, setFilters] = useState<FilterState>({
     accountId: searchParams.get('accountId') ?? null,
@@ -44,6 +47,7 @@ function TransactionsContent() {
     reviewed: searchParams.get('reviewed') ?? null,
     minAmount: searchParams.get('minAmount') ?? null,
     maxAmount: searchParams.get('maxAmount') ?? null,
+    categorizedByAi: searchParams.get('categorizedByAi') ?? null,
     sort: searchParams.get('sort') ?? 'date',
     order: searchParams.get('order') ?? 'desc',
   });
@@ -75,15 +79,16 @@ function TransactionsContent() {
     if (filters.reviewed) params.set('reviewed', filters.reviewed);
     if (filters.minAmount) params.set('minAmount', filters.minAmount);
     if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
+    if (filters.categorizedByAi) params.set('categorizedByAi', filters.categorizedByAi);
     if (filters.sort !== 'date') params.set('sort', filters.sort);
     if (filters.order !== 'desc') params.set('order', filters.order);
 
     const newUrl = `?${params.toString()}`;
-    const currentUrl = `?${searchParams.toString()}`;
+    const currentUrl = `?${searchParamsRef.current.toString()}`;
     if (newUrl !== currentUrl) {
       router.replace(newUrl, { scroll: false });
     }
-  }, [filters, router, searchParams]);
+  }, [filters, router]);
 
   const spAccountId = searchParams.get('accountId');
   const spAccountIds = searchParams.get('accountIds');
@@ -97,6 +102,7 @@ function TransactionsContent() {
   const spReviewed = searchParams.get('reviewed');
   const spMinAmount = searchParams.get('minAmount');
   const spMaxAmount = searchParams.get('maxAmount');
+  const spCategorizedByAi = searchParams.get('categorizedByAi');
   const spSort = searchParams.get('sort');
   const spOrder = searchParams.get('order');
 
@@ -114,6 +120,7 @@ function TransactionsContent() {
       const reviewed = spReviewed ?? null;
       const minAmount = spMinAmount ?? null;
       const maxAmount = spMaxAmount ?? null;
+      const categorizedByAi = spCategorizedByAi ?? null;
       const sort = spSort ?? 'date';
       const order = spOrder ?? 'desc';
       if (
@@ -129,14 +136,15 @@ function TransactionsContent() {
         prev.reviewed === reviewed &&
         prev.minAmount === minAmount &&
         prev.maxAmount === maxAmount &&
+        prev.categorizedByAi === categorizedByAi &&
         prev.sort === sort &&
         prev.order === order
       ) {
         return prev;
       }
-      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, search, startDate, endDate, pending, reviewed, minAmount, maxAmount, sort, order };
+      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, search, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
     });
-  }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spSearch, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spSort, spOrder]);
+    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spSearch, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
 
   const updateFilter = useCallback((key: keyof FilterState, value: string | null) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -156,6 +164,7 @@ function TransactionsContent() {
       reviewed: null,
       minAmount: null,
       maxAmount: null,
+      categorizedByAi: null,
       sort: 'date',
       order: 'desc',
     });

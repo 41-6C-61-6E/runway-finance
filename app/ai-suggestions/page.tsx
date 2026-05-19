@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
+import { CategoryCombobox } from '@/components/budgets/category-combobox';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers, Pencil } from 'lucide-react';
 
 type AiProposal = {
   id: string;
@@ -40,14 +41,183 @@ function ProposalCard({
   onApprove,
   onReject,
   processing,
+  editingId,
+  editPayload,
+  onEdit,
+  onCancelEdit,
+  onEditField,
+  categories,
 }: {
   proposal: AiProposal;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   processing: string | null;
+  editingId: string | null;
+  editPayload: any;
+  onEdit: (id: string) => void;
+  onCancelEdit: () => void;
+  onEditField: (field: string, value: any) => void;
+  categories: { id: string; name: string; isIncome: boolean; parentId: string | null; color: string }[];
 }) {
   const confidence = parseInt(proposal.confidence ?? '0');
   const payload = proposal.payload;
+  const isEditing = editingId === proposal.id;
+
+  if (isEditing) {
+    const renderField = (label: string, field: string, type: 'text' | 'select' | 'checkbox', options?: string[]) => (
+      <div key={field} className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground shrink-0">{label}:</span>
+        {type === 'text' ? (
+          <input
+            value={editPayload[field] ?? ''}
+            onChange={(e) => onEditField(field, e.target.value)}
+            className="flex-1 px-2 py-1 bg-background border border-input rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        ) : type === 'checkbox' ? (
+          <input
+            type="checkbox"
+            checked={!!editPayload[field]}
+            onChange={(e) => onEditField(field, e.target.checked)}
+            className="accent-primary"
+          />
+        ) : (
+          <select
+            value={editPayload[field] ?? ''}
+            onChange={(e) => onEditField(field, e.target.value)}
+            className="flex-1 px-2 py-1 bg-background border border-input rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {options?.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
+      </div>
+    );
+
+    const categoryComboboxField = (label: string, nameField: string) => {
+      const catId = categories.find((c) => c.name === editPayload[nameField])?.id ?? '';
+      return (
+        <div key={nameField} className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground shrink-0">{label}:</span>
+          <div className="flex-1">
+            <CategoryCombobox
+              categories={categories}
+              value={catId}
+              onSelect={(id) => {
+                const cat = categories.find((c) => c.id === id);
+                onEditField(nameField, cat?.name ?? '');
+              }}
+            />
+          </div>
+        </div>
+      );
+    };
+
+    let fields: { label: string; field: string; type: 'text' | 'select' | 'checkbox'; options?: string[] }[] = [];
+    switch (proposal.type) {
+      case 'categorize':
+        return (
+          <div className="p-4 bg-card border border-primary/40 rounded-lg">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
+                  <ProposalIcon type={proposal.type} />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground uppercase">Categorize</span>
+                <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
+                  title="Approve with edits">
+                  {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save & Approve
+                </button>
+                <button onClick={onCancelEdit} disabled={processing === proposal.id}
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            {categoryComboboxField('Category', 'proposedCategoryName')}
+            {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
+          </div>
+        );
+      case 'create_category':
+        fields = [
+          { label: 'Name', field: 'name', type: 'text' },
+          { label: 'Parent', field: 'parentName', type: 'text' },
+          { label: 'Color', field: 'color', type: 'text' },
+          { label: 'Income', field: 'isIncome', type: 'checkbox' },
+        ];
+        break;
+      case 'create_rule':
+        return (
+          <div className="p-4 bg-card border border-primary/40 rounded-lg">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
+                  <ProposalIcon type={proposal.type} />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground uppercase">New Rule</span>
+                <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
+                  title="Approve with edits">
+                  {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save & Approve
+                </button>
+                <button onClick={onCancelEdit} disabled={processing === proposal.id}
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2 mb-2">
+              {renderField('Name', 'ruleName', 'text')}
+              {renderField('Field', 'conditionField', 'select', ['description', 'payee', 'amount', 'memo'])}
+              {renderField('Operator', 'conditionOperator', 'select', ['contains', 'equals', 'starts_with', 'ends_with', 'regex'])}
+              {renderField('Value', 'conditionValue', 'text')}
+              {categoryComboboxField('Category', 'setCategoryName')}
+              {renderField('Case sensitive', 'conditionCaseSensitive', 'checkbox')}
+            </div>
+            {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
+          </div>
+        );
+    }
+
+    return (
+      <div className="p-4 bg-card border border-primary/40 rounded-lg">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
+              <ProposalIcon type={proposal.type} />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground uppercase">New Category</span>
+            <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
+              title="Approve with edits">
+              {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              Save & Approve
+            </button>
+            <button onClick={onCancelEdit} disabled={processing === proposal.id}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-2">
+          {fields.map((f) => renderField(f.label, f.field, f.type, f.options))}
+        </div>
+
+        {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
+      </div>
+    );
+  }
 
   const detailLines: string[] = [];
   switch (proposal.type) {
@@ -84,6 +254,13 @@ function ProposalCard({
         </div>
         {proposal.status === 'pending' && (
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onEdit(proposal.id)}
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+              title="Edit before approving"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => onApprove(proposal.id)}
               disabled={processing === proposal.id}
@@ -138,30 +315,24 @@ export default function AiSuggestionsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
-  const [showTestModal, setShowTestModal] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showTestProgress, setShowTestProgress] = useState(false);
-  const [processedCount, setProcessedCount] = useState(0);
-  const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
-  const [confirmModalConfig, setConfirmModalConfig] = useState<{
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    actionLabel: string;
-    isDestructive?: boolean;
-  } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalToAnalyze, setTotalToAnalyze] = useState<number | null>(null);
   const [newProposalsCount, setNewProposalsCount] = useState(0);
   const [newTxnsCount, setNewTxnsCount] = useState(0);
   const [newCategoriesCount, setNewCategoriesCount] = useState(0);
   const [newRulesCount, setNewRulesCount] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [batchSize, setBatchSize] = useState<number | null>(null);
-  const [totalToAnalyze, setTotalToAnalyze] = useState<number | null>(null);
   const [lastBatchAt, setLastBatchAt] = useState<number | null>(null);
   const [lastBatchDuration, setLastBatchDuration] = useState<number | null>(null);
+  const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
+  const [batchSize, setBatchSize] = useState(25);
+  const [showTestProgress, setShowTestProgress] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{ title: string; description: string; actionLabel: string; onConfirm: () => void; isDestructive?: boolean } | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPayload, setEditPayload] = useState<any>(null);
+  const [categories, setCategories] = useState<{ id: string; name: string; isIncome: boolean; parentId: string | null; color: string }[]>([]);
   const analyzingRef = useRef(false);
 
   const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
@@ -197,6 +368,10 @@ export default function AiSuggestionsPage() {
 
   useEffect(() => {
     fetchProposals();
+    fetch('/api/categories', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setCategories(data); })
+      .catch(() => {});
     // Restore analysis status from localStorage (survives navigation and reload)
     try {
       const raw = localStorage.getItem(STATUS_KEY);
@@ -458,21 +633,50 @@ export default function AiSuggestionsPage() {
     setShowTestProgress(true);
   };
 
+  const handleEdit = (id: string) => {
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) return;
+    setEditingId(id);
+    setEditPayload({ ...proposal.payload });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditPayload(null);
+  };
+
+  const handleEditField = (field: string, value: any) => {
+    setEditPayload((prev: any) => ({ ...prev, [field]: value }));
+  };
+
   const handleApprove = async (id: string) => {
+    const isEditing = editingId === id;
+    const modifiedPayload = isEditing ? editPayload : undefined;
+
     confirmAction({
       title: 'Approve Suggestion',
-      description: 'Are you sure you want to approve this AI suggestion? This will apply the change to your financial data.',
+      description: isEditing
+        ? 'Are you sure you want to approve this suggestion with your edits? This will apply the change to your financial data.'
+        : 'Are you sure you want to approve this AI suggestion? This will apply the change to your financial data.',
       actionLabel: 'Approve',
       onConfirm: async () => {
         setProcessing(id);
         try {
-          const res = await fetch(`/api/ai/proposals/${id}/approve`, { method: 'POST', credentials: 'include' });
+          const body = modifiedPayload ? { payload: modifiedPayload } : {};
+          const res = await fetch(`/api/ai/proposals/${id}/approve`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
           if (!res.ok) {
             const data = await res.json();
             showFeedback('error', data.error || 'Failed to approve suggestion');
           } else {
             showFeedback('success', 'Approved.');
           }
+          setEditingId(null);
+          setEditPayload(null);
           await fetchProposals();
         } catch {
           showFeedback('error', 'Failed to approve.');
@@ -873,6 +1077,12 @@ export default function AiSuggestionsPage() {
                     onApprove={handleApprove}
                     onReject={handleReject}
                     processing={processing}
+                    editingId={editingId}
+                    editPayload={editPayload}
+                    onEdit={handleEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onEditField={handleEditField}
+                    categories={categories}
                   />
                 </div>
               </div>

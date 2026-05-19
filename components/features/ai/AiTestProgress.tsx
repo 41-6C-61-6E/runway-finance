@@ -92,12 +92,29 @@ export default function AiTestProgress({
       stopTimer();
       const now = Date.now();
       setElapsed(now - startRef.current);
+      
+      // Ensure receiving shows 'active' briefly before 'done' to avoid the "flash" issue
+      // where it goes from pending -> done without showing active
+      const prevReceiving = stageStatus.receiving;
       setStageStatus(prev => ({
         ...prev,
         connecting: 'done',
         sending: 'done',
-        receiving: res.ok ? 'done' : 'error',
+        receiving: prevReceiving === 'pending' ? 'active' : (res.ok ? 'done' : 'error'),
       }));
+      
+      // If we just set receiving to 'active', transition to 'done' after a short delay
+      if (prevReceiving === 'pending') {
+        setTimeout(() => {
+          if (!cancelled) {
+            setStageStatus(prev => ({
+              ...prev,
+              receiving: res.ok ? 'done' : 'error',
+            }));
+          }
+        }, 300);
+      }
+      
       setStageTimings({
         config: (stageStartRef.current.connecting || now) - (stageStartRef.current.config || now),
         connecting: (stageStartRef.current.sending || now) - (stageStartRef.current.connecting || now),

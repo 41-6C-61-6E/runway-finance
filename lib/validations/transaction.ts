@@ -11,6 +11,7 @@ export const TransactionFilterSchema = z.object({
   search: z.string().max(200).optional(),
   pending: z.coerce.boolean().optional(),
   reviewed: z.coerce.boolean().optional(),
+  categorizedByAi: z.coerce.boolean().optional(),
   minAmount: z.coerce.number().optional(),
   maxAmount: z.coerce.number().optional(),
   limit: z.coerce.number().min(1).max(200).default(50),

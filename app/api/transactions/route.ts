@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     search: searchParams.get('search') ?? undefined,
     pending: searchParams.get('pending') ?? undefined,
     reviewed: searchParams.get('reviewed') ?? undefined,
+    categorizedByAi: searchParams.get('categorizedByAi') ?? undefined,
     minAmount: searchParams.get('minAmount') ?? undefined,
     maxAmount: searchParams.get('maxAmount') ?? undefined,
     limit: parseInt(searchParams.get('limit') ?? '50', 10),
@@ -85,6 +86,9 @@ export async function GET(request: Request) {
   }
   if (filters.reviewed !== undefined) {
     whereConditions.push(eq(transactions.reviewed, filters.reviewed));
+  }
+  if (filters.categorizedByAi !== undefined) {
+    whereConditions.push(eq(transactions.categorizedByAi, filters.categorizedByAi));
   }
 
   // Handle category filter

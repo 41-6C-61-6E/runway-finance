@@ -364,8 +364,11 @@ async function callAiApi(
         if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
           throw new Error(`Invalid suggestion type: ${s.type}`);
         }
-        if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 1) {
+        if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 100) {
           throw new Error(`Invalid confidence value: ${s.confidence}`);
+        }
+        if (s.confidence > 1) {
+          s.confidence /= 100;
         }
       }
 
@@ -393,11 +396,23 @@ function buildPayload(
     case 'categorize': {
       const tx = txns[suggestion.transactionIndex];
       if (!tx) return null;
+
+      let resolvedCategoryId = suggestion.categoryId;
+      if (resolvedCategoryId) {
+        const catById = categories.find((c) => c.id === resolvedCategoryId);
+        if (!catById) {
+          const catByName = suggestion.categoryName
+            ? categories.find((c) => c.name.toLowerCase() === suggestion.categoryName.toLowerCase())
+            : null;
+          resolvedCategoryId = catByName?.id ?? null;
+        }
+      }
+
       return {
         type: 'categorize',
         transactionId: tx.id,
         transactionDescription: tx.description,
-        proposedCategoryId: suggestion.categoryId,
+        proposedCategoryId: resolvedCategoryId,
         proposedCategoryName: suggestion.categoryName,
       };
     }
@@ -487,6 +502,9 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     switch (proposal.type) {
       case 'categorize': {
         let categoryId = payload.proposedCategoryId;
+        if (categoryId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId)) {
+          categoryId = null;
+        }
         if (!categoryId && payload.proposedCategoryName) {
           categoryId = categoryIdMap.get(payload.proposedCategoryName) ?? null;
         }
