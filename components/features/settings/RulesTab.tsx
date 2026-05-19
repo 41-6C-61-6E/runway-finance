@@ -78,35 +78,72 @@ export default function RulesTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSystemRules, setShowSystemRules] = useState(true);
   const [systemToggling, setSystemToggling] = useState(false);
+  const [showAiGeneratedRules, setShowAiGeneratedRules] = useState(true);
+  const [aiToggling, setAiToggling] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const getCategoryName = (id: string | null) => {
+  const getCategoryName = useCallback((id: string | null) => {
     if (!id) return null;
     return categories.find((c) => c.id === id) ?? null;
-  };
+  }, [categories]);
 
   const systemRules = useMemo(() => rules.filter((r) => r.isSystem), [rules]);
   const systemRulesAllActive = useMemo(
     () => systemRules.length > 0 && systemRules.every((r) => r.isActive),
     [systemRules]
   );
+
+  // Get AI-generated rules
+  const aiRules = useMemo(() => rules.filter((r) => r.createdByAi), [rules]);
+  const aiRulesAllActive = useMemo(
+    () => aiRules.length > 0 && aiRules.every((r) => r.isActive),
+    [aiRules]
+  );
+
+  // Enhanced search filtering with error handling
   const filteredRules = useMemo(() => {
-    let result = rules;
-    if (!showSystemRules) {
-      result = result.filter((r) => !r.isSystem);
+    try {
+      let result = rules;
+      
+      // Filter out system rules if not shown
+      if (!showSystemRules) {
+        result = result.filter((r) => !r.isSystem);
+      }
+      
+      // Filter out AI-generated rules if not shown
+      if (!showAiGeneratedRules) {
+        result = result.filter((r) => !r.createdByAi);
+      }
+      
+      // Apply search filter if query exists
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter((r) => {
+          try {
+            const cat = r.setCategoryId ? getCategoryName(r.setCategoryId) : null;
+            const catName = cat ? cat.name.toLowerCase() : '';
+            
+            // Safely check all fields for matches
+            return (
+              (r.name && r.name.toLowerCase().includes(q)) ||
+              (r.conditionValue && r.conditionValue.toLowerCase().includes(q)) ||
+              (catName && catName.includes(q)) ||
+              (r.createdByAi && q.includes('ai'))
+            );
+          } catch (e) {
+            // If there's an error in filtering, return false to exclude the item
+            console.error('Error filtering rule:', e);
+            return false;
+          }
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error in filteredRules calculation:', error);
+      return [];
     }
-    if (!searchQuery.trim()) return result;
-    const q = searchQuery.toLowerCase();
-    return result.filter((r) => {
-      const cat = r.setCategoryId ? getCategoryName(r.setCategoryId) : null;
-      const catName = cat ? cat.name.toLowerCase() : '';
-      return (
-        r.name.toLowerCase().includes(q) ||
-        r.conditionValue.toLowerCase().includes(q) ||
-        catName.includes(q)
-      );
-    });
-  }, [rules, searchQuery, categories, showSystemRules]);
+  }, [rules, searchQuery, categories, showSystemRules, showAiGeneratedRules, getCategoryName]);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -124,7 +161,8 @@ export default function RulesTab() {
       const data = await res.json();
       showFeedback('success', `Rule applied: ${data.matched} of ${data.total} transactions matched.`);
       await fetchRules();
-    } catch {
+    } catch (error) {
+      console.error('Error running rule:', error);
       showFeedback('error', 'Failed to apply rule.');
     } finally {
       setRunningRuleId(null);
@@ -142,7 +180,8 @@ export default function RulesTab() {
       const data = await res.json();
       showFeedback('success', `All rules applied: ${data.updated} of ${data.total} transactions updated.`);
       await fetchRules();
-    } catch {
+    } catch (error) {
+      console.error('Error running all rules:', error);
       showFeedback('error', 'Failed to apply all rules.');
     } finally {
       setRunningAll(false);
@@ -160,7 +199,8 @@ export default function RulesTab() {
       setShowResetConfirm(false);
       showFeedback('success', 'Rules reset to defaults.');
       await fetchRules();
-    } catch {
+    } catch (error) {
+      console.error('Error resetting rules:', error);
       showFeedback('error', 'Failed to reset rules.');
     } finally {
       setResetting(false);
@@ -172,7 +212,8 @@ export default function RulesTab() {
       const res = await fetch('/api/category-rules', { credentials: 'include' });
       const data = await res.json();
       setRules(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching rules:', error);
       setRules([]);
     }
   }, []);
@@ -182,13 +223,15 @@ export default function RulesTab() {
       const res = await fetch('/api/categories', { credentials: 'include' });
       const data = await res.json();
       setCategories(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching categories:', error);
       setCategories([]);
     }
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchRules(), fetchCategories()]).finally(() => setLoading(false));
+    Promise.all([fetchRules(), fetchCategories()])
+      .finally(() => setLoading(false));
   }, [fetchRules, fetchCategories]);
 
   const openAdd = () => {
@@ -252,6 +295,9 @@ export default function RulesTab() {
       setDrawerOpen(false);
       setEditingRule(null);
       await fetchRules();
+    } catch (error) {
+      console.error('Error saving rule:', error);
+      showFeedback('error', 'Failed to save rule.');
     } finally {
       setSaving(false);
     }
@@ -266,7 +312,9 @@ export default function RulesTab() {
       });
       setDeleting(null);
       await fetchRules();
-    } catch {}
+    } catch (error) {
+      console.error('Error deleting rule:', error);
+    }
   };
 
   const handleMove = async (ruleId: string, direction: 'up' | 'down') => {
@@ -287,7 +335,9 @@ export default function RulesTab() {
         body: JSON.stringify({ rules: updates }),
       });
       await fetchRules();
-    } catch {}
+    } catch (error) {
+      console.error('Error moving rule:', error);
+    }
   };
 
   const handleToggleActive = async (rule: Rule) => {
@@ -299,7 +349,9 @@ export default function RulesTab() {
         body: JSON.stringify({ isActive: !rule.isActive }),
       });
       await fetchRules();
-    } catch {}
+    } catch (error) {
+      console.error('Error toggling rule active status:', error);
+    }
   };
 
   const handleToggleSystemRules = async () => {
@@ -315,28 +367,60 @@ export default function RulesTab() {
       if (!res.ok) throw new Error('Failed to toggle system rules');
       showFeedback('success', `System rules ${newActive ? 'enabled' : 'disabled'}.`);
       await fetchRules();
-    } catch {
+    } catch (error) {
+      console.error('Error toggling system rules:', error);
       showFeedback('error', 'Failed to toggle system rules.');
     } finally {
       setSystemToggling(false);
     }
   };
 
+  const handleToggleAiRules = async () => {
+    const newActive = !aiRulesAllActive;
+    setAiToggling(true);
+    try {
+      const res = await fetch('/api/category-rules/toggle-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ active: newActive }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle AI rules');
+      showFeedback('success', `AI rules ${newActive ? 'enabled' : 'disabled'}.`);
+      await fetchRules();
+    } catch (error) {
+      console.error('Error toggling AI rules:', error);
+      showFeedback('error', 'Failed to toggle AI rules.');
+    } finally {
+      setAiToggling(false);
+    }
+  };
+
   const formatCondition = (rule: Rule) => {
-    const field = FIELD_OPTIONS.find((f) => f.value === rule.conditionField)?.label ?? rule.conditionField;
-    const op = OPERATOR_LABELS[rule.conditionOperator] ?? rule.conditionOperator;
-    return `${field} ${op} "${rule.conditionValue}"`;
+    try {
+      const field = FIELD_OPTIONS.find((f) => f.value === rule.conditionField)?.label ?? rule.conditionField;
+      const op = OPERATOR_LABELS[rule.conditionOperator] ?? rule.conditionOperator;
+      return `${field} ${op} "${rule.conditionValue}"`;
+    } catch (error) {
+      console.error('Error formatting condition:', error);
+      return 'Invalid condition';
+    }
   };
 
   const formatAction = (rule: Rule) => {
-    const parts: string[] = [];
-    if (rule.setCategoryId) {
-      const cat = getCategoryName(rule.setCategoryId);
-      if (cat) parts.push(`→ ${cat.name}`);
+    try {
+      const parts: string[] = [];
+      if (rule.setCategoryId) {
+        const cat = getCategoryName(rule.setCategoryId);
+        if (cat) parts.push(`→ ${cat.name}`);
+      }
+      if (rule.setPayee) parts.push(`payee: "${rule.setPayee}"`);
+      if (rule.setReviewed === true) parts.push('mark reviewed');
+      return parts.length > 0 ? parts.join(', ') : '—';
+    } catch (error) {
+      console.error('Error formatting action:', error);
+      return '—';
     }
-    if (rule.setPayee) parts.push(`payee: "${rule.setPayee}"`);
-    if (rule.setReviewed === true) parts.push('mark reviewed');
-    return parts.length > 0 ? parts.join(', ') : '—';
   };
 
   if (loading) {
@@ -387,6 +471,7 @@ export default function RulesTab() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
             placeholder="Search rules by name, keyword, or category..."
+            aria-label="Search rules"
           />
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -403,6 +488,21 @@ export default function RulesTab() {
               checked={systemRulesAllActive}
               onCheckedChange={handleToggleSystemRules}
               disabled={systemToggling}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">Show AI Generated</span>
+            <Switch
+              checked={showAiGeneratedRules}
+              onCheckedChange={setShowAiGeneratedRules}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">Enable AI Generated</span>
+            <Switch
+              checked={aiRulesAllActive}
+              onCheckedChange={handleToggleAiRules}
+              disabled={aiToggling}
             />
           </div>
         </div>

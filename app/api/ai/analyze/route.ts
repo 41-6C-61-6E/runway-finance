@@ -68,7 +68,8 @@ export async function POST() {
               existing.log = existing.log.slice(-50);
             }
           }
-        }
+        },
+        abortController
       );
 
       const existing = activeAnalysisSessions.get(userId);
