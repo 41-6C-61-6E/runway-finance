@@ -15,11 +15,7 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
     description:
       'Ratio = Total Liabilities / Total Assets. Rating thresholds: < 0.35 Excellent, < 0.45 Good, < 0.55 Fair, < 0.75 Poor, ≥ 0.75 Critical. Donut slices show each category\'s share of total assets or total debt.',
   },
-  assetAllocationChart: {
-    title: 'Asset Allocation',
-    description:
-      'Each asset type\'s allocation = (sum of balances for that type / total assets) × 100.',
-  },
+
   accountValuesChart: {
     title: 'Account Values',
     description:

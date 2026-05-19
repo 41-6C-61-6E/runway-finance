@@ -52,6 +52,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     transactionsFetched: result.transactionsFetched,
     transactionsNew: result.transactionsNew,
     transactionsUpdated: result.transactionsUpdated,
+    details: result.details ?? [],
+    durationMs: result.durationMs ?? 0,
     ...(result.status === 'error' && { error: result.errorMessage }),
   }, { status: result.status === 'success' ? 200 : 502 });
 }

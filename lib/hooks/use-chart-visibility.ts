@@ -9,7 +9,6 @@ export const CHARTS = {
       netWorthSummary: 'Summary Cards',
       netWorthChart: 'Net Worth Line Chart',
       debtToAssetRatio: 'Debt-to-Asset Ratio',
-      assetAllocationChart: 'Asset Allocation Chart',
       accountValuesChart: 'Account Values Chart',
     },
   },

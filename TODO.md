@@ -4,15 +4,7 @@
 
 ## CHANGES:
 - get defaults right
-- [DONE] Fix Budget Actual logic:
-  - Resolved strict date comparison issue by using exclusive range (gte/lt) for timestamps and UTC period boundaries.
-  - Implemented recursive category roll-up to include sub-category spending in parent budgets (supporting multi-level budget mapping).
-  - Switched to live transaction querying with `force-dynamic` to ensure real-time budget updates.
-  - Decrypted category names in the API to fix UI display and matching issues.
-
-- [DONE] Searchable Budget Categories:
-  - Created `CategoryCombobox` to replace standard Select in budget creation.
-  - Integrated search and color visualization for category selection.
+- support for extra principal, prinicpal, interest, escrow
 
 - show the math needs to show example calculations with real data
 - Net worth display assets and liabilities doesnt do anyhting in bar chart mode. It should display opposing bars (assets up and liabilities down), with a line through the chart for net worth.

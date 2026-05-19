@@ -247,6 +247,7 @@ export const syncLogs = pgTable('sync_logs', {
   transactionsNew: text('transactions_new').notNull(),
   errorMessage: text('error_message'),
   durationMs: text('duration_ms'),
+  details: text('details'),
 });
 
 // ── Category Rules ───────────────────────────────────────────────────────────
