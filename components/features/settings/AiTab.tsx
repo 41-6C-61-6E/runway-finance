@@ -113,25 +113,29 @@ export default function AiTab() {
   const [testProgressFn, setTestProgressFn] = useState<((signal: AbortSignal) => Promise<{ ok: boolean; message: string; response?: string }>) | null>(null);
 
   const loadData = async () => {
-    const [provRes, settingsRes] = await Promise.all([
-      fetch('/api/ai/providers', { credentials: 'include' }),
-      fetch('/api/user-settings', { credentials: 'include' }),
-    ]);
-    if (provRes.ok) {
-      const data: Provider[] = await provRes.json();
-      setProviders(data);
-    }
-    if (settingsRes.ok) {
-      const data = await settingsRes.json();
-      setAutomation({
-        aiSystemPrompt: data.aiSystemPrompt ?? null,
-        aiAutoAnalyze: data.aiAutoAnalyze ?? false,
-        aiAutoApprove: data.aiAutoApprove ?? false,
-        aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
-         aiBatchSize: data.aiBatchSize ?? 25,
-         aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 600,
-        aiActiveProviderId: data.aiActiveProviderId ?? null,
-      });
+    try {
+      const [provRes, settingsRes] = await Promise.all([
+        fetch('/api/ai/providers', { credentials: 'include' }),
+        fetch('/api/user-settings', { credentials: 'include' }),
+      ]);
+      if (provRes.ok) {
+        const data: Provider[] = await provRes.json();
+        setProviders(data);
+      }
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        setAutomation({
+          aiSystemPrompt: data.aiSystemPrompt ?? null,
+          aiAutoAnalyze: data.aiAutoAnalyze ?? false,
+          aiAutoApprove: data.aiAutoApprove ?? false,
+          aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
+          aiBatchSize: data.aiBatchSize ?? 25,
+          aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 600,
+          aiActiveProviderId: data.aiActiveProviderId ?? null,
+        });
+      }
+    } catch {
+      setSaveResult({ ok: false, message: 'Failed to load AI settings' });
     }
     setLoading(false);
   };
@@ -188,7 +192,7 @@ export default function AiTab() {
     if (res.ok) {
       setShowForm(false);
       setSaveResult({ ok: true, message: editingId ? 'Provider updated.' : 'Provider added.' });
-      loadData();
+      await loadData();
     } else {
       const data = await res.json().catch(() => ({}));
       setSaveResult({ ok: false, message: data.error || data.message || 'Failed to save provider' });
@@ -238,7 +242,7 @@ export default function AiTab() {
     });
     if (res.ok) {
       setSaveResult({ ok: true, message: 'Provider deleted.' });
-      loadData();
+      await loadData();
     } else {
       setSaveResult({ ok: false, message: 'Failed to delete provider' });
     }
@@ -253,7 +257,7 @@ export default function AiTab() {
     });
     if (res.ok) {
       setSaveResult({ ok: true, message: 'Active provider updated.' });
-      loadData();
+      await loadData();
     } else {
       setSaveResult({ ok: false, message: 'Failed to set active provider' });
     }

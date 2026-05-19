@@ -385,7 +385,7 @@ export default function AiSuggestionsPage() {
         };
       } else {
         const msg = data.errors?.length
-          ? `Analysis completed with ${data.errors.length} error(s). ${data.proposalsCreated} proposals created.`
+          ? `Analysis completed with ${data.errors.length} error(s): ${data.errors.join('; ')}. ${data.proposalsCreated} proposals created.`
           : `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
         finalStatus = { status: data.errors?.length ? 'error' : 'completed', message: msg };
       }
@@ -698,11 +698,9 @@ export default function AiSuggestionsPage() {
               ) : savedStatus?.status === 'error' ? (
                 <>
                   <p className="font-medium text-destructive">{savedStatus.message}</p>
-                  {savedStatus.message.includes('timed out') && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      The analysis took longer than expected. Try running it again, or check your AI provider settings.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Check your AI provider settings and try again. If the issue persists, verify your AI provider endpoint and API key.
+                  </p>
                 </>
               ) : (
                 <p className="text-sm">{savedStatus?.message}</p>
@@ -718,7 +716,7 @@ export default function AiSuggestionsPage() {
                   Cancel
                 </button>
               )}
-              {savedStatus?.status === 'error' && savedStatus.message.includes('timed out') && (
+              {savedStatus?.status === 'error' && (
                 <button
                   onClick={handleAnalyze}
                   disabled={analyzing}
