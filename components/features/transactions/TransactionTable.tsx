@@ -68,6 +68,7 @@ const ALL_COLUMNS: string[] = [
   'date',
   'postedDate',
   'description',
+  'ai',
   'account',
   'category',
   'amount',
@@ -78,6 +79,7 @@ const COLUMN_LABELS: Record<string, string> = {
   date: 'Date',
   postedDate: 'Posted',
   description: 'Description',
+  ai: 'AI',
   account: 'Account',
   category: 'Category',
   amount: 'Amount',
@@ -88,6 +90,7 @@ const COLUMN_MIN_WIDTHS: Record<string, number> = {
   date: 90,
   postedDate: 90,
   description: 120,
+  ai: 40,
   account: 80,
   category: 100,
   amount: 100,
@@ -436,6 +439,23 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
             </div>
           );
         },
+      },
+      {
+        id: 'ai',
+        accessorFn: (row) => row.categorizedByAi,
+        header: ({ column }) => (
+          <SortableHeader column={column} title="AI" />
+        ),
+        cell: ({ row }) => {
+          const categorizedByAi = row.getValue('ai') as boolean;
+          if (!categorizedByAi) return null;
+          return (
+            <div className="flex items-center justify-center" title="Categorized by AI">
+              <Sparkles className="h-3.5 w-3.5 text-primary/70" />
+            </div>
+          );
+        },
+        enableSorting: false,
       },
       {
         accessorKey: 'accountName',

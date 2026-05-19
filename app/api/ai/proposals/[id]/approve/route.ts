@@ -8,7 +8,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
@@ -18,6 +18,9 @@ export async function POST(
 
   const userId = session.user.id;
   const { id } = await params;
+
+  let body: { payload?: any } = {};
+  try { body = await request.json(); } catch { /* no body */ }
 
   const db = getDb();
 
@@ -35,16 +38,20 @@ export async function POST(
     return NextResponse.json({ error: 'Proposal already processed' }, { status: 400 });
   }
 
-  const payload = proposal.payload as any;
+  const payload = (body.payload ?? proposal.payload) as any;
   const dek = await getSessionDEK();
 
   try {
     switch (proposal.type) {
       case 'categorize': {
+        let categoryId = payload.proposedCategoryId;
+        if (categoryId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId)) {
+          categoryId = null;
+        }
         await db
           .update(transactions)
           .set({
-            categoryId: payload.proposedCategoryId,
+            categoryId,
             reviewed: true,
             categorizedByAi: true,
             updatedAt: new Date(),

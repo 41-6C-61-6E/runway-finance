@@ -67,9 +67,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   wrappedDek: pwdWrapped.ciphertext,
                   wrappingIv: pwdWrapped.iv,
                   wrappingTag: pwdWrapped.tag,
-                  serverWrappedDek: null,
-                  serverWrappingIv: null,
-                  serverWrappingTag: null,
                   updatedAt: new Date(),
                 }).where(eq(userEncryptionKeys.userId, user.username));
               } else {
@@ -79,6 +76,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   iv: keyRow.wrappingIv,
                   tag: keyRow.wrappingTag,
                 }, kek);
+
+                const serverKey = getServerKey();
+                const serverWrapped = await wrapKey(dek, serverKey);
+                await db.update(userEncryptionKeys).set({
+                  serverWrappedDek: serverWrapped.ciphertext,
+                  serverWrappingIv: serverWrapped.iv,
+                  serverWrappingTag: serverWrapped.tag,
+                }).where(eq(userEncryptionKeys.userId, user.username));
               }
             } else {
               dek = generateDEK();

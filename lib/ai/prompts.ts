@@ -8,7 +8,7 @@ Rules:
 - Only suggest a new category if no existing category fits well (3+ similar transactions with no good match).
 - Only suggest a rule if a clear, reusable pattern exists across 2+ transactions.
 - Prefer using existing categories over creating new ones.
-- Be conservative with confidence scores — 95%+ only for obvious matches.
+- Confidence must be a decimal between 0 and 1 (e.g., 0.95, not 95). Be conservative — 0.95+ only for obvious matches.
 - Colors should be hex codes. Suggest colors that visually suit the category type.
 
 Respond with ONLY valid JSON matching this schema:
@@ -54,5 +54,5 @@ For "create_rule" suggestions:
 - Only suggest rules for clear, repetitive patterns.
 - Condition operators: "contains" (substring match), "equals" (exact), "starts_with" (prefix), "ends_with" (suffix), "regex" (regular expression).`;
 
-export const DEFAULT_TEST_PROMPT = 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
+export const DEFAULT_TEST_PROMPT = 'Write a haiku about money, finance, retirement, investing, or financial freedom.';
 export const TEST_PROMPT_STORAGE_KEY = 'ai_test_prompt';

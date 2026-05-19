@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { cookies } from 'next/headers';
 import { getDb } from '@/lib/db';
 import { aiProviders, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
-import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
 
 export async function GET() {
+  await cookies(); // ensure route is treated as dynamic under cacheComponents
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  // Seed env-configured providers for existing users on first load
-  await seedUserAiProviders(session.user.id);
-
   const db = getDb();
   const dek = await getSessionDEK();
+
   const rows = await db
     .select()
     .from(aiProviders)

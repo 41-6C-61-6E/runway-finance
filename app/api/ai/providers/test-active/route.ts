@@ -5,6 +5,7 @@ import { aiProviders, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
+import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
   const endpoint = provider.endpoint.replace(/\/$/, '');
   const model = provider.model;
-  const userPrompt = body.prompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.';
+  const userPrompt = body.prompt || DEFAULT_TEST_PROMPT;
 
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: userPrompt }],
-        max_tokens: 10,
+        max_tokens: 200,
       }),
     });
     const elapsed = Date.now() - startTime;

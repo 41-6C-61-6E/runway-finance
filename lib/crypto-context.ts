@@ -44,14 +44,5 @@ export async function getServerDEK(userId: string): Promise<Uint8Array> {
     );
   }
 
-  // Fallback: if no server-wrapped DEK exists, try the password-wrapped DEK
-  // This handles existing users before server re-wrap
-  return unwrapKey(
-    {
-      ciphertext: keyRow.wrappedDek,
-      iv: keyRow.wrappingIv,
-      tag: keyRow.wrappingTag,
-    },
-    serverKey,
-  );
+  throw new Error('No server-wrapped encryption key found — please log in again to re-generate it');
 }
