@@ -625,7 +625,27 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
           </div>
         </div>
 
-        {/* Status and Amount Filters Row */}
+          {/* Amount Filter Group */}
+          <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount:</span>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.minAmount ?? ''}
+              onChange={(e) => onChange('minAmount', e.target.value || null)}
+              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.maxAmount ?? ''}
+              onChange={(e) => onChange('maxAmount', e.target.value || null)}
+              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+            />
+          </div>
+
+        {/* Status Filters Row */}
         <div className="flex flex-wrap gap-2 items-center pt-1">
           {/* Status Filter Group */}
           <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
@@ -670,26 +690,6 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
             >
               AI Categorized
             </button>
-          </div>
-
-          {/* Amount Filter Group */}
-          <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount:</span>
-            <input
-              type="number"
-              placeholder="Min"
-              value={filters.minAmount ?? ''}
-              onChange={(e) => onChange('minAmount', e.target.value || null)}
-              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <input
-              type="number"
-              placeholder="Max"
-              value={filters.maxAmount ?? ''}
-              onChange={(e) => onChange('maxAmount', e.target.value || null)}
-              className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-            />
           </div>
 
           {/* Clear All Button */}

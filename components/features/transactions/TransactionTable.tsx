@@ -140,6 +140,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     account: true,
     category: true,
     postedDate: false,
+    ai: false,
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
