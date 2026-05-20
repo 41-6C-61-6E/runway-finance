@@ -36,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  let body: { label?: string };
+  let body: { label?: string; syncFrequency?: string };
   try {
     body = await request.json();
   } catch {
@@ -46,20 +46,36 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  if (!body.label || body.label.trim().length === 0) {
-    return NextResponse.json(
-      { error: 'validation_error', message: 'Label is required' },
-      { status: 400 }
-    );
+  const updateData: Record<string, any> = {};
+  
+  if ('label' in body && body.label !== undefined) {
+    if (!body.label || body.label.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'Label is required' },
+        { status: 400 }
+      );
+    }
+    updateData.label = body.label.trim();
+  }
+
+  if ('syncFrequency' in body && body.syncFrequency !== undefined) {
+    const validFrequencies = ['manual', 'daily', 'weekly', 'monthly'];
+    if (!validFrequencies.includes(body.syncFrequency)) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'Invalid sync frequency' },
+        { status: 400 }
+      );
+    }
+    updateData.syncFrequency = body.syncFrequency;
   }
 
   const [updated] = await getDb()
     .update(simplifinConnections)
-    .set({ label: body.label.trim() })
+    .set(updateData)
     .where(eq(simplifinConnections.id, id))
     .returning();
 
-  logger.info('Connection label updated', { connectionId: id, label: body.label.trim() });
+  logger.info('Connection updated', { connectionId: id, updateData });
   return NextResponse.json(updated);
 }
 

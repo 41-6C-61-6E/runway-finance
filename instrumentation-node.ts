@@ -13,11 +13,13 @@ export async function registerNodeInstrumentation(): Promise<void> {
     logger.error('[startup] Database initialization failed', { error: err instanceof Error ? err.message : String(err) });
   }
 
-  // Register cron sync task
+  // Register cron sync task (now deprecated - connections will be synced on-demand)
+  // The global cron sync is replaced by per-connection sync frequency configuration
   const schedule = process.env.SYNC_CRON_SCHEDULE ?? '';
 
   if (!schedule) {
-    logger.warn(`${LOG_TAG} SYNC_CRON_SCHEDULE is not set — periodic sync is disabled.`);
+    logger.warn(`[runway-sync] SYNC_CRON_SCHEDULE is not set — periodic sync is disabled.`);
+    logger.warn(`[runway-sync] Periodic sync is now handled per-connection with configurable frequencies.`);
     return;
   }
 

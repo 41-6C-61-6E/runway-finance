@@ -189,13 +189,11 @@ export default function ResizableSidebar() {
                   <>
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        appStatus.connected
-                          ? appStatus.lastSyncStatus === 'ok'
-                            ? 'bg-chart-1'
-                            : appStatus.lastSyncStatus === 'error'
-                            ? 'bg-destructive'
-                            : 'bg-chart-3'
-                          : 'bg-muted-foreground/50'
+                        appStatus.lastSyncStatus === 'ok'
+                          ? 'bg-status-positive'
+                          : appStatus.lastSyncStatus === 'error'
+                          ? 'bg-destructive'
+                          : 'bg-status-warning'
                       }`} />
                       <span className="text-xs text-sidebar-foreground/70">
                         {appStatus.connected ? 'Connected' : 'No bridge'}

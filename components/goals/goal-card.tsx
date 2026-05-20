@@ -47,7 +47,7 @@ function getPriorityBadge(priority: number) {
 function getStatusBadge(status: string) {
   switch (status) {
     case 'completed':
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-chart-1/20 text-chart-1 uppercase">Done</span>;
+      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-positive/20 text-status-positive uppercase">Done</span>;
     case 'paused':
       return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase">Paused</span>;
     default:
@@ -207,7 +207,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
             </span>
           )}
           {isCompleted && (
-            <span className="text-chart-1 font-medium">✓ Complete</span>
+            <span className="text-status-positive font-medium">✓ Complete</span>
           )}
         </div>
       </div>

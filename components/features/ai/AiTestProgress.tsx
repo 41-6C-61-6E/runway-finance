@@ -155,7 +155,8 @@ export default function AiTestProgress({
       case 'active':
         return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
       case 'done':
-        return <Check className="h-4 w-4 text-chart-2" />;
+         return <Check className="h-4 w-4 text-status-positive" />;
+
       case 'error':
         return <X className="h-4 w-4 text-destructive" />;
     }
@@ -251,7 +252,8 @@ export default function AiTestProgress({
                   <X className="h-4 w-4 text-destructive" />
                 )}
                 <span className={`text-sm font-semibold ${
-                  result.ok ? 'text-chart-2' : 'text-destructive'
+                   result.ok ? 'text-status-positive' : 'text-destructive'
+
                 }`}>
                   {result.ok ? 'Connected' : 'Connection Failed'}
                 </span>
@@ -260,7 +262,8 @@ export default function AiTestProgress({
                 </span>
               </div>
               <p className={`text-xs mt-1 ${
-                result.ok ? 'text-chart-2/80' : 'text-destructive/80'
+                 result.ok ? 'text-status-positive/80' : 'text-destructive/80'
+
               }`}>
                 {result.message}
               </p>

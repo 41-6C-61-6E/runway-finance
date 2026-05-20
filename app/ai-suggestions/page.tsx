@@ -18,7 +18,7 @@ type AiProposal = {
 };
 
 function confidenceColor(confidence: number): string {
-  if (confidence >= 80) return 'bg-chart-2/20 text-chart-2';
+  if (confidence >= 80) return 'bg-status-positive/20 text-status-positive';
   if (confidence >= 50) return 'bg-yellow-500/20 text-yellow-500';
   return 'bg-destructive/20 text-destructive';
 }
@@ -805,7 +805,8 @@ export default function AiSuggestionsPage() {
           </div>
           <div className="flex items-center gap-2">
             {feedback && (
-              <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
+               <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+
                 {feedback.message}
               </span>
             )}
