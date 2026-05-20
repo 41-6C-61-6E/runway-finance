@@ -684,7 +684,8 @@ export default function ManualAccountsSection() {
       {syncResult && (
         <div className={`mb-4 p-3 rounded-lg border ${
           syncResult.status === 'success'
-            ? 'bg-chart-1/10 border-chart-1/20'
+                        ? 'bg-status-positive/10 border-status-positive/20'
+
             : 'bg-destructive/10 border-destructive/20'
         }`}>
           <p className={`text-xs font-medium ${syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
@@ -718,10 +719,10 @@ export default function ManualAccountsSection() {
                     <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                       account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
                       account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
-                      account.type === 'crypto' ? 'bg-chart-2/20 text-chart-2' :
+                       account.type === 'crypto' ? 'bg-status-positive/20 text-status-positive' :
                       account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
                       account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
-                      account.type === 'cash' ? 'bg-chart-1/20 text-chart-1' :
+                       account.type === 'cash' ? 'bg-status-positive/20 text-status-positive' :
                       'bg-muted text-muted-foreground'
                     }`}>
                       {getSubTypeLabel(account)}

@@ -159,6 +159,7 @@ export const simplifinConnections = pgTable('simplefin_connections', {
   accessUrlIv: text('access_url_iv').notNull(),
   accessUrlTag: text('access_url_tag').notNull(),
   label: text('label').notNull().default('Primary'),
+  syncFrequency: text('sync_frequency').notNull().default('manual'),
   lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
   lastSyncStatus: text('last_sync_status').notNull().default('pending'),
   lastSyncError: text('last_sync_error'),

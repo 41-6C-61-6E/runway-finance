@@ -34,6 +34,8 @@ body,
   --chart-5: oklch(0.6 0.15 340);
   --chart-synthetic: oklch(0.7 0.1 150);
   --destructive-synthetic: oklch(0.65 0.12 25);
+  --status-positive: oklch(0.6 0.18 150);
+  --status-warning: oklch(0.65 0.15 50);
   --sidebar: oklch(0.99 0.001 60);
   --sidebar-foreground: oklch(0.18 0.01 285);
   --sidebar-primary: oklch(0.45 0.22 280);
@@ -80,6 +82,8 @@ body,
   --chart-5: oklch(0.65 0.15 340);
   --chart-synthetic: oklch(0.55 0.1 150);
   --destructive-synthetic: oklch(0.5 0.12 25);
+  --status-positive: oklch(0.7 0.18 150);
+  --status-warning: oklch(0.7 0.15 50);
   --sidebar: oklch(0.12 0.003 285);
   --sidebar-foreground: oklch(0.96 0.003 285);
   --sidebar-primary: oklch(0.62 0.2 280);
@@ -117,6 +121,8 @@ body,
   --chart-5: oklch(0.65 0.15 340);
   --chart-synthetic: oklch(0.55 0.1 150);
   --destructive-synthetic: oklch(0.5 0.12 25);
+  --status-positive: oklch(0.7 0.18 150);
+  --status-warning: oklch(0.7 0.15 50);
   --sidebar: oklch(0.22 0.003 285);
   --sidebar-foreground: oklch(0.85 0.003 285);
   --sidebar-primary: oklch(0.6 0.18 280);
@@ -153,6 +159,8 @@ body,
   --color-chart-5: var(--chart-5);
   --color-chart-synthetic: var(--chart-synthetic);
   --color-destructive-synthetic: var(--destructive-synthetic);
+  --color-status-positive: var(--status-positive);
+  --color-status-warning: var(--status-warning);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

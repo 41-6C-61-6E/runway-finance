@@ -4,3 +4,8 @@ export const CreateConnectionSchema = z.object({
   setupToken: z.string().min(1),
   label: z.string().max(100).default('Primary'),
 });
+
+export const UpdateConnectionSchema = z.object({
+  label: z.string().max(100).optional(),
+  syncFrequency: z.enum(['manual', 'daily', 'weekly', 'monthly']).optional(),
+});

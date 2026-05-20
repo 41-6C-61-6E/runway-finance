@@ -43,7 +43,6 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
-      - SYNC_CRON_SCHEDULE=0 */6 * * *
 
     depends_on:
       - postgres

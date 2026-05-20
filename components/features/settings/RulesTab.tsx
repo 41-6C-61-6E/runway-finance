@@ -433,7 +433,7 @@ export default function RulesTab() {
         <h2 className="text-lg font-semibold text-foreground">Categorization Rules</h2>
         <div className="flex items-center gap-2">
           {feedback && (
-            <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
+            <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
               {feedback.message}
             </span>
           )}

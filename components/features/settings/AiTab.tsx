@@ -464,7 +464,7 @@ export default function AiTab() {
               </button>
             </div>
             {formTestResult && (
-              <div className={`text-xs px-2 py-1 rounded-lg ${formTestResult.ok ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'}`}>
+              <div className={`text-xs px-2 py-1 rounded-lg ${formTestResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
                 {formTestResult.message}
               </div>
             )}

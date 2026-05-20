@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
-import { getDb } from '@/lib/db';
-import { simplifinConnections } from '@/lib/db/schema';
+import { auth } from '../../../lib/auth';
+import { requireDeleteConfirmation } from '../../../lib/utils/require-auth';
+import { getDb } from '../../../lib/db';
+import { simplifinConnections } from '../../../lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { logger } from '@/lib/logger';
+import { logger } from '../../../lib/logger';
 
 export async function GET() {
   const session = await auth();
@@ -18,6 +18,7 @@ export async function GET() {
     .select({
       id: simplifinConnections.id,
       label: simplifinConnections.label,
+      syncFrequency: simplifinConnections.syncFrequency,
       lastSyncAt: simplifinConnections.lastSyncAt,
       lastSyncStatus: simplifinConnections.lastSyncStatus,
       lastSyncError: simplifinConnections.lastSyncError,
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { setupToken: string; label?: string };
+  let body: { setupToken: string; label?: string; syncFrequency?: string };
   try {
     body = await request.json();
   } catch {
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
   }
 
   const { setupToken, label } = parsed.data;
+  const syncFrequency = body.syncFrequency || 'manual';
 
   // Claim access URL from SimpleFIN
   let accessUrl: string;
@@ -120,10 +122,11 @@ export async function POST(request: Request) {
       accessUrlIv: '',
       accessUrlTag: '',
       label,
+      syncFrequency,
     })
     .returning();
 
-  logger.info('Connection created', { connectionId: connection.id, label: connection.label });
+  logger.info('Connection created', { connectionId: connection.id, label: connection.label, syncFrequency });
   return NextResponse.json(connection, { status: 201 });
 }
 

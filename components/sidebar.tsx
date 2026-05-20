@@ -7,6 +7,7 @@ export default function Sidebar() {
 
   const navItems = [
     { href: '/', label: 'Dashboard' },
+    { href: '/accounts', label: 'Accounts' },
     { href: '/settings', label: 'Settings' },
   ]
 

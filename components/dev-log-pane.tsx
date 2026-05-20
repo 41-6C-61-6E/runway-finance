@@ -213,10 +213,10 @@ export default function DevLogPane() {
       return 'bg-destructive'
     }
     if (logs.some((log) => log.level === 'warn')) {
-      return 'bg-chart-3'
+      return 'bg-status-warning'
     }
     if (isConnected) {
-      return 'bg-chart-1'
+      return 'bg-status-positive'
     }
     return 'bg-muted-foreground'
   }
@@ -245,7 +245,7 @@ export default function DevLogPane() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">Logs</span>
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-chart-1' : 'bg-destructive'}`} />
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-status-positive' : 'bg-destructive'}`} />
             </div>
             <div className="flex items-center gap-2">
               {/* Level filter */}
