@@ -121,7 +121,7 @@ export function DebtToAssetRatio() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/accounts');
+        const res = await fetch('/api/accounts', { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch accounts');
         const data = await res.json();
         setAccounts(data);

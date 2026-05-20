@@ -85,7 +85,7 @@ export function NetWorthChart() {
         const url = new URL('/api/net-worth/chart', window.location.origin);
         url.searchParams.set('timeframe', timeframe);
 
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to fetch chart data');
 
         const result: ChartResponse = await response.json();

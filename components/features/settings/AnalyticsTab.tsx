@@ -63,7 +63,7 @@ export default function AnalyticsTab() {
     setRecalculating(true);
     setRecalcResult(null);
     try {
-      const res = await fetch('/api/analytics/recalculate-snapshots', { method: 'POST' });
+      const res = await fetch('/api/analytics/recalculate-snapshots', { method: 'POST', credentials: 'include' });
       const data = await res.json();
       setRecalcResult(data);
     } catch (error: any) {

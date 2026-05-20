@@ -17,7 +17,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
   const fetchPrivacyMode = useCallback(async () => {
     try {
-      const res = await fetch('/api/user-settings', { credentials: 'include' });
+      const res = await fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setPrivacyMode(data.privacyMode || false);
