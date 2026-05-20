@@ -10,14 +10,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
-
-interface ChartPoint {
-  date: string;
-  netWorth: number;
-  totalAssets: number;
-  totalLiabilities: number;
-  isSynthetic?: boolean;
-}
+import type { ChartPoint } from '@/lib/types/financial';
 
 function getMonthRange(point: ChartPoint): { startDate: string; endDate: string } {
   const d = new Date(point.date);

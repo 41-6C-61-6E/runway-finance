@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildRealEstateTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { Home, Banknote, Equal, Percent } from 'lucide-react';
 
 interface Summary {
@@ -15,15 +18,18 @@ interface Summary {
 
 export function RealEstateSummary() {
   const { isEnabled } = useSyntheticData();
+  const { enabled: showMath } = useShowMath();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [properties, setProperties] = useState<any[]>([]);
 
   useEffect(() => {
     fetch('/api/real-estate', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         setSummary(data.summary);
+        setProperties(data.properties ?? []);
         const hasEst = (data.properties ?? []).some((p: { snapshots?: Array<{ isSynthetic?: boolean }> }) =>
           (p.snapshots ?? []).some((s) => s.isSynthetic)
         );
@@ -32,6 +38,11 @@ export function RealEstateSummary() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const trace = useMemo(() => {
+    if (!summary || summary.propertyCount === 0) return null;
+    return buildRealEstateTrace(summary);
+  }, [summary]);
 
   if (loading) {
     return (
@@ -79,6 +90,7 @@ export function RealEstateSummary() {
         );
       })}
     </div>
+    {showMath && trace && <CalculationTraceOverlay trace={trace} />}
     </div>
   );
 }

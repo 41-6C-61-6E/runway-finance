@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Play, Search, Sparkles } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
+import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 
 type Rule = {
   id: string;

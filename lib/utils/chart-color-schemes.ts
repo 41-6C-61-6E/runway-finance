@@ -1,4 +1,4 @@
-export type ChartColorSchemeId = 'forest' | 'ocean' | 'sunset' | 'nord' | 'synthwave' | 'monochrome' | 'candy' | 'earth' | 'pastel';
+export type ChartColorSchemeId = 'forest' | 'nord' | 'earth' | 'pastel' | 'skittles' | 'fauntleroy' | 'tahoma' | 'evergreen' | 'kabosu';
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -20,30 +20,6 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.65 0.15 340)',
     ],
   },
-  ocean: {
-    id: 'ocean',
-    name: 'Ocean',
-    description: 'Blues, teals, indigos',
-    colors: [
-      'oklch(0.6 0.15 220)',
-      'oklch(0.65 0.12 190)',
-      'oklch(0.55 0.18 260)',
-      'oklch(0.7 0.1 170)',
-      'oklch(0.5 0.12 240)',
-    ],
-  },
-  sunset: {
-    id: 'sunset',
-    name: 'Sunset',
-    description: 'Oranges, reds, roses',
-    colors: [
-      'oklch(0.65 0.18 40)',
-      'oklch(0.6 0.2 20)',
-      'oklch(0.7 0.15 80)',
-      'oklch(0.55 0.15 350)',
-      'oklch(0.6 0.12 60)',
-    ],
-  },
   nord: {
     id: 'nord',
     name: 'Nord',
@@ -54,42 +30,6 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.6 0.12 180)',
       'oklch(0.55 0.06 280)',
       'oklch(0.7 0.08 80)',
-    ],
-  },
-  synthwave: {
-    id: 'synthwave',
-    name: 'Synthwave',
-    description: 'Neon pinks, purples, cyan',
-    colors: [
-      'oklch(0.65 0.25 330)',
-      'oklch(0.6 0.22 290)',
-      'oklch(0.7 0.2 60)',
-      'oklch(0.6 0.2 200)',
-      'oklch(0.6 0.25 10)',
-    ],
-  },
-  monochrome: {
-    id: 'monochrome',
-    name: 'Monochrome',
-    description: 'Single-hue progression',
-    colors: [
-      'oklch(0.7 0.05 260)',
-      'oklch(0.6 0.08 260)',
-      'oklch(0.5 0.1 260)',
-      'oklch(0.4 0.12 260)',
-      'oklch(0.3 0.14 260)',
-    ],
-  },
-  candy: {
-    id: 'candy',
-    name: 'Candy',
-    description: 'Bright pinks, purples, oranges',
-    colors: [
-      'oklch(0.7 0.22 350)',
-      'oklch(0.65 0.2 300)',
-      'oklch(0.72 0.18 30)',
-      'oklch(0.68 0.15 280)',
-      'oklch(0.7 0.2 10)',
     ],
   },
   earth: {
@@ -114,6 +54,66 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.82 0.08 320)',
       'oklch(0.78 0.07 240)',
       'oklch(0.8 0.09 40)',
+    ],
+  },
+  skittles: {
+    id: 'skittles',
+    name: 'Skittles',
+    description: 'Bright rainbow candy',
+    colors: [
+      'oklch(0.65 0.22 25)',
+      'oklch(0.7 0.2 55)',
+      'oklch(0.78 0.18 90)',
+      'oklch(0.65 0.18 145)',
+      'oklch(0.6 0.2 300)',
+    ],
+  },
+  fauntleroy: {
+    id: 'fauntleroy',
+    name: 'Fauntleroy',
+    description: 'Seattle ferry greens, teals, slate',
+    colors: [
+      'oklch(0.45 0.12 165)',
+      'oklch(0.6 0.14 195)',
+      'oklch(0.7 0.1 185)',
+      'oklch(0.55 0.08 255)',
+      'oklch(0.85 0.02 90)',
+    ],
+  },
+  tahoma: {
+    id: 'tahoma',
+    name: 'Tahoma',
+    description: 'Ice, snow, rock blues',
+    colors: [
+      'oklch(0.75 0.06 220)',
+      'oklch(0.9 0.01 240)',
+      'oklch(0.5 0.02 260)',
+      'oklch(0.65 0.08 210)',
+      'oklch(0.35 0.03 270)',
+    ],
+  },
+  evergreen: {
+    id: 'evergreen',
+    name: 'Evergreen',
+    description: 'PNW pine, moss, fern',
+    colors: [
+      'oklch(0.45 0.15 150)',
+      'oklch(0.55 0.12 130)',
+      'oklch(0.5 0.1 160)',
+      'oklch(0.6 0.13 140)',
+      'oklch(0.4 0.12 155)',
+    ],
+  },
+  kabosu: {
+    id: 'kabosu',
+    name: 'Kabosu',
+    description: 'Golden BTC orange, amber, gold',
+    colors: [
+      'oklch(0.7 0.2 65)',
+      'oklch(0.75 0.18 80)',
+      'oklch(0.65 0.2 55)',
+      'oklch(0.8 0.15 85)',
+      'oklch(0.55 0.2 45)',
     ],
   },
 };

@@ -52,6 +52,8 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   simpleira: 'Simple IRA',
   '529': '529 Account',
   otherAsset: 'Other Asset',
+  otherasset: 'Other Asset',
+  otherInvestment: 'Other Investments',
   vehicle: 'Vehicle',
   crypto: 'Crypto',
   metals: 'Metals',

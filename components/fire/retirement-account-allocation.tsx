@@ -82,10 +82,10 @@ export function RetirementAccountAllocation() {
 
   const totalInvested = groups.reduce((s, g) => s + g.total, 0);
 
-  const pieData = groups.map((g) => ({
+  const pieData = groups.map((g, index) => ({
     id: g.label,
     value: g.total,
-    color: SUBGROUP_COLORS[g.label] || 'var(--color-chart-1)',
+    color: `var(--chart-${(index % 5) + 1})`,
   }));
 
   if (loading) {
@@ -132,11 +132,10 @@ export function RetirementAccountAllocation() {
           data={pieData}
           margin={{ top: 10, right: 100, bottom: 10, left: 100 }}
           innerRadius={0.55}
-          padAngle={1.5}
+          padAngle={0.5}
           cornerRadius={3}
           colors={{ datum: 'data.color' }}
-          borderWidth={1}
-          borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
+          borderWidth={0}
           enableArcLinkLabels={false}
           enableArcLabels={false}
           theme={nivoTheme}

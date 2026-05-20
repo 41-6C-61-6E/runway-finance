@@ -1,6 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildFireTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 
 interface FireScenario {
   currentAge: number;
@@ -30,6 +34,7 @@ function calculateYearsToFI(
 }
 
 export function FireMetrics({ scenario }: { scenario: FireScenario }) {
+  const { enabled: showMath } = useShowMath();
   const fireNumber = scenario.safeWithdrawalRate > 0
     ? scenario.targetAnnualExpenses / scenario.safeWithdrawalRate
     : 0;
@@ -44,6 +49,19 @@ export function FireMetrics({ scenario }: { scenario: FireScenario }) {
     fireNumber,
   );
 
+  const trace = useMemo(
+    () =>
+      buildFireTrace({
+        fireNumber,
+        currentInvestableAssets: scenario.currentInvestableAssets,
+        percentToFire,
+        yearsToFI,
+        safeWithdrawalRate: scenario.safeWithdrawalRate,
+        targetAnnualExpenses: scenario.targetAnnualExpenses,
+      }),
+    [fireNumber, scenario, percentToFire, yearsToFI]
+  );
+
   const metrics = [
     { label: 'FIRE Number', value: formatCurrency(fireNumber) },
     { label: 'Current Savings', value: formatCurrency(scenario.currentInvestableAssets) },
@@ -55,20 +73,23 @@ export function FireMetrics({ scenario }: { scenario: FireScenario }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {metrics.map((m) => (
-        <div
-          key={m.label}
-          className="bg-card border border-border rounded-xl shadow-sm p-5"
-        >
-          <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-            {m.label}
-          </p>
-          <p className="text-xl font-bold text-foreground financial-value">
-            {m.value}
-          </p>
-        </div>
-      ))}
+    <div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map((m) => (
+          <div
+            key={m.label}
+            className="bg-card border border-border rounded-xl shadow-sm p-5"
+          >
+            <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+              {m.label}
+            </p>
+            <p className="text-xl font-bold text-foreground financial-value">
+              {m.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      {showMath && <CalculationTraceOverlay trace={trace} />}
     </div>
   );
 }

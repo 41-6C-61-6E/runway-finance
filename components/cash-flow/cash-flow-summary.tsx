@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildCashFlowTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 
 interface SummaryData {
   totalIncome: number;
@@ -48,6 +51,7 @@ export function CashFlowSummary() {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { enabled: showMath } = useShowMath();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,6 +70,11 @@ export function CashFlowSummary() {
     };
     fetchData();
   }, []);
+
+  const trace = useMemo(() => {
+    if (!data) return null;
+    return buildCashFlowTrace(data);
+  }, [data]);
 
   if (loading) {
     return (
@@ -92,32 +101,35 @@ export function CashFlowSummary() {
   if (!data) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <StatCard
-        label="Total Income"
-        value={formatCurrency(data.totalIncome)}
-        change={data.change.income}
-        valueColor="text-chart-1"
-      />
-      <StatCard
-        label="Total Expenses"
-        value={formatCurrency(data.totalExpenses)}
-        change={data.change.expenses}
-        valueColor="text-destructive"
-        isInverse
-      />
-      <StatCard
-        label="Net Income"
-        value={formatCurrency(data.netIncome)}
-        change={data.change.netIncome}
-        valueColor="text-primary"
-      />
-      <StatCard
-        label="Savings Rate"
-        value={data.savingsRate.toFixed(1) + '%'}
-        change={data.change.netIncome}
-        valueColor="text-chart-3"
-      />
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard
+          label="Total Income"
+          value={formatCurrency(data.totalIncome)}
+          change={data.change.income}
+          valueColor="text-chart-1"
+        />
+        <StatCard
+          label="Total Expenses"
+          value={formatCurrency(data.totalExpenses)}
+          change={data.change.expenses}
+          valueColor="text-destructive"
+          isInverse
+        />
+        <StatCard
+          label="Net Income"
+          value={formatCurrency(data.netIncome)}
+          change={data.change.netIncome}
+          valueColor="text-primary"
+        />
+        <StatCard
+          label="Savings Rate"
+          value={data.savingsRate.toFixed(1) + '%'}
+          change={data.change.netIncome}
+          valueColor="text-chart-3"
+        />
+      </div>
+      {showMath && trace && <CalculationTraceOverlay trace={trace} />}
     </div>
   );
 }

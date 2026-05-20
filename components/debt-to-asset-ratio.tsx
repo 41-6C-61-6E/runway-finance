@@ -5,10 +5,10 @@ import { ResponsivePie } from '@nivo/pie';
 import { useRouter } from 'next/navigation';
 import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES } from '@/lib/utils/account-scope';
-
-const ASSET_TYPES = ASSET_ACCOUNT_TYPES;
-const LIABILITY_TYPES = LIABILITY_ACCOUNT_TYPES;
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildDebtToAssetTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 
 const RATING_THRESHOLDS = [
   { max: 0.35, label: 'Excellent', hue: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -34,38 +34,49 @@ const RATING_PROGRESS_COLORS: Record<string, string> = {
   Critical: 'bg-red-500',
 };
 
-const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string; color: string }> = {
-  checking: { label: 'Cash & Checking', color: '#22c55e' },
-  savings: { label: 'Savings', color: '#3b82f6' },
-  investment: { label: 'Taxable Brokerage', color: '#8b5cf6' },
-  brokerage: { label: 'Taxable Brokerage', color: '#8b5cf6' },
-  otherinvestment: { label: 'Other Investments', color: '#06b6d4' },
-  retirement: { label: 'Retirement', color: '#6366f1' },
-  rothira: { label: 'Retirement', color: '#6366f1' },
-  traditionalira: { label: 'Retirement', color: '#6366f1' },
-  '401k': { label: 'Retirement', color: '#6366f1' },
-  '403b': { label: 'Retirement', color: '#6366f1' },
-  sepira: { label: 'Retirement', color: '#6366f1' },
-  simpleira: { label: 'Retirement', color: '#6366f1' },
-  realestate: { label: 'Real Estate', color: '#f59e0b' },
-  primaryhome: { label: 'Real Estate', color: '#f59e0b' },
-  secondaryhome: { label: 'Real Estate', color: '#f59e0b' },
-  rentalproperty: { label: 'Real Estate', color: '#f59e0b' },
-  commercial: { label: 'Real Estate', color: '#f59e0b' },
-  land: { label: 'Real Estate', color: '#f59e0b' },
-  otherrealestate: { label: 'Real Estate', color: '#f59e0b' },
-  vehicle: { label: 'Vehicle', color: '#ef4444' },
-  crypto: { label: 'Other Investments', color: '#06b6d4' },
-  metals: { label: 'Other Investments', color: '#06b6d4' },
-  '529': { label: 'Other Investments', color: '#06b6d4' },
-  otherAsset: { label: 'Other Investments', color: '#06b6d4' },
-  other: { label: 'Other Investments', color: '#06b6d4' },
+// Color mappings that will respect theme colors
+const CHART_COLOR_MAP = [
+  'var(--chart-1)',
+  'var(--chart-2)', 
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-synthetic)',
+  'var(--destructive-synthetic)',
+];
+
+const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
+  checking: { label: 'Cash & Checking' },
+  savings: { label: 'Savings' },
+  investment: { label: 'Taxable Brokerage' },
+  brokerage: { label: 'Taxable Brokerage' },
+  otherinvestment: { label: 'Other Investments' },
+  retirement: { label: 'Retirement' },
+  rothira: { label: 'Retirement' },
+  traditionalira: { label: 'Retirement' },
+  '401k': { label: 'Retirement' },
+  '403b': { label: 'Retirement' },
+  sepira: { label: 'Retirement' },
+  simpleira: { label: 'Retirement' },
+  realestate: { label: 'Real Estate' },
+  primaryhome: { label: 'Real Estate' },
+  secondaryhome: { label: 'Real Estate' },
+  rentalproperty: { label: 'Real Estate' },
+  commercial: { label: 'Real Estate' },
+  land: { label: 'Real Estate' },
+  otherrealestate: { label: 'Real Estate' },
+  vehicle: { label: 'Vehicle' },
+  crypto: { label: 'Other Investments' },
+  metals: { label: 'Other Investments' },
+  '529': { label: 'Other Investments' },
+  otherAsset: { label: 'Other Investments' },
+  other: { label: 'Other Investments' },
 };
 
-const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string; color: string }> = {
-  credit: { label: 'Credit Cards', color: '#ef4444' },
-  loan: { label: 'Loans', color: '#f97316' },
-  mortgage: { label: 'Mortgages', color: '#eab308' },
+const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
+  credit: { label: 'Credit Cards' },
+  loan: { label: 'Loans' },
+  mortgage: { label: 'Mortgages' },
 };
 
 function getRating(ratio: number) {
@@ -86,6 +97,7 @@ interface AccountData {
   id: string;
   type: string;
   balance: string | number;
+  name: string;
 }
 
 interface CategoryEntry {
@@ -97,6 +109,7 @@ interface CategoryEntry {
 
 export function DebtToAssetRatio() {
   const router = useRouter();
+  const { enabled: showMath } = useShowMath();
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,11 +143,11 @@ export function DebtToAssetRatio() {
     for (const acc of accounts) {
       const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
 
-      if (ASSET_TYPES.includes(acc.type)) {
+      if (isAssetAccount(acc.type)) {
         assets += balance;
         const cat = ASSET_DISPLAY_CATEGORIES[acc.type] || { label: 'Other', color: '#6b7280' };
         assetMap[cat.label] = (assetMap[cat.label] || 0) + balance;
-      } else if (LIABILITY_TYPES.includes(acc.type)) {
+      } else if (isLiabilityAccount(acc.type)) {
         const absBalance = Math.abs(balance);
         liabilities += absBalance;
         const cat = DEBT_DISPLAY_CATEGORIES[acc.type] || { label: 'Other Debt', color: '#6b7280' };
@@ -145,8 +158,8 @@ export function DebtToAssetRatio() {
     const rawRatio = assets > 0 ? liabilities / assets : 0;
     const ratingInfo = getRating(rawRatio);
 
-    const makeCategories = (map: Record<string, number>, colorMap: Record<string, { label: string; color: string }>, typeKey: string): CategoryEntry[] => {
-      const merged: Record<string, CategoryEntry> = {};
+    const makeCategories = (map: Record<string, number>, colorMap: Record<string, { label: string }>, typeKey: string): CategoryEntry[] => {
+      const merged: Record<string, { key: string; label: string; amount: number }> = {};
       for (const acc of accounts) {
         const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
         const catInfo = colorMap[acc.type];
@@ -156,11 +169,15 @@ export function DebtToAssetRatio() {
         merged[catInfo.label] = {
           key: acc.type,
           label: catInfo.label,
-          color: catInfo.color,
           amount: (merged[catInfo.label]?.amount || 0) + val,
         };
       }
-      return Object.values(merged).sort((a, b) => b.amount - a.amount);
+      return Object.values(merged)
+        .sort((a, b) => b.amount - a.amount)
+        .map((entry, i) => ({
+          ...entry,
+          color: CHART_COLOR_MAP[i % CHART_COLOR_MAP.length],
+        }));
     };
 
     return {
@@ -173,17 +190,26 @@ export function DebtToAssetRatio() {
     };
   }, [accounts]);
 
+  const debtTrace = useMemo(() => {
+    if (!showMath || accounts.length === 0) return null;
+    return buildDebtToAssetTrace(accounts);
+  }, [accounts, showMath]);
+
   const activeCategories = activeTab === 'assets' ? assetCategories : debtCategories;
   const activeTotal = activeTab === 'assets' ? totalAssets : totalLiabilities;
 
   const pieData = useMemo(() => {
-    return activeCategories.map((cat) => ({
-      id: cat.label,
-      value: unit === '%' && activeTotal > 0 ? (cat.amount / activeTotal) * 100 : cat.amount,
-      color: cat.color,
-      amount: cat.amount,
-      key: cat.key,
-    }));
+    // Assign theme-appropriate colors to categories based on their order
+    return activeCategories.map((cat, index) => {
+      const colorIndex = index % CHART_COLOR_MAP.length;
+      return {
+        id: cat.label,
+        value: unit === '%' && activeTotal > 0 ? (cat.amount / activeTotal) * 100 : cat.amount,
+        color: CHART_COLOR_MAP[colorIndex],
+        amount: cat.amount,
+        key: cat.key,
+      };
+    });
   }, [activeCategories, activeTotal, unit]);
 
   const handleClick = (accountType: string) => {
@@ -341,11 +367,10 @@ export function DebtToAssetRatio() {
               data={pieData}
               margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
               innerRadius={0.65}
-              padAngle={1.5}
+              padAngle={0.5}
               cornerRadius={3}
               colors={{ datum: 'data.color' }}
-              borderWidth={1}
-              borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
+              borderWidth={0}
               enableArcLinkLabels={false}
               enableArcLabels={false}
               theme={nivoTheme}
@@ -372,8 +397,9 @@ export function DebtToAssetRatio() {
 
         {/* Legend */}
         <div className="space-y-2">
-          {activeCategories.map((cat) => {
+          {activeCategories.map((cat, index) => {
             const share = activeTotal > 0 ? (cat.amount / activeTotal) * 100 : 0;
+            const colorIndex = index % CHART_COLOR_MAP.length;
             return (
               <div
                 key={cat.label}
@@ -382,7 +408,7 @@ export function DebtToAssetRatio() {
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: cat.color }}
+                  style={{ backgroundColor: CHART_COLOR_MAP[colorIndex] }}
                 />
                 <span className="text-xs text-foreground/80 flex-1">{cat.label}</span>
                 <span className="text-xs text-foreground font-medium tabular-nums blur-number">
@@ -393,6 +419,7 @@ export function DebtToAssetRatio() {
           })}
         </div>
       </div>
+      {showMath && debtTrace && <CalculationTraceOverlay trace={debtTrace} />}
     </div>
   );
 }

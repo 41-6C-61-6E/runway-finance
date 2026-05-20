@@ -149,11 +149,10 @@ export function PortfolioAllocationChart() {
             data={chartData}
             margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
             innerRadius={0.6}
-            padAngle={1.5}
+            padAngle={0.5}
             cornerRadius={4}
             activeOuterRadiusOffset={4}
-            borderWidth={1}
-            borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
+            borderWidth={0}
             colors={{ datum: 'data.color' }}
             enableArcLinkLabels={false}
             enableArcLabels={false}

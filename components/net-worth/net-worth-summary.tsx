@@ -2,46 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-
-const ASSET_TYPES = ['checking', 'savings', 'investment', 'other', 'brokerage', 'retirement', 'realestate', 'vehicle', 'crypto', 'metals', 'otherAsset'];
-const LIABILITY_TYPES = ['credit', 'loan', 'mortgage'];
-
-function isAsset(type: string) { return ASSET_TYPES.includes(type); }
-function isLiability(type: string) { return LIABILITY_TYPES.includes(type); }
-
-function formatTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    checking: 'Checking',
-    savings: 'Savings',
-    investment: 'Investment',
-    brokerage: 'Brokerage',
-    retirement: 'Retirement',
-    realestate: 'Real Estate',
-    vehicle: 'Vehicle',
-    crypto: 'Crypto',
-    metals: 'Metals',
-    other: 'Other',
-    otherAsset: 'Other Assets',
-    credit: 'Credit',
-    loan: 'Loan',
-    mortgage: 'Mortgage',
-  };
-  return map[type] || type.charAt(0).toUpperCase() + type.slice(1);
-}
-
-interface AccountData {
-  id: string;
-  type: string;
-  balance: string | number;
-  name: string;
-}
-
-interface ChartPoint {
-  date: string;
-  netWorth: number;
-  totalAssets: number;
-  totalLiabilities: number;
-}
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/account-types';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildNetWorthTraces } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
+import type { AccountData, ChartPoint } from '@/lib/types/financial';
 
 interface ChartResponse {
   data: ChartPoint[];
@@ -57,6 +23,7 @@ export function NetWorthSummary() {
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [hasEstimated, setHasEstimated] = useState(false);
+  const { enabled: showMath } = useShowMath();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'totals' | 'percentages'>('totals');
@@ -77,7 +44,7 @@ export function NetWorthSummary() {
         ]);
         setAccounts(accountsData);
         setChartData(chartResponse.data || []);
-        setHasEstimated((chartResponse.data ?? []).some((d: ChartPoint) => (d as any).isSynthetic));
+        setHasEstimated((chartResponse.data ?? []).some((d: ChartPoint) => d.isSynthetic));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -95,10 +62,10 @@ export function NetWorthSummary() {
 
     for (const acc of accounts) {
       const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
-      if (isAsset(acc.type)) {
+      if (isAssetAccount(acc.type)) {
         totalAssets += balance;
         assetByType[acc.type] = (assetByType[acc.type] || 0) + balance;
-      } else if (isLiability(acc.type)) {
+      } else if (isLiabilityAccount(acc.type)) {
         const abs = Math.abs(balance);
         totalLiabilities += abs;
         liabilityByType[acc.type] = (liabilityByType[acc.type] || 0) + abs;
@@ -107,6 +74,8 @@ export function NetWorthSummary() {
 
     return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities, assetByType, liabilityByType };
   }, [accounts]);
+
+  const traces = useMemo(() => showMath ? buildNetWorthTraces(accounts) : [], [accounts, showMath]);
 
   const deltas = useMemo(() => {
     if (chartData.length < 2) return { assets: 0, liabilities: 0, netWorth: 0, pctAssets: 0, pctLiabilities: 0, pctNetWorth: 0 };
@@ -147,7 +116,7 @@ export function NetWorthSummary() {
           <div className="space-y-2">
             {allAssetTypes.map(([type, val]) => (
               <div key={type} className="flex justify-between text-sm">
-                <span className="text-foreground">{formatTypeLabel(type)}</span>
+                <span className="text-foreground">{ACCOUNT_TYPE_LABELS[type] || type}</span>
                 <span className="font-medium text-chart-1 financial-value">
                   {totals.totalAssets > 0 ? ((val / totals.totalAssets) * 100).toFixed(1) : '0'}%
                 </span>
@@ -161,7 +130,7 @@ export function NetWorthSummary() {
           <div className="space-y-2">
             {allLiabilityTypes.map(([type, val]) => (
               <div key={type} className="flex justify-between text-sm">
-                <span className="text-foreground">{formatTypeLabel(type)}</span>
+                <span className="text-foreground">{ACCOUNT_TYPE_LABELS[type] || type}</span>
                 <span className="font-medium text-destructive financial-value">
                   {totals.totalLiabilities > 0 ? ((val / totals.totalLiabilities) * 100).toFixed(1) : '0'}%
                 </span>
@@ -267,10 +236,12 @@ export function NetWorthSummary() {
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Assets</h3>
           {totalLabel('assets', totals.totalAssets, deltas.assets, deltas.pctAssets)}
+          {showMath && traces[0] && <CalculationTraceOverlay trace={traces[0]} />}
         </div>
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Liabilities</h3>
           {totalLabel('liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities)}
+          {showMath && traces[1] && <CalculationTraceOverlay trace={traces[1]} />}
         </div>
       </div>
     </div>
