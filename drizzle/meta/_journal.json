@@ -202,6 +202,13 @@
       "idx": 28,
       "version": "7",
       "when": 1747785600000,
+      "tag": "0028_missing_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1747785600000,
       "tag": "0029_add_simplefin_sync_logs",
       "breakpoints": true
     }
