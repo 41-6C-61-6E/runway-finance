@@ -113,20 +113,6 @@ export default function AnalyticsTab() {
           data from your accounts.
         </p>
 
-        {/* Global Toggle */}
-        <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg mb-3">
-          <div>
-            <span className="text-sm font-medium text-foreground">Show estimated historical data in charts</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Master toggle for all estimated data. When off, individual module settings are ignored.
-            </p>
-          </div>
-          <Switch
-            checked={settings.global}
-            onCheckedChange={(checked) => updateSettings({ global: checked })}
-          />
-        </div>
-
         {/* Module Toggles */}
         <div className="space-y-2">
           {MODULES.map((mod) => {
@@ -135,7 +121,7 @@ export default function AnalyticsTab() {
             return (
               <div
                 key={mod.key}
-                className={`p-3 bg-muted/30 border border-border rounded-lg transition-opacity ${!settings.global ? 'opacity-50' : ''}`}
+                className="p-3 bg-muted/30 border border-border rounded-lg"
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
@@ -144,7 +130,6 @@ export default function AnalyticsTab() {
                   </div>
                   <Switch
                     checked={moduleEnabled}
-                    disabled={!settings.global}
                     onCheckedChange={(checked) => updateSettings({ [mod.key]: checked })}
                   />
                 </div>
@@ -152,12 +137,7 @@ export default function AnalyticsTab() {
                 <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
                   ⚠ BETA: This feature is under development and data may not be accurate.
                 </p>
-                {!settings.global && (
-                  <p className="text-[10px] text-muted-foreground italic mt-1">
-                    Enable the global toggle above to customize this module.
-                  </p>
-                )}
-                {settings.global && !individuallyChecked && (
+                {individuallyChecked === false && (
                   <p className="text-[10px] text-chart-3 italic mt-1">
                     Estimated data hidden for {mod.label.toLowerCase()}.
                   </p>

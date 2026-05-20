@@ -9,6 +9,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { EstimatePill } from '@/components/ui/estimate-pill';
 
 interface PropertySnapshot {
   date: string;
@@ -155,17 +156,19 @@ export function EquityOverTimeChart() {
   );
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm relative">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
         <div className="flex items-center gap-2">
-          {hasEstimated && (
-            <span className="text-[10px] text-muted-foreground italic">Includes estimated values</span>
-          )}
           <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
         </div>
       </div>
       <div className="h-[300px] px-2 pb-2">
+        {hasEstimated && (
+          <div className="absolute top-2 right-2 z-10">
+            <EstimatePill />
+          </div>
+        )}
         <div className="financial-chart h-full">
           <ResponsiveLine
             data={filtered}

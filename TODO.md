@@ -5,11 +5,8 @@
 ## CHANGES:
 - get defaults right
 - support for extra principal, prinicpal, interest, escrow
-
-- show the math needs to show example calculations with real data
 - Net worth display assets and liabilities doesnt do anyhting in bar chart mode. It should display opposing bars (assets up and liabilities down), with a line through the chart for net worth.
-- The spacing is wrong for liability accounts in the net worth "Asset Allocation" bar chart. chart also needs proper labels, legend, and filtering
-- The net worth "Asset Allocation" pie chart needs abels, legend, and filtering
+- The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart 
 
 
 ## NEW FEATUES:

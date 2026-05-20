@@ -194,7 +194,6 @@ export function AccountValuesChart() {
                 return data.find((d) => d.date === dateStr);
               })()?.isSynthetic && (
                 <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
-                  Some values are estimated
                 </div>
               )}
             </ChartTooltip>

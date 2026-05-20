@@ -36,7 +36,9 @@ export function useSyntheticData() {
   const isEnabled = useCallback(
     (module: keyof SyntheticDataSettings) => {
       if (loading) return true;
-      if (!settings.global) return false;
+      // When global flag is not present, default to true for backward compatibility
+      // But when it's explicitly false, respect the individual module toggle
+      if (settings.global !== undefined && !settings.global) return false;
       return settings[module] !== false;
     },
     [settings, loading]

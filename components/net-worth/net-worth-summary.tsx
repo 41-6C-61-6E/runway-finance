@@ -7,6 +7,7 @@ import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/account-types';
 import { useShowMath } from '@/lib/hooks/use-show-math';
 import { buildNetWorthTraces } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
+import { EstimatePill } from '@/components/ui/estimate-pill';
 import type { AccountData, ChartPoint } from '@/lib/types/financial';
 
 interface ChartResponse {
@@ -94,7 +95,7 @@ export function NetWorthSummary() {
     };
   }, [chartData]);
 
-  const totalLabel = (id: string, value: number, delta: number, pct: number) => (
+  const totalLabel = (id: string, value: number, delta: number, pct: number, timeframe?: string) => (
     <>
       <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
       <div className={`flex items-center gap-1 mt-1 text-sm font-medium ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
@@ -102,71 +103,13 @@ export function NetWorthSummary() {
         <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
         <span className="text-xs opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
       </div>
+      {timeframe && (
+        <div className="text-xs text-muted-foreground mt-1">
+          in the last {timeframe}
+        </div>
+      )}
     </>
   );
-
-  const pctView = () => {
-    const allAssetTypes = Object.entries(totals.assetByType).sort(([, a], [, b]) => b - a);
-    const allLiabilityTypes = Object.entries(totals.liabilityByType).sort(([, a], [, b]) => b - a);
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Assets by Type</h3>
-          <div className="space-y-2">
-            {allAssetTypes.map(([type, val]) => (
-              <div key={type} className="flex justify-between text-sm">
-                <span className="text-foreground">{ACCOUNT_TYPE_LABELS[type] || type}</span>
-                <span className="font-medium text-chart-1 financial-value">
-                  {totals.totalAssets > 0 ? ((val / totals.totalAssets) * 100).toFixed(1) : '0'}%
-                </span>
-              </div>
-            ))}
-            {allAssetTypes.length === 0 && <p className="text-xs text-muted-foreground">No asset accounts</p>}
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Liabilities by Type</h3>
-          <div className="space-y-2">
-            {allLiabilityTypes.map(([type, val]) => (
-              <div key={type} className="flex justify-between text-sm">
-                <span className="text-foreground">{ACCOUNT_TYPE_LABELS[type] || type}</span>
-                <span className="font-medium text-destructive financial-value">
-                  {totals.totalLiabilities > 0 ? ((val / totals.totalLiabilities) * 100).toFixed(1) : '0'}%
-                </span>
-              </div>
-            ))}
-            {allLiabilityTypes.length === 0 && <p className="text-xs text-muted-foreground">No liability accounts</p>}
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Net Worth</h3>
-          <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(totals.netWorth)}</div>
-          <div className="flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)' }}>
-            <span>{deltas.netWorth >= 0 ? '↑' : '↓'}</span>
-            <span className="financial-value">{formatCurrency(Math.abs(deltas.netWorth))}</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-border">
-            <p className="text-xs text-muted-foreground mb-2">Asset Allocation</p>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
-              <div
-                className="bg-chart-1 h-full transition-all"
-                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
-              />
-              <div
-                className="bg-destructive h-full transition-all"
-                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-              <span>Assets {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
-              <span>Liabilities {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -190,58 +133,50 @@ export function NetWorthSummary() {
     );
   }
 
-  if (viewMode === 'percentages') {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Summary</h2>
-          <div className="flex items-center gap-2">
-            {hasEstimated && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
-                <span className="text-[10px] text-chart-3 font-medium">Includes estimates</span>
-              </span>
-            )}
-            <button
-              onClick={() => setViewMode('totals')}
-              className="px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground shadow-sm"
-            >
-              Totals
-            </button>
-          </div>
-        </div>
-        {pctView()}
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-muted-foreground">Summary</h2>
-        <div className="flex items-center gap-2">
-          {hasEstimated && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
-              <span className="text-[10px] text-chart-3 font-medium">Includes estimates</span>
-            </span>
-          )}
-          <button
-            onClick={() => setViewMode('percentages')}
-            className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-          >
-            Percentages
-          </button>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm sm:col-span-1">
+          <div className="grid grid-cols-1 gap-5">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Assets</h3>
+              {totalLabel('assets', totals.totalAssets, deltas.assets, deltas.pctAssets, '1 year')}
+              {showMath && traces[0] && <CalculationTraceOverlay trace={traces[0]} />}
+            </div>
+            <div className="border-t border-border pt-5">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Liabilities</h3>
+              {totalLabel('liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, '1 year')}
+              {showMath && traces[1] && <CalculationTraceOverlay trace={traces[1]} />}
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Assets</h3>
-          {totalLabel('assets', totals.totalAssets, deltas.assets, deltas.pctAssets)}
-          {showMath && traces[0] && <CalculationTraceOverlay trace={traces[0]} />}
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Liabilities</h3>
-          {totalLabel('liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities)}
-          {showMath && traces[1] && <CalculationTraceOverlay trace={traces[1]} />}
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm sm:col-span-2">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Net Worth</h3>
+          <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(totals.netWorth)}</div>
+          <div className="flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)' }}>
+            <span>{deltas.netWorth >= 0 ? '↑' : '↓'}</span>
+            <span className="financial-value">{formatCurrency(Math.abs(deltas.netWorth))}</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            in the last 1 year
+          </div>
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-2">Asset Allocation</p>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
+              <div
+                className="bg-chart-1 h-full transition-all"
+                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
+              />
+              <div
+                className="bg-destructive h-full transition-all"
+                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+              <span>Assets {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
+              <span>Liabilities {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
