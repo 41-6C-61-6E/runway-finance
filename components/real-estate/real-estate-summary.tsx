@@ -68,14 +68,6 @@ export function RealEstateSummary() {
 
   return (
     <div>
-      {isEnabled('realEstate') && hasEstimated && (
-        <div className="flex items-center gap-1.5 mb-3">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20">
-            <span className="w-1.5 h-0.5 bg-chart-3 rounded-full" style={{ textDecorationStyle: 'dashed' }} />
-            <span className="text-[10px] text-chart-3 font-medium">Some values are estimated</span>
-          </span>
-        </div>
-      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;

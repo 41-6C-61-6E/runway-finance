@@ -34,7 +34,7 @@ function NetWorthContent() {
                   </Suspense>
                 )}
               </div>
-              <div className="pt-9">
+              <div>
                 <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
                   <div>
                     <DebtToAssetRatio />

@@ -6,6 +6,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ForecastChart } from '@/components/cash-flow/forecast-chart';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { TrendingUp, TrendingDown, BarChart3, Table2 } from 'lucide-react';
+import { EstimatePill } from '@/components/ui/estimate-pill';
 
 type ForecastMode = 'historical' | 'budget' | 'hybrid';
 
@@ -154,14 +155,27 @@ export function CashFlowForecast() {
   }
 
   const chartData = data.historical || [];
+  
+  // Check if cash flow projections are enabled
+  const showCashFlowProjections = isEnabled('cashFlowProjections');
+
+  // Return null if projections are disabled and there's no historical data
+  if (!showCashFlowProjections && (!data || data.historical.length === 0)) {
+    return null;
+  }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm relative">
       <div className="p-5 pb-3">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Forecast</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Projected account balances based on {forecastMode === 'historical' ? 'historical averages' : forecastMode === 'budget' ? 'budgeted amounts' : 'budgets and historical data'}
         </p>
+        {showCashFlowProjections && (
+          <div className="absolute top-2 right-2 z-10">
+            <EstimatePill />
+          </div>
+        )}
       </div>
 
       {/* Config Bar */}

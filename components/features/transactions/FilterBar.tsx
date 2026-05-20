@@ -623,7 +623,6 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               </div>
             )}
           </div>
-        </div>
 
           {/* Amount Filter Group */}
           <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
@@ -644,6 +643,7 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               className="w-20 px-2.5 py-1 bg-background border border-input rounded-md text-foreground text-xs placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
             />
           </div>
+        </div>
 
         {/* Status Filters Row */}
         <div className="flex flex-wrap gap-2 items-center pt-1">
@@ -689,6 +689,77 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               }`}
             >
               AI Categorized
+            </button>
+            <button
+              onClick={() => {
+                // Toggle uncategorized filter
+                // We'll treat this as a category filter since it's not a standard status
+                const currentCategoryFilter = filters.categoryIds || '';
+                const categoryIds = currentCategoryFilter.split(',').filter(id => id.trim() !== '');
+                
+                if (categoryIds.includes('uncategorized')) {
+                  // Remove uncategorized
+                  const newCategoryIds = categoryIds.filter(id => id !== 'uncategorized');
+                  onChange('categoryIds', newCategoryIds.length > 0 ? newCategoryIds.join(',') : null);
+                } else {
+                  // Add uncategorized
+                  const newCategoryIds = [...categoryIds, 'uncategorized'];
+                  onChange('categoryIds', newCategoryIds.join(','));
+                }
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                (filters.categoryIds && filters.categoryIds.includes('uncategorized'))
+                  ? 'border border-muted-foreground/50 bg-muted text-foreground shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Uncategorized
+            </button>
+            <button
+              onClick={() => {
+                // Toggle positive filter - exclusive with negative
+                // If already active, remove it
+                if (filters.minAmount === '0.01') {
+                  onChange('minAmount', null);
+                } else {
+                  // Activate positive filter (amount >= 0.01)
+                  onChange('minAmount', '0.01');
+                  // Deactivate negative filter if it's active
+                  if (filters.maxAmount === '-0.01') {
+                    onChange('maxAmount', null);
+                  }
+                }
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.minAmount === '0.01' 
+                  ? 'border border-green-500 bg-green-500/20 text-green-500 shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Positive
+            </button>
+            <button
+              onClick={() => {
+                // Toggle negative filter - exclusive with positive
+                // If already active, remove it
+                if (filters.maxAmount === '-0.01') {
+                  onChange('maxAmount', null);
+                } else {
+                  // Activate negative filter (amount <= -0.01)
+                  onChange('maxAmount', '-0.01');
+                  // Deactivate positive filter if it's active
+                  if (filters.minAmount === '0.01') {
+                    onChange('minAmount', null);
+                  }
+                }
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                filters.maxAmount === '-0.01'
+                  ? 'border border-red-500 bg-red-500/20 text-red-500 shadow-sm'
+                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Negative
             </button>
           </div>
 
