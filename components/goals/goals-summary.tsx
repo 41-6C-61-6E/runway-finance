@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildGoalsTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 
 interface Goal {
   id: string;
@@ -23,8 +26,20 @@ interface SummaryData {
 }
 
 export function GoalsSummary() {
+  const { enabled: showMath } = useShowMath();
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const goalsTrace = useMemo(
+    () =>
+      data
+        ? buildGoalsTrace({
+            totalTarget: data.totalTarget,
+            totalCurrent: data.totalCurrent,
+            overallProgress: data.overallProgress,
+          })
+        : null,
+    [data]
+  );
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -142,7 +157,7 @@ export function GoalsSummary() {
 
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Overall Progress</p>
-          <p className="text-2xl font-bold text-foreground">{data.overallProgress.toFixed(1)}%</p>
+          <p className="text-2xl font-bold text-foreground blur-number">{data.overallProgress.toFixed(1)}%</p>
           <div className="w-full bg-muted/30 rounded-full h-1.5 mt-2 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${
@@ -155,6 +170,8 @@ export function GoalsSummary() {
           </div>
         </div>
       </div>
+
+      {showMath && goalsTrace && <CalculationTraceOverlay trace={goalsTrace} />}
 
       {/* Breakdown by Type */}
       {Object.keys(data.byType).length > 1 && (

@@ -101,7 +101,7 @@ export function calculateAmortizationWithExtraPayments(
   const lumpSumDate = extra.lumpSumDate;
 
   if (extra.biweekly) {
-    extraMonthly += effectivePayment / 12;
+    extraMonthly += effectivePayment / 2;
   }
 
   const accelerated: AmortizationRow[] = [];
@@ -123,7 +123,7 @@ export function calculateAmortizationWithExtraPayments(
     if (principal <= 0) principal = balance;
     if (principal > balance + interest) principal = balance + interest;
 
-    balance -= principal;
+    balance -= (principal - interest);
 
     const paymentDate = new Date(start);
     paymentDate.setMonth(start.getMonth() + month - 1);

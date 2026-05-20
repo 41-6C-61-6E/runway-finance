@@ -13,7 +13,7 @@ import { CardStyleInitializer } from '@/components/card-style-initializer';
 export default function ClientLayout({ children }: { children: ReactNode }) {
   return (
     <ReactQueryProvider>
-      <ThemeProvider defaultTheme="dark" attribute="data-theme">
+      <ThemeProvider defaultTheme="moonlight" attribute="data-theme">
         <SessionProvider>
           <ChartColorSchemeInitializer />
           <CardStyleInitializer />

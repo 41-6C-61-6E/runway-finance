@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
+import { useShowMath } from '@/lib/hooks/use-show-math';
+import { buildBudgetTrace } from '@/lib/services/trace-engine';
+import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { DollarSign, ShoppingCart, PiggyBank, TrendingDown, TrendingUp, BadgeDollarSign } from 'lucide-react';
 
 interface BudgetData {
@@ -18,6 +21,7 @@ interface BudgetData {
 
 export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
+  const { enabled: showMath } = useShowMath();
   const [budgets, setBudgets] = useState<BudgetData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -144,6 +148,33 @@ export function BudgetSummary() {
         <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
           No budgets set for this period
         </div>
+      )}
+
+      {showMath && (
+        <>
+          {incomeBudgets.length > 0 && (
+            <CalculationTraceOverlay
+              trace={buildBudgetTrace({
+                totalBudgeted: totalIncomeBudgeted,
+                totalActual: totalIncomeActual,
+                remaining: incomeRemaining,
+                percentUsed: incomePercent,
+                type: 'income',
+              })}
+            />
+          )}
+          {expenseBudgets.length > 0 && (
+            <CalculationTraceOverlay
+              trace={buildBudgetTrace({
+                totalBudgeted: totalExpenseBudgeted,
+                totalActual: totalExpenseActual,
+                remaining: expenseRemaining,
+                percentUsed: expensePercent,
+                type: 'expense',
+              })}
+            />
+          )}
+        </>
       )}
     </div>
   );

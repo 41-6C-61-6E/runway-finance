@@ -26,6 +26,8 @@ export const ASSET_ACCOUNT_TYPES = [
   'sepira',
   'simpleira',
   '529',
+  'hsa',
+  'health',
 ];
 
 export const INVESTMENT_ACCOUNT_TYPES = [

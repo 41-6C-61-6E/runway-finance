@@ -449,7 +449,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between pb-5 border-b border-border">
                 <div>
                   <h3 className="text-sm font-medium text-foreground">Theme</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Toggle between light and dark theme</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cycle through light, moonlight, and dark themes</p>
                 </div>
                 <ModeToggle />
               </div>

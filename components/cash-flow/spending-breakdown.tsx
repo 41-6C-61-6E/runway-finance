@@ -78,11 +78,11 @@ export function SpendingBreakdown() {
     .filter((c) => !excludedCategoryIds.has(c.categoryId));
   const totalSpending = visibleCategories.reduce((sum, c) => sum + c.amount, 0);
 
-  const pieData = visibleCategories.map((c) => ({
+  const pieData = visibleCategories.map((c, index) => ({
     id: c.categoryName,
     label: c.categoryName,
     value: c.amount,
-    color: c.categoryColor,
+    color: `var(--chart-${(index % 5) + 1})`,
     categoryId: c.categoryId,
   }));
 
@@ -225,11 +225,10 @@ export function SpendingBreakdown() {
               data={pieData}
               margin={{ top: 20, right: 80, bottom: 20, left: 80 }}
               innerRadius={0.6}
-              padAngle={1}
+              padAngle={0.5}
               cornerRadius={3}
               colors={{ datum: 'data.color' }}
-              borderWidth={1}
-              borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+              borderWidth={0}
               enableArcLinkLabels={false}
               enableArcLabels={false}
               theme={nivoTheme}

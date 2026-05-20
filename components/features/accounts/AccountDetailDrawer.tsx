@@ -91,16 +91,15 @@ interface AccountDetailDrawerProps {
 }
 
 export default function AccountDetailDrawer({ account, open, onClose, onSuccess }: AccountDetailDrawerProps) {
-  if (!account) return null;
-
-  const [name, setName] = useState(account.name);
-  const [type, setType] = useState(account.type);
+  const [name, setName] = useState(account?.name ?? '');
+  const [type, setType] = useState(account?.type ?? '');
   const [majorType, setMajorType] = useState('banking');
-  const [isHidden, setIsHidden] = useState(account.isHidden);
-  const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account.isExcludedFromNetWorth);
+  const [isHidden, setIsHidden] = useState(account?.isHidden ?? false);
+  const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account?.isExcludedFromNetWorth ?? false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!account) return;
     setName(account.name);
     setType(account.type);
     setMajorType(findMajorType(account.type));
@@ -109,6 +108,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   }, [account]);
 
   const handleSave = useCallback(async () => {
+    if (!account) return;
     setSaving(true);
     try {
       await fetch(`/api/accounts/${account.id}`, {
@@ -121,7 +121,9 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account.id, name, type, isHidden, isExcludedFromNetWorth, onSuccess]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, onSuccess]);
+
+  if (!account || !open) return null;
 
   const handleMajorTypeChange = (newMajor: string) => {
     setMajorType(newMajor);

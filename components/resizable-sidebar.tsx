@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
@@ -21,6 +21,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
+  { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
   { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },

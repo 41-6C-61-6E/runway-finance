@@ -11,14 +11,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
-
-type NetWorthDataPoint = {
-  date: string;
-  netWorth: number;
-  totalAssets: number;
-  totalLiabilities: number;
-  isSynthetic?: boolean;
-};
+import type { ChartPoint } from '@/lib/types/financial';
 
 interface ChartSummary {
   current: number;
@@ -30,7 +23,7 @@ interface ChartSummary {
 }
 
 interface ChartResponse {
-  data: NetWorthDataPoint[];
+  data: ChartPoint[];
   summary: ChartSummary;
 }
 
@@ -39,7 +32,7 @@ const typeOptions = [
   { value: 'bar' as ChartType, label: 'Bar' },
 ];
 
-function getDateRange(point: NetWorthDataPoint): { startDate: string; endDate: string } {
+function getDateRange(point: ChartPoint): { startDate: string; endDate: string } {
   const d = new Date(point.date);
   const start = new Date(d.getFullYear(), d.getMonth(), 1);
   const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
@@ -72,7 +65,7 @@ export function NetWorthChart() {
   const { isEnabled } = useSyntheticData();
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [chartType, setChartType] = useState<ChartType>('line');
-  const [data, setData] = useState<NetWorthDataPoint[]>([]);
+  const [data, setData] = useState<ChartPoint[]>([]);
   const [summary, setSummary] = useState<ChartSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +118,7 @@ export function NetWorthChart() {
   }, [timeframe]);
 
   const handlePointClick = useCallback(
-    (point: NetWorthDataPoint) => {
+    (point: ChartPoint) => {
       const { startDate, endDate } = getDateRange(point);
       router.push(`/transactions?startDate=${startDate}&endDate=${endDate}`);
     },
