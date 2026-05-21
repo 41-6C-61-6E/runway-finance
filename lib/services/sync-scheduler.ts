@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections } from '@/lib/db/schema';
+import { simplifinConnections, userEncryptionKeys } from '@/lib/db/schema';
 import { syncConnection } from '@/lib/services/sync';
 import { getServerDEK } from '@/lib/crypto-context';
 import { eq } from 'drizzle-orm';
@@ -16,6 +16,15 @@ const SYNC_INTERVALS: Record<string, number> = {
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
+async function canSyncUser(userId: string): Promise<boolean> {
+  try {
+    await getServerDEK(userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 class SyncScheduler {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private _isRunning = false;
@@ -28,20 +37,30 @@ class SyncScheduler {
     const connections = await getDb()
       .select({
         id: simplifinConnections.id,
+        userId: simplifinConnections.userId,
         syncFrequency: simplifinConnections.syncFrequency,
         lastSyncAt: simplifinConnections.lastSyncAt,
       })
       .from(simplifinConnections);
 
     let scheduled = 0;
+    let skipped = 0;
     for (const conn of connections) {
+      if (!(await canSyncUser(conn.userId))) {
+        logger.warn(`${LOG_TAG} Skipping connection — server DEK unavailable`, {
+          connectionId: conn.id,
+          userId: conn.userId,
+        });
+        skipped++;
+        continue;
+      }
       if (this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt)) {
         scheduled++;
       }
     }
 
     this._isRunning = true;
-    logger.info(`${LOG_TAG} Scheduler initialized`, { total: connections.length, scheduled });
+    logger.info(`${LOG_TAG} Scheduler initialized`, { total: connections.length, scheduled, skipped });
   }
 
   schedule(
@@ -81,10 +100,26 @@ class SyncScheduler {
     }
   }
 
+  async scheduleForUser(userId: string): Promise<void> {
+    const connections = await getDb()
+      .select({
+        id: simplifinConnections.id,
+        syncFrequency: simplifinConnections.syncFrequency,
+        lastSyncAt: simplifinConnections.lastSyncAt,
+      })
+      .from(simplifinConnections)
+      .where(eq(simplifinConnections.userId, userId));
+
+    for (const conn of connections) {
+      this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt);
+    }
+  }
+
   private async execute(id: string): Promise<void> {
     this.timers.delete(id);
 
     let syncSuccess = false;
+    let dekUnavailable = false;
 
     try {
       const [connection] = await getDb()
@@ -111,10 +146,19 @@ class SyncScheduler {
         });
       }
     } catch (err) {
-      logger.error(`${LOG_TAG} Auto-sync error`, {
-        connectionId: id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('server-wrapped') || msg.includes('Encryption key unavailable')) {
+        dekUnavailable = true;
+        logger.warn(`${LOG_TAG} Server DEK unavailable, will not retry`, {
+          connectionId: id,
+          error: msg,
+        });
+      } else {
+        logger.error(`${LOG_TAG} Auto-sync error`, {
+          connectionId: id,
+          error: msg,
+        });
+      }
     }
 
     // Re-read current state to decide how to reschedule
@@ -129,6 +173,8 @@ class SyncScheduler {
         .limit(1);
 
       if (!updated || updated.syncFrequency === 'manual') return;
+
+      if (dekUnavailable) return;
 
       if (syncSuccess) {
         this.schedule(id, updated.syncFrequency, updated.lastSyncAt);

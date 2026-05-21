@@ -118,6 +118,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // Don't fail the login if seeding fails, just log it
           }
 
+          // Reschedule sync timers for this user's connections and manual accounts
+          // (the serverWrappedDek was just created/verified during this login)
+          try {
+            const { syncScheduler } = await import('@/lib/services/sync-scheduler');
+            const { manualAccountScheduler } = await import('@/lib/services/manual-account-scheduler');
+            if (syncScheduler.isRunning) {
+              await syncScheduler.scheduleForUser(user.username);
+            }
+            if (manualAccountScheduler.isRunning) {
+              await manualAccountScheduler.scheduleForUser(user.username);
+            }
+          } catch (err) {
+            logger.error('Auth: Failed to reschedule sync timers', { error: err instanceof Error ? err.message : String(err) });
+          }
+
           return {
             id: user.username,
             name: user.username,

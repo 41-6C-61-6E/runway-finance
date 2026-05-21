@@ -19,6 +19,15 @@ const SYNC_INTERVALS: Record<string, number> = {
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
+async function canSyncUser(userId: string): Promise<boolean> {
+  try {
+    await getServerDEK(userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<string> {
   if (!accountRow.metadata) return 'manual';
   try {
@@ -61,8 +70,18 @@ class ManualAccountScheduler {
       ));
 
     let scheduled = 0;
+    let skipped = 0;
     for (const row of accountRows) {
       if (!SYNCABLE_TYPES.includes(row.type as typeof SYNCABLE_TYPES[number])) continue;
+
+      if (!(await canSyncUser(row.userId))) {
+        logger.warn(`${LOG_TAG} Skipping account — server DEK unavailable`, {
+          accountId: row.id,
+          userId: row.userId,
+        });
+        skipped++;
+        continue;
+      }
 
       let dek = serverDekMap.get(row.userId);
       if (!dek) {
@@ -71,6 +90,7 @@ class ManualAccountScheduler {
           serverDekMap.set(row.userId, dek);
         } catch {
           logger.warn(`${LOG_TAG} Cannot get server DEK for user`, { userId: row.userId });
+          skipped++;
           continue;
         }
       }
@@ -82,7 +102,7 @@ class ManualAccountScheduler {
     }
 
     this._isRunning = true;
-    logger.info(`${LOG_TAG} Scheduler initialized`, { total: accountRows.length, scheduled });
+    logger.info(`${LOG_TAG} Scheduler initialized`, { total: accountRows.length, scheduled, skipped });
   }
 
   schedule(
@@ -123,10 +143,34 @@ class ManualAccountScheduler {
     }
   }
 
+  async scheduleForUser(userId: string): Promise<void> {
+    const db = getDb();
+    const userAccounts = await db
+      .select({
+        id: accounts.id,
+        type: accounts.type,
+        balanceDate: accounts.balanceDate,
+        metadata: accounts.metadata,
+      })
+      .from(accounts)
+      .where(and(
+        eq(accounts.userId, userId),
+        isNull(accounts.connectionId),
+      ));
+
+    const dek = await getServerDEK(userId);
+    for (const row of userAccounts) {
+      if (!SYNCABLE_TYPES.includes(row.type as typeof SYNCABLE_TYPES[number])) continue;
+      const syncFrequency = await extractSyncFrequency(row, dek);
+      this.schedule(row.id, userId, syncFrequency, row.balanceDate);
+    }
+  }
+
   private async execute(id: string, userId: string): Promise<void> {
     this.timers.delete(id);
 
     let syncSuccess = false;
+    let dekUnavailable = false;
 
     try {
       const dek = await getServerDEK(userId);
@@ -143,10 +187,16 @@ class ManualAccountScheduler {
         });
       }
     } catch (err) {
-      logger.error(`${LOG_TAG} Auto-sync error`, {
-        accountId: id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('server-wrapped') || msg.includes('Encryption key unavailable')) {
+        dekUnavailable = true;
+        logger.warn(`${LOG_TAG} Server DEK unavailable, will not retry`, { accountId: id });
+      } else {
+        logger.error(`${LOG_TAG} Auto-sync error`, {
+          accountId: id,
+          error: msg,
+        });
+      }
     }
 
     // Re-read current state to decide how to reschedule
@@ -168,6 +218,8 @@ class ManualAccountScheduler {
       const syncFrequency = await extractSyncFrequency(updated, dek);
 
       if (syncFrequency === 'manual') return;
+
+      if (dekUnavailable) return;
 
       if (syncSuccess) {
         this.schedule(id, updated.userId, syncFrequency, updated.balanceDate);
