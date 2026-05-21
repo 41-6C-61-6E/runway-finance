@@ -65,7 +65,8 @@ export function applyAccent(name: string) {
   initThemeObserver();
 
   const r = document.documentElement;
-  const isDark = r.getAttribute('data-theme') === 'dark';
+  const theme = r.getAttribute('data-theme');
+  const isDark = theme === 'dark' || theme === 'moonlight';
 
   // Custom hex color path
   if (isHexColor(name)) {

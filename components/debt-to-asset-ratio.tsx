@@ -48,6 +48,7 @@ const CHART_COLOR_MAP = [
 const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   checking: { label: 'Cash & Checking' },
   savings: { label: 'Savings' },
+  hsachecking: { label: 'HSA (Checking)' },
   investment: { label: 'Taxable Brokerage' },
   brokerage: { label: 'Taxable Brokerage' },
   otherinvestment: { label: 'Other Investments' },
@@ -58,6 +59,8 @@ const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   '403b': { label: 'Retirement' },
   sepira: { label: 'Retirement' },
   simpleira: { label: 'Retirement' },
+  hsa: { label: 'HSA (Investment)' },
+  health: { label: 'HSA (Investment)' },
   realestate: { label: 'Real Estate' },
   primaryhome: { label: 'Real Estate' },
   secondaryhome: { label: 'Real Estate' },

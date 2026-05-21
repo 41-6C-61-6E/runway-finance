@@ -1,6 +1,6 @@
-import cron from 'node-cron';
 import { logger, setDevMode } from '@/lib/logger';
-import { patchConsole, enableDevLogging } from '@/lib/dev-logs';
+import { syncScheduler } from '@/lib/services/sync-scheduler';
+import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
 const LOG_TAG = '[runway-sync]';
 
@@ -13,38 +13,39 @@ export async function registerNodeInstrumentation(): Promise<void> {
     logger.error('[startup] Database initialization failed', { error: err instanceof Error ? err.message : String(err) });
   }
 
-  // Register cron sync task (now deprecated - connections will be synced on-demand)
-  // The global cron sync is replaced by per-connection sync frequency configuration
-  const schedule = process.env.SYNC_CRON_SCHEDULE ?? '';
-
-  if (!schedule) {
-    logger.warn(`[runway-sync] SYNC_CRON_SCHEDULE is not set — periodic sync is disabled.`);
-    logger.warn(`[runway-sync] Periodic sync is now handled per-connection with configurable frequencies.`);
-    return;
+  // Initialize per-connection sync scheduler
+  try {
+    await syncScheduler.init();
+    logger.info(`${LOG_TAG} Sync scheduler initialized.`);
+  } catch (err) {
+    logger.error(`${LOG_TAG} Sync scheduler initialization failed`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
-  const task = cron.schedule(schedule, async () => {
-    try {
-      const { syncAllConnections } = await import('@/lib/services/sync-all');
-      await syncAllConnections();
-    } catch (err) {
-      logger.error(`${LOG_TAG} Cron task error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  });
-
-  logger.info(`${LOG_TAG} Cron registered: ${schedule}`);
+  // Initialize manual account sync scheduler
+  try {
+    await manualAccountScheduler.init();
+    logger.info(`${LOG_TAG} Manual account scheduler initialized.`);
+  } catch (err) {
+    logger.error(`${LOG_TAG} Manual account scheduler initialization failed`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   if (process.env.DEV_MODE === 'true') {
     setDevMode(true);
-    enableDevLogging();
-    patchConsole();
-    logger.info(`${LOG_TAG} Dev mode enabled — console logging captured.`);
+    logger.info(`${LOG_TAG} Dev mode enabled.`);
   }
 
+  // Graceful shutdown
   if (typeof process !== 'undefined' && typeof process.on === 'function') {
-    process.on('SIGTERM', () => {
-      task.stop();
-      logger.info(`${LOG_TAG} Cron stopped.`);
-    });
+    const handleShutdown = () => {
+      syncScheduler.shutdown();
+      manualAccountScheduler.shutdown();
+      logger.info(`${LOG_TAG} Schedulers stopped.`);
+    };
+    process.on('SIGTERM', handleShutdown);
+    process.on('SIGINT', handleShutdown);
   }
 }

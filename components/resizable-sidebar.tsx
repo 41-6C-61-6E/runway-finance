@@ -7,7 +7,7 @@ import SignOutForm from '@/components/sign-out-form'
 import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
-import { useHiddenPages, type HiddenPageKey } from '@/lib/hooks/use-hidden-pages'
+import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
@@ -48,6 +48,7 @@ export default function ResizableSidebar() {
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
+  const [devMode, setDevMode] = useState<boolean | null>(null)
   const [appStatus, setAppStatus] = useState<{
     connected: boolean
     lastSyncAt: string | null
@@ -92,6 +93,11 @@ export default function ResizableSidebar() {
       .then(r => r.json())
       .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
       .catch(() => {})
+
+    fetch('/api/dev-mode', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => setDevMode(data.devMode))
+      .catch(() => setDevMode(false))
   }, [])
 
   const formatRelativeTime = (dateStr: string | null) => {
@@ -141,7 +147,11 @@ export default function ResizableSidebar() {
 
         {/* Navigation Links */}
         <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
-          {navItems.filter((item) => item.pageKey === 'settings' || !isHidden(item.pageKey as HiddenPageKey)).map((item) => {
+          {navItems.filter((item) => {
+            const isDevModePage = (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey)
+            if (isDevModePage && devMode !== true) return false
+            return item.pageKey === 'settings' || !isHidden(item.pageKey as HiddenPageKey)
+          }).map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
             return (

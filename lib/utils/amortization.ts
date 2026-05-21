@@ -44,7 +44,22 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
 
   const start = new Date(startDate);
 
-  for (let month = 1; month <= termMonths && balance > 0; month++) {
+  for (let month = 1; month <= termMonths; month++) {
+    const paymentDate = new Date(start);
+    paymentDate.setMonth(start.getMonth() + month - 1);
+
+    if (balance <= 0) {
+      schedule.push({
+        month,
+        date: paymentDate.toISOString().split('T')[0],
+        payment: 0,
+        principal: 0,
+        interest: 0,
+        remainingBalance: 0,
+      });
+      continue;
+    }
+
     const interest = balance * monthlyRate;
     let principal = effectivePayment - interest;
 
@@ -58,9 +73,6 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
 
     balance -= principal;
 
-    const paymentDate = new Date(start);
-    paymentDate.setMonth(start.getMonth() + month - 1);
-
     schedule.push({
       month,
       date: paymentDate.toISOString().split('T')[0],
@@ -69,8 +81,6 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
       interest: Math.round(interest * 100) / 100,
       remainingBalance: Math.max(0, Math.round(balance * 100) / 100),
     });
-
-    if (balance <= 0) break;
   }
 
   return schedule;
@@ -101,32 +111,42 @@ export function calculateAmortizationWithExtraPayments(
   const lumpSumDate = extra.lumpSumDate;
 
   if (extra.biweekly) {
-    extraMonthly += effectivePayment / 2;
+    extraMonthly += effectivePayment / 12;
   }
 
   const accelerated: AmortizationRow[] = [];
   const start = new Date(startDate);
 
-  for (let month = 1; month <= termMonths && balance > 0; month++) {
+  for (let month = 1; month <= termMonths; month++) {
+    const paymentDate = new Date(start);
+    paymentDate.setMonth(start.getMonth() + month - 1);
+
+    if (balance <= 0) {
+      accelerated.push({
+        month,
+        date: paymentDate.toISOString().split('T')[0],
+        payment: 0,
+        principal: 0,
+        interest: 0,
+        remainingBalance: 0,
+      });
+      continue;
+    }
+
     const interest = balance * monthlyRate;
     let principal = effectivePayment - interest + extraMonthly;
 
     if (lumpSum > 0 && lumpSumDate) {
-      const paymentDate = new Date(start);
-      paymentDate.setMonth(start.getMonth() + month - 1);
       const lumpDate = new Date(lumpSumDate);
-      if (paymentDate >= lumpDate && month === 1) {
+      if (paymentDate >= lumpDate) {
         principal += lumpSum;
       }
     }
 
     if (principal <= 0) principal = balance;
-    if (principal > balance + interest) principal = balance + interest;
+    if (principal > balance) principal = balance;
 
-    balance -= (principal - interest);
-
-    const paymentDate = new Date(start);
-    paymentDate.setMonth(start.getMonth() + month - 1);
+    balance -= principal;
 
     accelerated.push({
       month,
@@ -136,8 +156,6 @@ export function calculateAmortizationWithExtraPayments(
       interest: Math.round(interest * 100) / 100,
       remainingBalance: Math.max(0, Math.round(balance * 100) / 100),
     });
-
-    if (balance <= 0) break;
   }
 
   const lastStandard = standard[standard.length - 1];

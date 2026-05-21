@@ -3,26 +3,42 @@
 # TO DO LIST
 
 ## CHANGES:
-- get defaults right
-- support for extra principal, prinicpal, interest, escrow
-- Net worth display assets and liabilities doesnt do anyhting in bar chart mode. It should display opposing bars (assets up and liabilities down), with a line through the chart for net worth.
-- The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart 
 
+
+- In manual accounts, Mortgages that are synced with SimpleFIN show up--this is correct, but put a label that the account is SIimpleFIN synced. ALso in the edit drawer for mortgage accounts, add support for broken out extra principal, prinicpal, interest, PMI, escrow(taxes, insurance) and then make sure that these values populate into the relevane charts in the real estate page. think through the logic and what might need to change on the real estate page. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- Stacked voume line chart for net worth line chart. The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart. For example Assets shoulld show as stacked volume of real estate, retirement, savings, etc. and liabilities should subract from the volume for loans, credit, etc. Each type 
+
+
+
+- Spending Breakdown pi and bar charts should actually use the category colors (or versions of them depending on theme) rather than the color scheme colors. 
 
 ## NEW FEATUES:
-- explore the idea of transfer categories
+- explore the idea of transfer categories, paired tx or tags
 - Better PWA support
-- AI Financial fitness evaluation
-- backup and restore
 - Vuln patch
 
+- Add a backup and restore feature where the user can download or restore all data and settings in a backup file or have the option to export all financial data as a set of csv files or json or whatever makes sense. This featue will be in the advanced settings tab. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- Plan an accounts page with account balance over time. A previous agent worked on an accounts page but it was not fully finished, so you may run into some remnants of that and need to do some cleanup. The accounts page should have a stacked volume line chart showing account balance over time and should be filterable by accounts, or account type or group type so that the chart updated based on the filtered accounts. There should also be an option to select a bar chart that will show the same data but in stacked bars (showing each account or acount group or type). Below the chart should be an e tree like expandable area showing every account, expandable by group and type, and with relevant statistics about that account, like balance trend, a little simple history chart indicator for just that account, recent activity, etc or whatever makes sense to show. 
+
+- add a SimpeFIN sync frequency setting configurable in the settings area and show when the next sync is scheduled to occur. A previous agent worked on the problem so you may find remnants to use or clean up. 
+
+- Currently there is no way to capture 401k match, tax withholding, other paycheck deductions (union dues, cafeteria, insurance) to be used in the analytics. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes. Understand the schema. There may need to be a manual transaction type feature. Where would it make sense to solicit this data form the user and incorporate it? Possibly a rule the triggers when a paycheck is detected and then the witholdings are auto created or somehting like that. Help me witht he logic and flow. make some proposals and ask quesitons. 
+
+- investments page with holdings and other metrics
+- screen grab projection lab and do that stuff
 
 ## BUGS:
-- some charts include excluded accounts (snakey, spending breakdown at the least)
-- idea of tags
-- logs dev mode brokn
+
+- real estate patoff chart - make sure the x axis shows the totality of both ilines
 
 
+- [DONE] hover colors in the nav bar of the moonlight theme need to be handled similar to dark mode so the text is readable when the mosue moved over the nav bar items. 
+
+- [DONE] health acccount handling should not in its own group, there should be Investments > HSA Account and Checking > HSA Account
+- [DONE] bulk edit of categeories does not work on transacitons page. THe category doesnt actually change. 
+-  [DONE] if AI suggestion sets a category, then the user sets it later to something else, the AI sparkles should go away, but it doesnt.
 
 [DONE] Snakey issues:
  - Cannot move forward to current month
@@ -78,3 +94,7 @@
 [DONE] In FIRE > Forecaster > Portfolio Projection, the x axis labels overlap and are unreadable. 
 
 [DONE] In Settings > Accounts > Manual Accounts manually added mortgages need and Adjust options (like gold/silver) so the outstanding balance can be adjusted.
+
+- [DONE]Make a defaults/config file where all the settings, API keys, and anything else in the projects that is configurable can be pre set upon deployment and onboarding of new users. Once the user changes a setting, store their preference. But for new users the defaults file should be used to populate the settings. Remove the existing APIs tab from settings and replace it with an Advanced tab on the right and have this be a key value listing of all the possible settings that the user can change. Warn the user at the top that changing these settings could cause unexpected behavior. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- [DONE] Add data explorer and financial logic to the dev mode toggel. remove the dev logging feature. When dev mode is off Financial Logic and Data explorer should not show up in the Nav bar. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.

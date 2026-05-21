@@ -630,6 +630,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const table = useReactTable({
     data: transactions,
     columns,
+    getRowId: (row) => row.id,
     state: {
       sorting,
       columnVisibility,

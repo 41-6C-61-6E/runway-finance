@@ -7,6 +7,7 @@ import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES, type AssetSub
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
+import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
 export async function GET() {
   const session = await auth();
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
       apiConfig,
     }, dek);
     logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
+
+    // Schedule auto-sync if the account has a sync frequency
+    const syncFrequency = (body.metadata?.syncFrequency as string) || 'manual';
+    manualAccountScheduler.schedule(account.id, userId, syncFrequency, account.balanceDate);
+
     return NextResponse.json(account, { status: 201 });
   } catch (err) {
     logger.error('POST /api/manual-accounts - error', { userId, name: body.name, error: err instanceof Error ? err.message : 'Failed to create account' });

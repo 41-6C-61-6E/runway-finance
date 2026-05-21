@@ -8,23 +8,14 @@ import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
 import type { ApiConfig } from '@/lib/services/asset-estimator';
+import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 const LOG_TAG = '[manual-accounts]';
 
 export type { ApiConfig };
 
-export const DEFAULT_API_CONFIG: ApiConfig = {
-  metalsApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart',
-  metalsApiKey: '',
-  redfinApiUrl: 'https://www.redfin.com/what-is-my-home-worth',
-  redfinApiKey: '',
-  fredApiUrl: 'https://api.stlouisfed.org/fred/series/observations',
-  fredApiKey: '',
-  btcApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD',
-  btcApiKey: '',
-  btcXpubApiUrl: 'https://{host}/api/v2/xpub/{xpub}?details=basic',
-};
+export const DEFAULT_API_CONFIG: ApiConfig = { ...API_KEY_DEFAULTS };
 
 export async function readApiConfig(userId: string): Promise<ApiConfig> {
   try {

@@ -39,6 +39,21 @@ const SYNC_FREQUENCIES = [
   { value: 'monthly', label: 'Monthly' },
 ] as const;
 
+const SYNC_INTERVALS: Record<string, number> = {
+  manual: 0,
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+  monthly: 30 * 24 * 60 * 60 * 1000,
+};
+
+function computeNextSync(syncFrequency: string, balanceDate: string | null): Date | null {
+  if (syncFrequency === 'manual') return null;
+  const interval = SYNC_INTERVALS[syncFrequency];
+  if (!interval) return null;
+  if (!balanceDate) return new Date();
+  return new Date(new Date(balanceDate).getTime() + interval);
+}
+
 const SYNC_FREQUENCY_LABELS: Record<string, string> = {
   manual: 'Manual',
   daily: 'Daily',
@@ -281,6 +296,23 @@ export default function ManualAccountsSection() {
       setSyncingId(null);
     }
   };
+
+  const handleSyncFrequencyChange = useCallback(async (accountId: string, frequency: string) => {
+    try {
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) return;
+      const newMeta = { ...(account.metadata || {}), syncFrequency: frequency };
+      await fetch(`/api/manual-accounts/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ metadata: newMeta }),
+      });
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === accountId ? { ...a, metadata: newMeta } : a))
+      );
+    } catch {}
+  }, [accounts]);
 
   const isMetalsAdjust = adjustAccount?.type === 'metals';
 
@@ -708,86 +740,116 @@ export default function ManualAccountsSection() {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = account.type === 'mortgage';
             const isSimpleFin = account.type === 'mortgage' && !account.metadata;
+            const syncFrequency = canSync(account) && account.metadata
+              ? String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')
+              : 'manual';
+            const nextSync = computeNextSync(syncFrequency, account.balanceDate);
+            const isSyncOverdue = nextSync && nextSync.getTime() <= Date.now();
             return (
               <div
                 key={account.id}
-                className="p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4"
+                className="p-4 bg-muted/30 border border-border rounded-lg space-y-2"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : getSubTypeLabel(account) === 'Cash' ? 'cash' : 'otherAsset']}</span>
-                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                      account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
-                      account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
-                       account.type === 'crypto' ? 'bg-status-positive/20 text-status-positive' :
-                      account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
-                      account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
-                       account.type === 'cash' ? 'bg-status-positive/20 text-status-positive' :
-                      'bg-muted text-muted-foreground'
-                    }`}>
-                      {getSubTypeLabel(account)}
-                    </span>
-                    {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
-                    {isSimpleFin && <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-1.5 py-0.5 rounded">SimpleFIN</span>}
-                  </div>
-                  <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                    <span>Last updated: {formatRelativeTime(account.balanceDate)}</span>
-                    {canSync(account) && account.metadata && (
-                      <span className={`text-[10px] ${SYNC_FREQ_COLORS[String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')] || 'text-muted-foreground'}`}>
-                        {SYNC_FREQUENCY_LABELS[String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')] || 'Manual'}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : getSubTypeLabel(account) === 'Cash' ? 'cash' : 'otherAsset']}</span>
+                      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                        account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
+                        account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
+                         account.type === 'crypto' ? 'bg-status-positive/20 text-status-positive' :
+                        account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
+                        account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
+                         account.type === 'cash' ? 'bg-status-positive/20 text-status-positive' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {getSubTypeLabel(account)}
                       </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="text-right">
-                    <div className={`font-mono text-sm font-semibold blur-number ${isLiability ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {fmt.sign}{fmt.text}
+                      {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
+                      {isSimpleFin && <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-1.5 py-0.5 rounded">SimpleFIN</span>}
                     </div>
-                    <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                    <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {canSync(account) && (
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="text-right">
+                      <div className={`font-mono text-sm font-semibold blur-number ${isLiability ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {fmt.sign}{fmt.text}
+                      </div>
+                      <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {canSync(account) && (
+                        <button
+                          onClick={() => handleSync(account.id)}
+                          disabled={syncingId === account.id}
+                          className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {syncingId === account.id ? 'Syncing...' : 'Sync'}
+                        </button>
+                      )}
+                      {canAdjust(account) && (
+                        <button
+                          onClick={() => {
+                            setAdjustAccount(account);
+                            const meta = account.metadata ?? {};
+                            setAdjustValue(
+                              account.type === 'metals'
+                                ? String((meta as Record<string, unknown>).amountOz ?? '0')
+                                : account.balance
+                            );
+                            setAdjustNote('');
+                          }}
+                          className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                        >
+                          Adjust
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleSync(account.id)}
-                        disabled={syncingId === account.id}
-                        className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {syncingId === account.id ? 'Syncing...' : 'Sync'}
-                      </button>
-                    )}
-                    {canAdjust(account) && (
-                      <button
-                        onClick={() => {
-                          setAdjustAccount(account);
-                          const meta = account.metadata ?? {};
-                          setAdjustValue(
-                            account.type === 'metals'
-                              ? String((meta as Record<string, unknown>).amountOz ?? '0')
-                              : account.balance
-                          );
-                          setAdjustNote('');
-                        }}
+                        onClick={() => openEdit(account)}
                         className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
                       >
-                        Adjust
+                        Edit
                       </button>
-                    )}
-                    <button
-                      onClick={() => openEdit(account)}
-                      className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteAccount(account)}
-                      className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
-                    >
-                      Delete
-                    </button>
+                      <button
+                        onClick={() => setDeleteAccount(account)}
+                        className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
+                <div className="text-xs text-muted-foreground">
+                  Last updated: {formatRelativeTime(account.balanceDate)}
+                </div>
+                {canSync(account) && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground">Sync frequency:</label>
+                      <select
+                        value={syncFrequency}
+                        onChange={(e) => handleSyncFrequencyChange(account.id, e.target.value)}
+                        className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="manual">Manual</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {syncFrequency === 'manual' ? (
+                        <span>Next sync: Not scheduled</span>
+                      ) : isSyncOverdue ? (
+                        <span className="text-chart-3">Next sync: Overdue</span>
+                      ) : nextSync ? (
+                        <span>Next sync: {formatRelativeTime(nextSync.toISOString())}</span>
+                      ) : (
+                        <span>Next sync: Now</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -24,13 +24,13 @@ const MAJOR_TYPE_OPTIONS = [
   { value: 'realestate', label: 'Real Estate' },
   { value: 'loan', label: 'Loan / Liability' },
   { value: 'asset', label: 'Other Asset' },
-  { value: 'health', label: 'Health' },
 ];
 
 const SUB_TYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
   banking: [
     { value: 'checking', label: 'Checking' },
     { value: 'savings', label: 'Savings' },
+    { value: 'hsachecking', label: 'HSA (Checking)' },
     { value: 'other', label: 'Other Banking / Cash' },
   ],
   credit: [
@@ -47,6 +47,8 @@ const SUB_TYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'sepira', label: 'SEP IRA' },
     { value: 'simpleira', label: 'Simple IRA' },
     { value: '529', label: '529 Account' },
+    { value: 'hsa', label: 'HSA (Investment)' },
+    { value: 'health', label: 'HSA' },
     { value: 'otherinvestment', label: 'Other Investment' },
   ],
   realestate: [
@@ -68,10 +70,6 @@ const SUB_TYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'crypto', label: 'Bitcoin / Crypto' },
     { value: 'metals', label: 'Metals' },
     { value: 'otherAsset', label: 'Other Asset' },
-  ],
-  health: [
-    { value: 'hsa', label: 'HSA' },
-    { value: 'health', label: 'Health Account' },
   ],
 };
 

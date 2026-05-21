@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { simplifinConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { syncScheduler } from '@/lib/services/sync-scheduler';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -76,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .returning();
 
   logger.info('Connection updated', { connectionId: id, updateData });
+  syncScheduler.schedule(id, updated.syncFrequency, updated.lastSyncAt);
   return NextResponse.json(updated);
 }
 
@@ -133,6 +135,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   await getDb().delete(syncLogs).where(eq(syncLogs.connectionId, id));
   await getDb().delete(simplifinConnections).where(eq(simplifinConnections.id, id));
 
+  syncScheduler.cancel(id);
   logger.info('Connection deleted', { connectionId: id, keepData });
   return new NextResponse(null, { status: 204 });
 }

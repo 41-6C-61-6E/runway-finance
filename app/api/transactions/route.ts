@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and, or, sql, gte, lte, desc, inArray } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, inArray, isNull } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -96,14 +96,14 @@ export async function GET(request: Request) {
     const ids = filters.categoryIds.split(',').map(id => id.trim()).filter(Boolean);
     if (ids.length > 0) {
       const uncategorizedIdx = ids.indexOf('uncategorized');
-      if (uncategorizedIdx !== -1) {
+        if (uncategorizedIdx !== -1) {
         const otherIds = ids.filter((_, i) => i !== uncategorizedIdx);
         if (otherIds.length > 0) {
           whereConditions.push(
-            or(eq(transactions.categoryId, null), inArray(transactions.categoryId, otherIds))
+            or(isNull(transactions.categoryId), inArray(transactions.categoryId, otherIds))
           );
         } else {
-          whereConditions.push(eq(transactions.categoryId, null));
+          whereConditions.push(isNull(transactions.categoryId));
         }
       } else {
         whereConditions.push(inArray(transactions.categoryId, ids));
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     }
   } else if (filters.categoryId) {
     if (filters.categoryId === 'uncategorized') {
-      whereConditions.push(eq(transactions.categoryId, null));
+      whereConditions.push(isNull(transactions.categoryId));
     } else {
       whereConditions.push(eq(transactions.categoryId, filters.categoryId));
     }
@@ -244,15 +244,18 @@ export async function PATCH(request: Request) {
   if (patch.ignored !== undefined) patchedFields.push('ignored');
   logger.info('Patching transactions', { idsCount: ids.length, patchedFields });
 
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.categoryId !== undefined) {
+    updateData.categoryId = patch.categoryId;
+    updateData.categorizedByAi = false;
+  }
+  if (patch.reviewed !== undefined) updateData.reviewed = patch.reviewed;
+  if (patch.ignored !== undefined) updateData.ignored = patch.ignored;
+
   const updated = await getDb()
     .update(transactions)
-    .set({
-      ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
-      ...(patch.reviewed !== undefined ? { reviewed: patch.reviewed } : {}),
-      ...(patch.ignored !== undefined ? { ignored: patch.ignored } : {}),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(transactions.userId, userId), sql`${transactions.id} = ANY(${ids})`))
+    .set(updateData)
+    .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)))
     .returning();
 
   logger.info('Transactions patched', { updatedCount: updated.length });

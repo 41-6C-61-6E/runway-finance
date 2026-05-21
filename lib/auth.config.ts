@@ -13,7 +13,7 @@ export const authConfig = {
       const { pathname } = nextUrl;
       const isOnSignin = pathname === "/signin";
       
-      // Allow access to dev-mode and dev-log APIs without a session
+      // Allow access to dev-mode API without a session
       if (pathname.startsWith("/api/dev-")) {
         return true;
       }

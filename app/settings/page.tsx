@@ -18,10 +18,11 @@ import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
 import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
 import AiTab from '@/components/features/settings/AiTab';
+import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
-import { useHiddenPages, HIDDEN_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
+import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
@@ -29,12 +30,28 @@ import { OnboardingChecklist } from '@/components/onboarding-checklist';
 type Connection = {
   id: string;
   label: string;
+  syncFrequency: string;
   lastSyncAt: string | null;
   lastSyncStatus: string;
   lastSyncError: string | null;
   createdAt: string;
   accessUrlEncrypted?: string;
 };
+
+const SYNC_INTERVALS: Record<string, number> = {
+  manual: 0,
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+  monthly: 30 * 24 * 60 * 60 * 1000,
+};
+
+function computeNextSync(syncFrequency: string, lastSyncAt: string | null): Date | null {
+  if (syncFrequency === 'manual') return null;
+  const interval = SYNC_INTERVALS[syncFrequency];
+  if (!interval) return null;
+  if (!lastSyncAt) return new Date();
+  return new Date(new Date(lastSyncAt).getTime() + interval);
+}
 
 type Account = {
   id: string;
@@ -99,7 +116,7 @@ export default function SettingsPage() {
   const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'apis' | 'ai'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'advanced' | 'ai'>('general');
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -108,35 +125,6 @@ export default function SettingsPage() {
   const [togglingAccount, setTogglingAccount] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
-
-  // API Keys state
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
-  const [apiKeysLoading, setApiKeysLoading] = useState(true);
-  const [apiKeysSaved, setApiKeysSaved] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/user-settings', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => {
-        setApiKeys(data.apiKeys ?? {});
-      })
-      .catch(() => {})
-      .finally(() => setApiKeysLoading(false));
-  }, []);
-
-  const handleSaveApiKeys = async () => {
-    setApiKeysSaved(false);
-    try {
-      await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ apiKeys }),
-      });
-      setApiKeysSaved(true);
-      setTimeout(() => setApiKeysSaved(false), 2000);
-    } catch {}
-  };
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -267,6 +255,20 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+
+  const handleSyncFrequencyChange = useCallback(async (connectionId: string, frequency: string) => {
+    try {
+      await fetch(`/api/connections/${connectionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ syncFrequency: frequency }),
+      });
+      setConnections((prev) =>
+        prev.map((c) => (c.id === connectionId ? { ...c, syncFrequency: frequency } : c))
+      );
+    } catch {}
+  }, []);
 
   const handleSync = async (connId: string) => {
     setSyncingId(connId);
@@ -422,20 +424,20 @@ export default function SettingsPage() {
               Analytics
             </button>
             <button
-              onClick={() => setActiveTab('apis')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'apis' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              APIs
-            </button>
-            <button
               onClick={() => setActiveTab('ai')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               AI
+            </button>
+            <button
+              onClick={() => setActiveTab('advanced')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'advanced' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Advanced
             </button>
           </div>
 
@@ -584,7 +586,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-medium text-foreground">Developer Mode</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Enable verbose application logs and debugging tools</p>
+                  <p className="text-xs text-muted-foreground mt-1">Enable developer tools such as the Financial Logic and Data Explorer pages</p>
                 </div>
                 <Switch
                   checked={devMode ?? false}
@@ -593,10 +595,10 @@ export default function SettingsPage() {
                 />
               </div>
               {devMode === true && (
-                <p className="text-xs text-primary pt-1">Dev mode is active. Logs will appear in the bottom pane.</p>
+                <p className="text-xs text-primary pt-1">Dev mode is active. Financial Logic and Data Explorer pages are visible in the nav.</p>
               )}
               {devMode === false && (
-                <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Logs are hidden.</p>
+                <p className="text-xs text-muted-foreground pt-1">Dev mode is disabled. Developer tools are hidden from the nav.</p>
               )}
             </div>
           </div>
@@ -612,7 +614,10 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                {HIDDEN_PAGE_KEYS.map((pageKey) => {
+                {HIDDEN_PAGE_KEYS.filter((pageKey) => {
+                  const isDevModePage = (DEV_MODE_PAGE_KEYS as readonly string[]).includes(pageKey)
+                  return !isDevModePage || devMode === true
+                }).map((pageKey) => {
                   const pageLabel =
                     pageKey === 'netWorth' ? 'Net Worth' :
                     pageKey === 'transactions' ? 'Transactions' :
@@ -621,6 +626,9 @@ export default function SettingsPage() {
                     pageKey === 'realEstate' ? 'Real Estate' :
                     pageKey === 'fire' ? 'FIRE' :
                     pageKey === 'dataExplorer' ? 'Data Explorer' :
+                    pageKey === 'financialLogic' ? 'Financial Logic' :
+                    pageKey === 'goals' ? 'Goals' :
+                    pageKey === 'spending' ? 'Spending' :
                     pageKey;
 
                   return (
@@ -678,13 +686,16 @@ export default function SettingsPage() {
                 <div className="text-muted-foreground text-sm">Loading...</div>
               ) : (
                 <div className="space-y-3">
-                  {connections.map((conn) => (
+                  {connections.map((conn) => {
+                    const nextSync = computeNextSync(conn.syncFrequency, conn.lastSyncAt);
+                    const isSyncOverdue = nextSync && nextSync.getTime() <= Date.now();
+                    return (
                     <div
                       key={conn.id}
-                      className="p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4"
+                      className="p-4 bg-muted/30 border border-border rounded-lg space-y-2"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 min-w-0">
                           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                             conn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
                             conn.lastSyncStatus === 'error' ? 'bg-destructive' :
@@ -703,52 +714,81 @@ export default function SettingsPage() {
                             </div>
                           ) : (
                             <span
-                              className="text-foreground font-medium cursor-pointer hover:text-primary transition-colors text-sm"
+                              className="text-foreground font-medium cursor-pointer hover:text-primary transition-colors text-sm truncate"
                               onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
                             >
                               {conn.label}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1 ml-4">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                            conn.lastSyncStatus === 'ok'
+                              ? 'bg-chart-1/20 text-chart-1'
+                              : conn.lastSyncStatus === 'error'
+                              ? 'bg-destructive/20 text-destructive'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {conn.lastSyncStatus === 'ok' ? 'Synced' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+                          </span>
+                          <button
+                            onClick={() => handleSync(conn.id)}
+                            disabled={syncingId === conn.id}
+                            className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {syncingId === conn.id ? 'Syncing...' : 'Sync'}
+                          </button>
+                          <button
+                            onClick={() => openDetails(conn)}
+                            className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
+                            className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
                           Last sync: {formatRelativeTime(conn.lastSyncAt)}
                         </div>
-                        {conn.lastSyncError && (
-                          <div className="text-xs text-destructive mt-1 ml-4 truncate">{conn.lastSyncError}</div>
-                        )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                          conn.lastSyncStatus === 'ok'
-                            ? 'bg-chart-1/20 text-chart-1'
-                            : conn.lastSyncStatus === 'error'
-                            ? 'bg-destructive/20 text-destructive'
-                            : 'bg-muted text-muted-foreground'
-                        }`}>
-                          {conn.lastSyncStatus === 'ok' ? 'Synced' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-                        </span>
-                        <button
-                          onClick={() => handleSync(conn.id)}
-                          disabled={syncingId === conn.id}
-                          className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {syncingId === conn.id ? 'Syncing...' : 'Sync'}
-                        </button>
-                        <button
-                          onClick={() => openDetails(conn)}
-                          className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
-                          className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
-                        >
-                          Delete
-                        </button>
+                      {conn.lastSyncError && (
+                        <div className="text-xs text-destructive truncate">{conn.lastSyncError}</div>
+                      )}
+                      <div className="flex items-center justify-between pt-2 border-t border-border">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground">Sync frequency:</label>
+                          <select
+                            value={conn.syncFrequency}
+                            onChange={(e) => handleSyncFrequencyChange(conn.id, e.target.value)}
+                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="manual">Manual</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {conn.syncFrequency === 'manual' ? (
+                            <span>Next sync: Not scheduled</span>
+                          ) : isSyncOverdue ? (
+                            <span className="text-chart-3">Next sync: Overdue</span>
+                          ) : nextSync ? (
+                            <span>Next sync: {formatRelativeTime(nextSync.toISOString())}</span>
+                          ) : (
+                            <span>Next sync: Now</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
 
                   {syncResult && (
                     <div className={`p-4 rounded-lg border space-y-3 ${
@@ -1096,202 +1136,9 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {activeTab === 'apis' && (
-        <div className="space-y-4">
-          {/* Current Connection Details */}
-          {connections.length > 0 && (
-            <div className="p-5 bg-card border border-border rounded-xl">
-              <h2 className="text-base font-semibold text-foreground mb-1">Active Connection</h2>
-              <p className="text-xs text-muted-foreground mb-3">
-                The following SimpleFIN bridge connection is currently in use for automatic accounts.
-              </p>
-              <div className="space-y-2">
-                {connections.map((conn) => (
-                  <div key={conn.id} className="p-3 bg-muted/30 border border-border rounded-lg space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">{conn.label}</span>
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${
-                        conn.lastSyncStatus === 'ok'
-                          ? 'bg-chart-1/20 text-chart-1'
-                          : conn.lastSyncStatus === 'error'
-                          ? 'bg-destructive/20 text-destructive'
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {conn.lastSyncStatus === 'ok' ? 'Active' : conn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-                      </span>
-                    </div>
-                    {conn.accessUrlEncrypted && (
-                      <div>
-                        <span className="text-[10px] text-muted-foreground">Access URL</span>
-                        <p className="text-xs font-mono text-foreground truncate">{maskAccessUrl(conn)}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* API Keys */}
-          <div className="p-5 bg-card border border-border rounded-xl">
-            <h2 className="text-base font-semibold text-foreground mb-1">API Keys &amp; Endpoints</h2>
-            <p className="text-xs text-muted-foreground mb-4">
-              Configure the endpoints and keys used for manual account valuations.
-            </p>
-
-            {apiKeysLoading ? (
-              <div className="text-muted-foreground text-sm py-4">Loading...</div>
-            ) : (
-              <div className="space-y-6">
-
-                {/* Metals API */}
-                <div className="p-4 bg-muted/20 border border-border rounded-lg">
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Metals (Gold/Silver) API
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Fetches spot prices for gold/silver manual accounts. Uses Yahoo Finance by default.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={apiKeys.metalsApiUrl || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiUrl: e.target.value }))}
-                      placeholder="Default: https://query1.finance.yahoo.com/v8/finance/chart"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <input
-                      type="password"
-                      value={apiKeys.metalsApiKey || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, metalsApiKey: e.target.value }))}
-                      placeholder="API key (not required for Yahoo Finance)"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
-                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
-{`curl -s -A 'Mozilla/5.0' '${apiKeys.metalsApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart'}/GC=F'`}
-                    </pre>
-                  </details>
-                </div>
-
-                {/* Redfin API */}
-                <div className="p-4 bg-muted/20 border border-border rounded-lg">
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Redfin Property API
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Estimates real estate property values for manual accounts. Uses Redfin public page by default.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={apiKeys.redfinApiUrl || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiUrl: e.target.value }))}
-                      placeholder="Default: https://www.redfin.com/what-is-my-home-worth"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <input
-                      type="password"
-                      value={apiKeys.redfinApiKey || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, redfinApiKey: e.target.value }))}
-                      placeholder="API key (not required for public page)"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
-                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
-{`curl -s -A 'Mozilla/5.0' '${apiKeys.redfinApiUrl || 'https://www.redfin.com/what-is-my-home-worth'}?propertyId=12345'`}
-                    </pre>
-                  </details>
-                </div>
-
-                {/* FRED API */}
-                <div className="p-4 bg-muted/20 border border-border rounded-lg">
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    FRED API (Federal Reserve)
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Fetches Home Price Index data for real estate historical estimates. Requires a free API key from FRED.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={apiKeys.fredApiUrl || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiUrl: e.target.value }))}
-                      placeholder="Default: https://api.stlouisfed.org/fred/series/observations"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <input
-                      type="password"
-                      value={apiKeys.fredApiKey || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, fredApiKey: e.target.value }))}
-                      placeholder="FRED API key"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example call</summary>
-                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
-{`curl -s '${apiKeys.fredApiUrl || 'https://api.stlouisfed.org/fred/series/observations'}?series_id=USSTHPI&api_key=${apiKeys.fredApiKey ? '*'.repeat(8) : 'YOUR_KEY'}&file_type=json'`}
-                    </pre>
-                  </details>
-                </div>
-
-                {/* BTC / Crypto API */}
-                <div className="p-4 bg-muted/20 border border-border rounded-lg">
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Bitcoin / Crypto API
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Fetches BTC spot price and xpub wallet balances for crypto manual accounts. Uses Yahoo Finance and Trezor Blockbook by default.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={apiKeys.btcApiUrl || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcApiUrl: e.target.value }))}
-                      placeholder="Default: https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <input
-                      type="text"
-                      value={apiKeys.btcXpubApiUrl || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcXpubApiUrl: e.target.value }))}
-                      placeholder="Default: https://{host}/api/v2/xpub/{xpub}?details=basic"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <input
-                      type="password"
-                      value={apiKeys.btcApiKey || ''}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, btcApiKey: e.target.value }))}
-                      placeholder="API key (not required for public endpoints)"
-                      className="w-full px-3 py-2 text-sm bg-background border border-input rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Example calls</summary>
-                    <pre className="mt-1 p-2 bg-background rounded text-[11px] text-muted-foreground overflow-x-auto font-mono">
-{`# BTC spot price
-curl -s -A 'Mozilla/5.0' '${apiKeys.btcApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD'}'
-
-# BTC wallet balance (Trezor Blockbook)
-curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=basic'`}
-                    </pre>
-                  </details>
-                </div>
-
-                <button
-                  onClick={handleSaveApiKeys}
-                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
-                >
-                  {apiKeysSaved ? 'Saved!' : 'Save API Keys'}
-                </button>
-              </div>
-            )}
-          </div>
+      {activeTab === 'advanced' && (
+        <div className="min-h-[400px]">
+          <AdvancedTab />
         </div>
       )}
 
@@ -1332,8 +1179,26 @@ curl -s -A 'Mozilla/5.0' 'https://btc1.trezor.io/api/v2/xpub/xpub6...?details=ba
                     </div>
                   </div>
                   <div>
+                    <label className="text-sm text-muted-foreground">Sync Frequency</label>
+                    <div className="mt-1 text-foreground text-sm capitalize">{detailsConn.syncFrequency}</div>
+                  </div>
+                  <div>
                     <label className="text-sm text-muted-foreground">Last Sync</label>
                     <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Next Sync</label>
+                    <div className="mt-1 text-foreground text-sm">
+                      {detailsConn.syncFrequency === 'manual'
+                        ? 'Not scheduled'
+                        : (() => {
+                            const ns = computeNextSync(detailsConn.syncFrequency, detailsConn.lastSyncAt);
+                            if (!ns) return 'Not scheduled';
+                            if (ns.getTime() <= Date.now()) return 'Overdue';
+                            return formatRelativeTime(ns.toISOString());
+                          })()
+                      }
+                    </div>
                   </div>
                   <div>
                     <label className="text-sm text-muted-foreground">Created</label>

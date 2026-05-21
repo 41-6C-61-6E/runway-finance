@@ -15,6 +15,9 @@ export const HIDDEN_PAGE_KEYS = [
   'financialLogic',
 ] as const;
 
+// Pages that only appear in the nav when developer mode is enabled
+export const DEV_MODE_PAGE_KEYS = ['financialLogic', 'dataExplorer'] as const;
+
 export type HiddenPageKey = (typeof HIDDEN_PAGE_KEYS)[number];
 
 export type HiddenPages = Partial<Record<HiddenPageKey, boolean>>;

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { simplifinConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { syncScheduler } from '@/lib/services/sync-scheduler';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,6 +45,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     logger.info('Sync completed', { connectionId: id, userId, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew, transactionsUpdated: result.transactionsUpdated });
   } else {
     logger.error('Sync failed', { connectionId: id, userId, error: result.errorMessage });
+  }
+
+  // Reschedule the sync timer based on the updated lastSyncAt
+  const [refreshed] = await getDb()
+    .select({ syncFrequency: simplifinConnections.syncFrequency, lastSyncAt: simplifinConnections.lastSyncAt })
+    .from(simplifinConnections)
+    .where(eq(simplifinConnections.id, id))
+    .limit(1);
+
+  if (refreshed) {
+    syncScheduler.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt);
   }
 
   return NextResponse.json({

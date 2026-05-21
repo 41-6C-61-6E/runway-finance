@@ -27,12 +27,14 @@ export const ASSET_ACCOUNT_TYPES = [
   'simpleira',
   '529',
   'hsa',
+  'hsachecking',
   'health',
 ];
 
 export const INVESTMENT_ACCOUNT_TYPES = [
   'investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
-  'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529'
+  'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529',
+  'hsa', 'health',
 ];
 
 export const isInvestmentAccount = (type: string) => INVESTMENT_ACCOUNT_TYPES.includes(type.toLowerCase());
