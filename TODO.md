@@ -33,6 +33,43 @@
 
 - real estate patoff chart - make sure the x axis shows the totality of both ilines
 
+There is an issue with the way the manual and simpleFIN syncs are happening. Investigate and fix. Ideally the user does not have to log in first and the syncs will start for all users when the server starts. There is an encryption key in the env that should be able to start the syncs without the user logging in.
+[WARN 2026-05-21T14:23:35.392Z] [sync-scheduler] Skipping connection — server DEK unavailable {
+connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
+userId: 'alanracek'
+}
+[INFO 2026-05-21T14:23:35.393Z] [sync-scheduler] Scheduler initialized { total: 1, scheduled: 0, skipped: 1 }
+[INFO 2026-05-21T14:23:35.393Z] [runway-sync] Sync scheduler initialized.
+[WARN 2026-05-21T14:23:35.396Z] [manual-account-scheduler] Skipping account — server DEK unavailable {
+accountId: 'ca3ff7c4-3c10-4f28-8110-5fa0bc22134f',
+userId: 'alanracek'
+}
+[INFO 2026-05-21T14:23:35.396Z] [manual-account-scheduler] Scheduler initialized { total: 1, scheduled: 0, skipped: 1 }
+[INFO 2026-05-21T14:23:35.396Z] [runway-sync] Manual account scheduler initialized.
+...
+PATCH /api/connections/d8d76938-ba80-47c2-8d57-4a30a9bb9377 200 in 632ms (compile: 601ms, render: 31ms)
+[INFO 2026-05-21T14:23:49.228Z] Connection updated {
+connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
+updateData: { syncFrequency: 'daily' }
+}
+[INFO 2026-05-21T14:23:49.229Z] [sync-scheduler] Scheduled {
+connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
+frequency: 'daily',
+delay: '0m'
+}
+PATCH /api/connections/d8d76938-ba80-47c2-8d57-4a30a9bb9377 200 in 44ms (compile: 8ms, render: 36ms)
+[WARN 2026-05-21T14:23:49.249Z] [sync-scheduler] Server DEK unavailable, will not retry {
+connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
+error: 'No server-wrapped encryption key found for user alanracek — serverWrappedDek=true, serverWrappingIv=true, serverWrappingTag=false, wrappedDek=true, salt=true'
+}
+
+
+
+
+
+
+
+
 
 - [DONE] hover colors in the nav bar of the moonlight theme need to be handled similar to dark mode so the text is readable when the mosue moved over the nav bar items. 
 

@@ -65,7 +65,11 @@ describe('Crypto', () => {
     expect(unwrapped).toEqual(dek);
   });
 
-  it('field decrypt throws on invalid JSON', async () => {
-    await expect(decryptField('not-json', testKey)).rejects.toThrow('Decryption failed');
+  it('field decrypt returns input string as-is on invalid JSON', async () => {
+    await expect(decryptField('not-json', testKey)).resolves.toBe('not-json');
+  });
+
+  it('field decrypt returns empty string on decryption failure', async () => {
+    await expect(decryptField('{"ct":"invalid","iv":"0123456789abcdef01234567"}', testKey)).resolves.toBe('');
   });
 });
