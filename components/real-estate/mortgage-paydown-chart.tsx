@@ -91,24 +91,22 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
   const chartData = useMemo(() => {
     const series: Array<{
       id: string;
-      data: Array<{ x: string; y: number }>;
+      data: Array<{ x: string | Date; y: number }>;
     }> = [];
 
-    // Standard amortization line - always show full loan term
     series.push({
       id: 'Standard',
       data: standard.map((r) => ({
-        x: r.date.slice(0, 7),
+        x: r.date,
         y: r.remainingBalance,
       })),
     });
 
-    // Accelerated line (only if showing projection with extra payments)
     if (showProjection && accelerated.length > 0) {
       series.push({
         id: 'With Extra Payments',
         data: accelerated.map((r) => ({
-          x: r.date.slice(0, 7),
+          x: r.date,
           y: r.remainingBalance,
         })),
       });
@@ -264,8 +262,8 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
         <div className="h-[250px]">
           <ResponsiveLine
             data={chartData}
-            margin={{ top: 10, right: 20, left: 80, bottom: 30 }}
-            xScale={{ type: 'point' }}
+            margin={{ top: 10, right: 50, left: 80, bottom: 30 }}
+            xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
             yScale={{ type: 'linear', min: 0, max: Math.max(...chartData.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
             curve="monotoneX"
             axisLeft={{
@@ -277,18 +275,8 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
               },
             }}
             axisBottom={{
-              tickSize: 0, tickPadding: 8,
-              tickValues: (() => {
-                const allDates = chartData[0]?.data.map((d) => d.x) ?? [];
-                const maxTicks = 6;
-                if (allDates.length <= maxTicks) return allDates;
-                const step = Math.ceil(allDates.length / maxTicks);
-                return allDates.filter((_, i) => i % step === 0);
-              })(),
-              format: (v: string) => {
-                const d = new Date(v + '-01');
-                return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-              },
+              tickSize: 0, tickPadding: 8, tickValues: 6,
+              format: '%b %Y',
             }}
             enableGridY={true}
             enableGridX={false}

@@ -14,6 +14,7 @@ import {
   updateCategorySpendingSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
+import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -73,7 +74,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.isHidden !== undefined) updateData.isHidden = body.isHidden;
   if (body.isExcludedFromNetWorth !== undefined) updateData.isExcludedFromNetWorth = body.isExcludedFromNetWorth;
   if (body.displayOrder !== undefined) updateData.displayOrder = body.displayOrder;
-  if (body.metadata !== undefined) updateData.metadata = body.metadata;
+  if (body.metadata !== undefined) {
+    updateData.metadata = body.metadata;
+  }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'validation_error', message: 'No valid fields to update' }, { status: 400 });
@@ -85,6 +88,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set({ ...updateData, updatedAt: new Date() })
     .where(eq(accounts.id, id))
     .returning();
+
+  // Reschedule sync timer when metadata (which contains syncFrequency) changes
+  if (body.metadata !== undefined && updated) {
+    const decrypted = await decryptRow('accounts', updated, dek);
+    const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
+    const syncFrequency = (meta.syncFrequency as string) || 'manual';
+    manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
+  }
 
   if (body.isHidden !== undefined || body.isExcludedFromNetWorth !== undefined) {
     const today = new Date().toISOString().split('T')[0];
@@ -119,6 +130,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   await deleteManualAccount(id, userId, false, dek);
+  manualAccountScheduler.cancel(id);
 
   logger.info('DELETE /api/manual-accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });

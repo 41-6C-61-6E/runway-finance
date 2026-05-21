@@ -30,9 +30,9 @@ export const PatchTransactionSchema = z.object({
 });
 
 export const BulkPatchTransactionSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(500),
+  ids: z.array(z.string()).min(1).max(500),
   patch: z.object({
-    categoryId: z.string().uuid().nullable().optional(),
+    categoryId: z.string().nullable().optional(),
     reviewed: z.boolean().optional(),
     ignored: z.boolean().optional(),
   }),

@@ -44,6 +44,8 @@ interface SankeyNode {
   label?: string;
   color?: string;
   categoryId?: string;
+  value?: number;
+  percentage?: number;
 }
 
 interface SankeyLink {
@@ -99,37 +101,40 @@ function getMonthRange(timeframe: TimeRange, selectedMonth?: string): { start: s
 
 const sankeyTheme = {
   background: 'transparent',
-  text: { fill: 'var(--color-foreground)', fontSize: 10 },
+  text: { fill: 'var(--color-foreground)', fontSize: 11, fontWeight: 500 },
   axis: {
     domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
-    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)', fontSize: 10 } },
+    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)', fontSize: 11 } },
   },
   grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3' } },
   tooltip: {
     container: {
       background: 'var(--color-card)',
       border: '1px solid var(--color-border)',
-      borderRadius: '0.5rem',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+      borderRadius: '0.75rem',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
       color: 'var(--color-foreground)',
-      fontSize: '10px',
-      padding: '8px 12px',
+      fontSize: '12px',
+      padding: '10px 14px',
     },
   },
   legends: {
-    text: { fill: 'var(--color-muted-foreground)', fontSize: 10 },
+    text: { fill: 'var(--color-muted-foreground)', fontSize: 11 },
   },
   labels: {
-    text: { fill: 'var(--color-foreground)', fontSize: 10, fontWeight: 600 },
+    text: { fill: 'var(--color-foreground)', fontSize: 11, fontWeight: 600 },
   },
 };
 
-const FALLBACK_COLORS = [
-  '#c5d9f0',  // pastel blue
-  '#d9f0c5',  // pastel green
-  '#f0e6c5',  // pastel gold
-  '#f0c5c5',  // pastel red
-  '#dec5f0',  // pastel purple
+const VIBRANT_COLORS = [
+  '#3b82f6',  // blue
+  '#10b981',  // green
+  '#f59e0b',  // amber
+  '#ef4444',  // red
+  '#8b5cf6',  // purple
+  '#ec4899',  // pink
+  '#06b6d4',  // cyan
+  '#f97316',  // orange
 ];
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -170,7 +175,15 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function pastelColor(hex: string): string {
+function getThemeType(): 'light' | 'dark' | 'moonlight' {
+  if (typeof window === 'undefined') return 'light';
+  const theme = document.documentElement.getAttribute('data-theme');
+  if (theme === 'dark') return 'dark';
+  if (theme === 'moonlight') return 'moonlight';
+  return 'light';
+}
+
+function vibrantColor(hex: string, isIncome: boolean): string {
   if (!hex || hex.startsWith('var(')) return hex;
   const num = parseInt(hex.replace('#', ''), 16);
   if (isNaN(num)) return hex;
@@ -178,7 +191,22 @@ function pastelColor(hex: string): string {
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
   const [h] = rgbToHsl(r, g, b);
-  const [pr, pg, pb] = hslToRgb(h, 0.18, 0.82);
+  
+  const theme = getThemeType();
+  let s: number, l: number;
+  
+  if (theme === 'light') {
+    s = 0.55;
+    l = 0.55;
+  } else if (theme === 'dark') {
+    s = 0.5;
+    l = 0.6;
+  } else {
+    s = 0.5;
+    l = 0.58;
+  }
+  
+  const [pr, pg, pb] = hslToRgb(h, s, l);
   return `#${((pr << 16) | (pg << 8) | pb).toString(16).padStart(6, '0')}`;
 }
 
@@ -242,12 +270,15 @@ function buildSankeyData(
         createdParentNodes.add(parentNodeId);
         const first = children[0];
         const childIds = children.map((c) => c.categoryId).join(',');
-        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : FALLBACK_COLORS[0];
+        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[0];
+        const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Income',
-          color: pastelColor(parentColor),
+          color: vibrantColor(parentColor, true),
           categoryId: childIds,
+          value: totalForParent,
+          percentage: totalIncome > 0 ? (totalForParent / totalIncome) * 100 : 0,
         });
       }
 
@@ -257,8 +288,10 @@ function buildSankeyData(
         nodes.push({
           id: childNodeId,
           label: cat.categoryName,
-          color: pastelColor(cat.categoryColor),
+          color: vibrantColor(cat.categoryColor, true),
           categoryId: cat.categoryId,
+          value: cat.amount,
+          percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
         });
         links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
         totalForParent += cat.amount;
@@ -272,8 +305,10 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label: cat.categoryName,
-        color: pastelColor(cat.categoryColor),
+        color: vibrantColor(cat.categoryColor, true),
         categoryId: cat.categoryId,
+        value: cat.amount,
+        percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
       });
       links.push({ source: childNodeId, target: hubId, value: cat.amount });
     });
@@ -284,8 +319,10 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label,
-        color: pastelColor(cat.categoryColor),
+        color: vibrantColor(cat.categoryColor, true),
         categoryId: cat.categoryId,
+        value: cat.amount,
+        percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
       });
       links.push({ source: childNodeId, target: hubId, value: cat.amount });
     });
@@ -293,12 +330,13 @@ function buildSankeyData(
 
   if (incomeCategories.length === 0 && totalIncome > 0) {
     const fallbackId = 'inc_fallback';
-    nodes.push({ id: fallbackId, label: 'Income', color: FALLBACK_COLORS[0] });
+    nodes.push({ id: fallbackId, label: 'Income', color: VIBRANT_COLORS[0], value: totalIncome, percentage: 100 });
     links.push({ source: fallbackId, target: hubId, value: totalIncome });
   }
 
   if (incomeCategories.length > 0 || expenseCategories.length > 0) {
-    nodes.push({ id: hubId, label: 'Available Funds', color: FALLBACK_COLORS[2] });
+    const totalFlow = totalIncome;
+    nodes.push({ id: hubId, label: 'Available Funds', color: VIBRANT_COLORS[2], value: totalFlow, percentage: 100 });
   }
 
   if (showParents) {
@@ -321,12 +359,15 @@ function buildSankeyData(
         createdParentNodes.add(parentNodeId);
         const first = children[0];
         const childIds = children.map((c) => c.categoryId).join(',');
-        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : FALLBACK_COLORS[1];
+        const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[1];
+        const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Expenses',
-          color: pastelColor(parentColor),
+          color: vibrantColor(parentColor, false),
           categoryId: childIds,
+          value: totalForParent,
+          percentage: totalExpenses > 0 ? (totalForParent / totalExpenses) * 100 : 0,
         });
       }
 
@@ -336,8 +377,10 @@ function buildSankeyData(
         nodes.push({
           id: childNodeId,
           label: cat.categoryName,
-          color: pastelColor(cat.categoryColor),
+          color: vibrantColor(cat.categoryColor, false),
           categoryId: cat.categoryId,
+          value: cat.amount,
+          percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
         });
         links.push({ source: parentNodeId, target: childNodeId, value: cat.amount });
         totalForParent += cat.amount;
@@ -351,8 +394,10 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label: cat.categoryName,
-        color: pastelColor(cat.categoryColor),
+        color: vibrantColor(cat.categoryColor, false),
         categoryId: cat.categoryId,
+        value: cat.amount,
+        percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
       });
       links.push({ source: hubId, target: childNodeId, value: cat.amount });
     });
@@ -363,8 +408,10 @@ function buildSankeyData(
       nodes.push({
         id: childNodeId,
         label,
-        color: pastelColor(cat.categoryColor),
+        color: vibrantColor(cat.categoryColor, false),
         categoryId: cat.categoryId,
+        value: cat.amount,
+        percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
       });
       links.push({ source: hubId, target: childNodeId, value: cat.amount });
     });
@@ -372,19 +419,21 @@ function buildSankeyData(
 
   if (expenseCategories.length === 0 && totalExpenses > 0) {
     const fallbackId = 'exp_fallback';
-    nodes.push({ id: fallbackId, label: 'Expenses', color: FALLBACK_COLORS[1] });
+    nodes.push({ id: fallbackId, label: 'Expenses', color: VIBRANT_COLORS[1], value: totalExpenses, percentage: 100 });
     links.push({ source: hubId, target: fallbackId, value: totalExpenses });
   }
 
   if (savings > 0) {
     const savingsId = '__savings__';
-    nodes.push({ id: savingsId, label: 'Savings', color: FALLBACK_COLORS[2] });
+    const savingsPercentage = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
+    nodes.push({ id: savingsId, label: 'Savings', color: VIBRANT_COLORS[2], value: savings, percentage: savingsPercentage });
     links.push({ source: hubId, target: savingsId, value: savings });
   }
 
   if (deficit > 0) {
     const deficitId = '__deficit__';
-    nodes.push({ id: deficitId, label: 'Deficit', color: 'var(--color-destructive)' });
+    const deficitPercentage = totalIncome > 0 ? (deficit / totalIncome) * 100 : 0;
+    nodes.push({ id: deficitId, label: 'Deficit', color: 'var(--color-destructive)', value: deficit, percentage: deficitPercentage });
     links.push({ source: hubId, target: deficitId, value: deficit });
   }
 
@@ -403,6 +452,7 @@ export function CashFlowSankey() {
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
   const [showParents, setShowParents] = useState(true);
+  const [showPercentages, setShowPercentages] = useState(false);
   const [accountFilterOpen, setAccountFilterOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const accountFilterRef = useRef<HTMLDivElement>(null);
@@ -446,6 +496,66 @@ export function CashFlowSankey() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleThemeChange = () => {
+      const range = getMonthRange(timeframe, month);
+      const acctParam = getAccountIdsParam();
+      fetchDataWithParams(range, acctParam);
+    };
+    
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'data-theme') {
+          handleThemeChange();
+        }
+      });
+    });
+    
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
+
+  const fetchDataWithParams = async (range: { start: string; end: string }, acctParam: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let categories: CategoryData[];
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      if (timeframe === '1m') {
+        const [categoriesRes, summaryRes] = await Promise.all([
+          fetch(`/api/cash-flow/categories?month=${range.start}${acctParam}`),
+          fetch('/api/cash-flow/summary'),
+        ]);
+        if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
+        categories = await categoriesRes.json();
+        if (summaryRes.ok) {
+          const summary: SummaryData = await summaryRes.json();
+          const catIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+          const catExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+          totalIncome = catIncome || summary.totalIncome;
+          totalExpenses = catExpenses || summary.totalExpenses;
+        }
+      } else {
+        const res = await fetch(`/api/cash-flow/categories?startMonth=${range.start}&endMonth=${range.end}${acctParam}`);
+        if (!res.ok) throw new Error('Failed to fetch sankey data');
+        categories = await res.json();
+        totalIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+        totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+      }
+
+      const parentLookup = buildParentLookup(allCategoryInfo);
+      const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
+      setSankeyData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
       const next = new Set(prev);
@@ -462,49 +572,9 @@ export function CashFlowSankey() {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const range = getMonthRange(timeframe, month);
-        const acctParam = getAccountIdsParam();
-        let categories: CategoryData[];
-        let totalIncome = 0;
-        let totalExpenses = 0;
-
-        if (timeframe === '1m') {
-          const [categoriesRes, summaryRes] = await Promise.all([
-            fetch(`/api/cash-flow/categories?month=${range.start}${acctParam}`),
-            fetch('/api/cash-flow/summary'),
-          ]);
-          if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
-          categories = await categoriesRes.json();
-          if (summaryRes.ok) {
-            const summary: SummaryData = await summaryRes.json();
-            const catIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-            const catExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-            totalIncome = catIncome || summary.totalIncome;
-            totalExpenses = catExpenses || summary.totalExpenses;
-          }
-        } else {
-          const res = await fetch(`/api/cash-flow/categories?startMonth=${range.start}&endMonth=${range.end}${acctParam}`);
-          if (!res.ok) throw new Error('Failed to fetch sankey data');
-          categories = await res.json();
-          totalIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-          totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-        }
-
-        const parentLookup = buildParentLookup(allCategoryInfo);
-        const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
-        setSankeyData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    const range = getMonthRange(timeframe, month);
+    const acctParam = getAccountIdsParam();
+    fetchDataWithParams(range, acctParam);
   }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
 
   const getNodeCategoryId = (nodeName: string): string | undefined => {
@@ -624,6 +694,22 @@ export function CashFlowSankey() {
               />
             </button>
           </label>
+          {/* Values/Percentages toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <span className="text-[10px] text-muted-foreground">{showPercentages ? '%' : '$'}</span>
+            <button
+              onClick={() => setShowPercentages(!showPercentages)}
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                showPercentages ? 'bg-primary' : 'bg-muted-foreground/30'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
+                  showPercentages ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                }`}
+              />
+            </button>
+          </label>
           {/* Account filter dropdown */}
           {allAccounts.length > 0 && (
             <div className="relative" ref={accountFilterRef}>
@@ -714,27 +800,30 @@ export function CashFlowSankey() {
           </div>
         )}
       </div>
-      <div className={showParents ? 'h-[550px]' : 'h-[400px]'}>
+      <div className={showParents ? 'h-[600px]' : 'h-[450px]'}>
         <div className="financial-chart h-full px-2 pb-2">
           <ResponsiveSankey
             data={sankeyData}
             label="label"
-            margin={{ top: 20, right: 120, bottom: 20, left: 120 }}
+            margin={{ top: 30, right: 140, bottom: 30, left: 140 }}
             align="justify"
             colors={node => (node as unknown as { color: string }).color}
-            nodeOpacity={1}
-            nodeHoverOthersOpacity={0.6}
-            nodeThickness={showParents ? 20 : 24}
-            nodeSpacing={showParents ? 22 : 28}
+            nodeOpacity={0.95}
+            nodeHoverOpacity={1}
+            nodeHoverOthersOpacity={0.35}
+            nodeThickness={showParents ? 22 : 26}
+            nodeSpacing={showParents ? 24 : 30}
+            nodeBorderRadius={4}
             nodeBorderWidth={0}
-            linkOpacity={1}
-            linkHoverOpacity={1}
-            linkContract={0}
+            linkOpacity={0.55}
+            linkHoverOpacity={0.85}
+            linkHoverOthersOpacity={0.15}
+            linkContract={2}
             linkBlendMode="normal"
             enableLinkGradient={true}
             labelPosition="outside"
             labelOrientation="horizontal"
-            labelPadding={14}
+            labelPadding={16}
             theme={sankeyTheme}
             onClick={(datum) => {
               const d = datum as { id?: string; source?: { id: string }; target?: { id: string } };
@@ -744,18 +833,45 @@ export function CashFlowSankey() {
                 handleNodeClick(d.id);
               }
             }}
-            nodeTooltip={({ node }) => (
-              <ChartTooltip>
-                <TooltipHeader>{node.label}</TooltipHeader>
-                <TooltipRow label="Total" value={formatCurrency(node.value)} />
-              </ChartTooltip>
-            )}
-            linkTooltip={({ link }) => (
-              <ChartTooltip>
-                <TooltipHeader>{link.source.label} &rarr; {link.target.label}</TooltipHeader>
-                <TooltipRow label="Amount" value={formatCurrency(link.value)} />
-              </ChartTooltip>
-            )}
+            nodeTooltip={({ node }) => {
+              const nodeData = node as unknown as { value: number; percentage?: number };
+              const displayValue = showPercentages && nodeData.percentage !== undefined
+                ? `${nodeData.percentage.toFixed(1)}%`
+                : formatCurrency(nodeData.value);
+              return (
+                <ChartTooltip>
+                  <TooltipHeader>{node.label}</TooltipHeader>
+                  <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
+                  {showPercentages && nodeData.percentage !== undefined && (
+                    <TooltipRow label="Amount" value={formatCurrency(nodeData.value)} />
+                  )}
+                </ChartTooltip>
+              );
+            }}
+            linkTooltip={({ link }) => {
+              const linkData = link as unknown as { value: number; source: { id: string; label: string }; target: { id: string; label: string } };
+              const sourceNode = sankeyData?.nodes.find(n => n.id === linkData.source.id);
+              const targetNode = sankeyData?.nodes.find(n => n.id === linkData.target.id);
+              const sourceTotal = sourceNode?.value || 0;
+              const targetTotal = targetNode?.value || 0;
+              const percentageOfSource = sourceTotal > 0 ? (linkData.value / sourceTotal) * 100 : 0;
+              const percentageOfTarget = targetTotal > 0 ? (linkData.value / targetTotal) * 100 : 0;
+              
+              return (
+                <ChartTooltip>
+                  <TooltipHeader>{linkData.source.label} → {linkData.target.label}</TooltipHeader>
+                  {showPercentages ? (
+                    <>
+                      <TooltipRow label="Of Source" value={`${percentageOfSource.toFixed(1)}%`} />
+                      <TooltipRow label="Of Target" value={`${percentageOfTarget.toFixed(1)}%`} />
+                      <TooltipRow label="Amount" value={formatCurrency(linkData.value)} />
+                    </>
+                  ) : (
+                    <TooltipRow label="Amount" value={formatCurrency(linkData.value)} />
+                  )}
+                </ChartTooltip>
+              );
+            }}
             animate={true}
             motionConfig="gentle"
           />

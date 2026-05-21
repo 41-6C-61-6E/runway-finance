@@ -246,7 +246,15 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
   };
 
   const hasActiveFilters = Object.values(filters).some(
-    (v) => v !== null && v !== 'date' && v !== 'desc'
+    (v) => {
+      // Return true if any filter is active (excluding null, empty strings, and default values)
+      if (v === null || v === '') return false;
+      
+      // Handle special cases for filters that could be default values
+      if (v === 'all' && (filters.startDate === null && filters.endDate === null)) return false;
+      
+      return true;
+    }
   );
 
   const parents = categories.filter((c) => !c.parentId);
@@ -649,7 +657,7 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
         <div className="flex flex-wrap gap-2 items-center pt-1">
           {/* Status Filter Group */}
           <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status:</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filter:</span>
             <button
               onClick={() => onChange('pending', filters.pending === 'true' ? null : 'true')}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
@@ -715,62 +723,22 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
             >
               Uncategorized
             </button>
-            <button
-              onClick={() => {
-                // Toggle positive filter - exclusive with negative
-                // If already active, remove it
-                if (filters.minAmount === '0.01') {
-                  onChange('minAmount', null);
-                } else {
-                  // Activate positive filter (amount >= 0.01)
-                  onChange('minAmount', '0.01');
-                  // Deactivate negative filter if it's active
-                  if (filters.maxAmount === '-0.01') {
-                    onChange('maxAmount', null);
-                  }
-                }
-              }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                filters.minAmount === '0.01' 
-                  ? 'border border-green-500 bg-green-500/20 text-green-500 shadow-sm'
-                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              Positive
-            </button>
-            <button
-              onClick={() => {
-                // Toggle negative filter - exclusive with positive
-                // If already active, remove it
-                if (filters.maxAmount === '-0.01') {
-                  onChange('maxAmount', null);
-                } else {
-                  // Activate negative filter (amount <= -0.01)
-                  onChange('maxAmount', '-0.01');
-                  // Deactivate positive filter if it's active
-                  if (filters.minAmount === '0.01') {
-                    onChange('minAmount', null);
-                  }
-                }
-              }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                filters.maxAmount === '-0.01'
-                  ? 'border border-red-500 bg-red-500/20 text-red-500 shadow-sm'
-                  : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              Negative
-            </button>
           </div>
 
-          {/* Clear All Button */}
+          {/* Clear All Button - Positioned in bottom right of filter area */}
           {hasActiveFilters && (
-            <button
-              onClick={onClearAll}
-              className="ml-auto px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-            >
-              Clear All
-            </button>
+            <div className="ml-auto flex justify-end w-full sm:w-auto relative z-10">
+              <button
+                onClick={onClearAll}
+                className="px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all flex items-center gap-1 min-w-[80px] justify-center bg-background/90 backdrop-blur-sm shadow-lg"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Clear All
+              </button>
+            </div>
           )}
         </div>
       </div>

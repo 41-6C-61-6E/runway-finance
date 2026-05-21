@@ -33,8 +33,9 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: st
   simpleira:      { group: 'Investments',   subGroup: 'Simple IRA',       icon: '📈' },
   '529':          { group: 'Investments',   subGroup: '529 Account',      icon: '📈' },
   otherAsset: { group: 'Investments',   subGroup: 'Other Assets',     icon: '📈' },
-  hsa:        { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
-  health:     { group: 'Health',        subGroup: 'Health Accounts',  icon: '🏥' },
+  hsa:        { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
+  hsachecking: { group: 'Banking',      subGroup: 'HSA Account',      icon: '🏥' },
+  health:     { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
   loan:       { group: 'Loans',         subGroup: 'Loans',            icon: '📋' },
   mortgage:   { group: 'Loans',         subGroup: 'Mortgages',        icon: '📋' },
   realestate: { group: 'Real Estate',   subGroup: 'Real Estate',      icon: '🏠' },
@@ -47,7 +48,7 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: st
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities',    icon: '⚠️' },
 };
 
-const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Real Estate', 'Health', 'Loans', 'Liabilities'];
+const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Real Estate', 'Loans', 'Liabilities'];
 
 function getHierarchy(accountType: string) {
   return TYPE_HIERARCHY[accountType] ?? { group: 'Other', subGroup: 'Other', icon: '📁' };

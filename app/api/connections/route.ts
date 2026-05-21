@@ -5,6 +5,7 @@ import { getDb } from '../../../lib/db';
 import { simplifinConnections } from '../../../lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../../../lib/logger';
+import { syncScheduler } from '@/lib/services/sync-scheduler';
 
 export async function GET() {
   const session = await auth();
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
     .returning();
 
   logger.info('Connection created', { connectionId: connection.id, label: connection.label, syncFrequency });
+  syncScheduler.schedule(connection.id, connection.syncFrequency, connection.lastSyncAt);
   return NextResponse.json(connection, { status: 201 });
 }
 

@@ -130,7 +130,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Sanitize and encrypt text fields
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
-  if (categoryId !== undefined) updateData.categoryId = categoryId;
+  if (categoryId !== undefined) {
+    updateData.categoryId = categoryId;
+    updateData.categorizedByAi = false;
+  }
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
   if (notes !== undefined) updateData.notes = sanitizeText(notes, 2000);
   if (memo !== undefined) updateData.memo = sanitizeText(memo, 500);

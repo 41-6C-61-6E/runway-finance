@@ -4,6 +4,7 @@ import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
 import type { AmortizationParams } from '@/lib/utils/amortization';
+import { API_KEY_DEFAULTS } from '@/config/defaults';
 
 const LOG_TAG = '[asset-estimator]';
 
@@ -53,7 +54,7 @@ async function fetchFredSeries(
     return [];
   }
 
-  const baseUrl = apiConfig?.fredApiUrl || 'https://api.stlouisfed.org/fred/series/observations';
+  const baseUrl = apiConfig?.fredApiUrl || API_KEY_DEFAULTS.fredApiUrl;
   const url = `${baseUrl}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}&sort_order=asc`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -239,7 +240,7 @@ export async function estimateMetalsHistory(
   try {
     const startTs = Math.floor(new Date(purchaseDate).getTime() / 1000);
     const endTs = Math.floor(new Date(today).getTime() / 1000);
-    const baseUrl = apiConfig?.metalsApiUrl || 'https://query1.finance.yahoo.com/v8/finance/chart';
+    const baseUrl = apiConfig?.metalsApiUrl || API_KEY_DEFAULTS.metalsApiUrl;
     const url = `${baseUrl}/${ticker}?period1=${startTs}&period2=${endTs}&interval=1mo`;
 
     const res = await fetch(url, {

@@ -52,8 +52,13 @@ export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActions
           credentials: 'include',
           body: JSON.stringify({ ids: selectedIds, patch: updates }),
         });
+        const data = await res.json();
         if (!res.ok) {
-          console.error('Bulk patch failed', await res.text());
+          console.error('Bulk patch failed', data);
+          return;
+        }
+        if (data.updated === 0) {
+          console.warn('Bulk patch: 0 rows updated', { ids: selectedIds, patch: updates });
         }
         onClear();
       } catch (err) {

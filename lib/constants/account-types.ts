@@ -25,14 +25,15 @@ export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }>
   commercial:   { group: 'Real Estate', subGroup: 'Commercial' },
   land:         { group: 'Real Estate', subGroup: 'Land' },
   otherrealestate: { group: 'Real Estate', subGroup: 'Other Real Estate' },
-  hsa:        { group: 'Health',        subGroup: 'Health Accounts' },
-  health:     { group: 'Health',        subGroup: 'Health Accounts' },
+  hsa:        { group: 'Investments',   subGroup: 'HSA Account' },
+  hsachecking: { group: 'Banking',      subGroup: 'HSA Account' },
+  health:     { group: 'Investments',   subGroup: 'HSA Account' },
   loan:       { group: 'Loans',         subGroup: 'Loans' },
   mortgage:   { group: 'Loans',         subGroup: 'Mortgages' },
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities' },
 };
 
-export const GROUP_ORDER = ['Banking', 'Credit', 'Investments', 'Real Estate', 'Health', 'Loans', 'Liabilities', 'Assets'];
+export const GROUP_ORDER = ['Banking', 'Credit', 'Investments', 'Real Estate', 'Loans', 'Liabilities', 'Assets'];
 
 export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   checking: 'Checking',
@@ -65,7 +66,8 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   land: 'Land',
   otherrealestate: 'Other Real Estate',
   hsa: 'HSA',
-  health: 'Health',
+  hsachecking: 'HSA (Checking)',
+  health: 'HSA',
   mortgage: 'Mortgage',
   otherLiability: 'Other Liability',
 };

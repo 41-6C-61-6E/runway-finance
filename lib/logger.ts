@@ -1,13 +1,4 @@
-import { addLog } from './dev-logs';
-
 let _devMode = false;
-
-const _console = {
-  log: console.log,
-  warn: console.warn,
-  error: console.error,
-  debug: console.debug,
-};
 
 export function setDevMode(v: boolean) {
   _devMode = v;
@@ -25,24 +16,20 @@ function ts(): string {
 
 export const logger = {
   info(message: string, metadata?: Record<string, unknown>) {
-    _console.log(`[INFO ${ts()}] ${message}`, metadata ?? '');
-    if (_devMode) addLog('info', message, metadata);
+    console.log(`[INFO ${ts()}] ${message}`, metadata ?? '');
   },
 
   warn(message: string, metadata?: Record<string, unknown>) {
-    _console.warn(`[WARN ${ts()}] ${message}`, metadata ?? '');
-    if (_devMode) addLog('warn', message, metadata);
+    console.warn(`[WARN ${ts()}] ${message}`, metadata ?? '');
   },
 
   error(message: string, metadata?: Record<string, unknown>) {
-    _console.error(`[ERROR ${ts()}] ${message}`, metadata ?? '');
-    if (_devMode) addLog('error', message, metadata);
+    console.error(`[ERROR ${ts()}] ${message}`, metadata ?? '');
   },
 
   debug(message: string, metadata?: Record<string, unknown>) {
-    if (DEBUG_ENABLED || _devMode) {
-      _console.debug(`[DEBUG ${ts()}] ${message}`, metadata ?? '');
-      if (_devMode) addLog('debug', message, metadata);
+    if (DEBUG_ENABLED) {
+      console.debug(`[DEBUG ${ts()}] ${message}`, metadata ?? '');
     }
   },
 };

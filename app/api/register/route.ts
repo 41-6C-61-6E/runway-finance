@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { addUser, findUser, createUserEncryptionKeys } from '@/lib/users';
 import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
+import { getDb } from '@/lib/db';
+import { userSettings } from '@/lib/db/schema';
+import { DEFAULTS } from '@/config/defaults';
 import { seedUserCategories } from '@/lib/db/seed-categories';
 import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
 import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
@@ -48,6 +51,32 @@ export async function POST(request: Request) {
     await seedUserCategories(username);
     await seedUserDefaultRules(username);
     await seedUserAiProviders(username);
+
+    const db = getDb();
+    await db.insert(userSettings).values({
+      userId: username,
+      currency: DEFAULTS.currency,
+      locale: DEFAULTS.locale,
+      timezone: DEFAULTS.timezone,
+      theme: DEFAULTS.theme,
+      accentColor: DEFAULTS.accentColor,
+      compactMode: DEFAULTS.compactMode,
+      dateFormat: DEFAULTS.dateFormat,
+      privacyMode: DEFAULTS.privacyMode,
+      chartVisibility: DEFAULTS.chartVisibility,
+      chartColorScheme: DEFAULTS.chartColorScheme,
+      forecastMode: DEFAULTS.forecastMode,
+      forecastLookbackMonths: DEFAULTS.forecastLookbackMonths,
+      hiddenPages: DEFAULTS.hiddenPages,
+      cardStyle: DEFAULTS.cardStyle,
+      showSyntheticData: DEFAULTS.showSyntheticData,
+      defaultChartTimeRange: DEFAULTS.defaultChartTimeRange,
+      defaultChartType: DEFAULTS.defaultChartType,
+      reduceTransparency: DEFAULTS.reduceTransparency,
+      hideAccountSubheadings: DEFAULTS.hideAccountSubheadings,
+      showMathEnabled: DEFAULTS.showMathEnabled,
+    });
+
     logger.info('Register API: user created', { username })
     return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
   } catch (error) {
