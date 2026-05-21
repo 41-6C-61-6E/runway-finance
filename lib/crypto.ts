@@ -147,7 +147,7 @@ export async function decryptField(payload: string | number, key: Uint8Array): P
   }
   
   try {
-    return decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
+    return await decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
   } catch {
     // Return empty string if decryption fails (corrupted data or wrong key)
     return '';

@@ -53,12 +53,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (keyRow) {
               const salt = hexToBytes(keyRow.salt);
 
-              if (keyRow.serverWrappedDek && keyRow.serverWrappingIv && keyRow.serverWrappingTag) {
+              if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
                 const serverKey = getServerKey();
                 dek = await unwrapKey({
                   ciphertext: keyRow.serverWrappedDek,
                   iv: keyRow.serverWrappingIv,
-                  tag: keyRow.serverWrappingTag,
+                  tag: keyRow.serverWrappingTag ?? '',
                 }, serverKey);
 
                 const kek = await deriveKeyFromPassword(password, salt);

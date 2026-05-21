@@ -33,12 +33,12 @@ export async function getServerDEK(userId: string): Promise<Uint8Array> {
 
   const serverKey = getServerKey();
 
-  if (keyRow.serverWrappedDek && keyRow.serverWrappingIv && keyRow.serverWrappingTag) {
+  if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
     return unwrapKey(
       {
         ciphertext: keyRow.serverWrappedDek,
         iv: keyRow.serverWrappingIv,
-        tag: keyRow.serverWrappingTag,
+        tag: keyRow.serverWrappingTag ?? '',
       },
       serverKey,
     );
