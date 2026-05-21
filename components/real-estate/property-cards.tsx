@@ -5,6 +5,17 @@ import { PropertyCard } from './property-card';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
+import { Input } from '@/components/ui/input';
+
+const PROPERTY_TYPES = [
+  { value: 'single-family', label: 'Single Family Home' },
+  { value: 'condo', label: 'Condo' },
+  { value: 'townhouse', label: 'Townhouse' },
+  { value: 'multi-family', label: 'Multi-Family' },
+  { value: 'land', label: 'Land' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'other', label: 'Other' },
+] as const;
 
 interface MortgageInfo {
   id: string;
@@ -58,6 +69,12 @@ export function PropertyCards() {
   const [editingMortgage, setEditingMortgage] = useState<MortgageInfo & { accountId: string } | null>(null);
   const [mortgageEditMeta, setMortgageEditMeta] = useState<Record<string, string>>({});
   const [savingMortgage, setSavingMortgage] = useState(false);
+
+  // Property details editing
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [propertyEditMeta, setPropertyEditMeta] = useState<Record<string, string>>({});
+  const [savingProperty, setSavingProperty] = useState(false);
+  const [propertyEditError, setPropertyEditError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -151,6 +168,65 @@ export function PropertyCards() {
     setMortgageEditMeta(flat);
   };
 
+  const openEditProperty = (property: Property) => {
+    setEditingProperty(property);
+    setPropertyEditError(null);
+    const meta = property.metadata ?? {};
+    const flat: Record<string, string> = {};
+    Object.entries(meta).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && !Array.isArray(v)) flat[k] = String(v);
+    });
+    // Flatten linked mortgage (first entry)
+    const mortgageIds = (meta.mortgageAccountIds as string[]) ?? [];
+    flat.linkedMortgageId = mortgageIds[0] ?? '';
+    setPropertyEditMeta(flat);
+  };
+
+  const handleSavePropertyDetails = async () => {
+    if (!editingProperty) return;
+    setSavingProperty(true);
+    setPropertyEditError(null);
+    try {
+      const metadata: Record<string, unknown> = { ...editingProperty.metadata };
+      if (propertyEditMeta.propertyType) metadata.propertyType = propertyEditMeta.propertyType;
+      else delete metadata.propertyType;
+      metadata.propertyId = propertyEditMeta.propertyId || '';
+      if (propertyEditMeta.purchasePrice) metadata.purchasePrice = parseFloat(propertyEditMeta.purchasePrice);
+      else delete metadata.purchasePrice;
+      if (propertyEditMeta.purchaseDate) metadata.purchaseDate = propertyEditMeta.purchaseDate;
+      else delete metadata.purchaseDate;
+      if (propertyEditMeta.zipCode) metadata.zipCode = propertyEditMeta.zipCode;
+      else delete metadata.zipCode;
+      if (propertyEditMeta.initialValue) metadata.initialValue = parseFloat(propertyEditMeta.initialValue);
+      else delete metadata.initialValue;
+      if (propertyEditMeta.linkedMortgageId) {
+        metadata.mortgageAccountIds = [propertyEditMeta.linkedMortgageId];
+      } else {
+        metadata.mortgageAccountIds = [];
+      }
+
+      const res = await fetch(`/api/accounts/${editingProperty.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ metadata }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to save property details');
+      }
+
+      setEditingProperty(null);
+      setPropertyEditMeta({});
+      await fetchData();
+    } catch (err) {
+      setPropertyEditError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setSavingProperty(false);
+    }
+  };
+
   const handleSaveMortgageAttributes = async () => {
     if (!editingMortgage) return;
     setSavingMortgage(true);
@@ -238,6 +314,7 @@ export function PropertyCards() {
             onUnlinkMortgage={(mortgageId) => handleUnlinkMortgage(property.id, mortgageId)}
             onOverrideValue={handleOverrideValue}
             onEditMortgage={(mortgage) => openEditMortgage(mortgage, mortgage.id)}
+            onEditProperty={() => openEditProperty(property)}
           />
         ))}
       </div>
@@ -317,6 +394,115 @@ export function PropertyCards() {
                 className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {savingMortgage ? 'Saving...' : 'Save'}
+              </button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit Property Details Sheet */}
+      <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); } }}>
+        <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+          <SheetHeader className="pb-4">
+            <SheetTitle>Edit Property Details</SheetTitle>
+            <SheetDescription>Update details for {editingProperty?.name}.</SheetDescription>
+          </SheetHeader>
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleSavePropertyDetails(); }}
+            className="space-y-4"
+          >
+            {propertyEditError && (
+              <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
+                <p className="text-destructive text-sm">{propertyEditError}</p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
+              <select
+                value={propertyEditMeta.propertyType || ''}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, propertyType: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select property type...</option>
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
+              <Input
+                value={propertyEditMeta.propertyId || ''}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
+                placeholder="e.g., 446533"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={propertyEditMeta.purchasePrice || ''}
+                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
+                  placeholder="e.g., 350000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
+                <Input
+                  type="date"
+                  value={propertyEditMeta.purchaseDate || ''}
+                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
+              <Input
+                value={propertyEditMeta.zipCode || ''}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, zipCode: e.target.value }))}
+                placeholder="e.g., 94105"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Initial Value (optional)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={propertyEditMeta.initialValue || ''}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, initialValue: e.target.value }))}
+                placeholder="e.g., 500000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Linked Mortgage (optional)</label>
+              <select
+                value={propertyEditMeta.linkedMortgageId || ''}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, linkedMortgageId: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">None (wholly owned)</option>
+                {mortgageAccounts.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <SheetFooter className="pt-4">
+              <SheetClose asChild>
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </SheetClose>
+              <button
+                type="submit"
+                disabled={savingProperty}
+                className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+              >
+                {savingProperty ? 'Saving...' : 'Save'}
               </button>
             </SheetFooter>
           </form>

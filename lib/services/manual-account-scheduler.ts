@@ -8,7 +8,7 @@ import { decryptField } from '@/lib/crypto';
 
 const LOG_TAG = '[manual-account-scheduler]';
 
-const SYNCABLE_TYPES = ['realestate', 'crypto', 'metals'] as const;
+const SYNCABLE_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'] as const;
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,

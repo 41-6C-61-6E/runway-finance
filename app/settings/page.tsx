@@ -360,6 +360,17 @@ export default function SettingsPage() {
     return `${days}d ago`;
   };
 
+  const formatTimeUntil = (date: Date): string => {
+    const diff = date.getTime() - Date.now();
+    if (diff <= 0) return 'Overdue';
+    const mins = Math.ceil(diff / 60000);
+    if (mins < 60) return `in ${mins}m`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `in ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `in ${days}d`;
+  };
+
   const maskAccessUrl = (conn: Connection) => {
     try {
       const decoded = Buffer.from(conn.accessUrlEncrypted || '', 'base64').toString('utf8');
@@ -776,14 +787,14 @@ export default function SettingsPage() {
                           </select>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {conn.syncFrequency === 'manual' ? (
-                            <span>Next sync: Not scheduled</span>
-                          ) : isSyncOverdue ? (
-                            <span className="text-chart-3">Next sync: Overdue</span>
-                          ) : nextSync ? (
-                            <span>Next sync: {formatRelativeTime(nextSync.toISOString())}</span>
+                          {syncingId === conn.id ? (
+                            <span className="text-chart-1 animate-pulse">Syncing...</span>
+                          ) : conn.syncFrequency === 'manual' ? (
+                            <span>Not scheduled</span>
+                          ) : nextSync && nextSync.getTime() > Date.now() ? (
+                            <span>Next sync: {formatTimeUntil(nextSync)}</span>
                           ) : (
-                            <span>Next sync: Now</span>
+                            <span className="text-chart-3">Next sync: Overdue</span>
                           )}
                         </div>
                       </div>
