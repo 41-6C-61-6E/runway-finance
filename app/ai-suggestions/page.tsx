@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
+import { PageHeader } from '@/components/page-header';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { CategoryCombobox } from '@/components/budgets/category-combobox';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
@@ -792,20 +793,20 @@ export default function AiSuggestionsPage() {
 
   return (
     <div className="min-h-screen w-full">
-      {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-foreground">AI Suggestions</h1>
-          {pendingCount > 0 && (
+      <PageHeader
+        title="AI Suggestions"
+        icon={Sparkles}
+        leftExtra={
+          pendingCount > 0 && (
             <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
               {pendingCount} pending
             </span>
-          )}
-        </div>
+          )
+        }
+      >
         <div className="flex items-center gap-2">
           {feedback && (
              <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
-
               {feedback.message}
             </span>
           )}
@@ -836,7 +837,7 @@ export default function AiSuggestionsPage() {
             {analyzing ? 'Analyzing...' : 'Run Analysis'}
           </button>
         </div>
-      </div>
+      </PageHeader>
       <ContentWrapper>
       <div className="max-w-3xl mx-auto space-y-6">
 

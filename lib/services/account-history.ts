@@ -102,12 +102,12 @@ export async function getPostedTransactions(
     .where(
       and(
         eq(transactions.accountId, accountId),
-        gte(transactions.postedDate, fromDate),
-        lte(transactions.postedDate, toDate),
+        gte(transactions.date, fromDate),
+        lte(transactions.date, toDate),
         eq(transactions.pending, false)
       )
     )
-    .orderBy(asc(transactions.postedDate));
+    .orderBy(asc(transactions.date));
 }
 
 /**
@@ -132,52 +132,85 @@ export async function generateHistoricalAccountSnapshots(
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
   const startedAt = Date.now();
 
-  const from = fromDate;
-  const to = toDate;
+  // 1. Fetch all real snapshots for this account
+  const realSnapshots = await getDb()
+    .select({
+      date: accountSnapshots.snapshotDate,
+      balance: accountSnapshots.balance,
+    })
+    .from(accountSnapshots)
+    .where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, false)
+      )
+    )
+    .orderBy(asc(accountSnapshots.snapshotDate));
 
-  const latestReal = await getLatestRealSnapshot(accountId, userId, from, dek);
+  // Decrypt real snapshot balances
+  const decryptedRealSnapshots = await Promise.all(
+    realSnapshots.map(async (s) => {
+      let balanceStr = String(s.balance);
+      if (dek) {
+        try {
+          const decrypted = await decryptField(s.balance, dek);
+          if (decrypted) balanceStr = decrypted;
+          else if (balanceStr.startsWith('{')) balanceStr = '0';
+        } catch {
+          // Keep raw value
+        }
+      }
+      return { date: String(s.date), balance: balanceStr };
+    })
+  );
 
+  const realByDate = new Map<string, number>();
+  for (const r of decryptedRealSnapshots) {
+    const parsed = parseFloat(r.balance);
+    if (!isNaN(parsed)) {
+      realByDate.set(r.date, parsed);
+    }
+  }
+
+  // 2. Fetch the earliest transaction date
   const earliestTxDate = await getEarliestTransactionDate(accountId);
 
-  let effectiveFromDate: string;
-  let runningBalance: number;
+  // 3. Determine the earliest date we have any data (real snapshot or transaction)
+  const firstReal = decryptedRealSnapshots[0];
+  const firstRealDate = firstReal ? firstReal.date : null;
 
-  if (latestReal) {
-    effectiveFromDate = latestReal.date;
-    runningBalance = parseFloat(latestReal.balance);
-    if (isNaN(runningBalance)) runningBalance = 0;
-  } else if (earliestTxDate) {
-    effectiveFromDate = earliestTxDate;
-    runningBalance = 0;
-  } else {
-    logger.debug(`${LOG_TAG} No data to backfill for account`, { accountId, from, to });
+  const calculationStartDate = [earliestTxDate, firstRealDate]
+    .filter((d): d is string => !!d)
+    .sort()[0];
+
+  // Delete all existing synthetic snapshots for this account to start with a clean slate
+  await getDb()
+    .delete(accountSnapshots)
+    .where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, true)
+      )
+    );
+
+  if (!calculationStartDate || calculationStartDate > toDate) {
+    logger.debug(`${LOG_TAG} No data within range to backfill for account`, { accountId, from: fromDate, to: toDate });
     return { syntheticCount: 0, skippedRealCount: 0 };
   }
 
-  const txs = await getPostedTransactions(accountId, effectiveFromDate, to);
+  // We only query transactions and calculate balances starting from calculationStartDate
+  const effectiveFromDate = calculationStartDate;
 
-  if (txs.length === 0) {
-    if (effectiveFromDate === from) {
-      if (isNaN(runningBalance)) runningBalance = 0;
-      const pool = getPool();
-      await pool.query(
-        `INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT ("user_id", "account_id", "snapshot_date") 
-         DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic`,
-        [userId, accountId, from, String(runningBalance), true]
-      );
-      logger.debug(`${LOG_TAG} Single synthetic snapshot inserted`, { accountId, date: from, balance: runningBalance });
-      return { syntheticCount: 1, skippedRealCount: 0 };
-    }
-    return { syntheticCount: 0, skippedRealCount: 0 };
-  }
+  // 4. Fetch all posted transactions in the range [effectiveFromDate, Math.max(toDate, firstRealDate)]
+  const effectiveToDate = firstRealDate && firstRealDate > toDate ? firstRealDate : toDate;
+  const txs = await getPostedTransactions(accountId, effectiveFromDate, effectiveToDate);
 
   const txByDate = new Map<string, number>();
   for (const tx of txs) {
-    const txDate = String(tx.postedDate ?? tx.date);
+    const txDate = tx.date;
     const existing = txByDate.get(txDate) ?? 0;
-    // Decrypt amount if DEK is available (amounts are encrypted JSON in the DB)
     let amountStr = tx.amount;
     if (dek) {
       try {
@@ -191,100 +224,110 @@ export async function generateHistoricalAccountSnapshots(
     txByDate.set(txDate, existing + amount);
   }
 
-  // Batch-fetch all existing real snapshots for the full date range
-  const existingReals = await getDb()
-    .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance })
-    .from(accountSnapshots)
-    .where(
-      and(
-        eq(accountSnapshots.accountId, accountId),
-        eq(accountSnapshots.userId, userId),
-        gte(accountSnapshots.snapshotDate, effectiveFromDate),
-        lte(accountSnapshots.snapshotDate, to),
-        eq(accountSnapshots.isSynthetic, false)
-      )
-    );
+  const balanceByDate = new Map<string, number>();
 
-  const realByDate = new Map<string, string>();
-  for (const r of existingReals) {
-    realByDate.set(String(r.snapshotDate), String(r.balance));
+  if (firstRealDate && firstReal) {
+    // 5. Two-pass backward/forward calculation anchored to the earliest real snapshot
+    const firstRealBalance = parseFloat(firstReal.balance);
+    const anchorBalance = isNaN(firstRealBalance) ? 0 : firstRealBalance;
+    balanceByDate.set(firstRealDate, anchorBalance);
+
+    // Backward Pass: Calculate daily balances backward from firstRealDate to effectiveFromDate (calculationStartDate)
+    let current = new Date(firstRealDate + 'T00:00:00Z');
+    const startLimit = new Date(effectiveFromDate + 'T00:00:00Z');
+    let runningBalance = anchorBalance;
+
+    while (current > startLimit) {
+      const dateStr = current.toISOString().split('T')[0];
+      const dailyChange = txByDate.get(dateStr) ?? 0;
+      runningBalance -= dailyChange;
+
+      current.setUTCDate(current.getUTCDate() - 1);
+      const prevDateStr = current.toISOString().split('T')[0];
+      balanceByDate.set(prevDateStr, runningBalance);
+    }
+
+    // Forward Pass: Calculate daily balances forward from firstRealDate to toDate
+    current = new Date(firstRealDate + 'T00:00:00Z');
+    const endLimit = new Date(toDate + 'T00:00:00Z');
+    runningBalance = anchorBalance;
+
+    while (current < endLimit) {
+      current.setUTCDate(current.getUTCDate() + 1);
+      const dateStr = current.toISOString().split('T')[0];
+
+      const realBal = realByDate.get(dateStr);
+      if (realBal !== undefined) {
+        runningBalance = realBal;
+      } else {
+        const dailyChange = txByDate.get(dateStr) ?? 0;
+        runningBalance += dailyChange;
+      }
+      balanceByDate.set(dateStr, runningBalance);
+    }
+  } else if (earliestTxDate) {
+    // 6. Fallback (no real snapshots): Calculate forward from 0 starting at earliestTxDate
+    let current = new Date(earliestTxDate + 'T00:00:00Z');
+    const endLimit = new Date(toDate + 'T00:00:00Z');
+    let runningBalance = txByDate.get(earliestTxDate) ?? 0;
+    balanceByDate.set(earliestTxDate, runningBalance);
+
+    while (current < endLimit) {
+      current.setUTCDate(current.getUTCDate() + 1);
+      const dateStr = current.toISOString().split('T')[0];
+      const dailyChange = txByDate.get(dateStr) ?? 0;
+      runningBalance += dailyChange;
+      balanceByDate.set(dateStr, runningBalance);
+    }
   }
 
-  // Use UTC midnight for stable date iteration to avoid DST-related duplicates
-  let current = new Date(effectiveFromDate + 'T00:00:00Z');
-  const end = new Date(to + 'T00:00:00Z');
+  // 7. Prepare synthetic snapshots ONLY for the requested range [fromDate, toDate]
+  // and do not go further back than calculationStartDate (effectiveFromDate)
   const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean }> = [];
-  const seenDates = new Set<string>();
+  const insertStartDate = fromDate > effectiveFromDate ? fromDate : effectiveFromDate;
+  const start = new Date(insertStartDate + 'T00:00:00Z');
+  const end = new Date(toDate + 'T00:00:00Z');
+  let current = new Date(start);
   let skippedReal = 0;
 
   while (current <= end) {
     const dateStr = current.toISOString().split('T')[0];
-    if (seenDates.has(dateStr)) {
-      current.setUTCDate(current.getUTCDate() + 1);
-      continue;
-    }
-    seenDates.add(dateStr);
-
-    const realBal = realByDate.get(dateStr);
-
-    if (realBal !== undefined) {
-      // Decrypt real balance if DEK is available (may be encrypted JSON)
-      let balValue = realBal;
-      if (dek) {
-        try {
-          const decrypted = await decryptField(realBal, dek);
-          // Only use decrypted value if it's non-empty
-          if (decrypted) balValue = decrypted;
-          // If decryption returned empty and raw value looks like JSON, default to 0
-          else if (realBal.startsWith('{')) balValue = '0';
-        } catch {
-          // Fallback: keep raw value
-        }
-      }
-      const parsedBalance = parseFloat(balValue);
-      if (isNaN(parsedBalance)) {
-        logger.warn(`${LOG_TAG} Real snapshot balance parsed as NaN, skipping update to running balance`, { date: dateStr, raw: realBal });
-      } else {
-        runningBalance = parsedBalance;
-        skippedReal++;
-      }
+    if (realByDate.has(dateStr)) {
+      skippedReal++;
     } else {
-      const dailyChange = txByDate.get(dateStr) ?? 0;
-      runningBalance += dailyChange;
-      
-      if (!isNaN(runningBalance)) {
+      const bal = balanceByDate.get(dateStr);
+      if (bal !== undefined && !isNaN(bal)) {
         toInsert.push({
           userId,
           accountId,
           snapshotDate: dateStr,
-          balance: String(runningBalance),
+          balance: String(bal),
           isSynthetic: true,
         });
       }
     }
-
     current.setUTCDate(current.getUTCDate() + 1);
   }
 
-  // Batch insert all synthetic snapshots in chunks to avoid PostgreSQL parameter limits
+  // 8. Batch insert all synthetic snapshots
   const BATCH_SIZE = 100;
   let syntheticCount = 0;
   if (toInsert.length > 0) {
     const pool = getPool();
     for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
       const chunk = toInsert.slice(i, i + BATCH_SIZE);
-      
-      // Build parameterized SQL query with explicit TEXT cast for balance
+
       const params: any[] = [];
       const valuePlaceholders: string[] = [];
       let paramIdx = 1;
-      
+
       for (const row of chunk) {
-        params.push(row.userId, row.accountId, row.snapshotDate, row.balance, row.isSynthetic);
+        const balanceEncrypted = dek ? await encryptField(row.balance, dek) : row.balance;
+        params.push(row.userId, row.accountId, row.snapshotDate, balanceEncrypted, row.isSynthetic);
         valuePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4})`);
         paramIdx += 5;
       }
-      
+
       const sqlText = `
         INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
         VALUES ${valuePlaceholders.join(', ')}
@@ -292,7 +335,7 @@ export async function generateHistoricalAccountSnapshots(
         DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic
         RETURNING "id"
       `;
-      
+
       try {
         const result = await pool.query(sqlText, params);
         syntheticCount += result.rows.length;
@@ -305,7 +348,7 @@ export async function generateHistoricalAccountSnapshots(
 
   logger.debug(`${LOG_TAG} Backfill complete`, {
     accountId,
-    range: { from: effectiveFromDate, to },
+    range: { from: fromDate, to: toDate },
     syntheticCount,
     skippedRealCount: skippedReal,
     durationMs: Date.now() - startedAt,
