@@ -380,7 +380,13 @@ export async function syncManualAccount(
 
   try {
     switch (account.type) {
-      case 'realestate': {
+      case 'realestate':
+      case 'primaryhome':
+      case 'secondaryhome':
+      case 'rentalproperty':
+      case 'commercial':
+      case 'land':
+      case 'otherrealestate': {
         const propertyId = meta.propertyId as string;
         if (!propertyId) throw new Error('No propertyId in metadata');
         newValue = await fetchRedfinValue(propertyId, apiConfig);
@@ -428,6 +434,12 @@ export async function syncManualAccount(
   if (Math.abs(delta) > 0.0001) {
     const assetTypeLabels: Record<string, string> = {
       realestate: 'Real Estate',
+      primaryhome: 'Primary Home',
+      secondaryhome: 'Secondary Home',
+      rentalproperty: 'Rental Property',
+      commercial: 'Commercial',
+      land: 'Land',
+      otherrealestate: 'Other Real Estate',
       crypto: 'Bitcoin',
       metals: 'Metals',
     };
@@ -451,7 +463,8 @@ export async function syncManualAccount(
   await updateNetWorthSnapshot(userId, dek);
 
   // Regenerate synthetic history for real estate to keep HPI curve aligned
-  if (account.type === 'realestate' || account.type === 'metals') {
+  const REAL_ESTATE_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate'];
+  if (REAL_ESTATE_TYPES.includes(account.type) || account.type === 'metals') {
     try {
       let rawMeta: string | Record<string, unknown>;
       if (dek && account.metadata) {

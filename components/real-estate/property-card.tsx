@@ -47,9 +47,10 @@ interface PropertyCardProps {
   onUnlinkMortgage: (mortgageId: string) => void;
   onOverrideValue: (propertyId: string, value: number) => void;
   onEditMortgage?: (mortgage: MortgageInfo) => void;
+  onEditProperty?: () => void;
 }
 
-export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue, onEditMortgage }: PropertyCardProps) {
+export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue, onEditMortgage, onEditProperty }: PropertyCardProps) {
   const [editingValue, setEditingValue] = useState(false);
   const [newValue, setNewValue] = useState(String(property.value));
   const isWhollyOwned = property.linkedMortgages.length === 0;
@@ -95,30 +96,41 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
             )}
           </div>
         </div>
-        <div className="text-right">
-          {editingValue ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-                className="w-24 px-2 py-1 text-xs bg-background border border-input rounded font-mono text-right"
-                autoFocus
-              />
-              <button onClick={handleSaveValue} className="text-[10px] text-primary font-medium">Save</button>
-              <button onClick={() => setEditingValue(false)} className="text-[10px] text-muted-foreground">Cancel</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <span className="font-mono text-base font-bold text-foreground blur-number">
-                {formatCurrency(property.value)}
-              </span>
-              <button onClick={() => { setNewValue(String(property.value)); setEditingValue(true); }} className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors">
-                <Pencil className="w-3 h-3" />
-              </button>
-            </div>
+        <div className="flex items-start gap-2">
+          {onEditProperty && (
+            <button
+              onClick={onEditProperty}
+              title="Edit property details"
+              className="mt-0.5 p-1.5 rounded-lg hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
           )}
-          <div className="text-[10px] text-muted-foreground">Estimated Value</div>
+          <div className="text-right">
+            {editingValue ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  className="w-24 px-2 py-1 text-xs bg-background border border-input rounded font-mono text-right"
+                  autoFocus
+                />
+                <button onClick={handleSaveValue} className="text-[10px] text-primary font-medium">Save</button>
+                <button onClick={() => setEditingValue(false)} className="text-[10px] text-muted-foreground">Cancel</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-base font-bold text-foreground blur-number">
+                  {formatCurrency(property.value)}
+                </span>
+                <button onClick={() => { setNewValue(String(property.value)); setEditingValue(true); }} className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors">
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <div className="text-[10px] text-muted-foreground">Estimated Value</div>
+          </div>
         </div>
       </div>
 
