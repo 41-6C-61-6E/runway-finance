@@ -14,6 +14,11 @@ interface MortgageInfo {
   interestRate: number;
   monthlyPayment: number;
   metadata?: Record<string, unknown>;
+  extraPrincipal?: number;
+  principal?: number;
+  interest?: number;
+  pmi?: number;
+  escrow?: number;
 }
 
 interface Property {
@@ -156,6 +161,11 @@ export function PropertyCards() {
         termMonths: parseInt(mortgageEditMeta.termMonths || '360', 10),
         monthlyPayment: parseFloat(mortgageEditMeta.monthlyPayment || '0'),
         escrowAmount: parseFloat(mortgageEditMeta.escrowAmount || '0'),
+        extraPrincipal: parseFloat(mortgageEditMeta.extraPrincipal || '0'),
+        principal: parseFloat(mortgageEditMeta.principal || '0'),
+        interest: parseFloat(mortgageEditMeta.interest || '0'),
+        pmi: parseFloat(mortgageEditMeta.pmi || '0'),
+        escrow: parseFloat(mortgageEditMeta.escrow || '0'),
       };
       if (mortgageEditMeta.purchaseDate) {
         metadata.purchaseDate = mortgageEditMeta.purchaseDate;
@@ -212,6 +222,11 @@ export function PropertyCards() {
     );
   }
 
+  const linkedMortgageIds = new Set(
+    data.properties.flatMap((p) => p.linkedMortgages.map((m) => m.id))
+  );
+  const availableMortgages = mortgageAccounts.filter((m) => !linkedMortgageIds.has(m.id));
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -219,7 +234,7 @@ export function PropertyCards() {
           <PropertyCard
             key={property.id}
             property={property}
-            onLinkMortgage={setLinkingPropertyId}
+            onLinkMortgage={() => setLinkingPropertyId(property.id)}
             onUnlinkMortgage={(mortgageId) => handleUnlinkMortgage(property.id, mortgageId)}
             onOverrideValue={handleOverrideValue}
             onEditMortgage={(mortgage) => openEditMortgage(mortgage, mortgage.id)}
@@ -228,34 +243,40 @@ export function PropertyCards() {
       </div>
 
       {/* Link Mortgage Modal */}
-      {linkingPropertyId && data && (
+      {linkingPropertyId && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-card border border-border rounded-xl p-5 max-w-sm w-full mx-4">
-            <h3 className="text-base font-semibold text-foreground mb-4">Link Mortgage</h3>
-            <select
-              value={selectedMortgageId}
-              onChange={(e) => setSelectedMortgageId(e.target.value)}
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm mb-4"
-            >
-              <option value="">Select a mortgage...</option>
-              {mortgageAccounts.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-            <div className="flex gap-2 justify-end">
+          <div className="bg-card border border-border rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Link Mortgage</h3>
+            {availableMortgages.length === 0 ? (
+              <p className="text-xs text-muted-foreground mb-4">No unlinked mortgage accounts available.</p>
+            ) : (
+              <select
+                value={selectedMortgageId}
+                onChange={(e) => setSelectedMortgageId(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm mb-4"
+              >
+                <option value="">Select a mortgage...</option>
+                {availableMortgages.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            )}
+            <div className="flex items-center justify-end gap-2">
               <button
-                onClick={() => setLinkingPropertyId(null)}
-                className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+                onClick={() => { setLinkingPropertyId(null); setSelectedMortgageId(''); }}
+                className="px-3 py-1.5 text-xs text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleLinkMortgage}
-                disabled={!selectedMortgageId}
-                className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-              >
-                Link
-              </button>
+              {availableMortgages.length > 0 && (
+                <button
+                  onClick={handleLinkMortgage}
+                  disabled={!selectedMortgageId}
+                  className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+                >
+                  Link Mortgage
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -301,66 +322,6 @@ export function PropertyCards() {
           </form>
         </SheetContent>
       </Sheet>
-    </>
-  );
-
-  const linkedMortgageIds = new Set(
-    data.properties.flatMap((p) => p.linkedMortgages.map((m) => m.id))
-  );
-  const availableMortgages = mortgageAccounts.filter((m) => !linkedMortgageIds.has(m.id));
-
-  return (
-    <>
-      {linkingPropertyId && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-card border border-border rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Link Mortgage</h3>
-            {availableMortgages.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No unlinked mortgage accounts available.</p>
-            ) : (
-              <select
-                value={selectedMortgageId}
-                onChange={(e) => setSelectedMortgageId(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm mb-4"
-              >
-                <option value="">Select a mortgage...</option>
-                {availableMortgages.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => { setLinkingPropertyId(null); setSelectedMortgageId(''); }}
-                className="px-3 py-1.5 text-xs text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              {availableMortgages.length > 0 && (
-                <button
-                  onClick={handleLinkMortgage}
-                  disabled={!selectedMortgageId}
-                  className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-                >
-                  Link Mortgage
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {data.properties.map((property) => (
-          <PropertyCard
-            key={property.id}
-            property={property}
-            onLinkMortgage={() => setLinkingPropertyId(property.id)}
-            onUnlinkMortgage={(mortgageId) => handleUnlinkMortgage(property.id, mortgageId)}
-            onOverrideValue={handleOverrideValue}
-          />
-        ))}
-      </div>
     </>
   );
 }

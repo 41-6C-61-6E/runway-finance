@@ -15,6 +15,7 @@ type Account = {
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
   metadata?: Record<string, unknown> | null;
+  connectionId?: string | null;
 };
 
 const MAJOR_TYPE_OPTIONS = [
@@ -152,7 +153,12 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         <div className="space-y-5">
           {/* Balance display */}
           <div className="p-4 bg-card border border-border rounded-xl">
-            <div className="text-xs text-muted-foreground">Current Balance</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">Current Balance</div>
+              {account.connectionId && (
+                <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>
+              )}
+            </div>
             <div className={`font-mono text-2xl font-bold mt-1 text-foreground financial-value`}>{text}</div>
             <div className="text-xs text-muted-foreground mt-1">{account.currency}</div>
           </div>

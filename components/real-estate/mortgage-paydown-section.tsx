@@ -13,6 +13,11 @@ interface MortgageInfo {
   monthlyPayment: number;
   termMonths?: number;
   metadata?: Record<string, unknown>;
+  extraPrincipal?: number;
+  principal?: number;
+  interest?: number;
+  pmi?: number;
+  escrow?: number;
 }
 
 interface PropertyData {

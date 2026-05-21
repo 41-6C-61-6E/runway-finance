@@ -10,6 +10,11 @@ interface MortgageAttributesMeta {
   monthlyPayment?: string;
   escrowAmount?: string;
   purchaseDate?: string;
+  extraPrincipal?: string;
+  principal?: string;
+  interest?: string;
+  pmi?: string;
+  escrow?: string;
 }
 
 interface MortgageAttributesFormProps {
@@ -82,14 +87,58 @@ export function MortgageAttributesForm({
           />
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Principal (monthly, optional)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={meta.principal || ''}
+            onChange={(e) => onChange({ ...meta, principal: e.target.value })}
+            placeholder="e.g., 800"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Interest (monthly, optional)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={meta.interest || ''}
+            onChange={(e) => onChange({ ...meta, interest: e.target.value })}
+            placeholder="e.g., 1000"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">PMI (monthly, optional)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={meta.pmi || ''}
+            onChange={(e) => onChange({ ...meta, pmi: e.target.value })}
+            placeholder="e.g., 80"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Escrow (taxes, ins., optional)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={meta.escrow || meta.escrowAmount || ''}
+            onChange={(e) => onChange({ ...meta, escrow: e.target.value, escrowAmount: e.target.value })}
+            placeholder="e.g., 400"
+          />
+        </div>
+      </div>
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Escrow (monthly, optional)</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Extra Principal (monthly, optional)</label>
         <Input
           type="number"
           step="0.01"
-          value={meta.escrowAmount || ''}
-          onChange={(e) => onChange({ ...meta, escrowAmount: e.target.value })}
-          placeholder="e.g., 400"
+          value={meta.extraPrincipal || ''}
+          onChange={(e) => onChange({ ...meta, extraPrincipal: e.target.value })}
+          placeholder="e.g., 200"
         />
       </div>
     </>

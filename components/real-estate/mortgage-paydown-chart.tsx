@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { formatCurrency } from '@/lib/utils/format';
 import { nivoTheme } from '@/components/charts/shared-chart-theme';
@@ -22,6 +22,11 @@ interface MortgageDetail {
   escrowAmount?: number;
   termMonths?: number;
   metadata?: Record<string, unknown>;
+  extraPrincipal?: number;
+  principal?: number;
+  interest?: number;
+  pmi?: number;
+  escrow?: number;
 }
 
 interface MortgagePaydownChartProps {
@@ -40,13 +45,37 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
   const monthlyPayment = mortgage.monthlyPayment;
   const mortgageStartDate = (mortgage.metadata as any)?.purchaseDate as string ?? '2020-01-01';
 
+  const principal = mortgage.principal ?? 0;
+  const interest = mortgage.interest ?? 0;
+  const escrow = mortgage.escrow ?? 0;
+  const pmi = mortgage.pmi ?? 0;
+
+  const monthlyPI = useMemo(() => {
+    if (principal > 0 && interest > 0) {
+      return principal + interest;
+    }
+    if (escrow > 0 || pmi > 0) {
+      return Math.max(0, monthlyPayment - escrow - pmi);
+    }
+    return monthlyPayment;
+  }, [principal, interest, escrow, pmi, monthlyPayment]);
+
+  useEffect(() => {
+    const ep = mortgage.extraPrincipal ?? 0;
+    setExtraMonthly(ep > 0 ? String(ep) : '');
+    setShowProjection(ep > 0);
+    setLumpSum('');
+    setLumpSumDate('');
+    setBiweekly(false);
+  }, [mortgage.id, mortgage.extraPrincipal]);
+
   const amortParams = useMemo(() => ({
     originalBalance: mortgage.originalLoanAmount,
     annualRate: mortgage.interestRate,
     termMonths,
-    monthlyPayment,
+    monthlyPayment: monthlyPI,
     startDate: mortgageStartDate,
-  }), [mortgage.originalLoanAmount, mortgage.interestRate, termMonths, monthlyPayment, mortgageStartDate]);
+  }), [mortgage.originalLoanAmount, mortgage.interestRate, termMonths, monthlyPI, mortgageStartDate]);
 
   const fullSchedule = useMemo(() => calculateAmortizationSchedule(amortParams), [amortParams]);
 
@@ -168,6 +197,46 @@ export function MortgagePaydownChart({ mortgage, propertyName }: MortgagePaydown
           <div className="font-mono font-medium text-foreground blur-number">{termMonths}mo</div>
         </div>
       </div>
+
+      {/* Payment Breakdown */}
+      {((mortgage.principal !== undefined && mortgage.principal > 0) ||
+        (mortgage.interest !== undefined && mortgage.interest > 0) ||
+        (mortgage.escrow !== undefined && mortgage.escrow > 0) ||
+        (mortgage.pmi !== undefined && mortgage.pmi > 0) ||
+        (mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0)) && (
+        <div className="mb-4 p-3 bg-muted/20 border border-border/50 rounded-lg grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px] text-muted-foreground">
+          {mortgage.principal !== undefined && mortgage.principal > 0 && (
+            <div>
+              <span className="block text-muted-foreground">Principal</span>
+              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.principal)}</span>
+            </div>
+          )}
+          {mortgage.interest !== undefined && mortgage.interest > 0 && (
+            <div>
+              <span className="block text-muted-foreground">Interest</span>
+              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.interest)}</span>
+            </div>
+          )}
+          {mortgage.escrow !== undefined && mortgage.escrow > 0 && (
+            <div>
+              <span className="block text-muted-foreground">Escrow</span>
+              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.escrow)}</span>
+            </div>
+          )}
+          {mortgage.pmi !== undefined && mortgage.pmi > 0 && (
+            <div>
+              <span className="block text-muted-foreground">PMI</span>
+              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.pmi)}</span>
+            </div>
+          )}
+          {mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0 && (
+            <div>
+              <span className="block text-chart-1 font-medium">Extra Principal</span>
+              <span className="font-mono font-medium text-chart-1 blur-number">{formatCurrency(mortgage.extraPrincipal)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Extra Payment Controls */}
       <div className="mb-4 p-3 bg-muted/30 border border-border rounded-lg">
