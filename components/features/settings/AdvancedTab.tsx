@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Download, Upload, FileArchive, Loader2 } from 'lucide-react';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
 
 type SettingsState = Record<string, unknown>;
@@ -146,12 +147,157 @@ export default function AdvancedTab() {
 
   const totalDirty = Object.keys(dirty).length;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backupBusy, setBackupBusy] = useState<'export' | 'csv' | 'import' | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
+
+  const handleExport = useCallback(async () => {
+    setBackupBusy('export');
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const res = await fetch('/api/backup/export', { credentials: 'include' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `runway-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupSuccess('Backup downloaded successfully.');
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setBackupBusy(null);
+    }
+  }, []);
+
+  const handleExportCsv = useCallback(async () => {
+    setBackupBusy('csv');
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const res = await fetch('/api/backup/export-csv', { credentials: 'include' });
+      if (!res.ok) throw new Error('CSV export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `runway-finance-export-${new Date().toISOString().split('T')[0]}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupSuccess('CSV export downloaded successfully.');
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'CSV export failed');
+    } finally {
+      setBackupBusy(null);
+    }
+  }, []);
+
+  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBackupBusy('import');
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const text = await file.text();
+      const res = await fetch('/api/backup/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: text,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      setBackupSuccess(data.message || 'Backup restored successfully.');
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setBackupBusy(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, []);
+
   if (loading) {
     return <div className="text-muted-foreground py-4 text-center text-sm">Loading settings...</div>;
   }
 
   return (
     <div className="space-y-3">
+      {/* Backup & Restore */}
+      <div className="p-4 bg-card border border-border rounded-lg space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Backup & Restore</h2>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Download a full backup of all your data and settings, or restore from a previous backup.
+          </p>
+        </div>
+
+        {backupError && (
+          <div className="p-2 bg-destructive/20 border border-destructive/30 rounded-lg">
+            <p className="text-xs text-destructive">{backupError}</p>
+          </div>
+        )}
+
+        {backupSuccess && (
+          <div className="p-2 bg-chart-1/20 border border-chart-1/30 rounded-lg">
+            <p className="text-xs text-chart-1">{backupSuccess}</p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={backupBusy !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
+          >
+            {backupBusy === 'export' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            Download Backup
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={backupBusy !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
+          >
+            {backupBusy === 'import' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Upload className="w-3.5 h-3.5" />
+            )}
+            Restore from Backup
+          </button>
+
+          <button
+            onClick={handleExportCsv}
+            disabled={backupBusy !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
+          >
+            {backupBusy === 'csv' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileArchive className="w-3.5 h-3.5" />
+            )}
+            Export as CSV
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+        </div>
+      </div>
+
       {/* Warning Banner */}
       <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
         <div className="flex items-start gap-2">

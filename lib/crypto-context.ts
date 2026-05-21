@@ -44,5 +44,12 @@ export async function getServerDEK(userId: string): Promise<Uint8Array> {
     );
   }
 
-  throw new Error('No server-wrapped encryption key found — please log in again to re-generate it');
+  throw new Error(
+    `No server-wrapped encryption key found for user ${userId} — ` +
+    `serverWrappedDek=${!!keyRow.serverWrappedDek}, ` +
+    `serverWrappingIv=${!!keyRow.serverWrappingIv}, ` +
+    `serverWrappingTag=${!!keyRow.serverWrappingTag}, ` +
+    `wrappedDek=${!!keyRow.wrappedDek}, ` +
+    `salt=${!!keyRow.salt}`
+  );
 }
