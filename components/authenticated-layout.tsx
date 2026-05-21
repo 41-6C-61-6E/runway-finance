@@ -13,7 +13,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/signin';
   const isSettingsPage = pathname === '/settings';
-  const hideAccountsSidebar = isSettingsPage || pathname === '/accounts';
+  const hideAccountsSidebar = isSettingsPage;
 
   if (isAuthPage) {
     return <>{children}</>;

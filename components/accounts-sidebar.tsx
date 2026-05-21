@@ -269,7 +269,7 @@ export default function AccountsSidebar() {
     return (
       <button
         onClick={toggleAccountsCollapsed}
-        className="fixed top-0 z-40 flex items-center justify-center w-6 h-10 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
+        className="fixed top-0 z-50 flex items-center justify-center w-6 h-10 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
         style={{ left: `${sidebarWidth}px` }}
         title="Expand accounts sidebar"
       >

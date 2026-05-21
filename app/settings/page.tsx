@@ -374,9 +374,12 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen w-full">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-foreground">Settings</h1>
+      </div>
       <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
         <div className="max-w-2xl w-full space-y-6">
-          <h1 className="text-xl font-semibold text-foreground">Settings</h1>
 
           {/* Setup Checklist */}
           <OnboardingChecklist />

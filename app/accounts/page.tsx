@@ -4,9 +4,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQuery } from '@tanstack/react-query';
-import { ResponsiveLine } from '@nivo/line';
-import { ResponsiveBar } from '@nivo/bar';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  ComposedChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
@@ -392,9 +402,9 @@ export default function AccountsPage() {
   }, [uniqueSeriesKeys, groupMode, reportableAccounts, isAssetSeries]);
 
   // ── Calculate dynamic stacking and data structures ──
-  const { stackedData, processedChartData, maxVal, minVal } = useMemo(() => {
+  const { rechartsData, activeAssets, activeLiabilities, processedChartData, maxVal, minVal } = useMemo(() => {
     if (historyData.length === 0) {
-      return { stackedData: [], processedChartData: [], maxVal: 1000, minVal: 0 };
+      return { rechartsData: [], activeAssets: [], activeLiabilities: [], processedChartData: [], maxVal: 1000, minVal: 0 };
     }
 
     // Compile accounts list matching each checked series
@@ -445,45 +455,20 @@ export default function AccountsPage() {
       return (latestPoint[b] || 0) - (latestPoint[a] || 0);
     });
 
-    const series: any[] = [];
-
-    // Stack assets (growing upwards, paint largest first)
-    for (let i = activeAssets.length - 1; i >= 0; i--) {
-      const key = activeAssets[i];
-      const info = seriesInfoMap.get(key);
-      const dataPoints = processedPoints.map((d) => {
-        let stackedVal = 0;
-        for (let j = 0; j <= i; j++) {
-          stackedVal += (d[activeAssets[j]] || 0);
-        }
-        return { x: d.date, y: stackedVal };
+    // Create the final data for Recharts, where liability keys are negative
+    const rechartsData = processedPoints.map((d) => {
+      const row: Record<string, any> = {
+        date: d.date,
+        netWorth: d.netWorth,
+        totalAssets: d.totalAssets,
+        totalLiabilities: -d.totalLiabilities,
+      };
+      selectedSeriesKeys.forEach((k) => {
+        const val = d[k] || 0;
+        row[k] = isAssetSeries(k) ? val : -val;
       });
-
-      series.push({
-        id: key,
-        color: info?.color || 'var(--chart-1)',
-        data: dataPoints,
-      });
-    }
-
-    // Stack liabilities (growing downwards, paint largest negative first)
-    for (let i = activeLiabilities.length - 1; i >= 0; i--) {
-      const key = activeLiabilities[i];
-      const info = seriesInfoMap.get(key);
-      const dataPoints = processedPoints.map((d) => {
-        let stackedVal = 0;
-        for (let j = 0; j <= i; j++) {
-          stackedVal += (d[activeLiabilities[j]] || 0);
-        }
-        return { x: d.date, y: -stackedVal };
-      });
-
-      series.push({
-        id: key,
-        color: info?.color || 'var(--color-destructive)',
-        data: dataPoints,
-      });
-    }
+      return row;
+    });
 
     // Find bounds
     const allValues = processedPoints.flatMap((d) => [
@@ -498,12 +483,14 @@ export default function AccountsPage() {
     const minValue = rawMin < 0 ? rawMin * 1.15 : 0;
 
     return {
-      stackedData: series,
+      rechartsData,
+      activeAssets,
+      activeLiabilities,
       processedChartData: processedPoints,
       maxVal: maxValue,
       minVal: minValue,
     };
-  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries, seriesInfoMap]);
+  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries]);
 
 
   // Hierarchy statistics calculations
@@ -627,15 +614,12 @@ export default function AccountsPage() {
   };
 
   // Tooltip helper
-  const sliceTooltip = useCallback(({ slice }: any) => {
-    const rawX = slice.points[0]?.data.x;
-    const dateStr = rawX instanceof Date 
-      ? rawX.toISOString().split('T')[0] 
-      : typeof rawX === 'string'
-        ? rawX.split('T')[0]
-        : String(rawX);
-    const point = processedChartData.find((d) => d.date === dateStr);
-    if (!point) return null;
+  // Tooltip helper
+  const CustomTooltip = useCallback(({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    
+    const point = payload[0].payload;
+    const dateStr = point.date;
 
     const formatPointDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
       month: 'short',
@@ -644,8 +628,8 @@ export default function AccountsPage() {
     });
 
     const activeKeys = Array.from(selectedSeriesKeys);
-    const activeAssets = activeKeys.filter((k) => isAssetSeries(k) && (point[k] || 0) > 0);
-    const activeLiabilities = activeKeys.filter((k) => !isAssetSeries(k) && (point[k] || 0) > 0);
+    const activeAssets = activeKeys.filter((k) => isAssetSeries(k) && Math.abs(point[k] || 0) > 0);
+    const activeLiabilities = activeKeys.filter((k) => !isAssetSeries(k) && Math.abs(point[k] || 0) > 0);
 
     return (
       <ChartTooltip>
@@ -666,7 +650,7 @@ export default function AccountsPage() {
                 <TooltipRow
                   key={key}
                   label={info?.label || key}
-                  value={formatCurrency(point[key] || 0)}
+                  value={formatCurrency(Math.abs(point[key] || 0))}
                   color={info?.color || 'var(--color-chart-1)'}
                 />
               );
@@ -683,7 +667,7 @@ export default function AccountsPage() {
                 <TooltipRow
                   key={key}
                   label={info?.label || key}
-                  value={formatCurrency(point[key] || 0)}
+                  value={formatCurrency(Math.abs(point[key] || 0))}
                   color={info?.color || 'var(--color-destructive)'}
                 />
               );
@@ -692,7 +676,7 @@ export default function AccountsPage() {
         )}
       </ChartTooltip>
     );
-  }, [processedChartData, selectedSeriesKeys, isAssetSeries, seriesInfoMap]);
+  }, [selectedSeriesKeys, isAssetSeries, seriesInfoMap]);
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
@@ -732,17 +716,6 @@ export default function AccountsPage() {
                     onChange={(t) => setChartType(t as ChartType)} 
                   />
 
-                  {/* Toggle Show Hidden */}
-                  <div className="flex items-center gap-1.5 pl-2 border-l border-border/50">
-                    <label htmlFor="show-hidden-toggle" className="text-[10px] font-semibold text-muted-foreground uppercase cursor-pointer">
-                      Show Hidden
-                    </label>
-                    <Switch
-                      id="show-hidden-toggle"
-                      checked={showHidden}
-                      onCheckedChange={setShowHidden}
-                    />
-                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-5 space-y-5">
@@ -849,114 +822,158 @@ export default function AccountsPage() {
                       <p className="text-xs text-muted-foreground">Select one or more filters above to render the chart.</p>
                     </div>
                   ) : chartType === 'bar' ? (
-                    /* Nivo Bar Chart Rendering */
+                    /* Recharts Bar Chart Rendering */
                     <div className="w-full h-full relative">
-                      <ResponsiveBar
-                        data={processedChartData.map((d) => {
-                          const row: Record<string, any> = {
-                            id: d.date,
-                          };
-                          selectedSeriesKeys.forEach((k) => {
-                            const val = d[k] || 0;
-                            row[k] = isAssetSeries(k) ? val : -val;
-                          });
-                          return row;
-                        })}
-                        keys={Array.from(selectedSeriesKeys)}
-                        indexBy="id"
-                        margin={{ top: 15, right: 20, left: 60, bottom: 45 }}
-                        valueScale={{ type: 'linear', min: minVal, max: maxVal }}
-                        padding={0.15}
-                        groupMode="stacked"
-                        borderRadius={1}
-                        colors={({ id }: any) => seriesInfoMap.get(String(id))?.color || 'var(--color-primary)'}
-                        axisLeft={{
-                          tickSize: 0,
-                          tickPadding: 8,
-                          format: (v: number) => {
-                            const absV = Math.abs(v);
-                            const sign = v < 0 ? '-' : '';
-                            if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                            if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                            return `${sign}$${absV}`;
-                          },
-                        }}
-                        axisBottom={{
-                          tickSize: 0,
-                          tickPadding: 8,
-                          tickValues: timeframe === '1m'
-                            ? processedChartData.filter((_, i) => i % 5 === 0).map(d => d.date)
-                            : Math.min(8, Math.max(3, Math.floor(processedChartData.length / 12))),
-                          format: timeframe === '1m' ? (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-                        }}
-                        enableGridY={true}
-                        enableGridX={false}
-                        theme={nivoTheme}
-                        enableLabel={false}
-                        tooltip={({ id, value, data }: any) => {
-                          const dateStr = data.id;
-                          const point = processedChartData.find(d => d.date === dateStr);
-                          if (!point) return null;
-                          const label = seriesInfoMap.get(String(id))?.label || String(id);
-                          return (
-                            <ChartTooltip>
-                              <TooltipHeader>{new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
-                              <TooltipRow
-                                label="Total"
-                                value={formatCurrency(point.netWorth)}
-                                color="var(--color-primary)"
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={rechartsData}
+                          stackOffset="sign"
+                          margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                          <XAxis
+                            dataKey="date"
+                            tickLine={false}
+                            axisLine={{ stroke: 'var(--color-border)' }}
+                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                            tickFormatter={(d) => {
+                              if (!d) return '';
+                              return timeframe === '1m'
+                                ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            }}
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={{ stroke: 'var(--color-border)' }}
+                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                            domain={[minVal, maxVal]}
+                            ticks={(() => {
+                              const step = (maxVal - minVal) / 4;
+                              const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                              const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                              return withZero;
+                            })()}
+                            tickFormatter={(v: number) => {
+                              const absV = Math.abs(v);
+                              const sign = v < 0 ? '-' : '';
+                              if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                              if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                              if (absV === 0) return '$0';
+                              return `${sign}$${absV.toFixed(0)}`;
+                            }}
+                          />
+                          <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                          <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                          
+                          {/* Render assets bars (positive stack) */}
+                          {activeAssets.map((key) => {
+                            const info = seriesInfoMap.get(key);
+                            return (
+                              <Bar
+                                key={key}
+                                dataKey={key}
+                                stackId="stack"
+                                fill={info?.color || 'var(--color-chart-1)'}
+                                radius={[0, 0, 0, 0]}
                               />
-                              <div className="mt-1 border-t border-border pt-1">
-                                <TooltipRow
-                                  label={label}
-                                  value={formatCurrency(Math.abs(value))}
-                                  color={seriesInfoMap.get(String(id))?.color || 'var(--color-primary)'}
-                                />
-                              </div>
-                            </ChartTooltip>
-                          );
-                        }}
-                      />
-                      {/* Bar Net Worth Overlay Removed */}
+                            );
+                          })}
+
+                          {/* Render liabilities bars (negative stack) */}
+                          {activeLiabilities.map((key) => {
+                            const info = seriesInfoMap.get(key);
+                            return (
+                              <Bar
+                                key={key}
+                                dataKey={key}
+                                stackId="stack"
+                                fill={info?.color || 'var(--color-destructive)'}
+                                radius={[0, 0, 0, 0]}
+                              />
+                            );
+                          })}
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   ) : (
-                    /* Nivo Line Chart Rendering */
+                    /* Recharts Area Chart Rendering */
                     <div className="w-full h-full relative">
-                      <ResponsiveLine
-                        data={stackedData}
-                        margin={{ top: 15, right: 20, left: 60, bottom: 45 }}
-                        xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-                        yScale={{ type: 'linear', min: minVal, max: maxVal }}
-                        curve="monotoneX"
-                        colors={(d: any) => d.color}
-                        lineWidth={0}
-                        enableArea={true}
-                        areaOpacity={0.3}
-                        enablePoints={false}
-                        enableGridX={false}
-                        enableGridY={true}
-                        axisBottom={{
-                          tickSize: 0,
-                          tickPadding: 8,
-                          tickValues: Math.min(8, Math.max(3, Math.floor(processedChartData.length / 12))),
-                          format: timeframe === '1m' ? '%b %d' : '%b %y',
-                        }}
-                        axisLeft={{
-                          tickSize: 0,
-                          tickPadding: 8,
-                          format: (v: number) => {
-                            const absV = Math.abs(v);
-                            const sign = v < 0 ? '-' : '';
-                            if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                            if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                            return `${sign}$${absV}`;
-                          },
-                        }}
-                        theme={nivoTheme}
-                        useMesh={true}
-                        enableSlices="x"
-                        sliceTooltip={sliceTooltip}
-                      />
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart
+                          data={rechartsData}
+                          stackOffset="sign"
+                          margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                          <XAxis
+                            dataKey="date"
+                            tickLine={false}
+                            axisLine={{ stroke: 'var(--color-border)' }}
+                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                            tickFormatter={(d) => {
+                              if (!d) return '';
+                              return timeframe === '1m'
+                                ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            }}
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={{ stroke: 'var(--color-border)' }}
+                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                            domain={[minVal, maxVal]}
+                            ticks={(() => {
+                              const step = (maxVal - minVal) / 4;
+                              const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                              const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                              return withZero;
+                            })()}
+                            tickFormatter={(v: number) => {
+                              const absV = Math.abs(v);
+                              const sign = v < 0 ? '-' : '';
+                              if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                              if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                              if (absV === 0) return '$0';
+                              return `${sign}$${absV.toFixed(0)}`;
+                            }}
+                          />
+                          <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                          <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
+                          
+                          {/* Render assets areas (positive stack) */}
+                          {activeAssets.map((key) => {
+                            const info = seriesInfoMap.get(key);
+                            return (
+                              <Area
+                                key={key}
+                                type="monotone"
+                                dataKey={key}
+                                stackId="stack"
+                                stroke="none"
+                                fill={info?.color || 'var(--color-chart-1)'}
+                                fillOpacity={0.85}
+                              />
+                            );
+                          })}
+
+                          {/* Render liabilities areas (negative stack) */}
+                          {activeLiabilities.map((key) => {
+                            const info = seriesInfoMap.get(key);
+                            return (
+                              <Area
+                                key={key}
+                                type="monotone"
+                                dataKey={key}
+                                stackId="stack"
+                                stroke="none"
+                                fill={info?.color || 'var(--color-destructive)'}
+                                fillOpacity={0.85}
+                              />
+                            );
+                          })}
+                        </ComposedChart>
+                      </ResponsiveContainer>
                     </div>
                   )}
                 </div>

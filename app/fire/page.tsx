@@ -57,32 +57,34 @@ function FireContent() {
 
   return (
     <div className="min-h-screen w-full">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-foreground">FIRE</h1>
+        <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit">
+          <button
+            onClick={() => setTab('forecaster')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              tab === 'forecaster'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Forecaster
+          </button>
+          <button
+            onClick={() => setTab('retirement')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              tab === 'retirement'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Retirement Planner
+          </button>
+        </div>
+      </div>
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
-          <h1 className="text-xl font-semibold text-foreground mb-5">FIRE</h1>
-
-          <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 mb-6 w-fit">
-            <button
-              onClick={() => setTab('forecaster')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                tab === 'forecaster'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Forecaster
-            </button>
-            <button
-              onClick={() => setTab('retirement')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                tab === 'retirement'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Retirement Planner
-            </button>
-          </div>
 
           {tab === 'forecaster' && (
             <>

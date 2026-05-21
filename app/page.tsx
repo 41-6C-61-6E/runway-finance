@@ -12,9 +12,12 @@ function NetWorthContent() {
 
   return (
     <div className="min-h-screen w-full">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-foreground">Net Worth</h1>
+      </div>
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
-          <h1 className="text-xl font-semibold text-foreground mb-5">Net Worth</h1>
           
           {isVisible('netWorthSummary') && isVisible('debtToAssetRatio') && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

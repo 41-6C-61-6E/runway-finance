@@ -1,11 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ResponsiveLine } from '@nivo/line';
-import { ResponsiveBar } from '@nivo/bar';
+import {
+  ComposedChart,
+  Area,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -42,6 +51,36 @@ const CHART_COLOR_MAP = [
   'var(--chart-synthetic)',
   'var(--destructive-synthetic)',
 ];
+
+const getCategoryColor = (cat: string, index: number, isAsset: boolean) => {
+  const cycle = Math.floor(index / 5);
+  const chartNum = (index % 5) + 1;
+  const baseVar = `var(--chart-${chartNum})`;
+  
+  if (isAsset) {
+    if (cycle === 0) {
+      return baseVar;
+    } else if (cycle % 2 === 1) {
+      const mixPct = Math.min(75, 20 + Math.floor(cycle / 2) * 20);
+      return `color-mix(in oklch, ${baseVar}, white ${mixPct}%)`;
+    } else {
+      const mixPct = Math.min(75, 20 + (Math.floor(cycle / 2) - 1) * 20);
+      return `color-mix(in oklch, ${baseVar}, black ${mixPct}%)`;
+    }
+  } else {
+    // Liabilities get reddish shades
+    const baseMixed = `color-mix(in oklch, ${baseVar}, var(--destructive) 60%)`;
+    if (cycle === 0) {
+      return baseMixed;
+    } else if (cycle % 2 === 1) {
+      const mixPct = Math.min(75, 20 + Math.floor(cycle / 2) * 20);
+      return `color-mix(in oklch, ${baseMixed}, white ${mixPct}%)`;
+    } else {
+      const mixPct = Math.min(75, 20 + (Math.floor(cycle / 2) - 1) * 20);
+      return `color-mix(in oklch, ${baseMixed}, black ${mixPct}%)`;
+    }
+  }
+};
 
 const ASSET_CATEGORIES_LIST = [
   'Cash & Checking',
@@ -217,7 +256,7 @@ export function NetWorthChart() {
     );
     const assetColors: Record<string, string> = {};
     sortedAssets.forEach((cat, index) => {
-      assetColors[cat] = CHART_COLOR_MAP[index % CHART_COLOR_MAP.length];
+      assetColors[cat] = getCategoryColor(cat, index, true);
     });
 
     const sortedLiabs = [...availableLiabilities].sort(
@@ -225,25 +264,17 @@ export function NetWorthChart() {
     );
     const liabColors: Record<string, string> = {};
     sortedLiabs.forEach((cat, index) => {
-      liabColors[cat] = CHART_COLOR_MAP[index % CHART_COLOR_MAP.length];
+      liabColors[cat] = getCategoryColor(cat, index, false);
     });
 
     return { ...assetColors, ...liabColors };
   }, [displayData, availableAssets, availableLiabilities]);
 
   // Frontend stacking & filtering logic
-  const { stackedData, processedChartData, maxVal, minVal } = useMemo(() => {
+  const { rechartsData, processedChartData, maxVal, minVal } = useMemo(() => {
     if (displayData.length === 0) {
-      return { stackedData: [], processedChartData: [], maxVal: 1000, minVal: 0 };
+      return { rechartsData: [], processedChartData: [], maxVal: 1000, minVal: 0 };
     }
-
-    const latestPoint = displayData[displayData.length - 1] || {};
-    const sortedAssets = [...selectedAssets].sort(
-      (a, b) => (latestPoint[b] || 0) - (latestPoint[a] || 0)
-    );
-    const sortedLiabilities = [...selectedLiabilities].sort(
-      (a, b) => (latestPoint[b] || 0) - (latestPoint[a] || 0)
-    );
 
     // Compute Net Worth for each date based on selected categories
     const processedPoints = displayData.map((d) => {
@@ -258,58 +289,37 @@ export function NetWorthChart() {
       };
     });
 
-    const series: Array<{ id: string; color: string; data: Array<{ x: string; y: number; isSynthetic?: boolean }> }> = [];
+    // Create the final data for Recharts, where liability keys are negative
+    const rechartsData = processedPoints.map((d, index) => {
+      const row: Record<string, any> = {
+        date: d.date,
+        netWorth: d.netWorth,
+        totalAssets: d.totalAssets,
+        totalLiabilities: -d.totalLiabilities,
+        isSynthetic: d.isSynthetic,
+      };
 
-    if (showBreakdown) {
-      // Stacking assets (positive, stack upwards)
-      // Iterate backwards so the largest stack is drawn first, allowing overlays to layer correctly
-      for (let i = sortedAssets.length - 1; i >= 0; i--) {
-        const cat = sortedAssets[i];
-        const dataPoints = displayData.map((d) => {
-          let stackedVal = 0;
-          for (let j = 0; j <= i; j++) {
-            stackedVal += (d[sortedAssets[j]] || 0);
-          }
-          return { x: d.date, y: stackedVal, isSynthetic: d.isSynthetic };
-        });
+      const isActual = !d.isSynthetic;
+      const isSynthetic = d.isSynthetic;
+      
+      row.netWorthActual = isActual ? d.netWorth : null;
+      
+      const isLastActual = isActual && (index === processedPoints.length - 1 || processedPoints[index + 1]?.isSynthetic);
+      row.netWorthSynthetic = (isSynthetic || isLastActual) ? d.netWorth : null;
 
-        series.push({
-          id: cat,
-          color: categoryColors[cat] || 'var(--chart-1)',
-          data: dataPoints,
+      if (showBreakdown) {
+        selectedAssets.forEach((cat) => {
+          row[cat] = d[cat] || 0;
         });
+        selectedLiabilities.forEach((cat) => {
+          row[cat] = -(d[cat] || 0); // Negate liabilities!
+        });
+      } else {
+        row.assets = d.totalAssets;
+        row.liabilities = -d.totalLiabilities; // Negate liabilities!
       }
-
-      // Stacking liabilities (negative, stack downwards)
-      // Iterate backwards so the largest negative stack is drawn first
-      for (let i = sortedLiabilities.length - 1; i >= 0; i--) {
-        const cat = sortedLiabilities[i];
-        const dataPoints = displayData.map((d) => {
-          let stackedVal = 0;
-          for (let j = 0; j <= i; j++) {
-            stackedVal += (d[sortedLiabilities[j]] || 0);
-          }
-          return { x: d.date, y: -stackedVal, isSynthetic: d.isSynthetic };
-        });
-
-        series.push({
-          id: cat,
-          color: categoryColors[cat] || 'var(--color-destructive)',
-          data: dataPoints,
-        });
-      }
-    } else {
-      series.push({
-        id: 'Total Assets',
-        color: 'var(--color-chart-1)',
-        data: displayData.map((d) => ({ x: d.date, y: d.totalAssets, isSynthetic: d.isSynthetic })),
-      });
-      series.push({
-        id: 'Total Liabilities',
-        color: 'var(--color-destructive)',
-        data: displayData.map((d) => ({ x: d.date, y: -d.totalLiabilities, isSynthetic: d.isSynthetic })),
-      });
-    }
+      return row;
+    });
 
     // Calculate Y scale bounds dynamically
     const allValues = processedPoints.flatMap((d) => {
@@ -330,12 +340,12 @@ export function NetWorthChart() {
     const minValue = rawMin < 0 ? rawMin * 1.15 : 0;
 
     return {
-      stackedData: series,
+      rechartsData,
       processedChartData: processedPoints,
       maxVal: maxValue,
       minVal: minValue,
     };
-  }, [displayData, selectedAssets, selectedLiabilities, categoryColors, showBreakdown]);
+  }, [displayData, selectedAssets, selectedLiabilities, showBreakdown]);
 
   // Recalculated summary stats matching the filtered selection
   const filteredSummary = useMemo(() => {
@@ -390,47 +400,14 @@ export function NetWorthChart() {
     });
   };
 
-  const SyntheticOverlay = ({ series, xScale, yScale }: any) => {
-    const mainSeries = series[0];
-    if (!mainSeries || !Array.isArray(mainSeries.data) || mainSeries.data.length < 2) return null;
+  const CustomTooltip = useCallback(({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    
+    const point = payload[0].payload;
+    const dateStr = point.date;
 
-    const estimatedPoints: Array<{ x: number; y: number }> = [];
-
-    for (const point of mainSeries.data) {
-      const dataPoint = point?.data;
-      if (!dataPoint?.isSynthetic) continue;
-
-      const px = point.position?.x ?? xScale?.(dataPoint.x);
-      const py = point.position?.y ?? yScale?.(dataPoint.y);
-      if (Number.isFinite(px) && Number.isFinite(py)) {
-        estimatedPoints.push({ x: px, y: py });
-      }
-    }
-
-    if (estimatedPoints.length < 2) return null;
-
-    const line = (pts: Array<{ x: number; y: number }>) =>
-      pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-
-    return (
-      <path
-        d={line(estimatedPoints)}
-        fill="none"
-        stroke="var(--color-primary)"
-        strokeWidth={2.5}
-        strokeDasharray="8 4"
-        opacity={0.6}
-      />
-    );
-  };
-
-  const sliceTooltip = useCallback(({ slice }: any) => {
-    const dateStr = slice.points[0]?.data.x;
-    const point = processedChartData.find((d) => d.date === dateStr);
-    if (!point) return null;
-
-    const activeAssetCats = availableAssets.filter((cat) => selectedCategories.has(cat) && (point[cat] || 0) > 0);
-    const activeLiabCats = availableLiabilities.filter((cat) => selectedCategories.has(cat) && (point[cat] || 0) > 0);
+    const activeAssetCats = availableAssets.filter((cat) => selectedCategories.has(cat) && Math.abs(point[cat] || 0) > 0);
+    const activeLiabCats = availableLiabilities.filter((cat) => selectedCategories.has(cat) && Math.abs(point[cat] || 0) > 0);
 
     return (
       <ChartTooltip>
@@ -445,13 +422,13 @@ export function NetWorthChart() {
         {showBreakdown ? (
           <>
             {activeAssetCats.length > 0 && (
-              <div className="mt-2 border-t border-border pt-1.5">
+              <div className="mt-2 border-t border-border/40 pt-1.5">
                 <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Assets</div>
                 {activeAssetCats.map((cat) => (
                   <TooltipRow
                     key={cat}
                     label={cat}
-                    value={formatCurrency(point[cat] || 0)}
+                    value={formatCurrency(Math.abs(point[cat] || 0))}
                     color={categoryColors[cat] || 'var(--color-chart-1)'}
                   />
                 ))}
@@ -459,13 +436,13 @@ export function NetWorthChart() {
             )}
 
             {activeLiabCats.length > 0 && (
-              <div className="mt-2 border-t border-border pt-1.5">
+              <div className="mt-2 border-t border-border/40 pt-1.5">
                 <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Liabilities</div>
                 {activeLiabCats.map((cat) => (
                   <TooltipRow
                     key={cat}
                     label={cat}
-                    value={formatCurrency(point[cat] || 0)}
+                    value={formatCurrency(Math.abs(point[cat] || 0))}
                     color={categoryColors[cat] || 'var(--color-destructive)'}
                   />
                 ))}
@@ -473,28 +450,35 @@ export function NetWorthChart() {
             )}
           </>
         ) : (
-          <div className="mt-2 border-t border-border pt-1.5">
+          <div className="mt-2 border-t border-border/40 pt-1.5">
             <TooltipRow
               label="Total Assets"
-              value={formatCurrency(point.totalAssets)}
+              value={formatCurrency(Math.abs(point.totalAssets))}
               color="var(--color-chart-1)"
             />
             <TooltipRow
               label="Total Liabilities"
-              value={formatCurrency(point.totalLiabilities)}
+              value={formatCurrency(Math.abs(point.totalLiabilities))}
               color="var(--color-destructive)"
             />
           </div>
         )}
 
         {point.isSynthetic && (
-          <div className="text-[10px] text-muted-foreground italic mt-1.5 border-t border-border pt-1">
+          <div className="text-[10px] text-muted-foreground italic mt-1.5 border-t border-border/40 pt-1">
             Estimated value
           </div>
         )}
       </ChartTooltip>
     );
-  }, [processedChartData, availableAssets, availableLiabilities, selectedCategories, categoryColors, showBreakdown]);
+  }, [availableAssets, availableLiabilities, selectedCategories, categoryColors, showBreakdown]);
+
+  const handleChartClick = useCallback((state: any) => {
+    if (state && state.activePayload && state.activePayload.length > 0) {
+      const clickedPoint = state.activePayload[0].payload;
+      handlePointClick(clickedPoint);
+    }
+  }, [handlePointClick]);
 
   const renderChart = () => {
     if (loading) {
@@ -521,249 +505,242 @@ export function NetWorthChart() {
     }
 
     if (chartType === 'bar') {
-      const barData = processedChartData.map((d) => {
-        const row: Record<string, any> = {
-          id: fmtDate(d.date),
-          isSynthetic: d.isSynthetic,
-        };
-        if (showBreakdown) {
-          selectedAssets.forEach((cat) => {
-            row[cat] = d[cat] || 0;
-          });
-          selectedLiabilities.forEach((cat) => {
-            row[cat] = -(d[cat] || 0);
-          });
-        } else {
-          row.assets = d.totalAssets;
-          row.liabilities = -d.totalLiabilities;
-        }
-        return row;
-      });
-
-      const keys = showBreakdown
-        ? [...selectedAssets, ...selectedLiabilities]
-        : ['assets', 'liabilities'];
-
-      const barColors = ({ id }: any) => {
-        if (showBreakdown) {
-          return categoryColors[id] || 'var(--color-primary)';
-        } else {
-          return id === 'liabilities' ? 'var(--color-destructive)' : 'var(--color-chart-1)';
-        }
-      };
-
       return (
-        <div className="relative h-full">
-          <ResponsiveBar
-            data={barData}
-            keys={keys}
-            indexBy="id"
-            margin={{ top: 10, right: 60, left: 90, bottom: 90 }}
-            valueScale={{ type: 'linear', min: minVal, max: maxVal }}
-            padding={0.05}
-            groupMode="stacked"
-            borderRadius={2}
-            colors={barColors}
-            axisLeft={{
-              tickSize: 0,
-              tickPadding: 12,
-              format: (v: number) => {
-                const absV = Math.abs(v);
-                const sign = v < 0 ? '-' : '';
-                if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                return `${sign}$${absV}`;
-              },
-              legend: 'Net Worth',
-              legendPosition: 'middle',
-              legendOffset: -40,
-            }}
-            axisBottom={{
-              tickSize: 0,
-              tickPadding: 12,
-              tickValues: timeframe === '1m'
-                ? barData.filter((_, i) => i % 3 === 0).map(d => d.id)
-                : Math.min(6, Math.max(3, Math.floor(data.length / 15))),
-              tickRotation: timeframe === '1m' ? -20 : -45,
-              legend: 'Time',
-              legendPosition: 'middle',
-              legendOffset: 75,
-            }}
-            enableGridY={true}
-            enableGridX={false}
-            theme={nivoTheme}
-            animate={data.length < 100}
-            onClick={({ data: bData }) => {
-              const pt = data.find((d) => fmtDate(d.date) === bData.id);
-              if (pt) handlePointClick(pt);
-            }}
-            enableLabel={false}
-            tooltip={({ id, data }: any) => {
-              const dateStr = data.id ? chartData.find(d => fmtDate(d.date) === data.id)?.date : null;
-              const point = processedChartData.find(d => d.date === dateStr);
-              if (!point) return null;
+        <div className="w-full h-full relative">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={rechartsData}
+              stackOffset="sign"
+              margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={(d) => {
+                  if (!d) return '';
+                  return timeframe === '1m'
+                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                domain={[minVal, maxVal]}
+                ticks={(() => {
+                  const step = (maxVal - minVal) / 4;
+                  const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                  const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                  return withZero;
+                })()}
+                tickFormatter={(v: number) => {
+                  const absV = Math.abs(v);
+                  const sign = v < 0 ? '-' : '';
+                  if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                  if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                  if (absV === 0) return '$0';
+                  return `${sign}$${absV.toFixed(0)}`;
+                }}
+              />
+              <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+              <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
               
-              const activeAssetCats = availableAssets.filter((cat) => selectedCategories.has(cat) && (point[cat] || 0) > 0);
-              const activeLiabCats = availableLiabilities.filter((cat) => selectedCategories.has(cat) && (point[cat] || 0) > 0);
-
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{String(data.id)}</TooltipHeader>
-                  <TooltipRow
-                    label="Net Worth"
-                    value={formatCurrency(point.netWorth)}
-                    color="var(--color-primary)"
+              {showBreakdown ? (
+                <>
+                  {/* Render assets bars stacked (positive) */}
+                  {selectedAssets.map((cat) => (
+                    <Bar
+                      key={cat}
+                      dataKey={cat}
+                      stackId="stack"
+                      fill={categoryColors[cat] || 'var(--color-chart-1)'}
+                      radius={[0, 0, 0, 0]}
+                    />
+                  ))}
+                  
+                  {/* Render liabilities bars stacked (negative) */}
+                  {selectedLiabilities.map((cat) => (
+                    <Bar
+                      key={cat}
+                      dataKey={cat}
+                      stackId="stack"
+                      fill={categoryColors[cat] || 'var(--color-destructive)'}
+                      radius={[0, 0, 0, 0]}
+                    />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {/* Render total assets bar */}
+                  <Bar
+                    dataKey="assets"
+                    stackId="stack"
+                    fill="var(--color-chart-1)"
+                    radius={[0, 0, 0, 0]}
                   />
-                  {showBreakdown ? (
-                    <>
-                      {activeAssetCats.length > 0 && (
-                        <div className="mt-2 border-t border-border pt-1.5">
-                          <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Assets</div>
-                          {activeAssetCats.map((cat) => (
-                            <TooltipRow
-                              key={cat}
-                              label={cat}
-                              value={formatCurrency(point[cat] || 0)}
-                              color={categoryColors[cat] || 'var(--color-chart-1)'}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      {activeLiabCats.length > 0 && (
-                        <div className="mt-2 border-t border-border pt-1.5">
-                          <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Liabilities</div>
-                          {activeLiabCats.map((cat) => (
-                            <TooltipRow
-                              key={cat}
-                              label={cat}
-                              value={formatCurrency(point[cat] || 0)}
-                              color={categoryColors[cat] || 'var(--color-destructive)'}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="mt-2 border-t border-border pt-1.5">
-                      <TooltipRow
-                        label="Assets"
-                        value={formatCurrency(point.totalAssets)}
-                        color="var(--color-chart-1)"
-                      />
-                      <TooltipRow
-                        label="Liabilities"
-                        value={formatCurrency(point.totalLiabilities)}
-                        color="var(--color-destructive)"
-                      />
-                    </div>
-                  )}
-                  {data?.isSynthetic && (
-                    <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
-                      Estimated value
-                    </div>
-                  )}
-                </ChartTooltip>
-              );
-            }}
-          />
-          <div className="absolute inset-0 pointer-events-none">
-            <ResponsiveLine
-              data={[{
-                id: 'Net Worth',
-                data: processedChartData.map((d) => ({ x: d.date, y: d.netWorth, isSynthetic: d.isSynthetic }))
-              }]}
-              margin={{ top: 10, right: 60, left: 90, bottom: 90 }}
-              xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-              yScale={{ type: 'linear', min: minVal, max: maxVal }}
-              curve="monotoneX"
-              colors={['var(--color-primary)']}
-              lineWidth={2}
-              enablePoints={false}
-              enableGridX={false}
-              enableGridY={false}
-              axisLeft={null}
-              axisBottom={null}
-              theme={nivoTheme}
-              animate={data.length < 100}
-              layers={['lines', SyntheticOverlay]}
-              tooltip={() => null}
-            />
-          </div>
+                  
+                  {/* Render total liabilities bar (negative) */}
+                  <Bar
+                    dataKey="liabilities"
+                    stackId="stack"
+                    fill="var(--color-destructive)"
+                    radius={[0, 0, 0, 0]}
+                  />
+                </>
+              )}
+
+              {/* Net Worth actual line (solid) */}
+              <Line
+                type="monotone"
+                dataKey="netWorthActual"
+                stroke="var(--color-primary)"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0 }}
+              />
+
+              {/* Net Worth synthetic line (dashed) */}
+              <Line
+                type="monotone"
+                dataKey="netWorthSynthetic"
+                stroke="var(--color-primary)"
+                strokeWidth={3}
+                strokeDasharray="5 5"
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       );
     }
 
     return (
-      <div className="relative h-full">
-        <ResponsiveLine
-          data={stackedData}
-          margin={{ top: 10, right: 60, left: 90, bottom: 90 }}
-          xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-          yScale={{ type: 'linear', min: minVal, max: maxVal }}
-          curve="monotoneX"
-          colors={(d: any) => d.color}
-          lineWidth={showBreakdown ? 0 : 2}
-          enableArea={showBreakdown}
-          areaOpacity={0.35}
-          enablePoints={false}
-          enableGridX={false}
-          enableGridY={true}
-          axisBottom={{
-            tickSize: 0,
-            tickPadding: 12,
-            tickValues: Math.min(6, Math.max(3, Math.floor(data.length / 15))),
-            format: timeframe === '1m' ? '%b %d' : '%b %y',
-            tickRotation: timeframe === '1m' ? -20 : -45,
-          }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 12,
-            format: (v: number) => {
-              const absV = Math.abs(v);
-              const sign = v < 0 ? '-' : '';
-              if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-              if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-              return `${sign}$${absV}`;
-            },
-          }}
-          theme={nivoTheme}
-          enableSlices="x"
-          sliceTooltip={sliceTooltip}
-          animate={data.length < 100}
-          layers={[
-            'grid',
-            'axes',
-            'areas',
-            'lines',
-            'points',
-            'slices',
-            'mesh',
-          ] as any}
-        />
-        
-        <div className="absolute inset-0 pointer-events-none">
-          <ResponsiveLine
-            data={[{
-              id: 'Net Worth',
-              data: processedChartData.map((d) => ({ x: d.date, y: d.netWorth, isSynthetic: d.isSynthetic }))
-            }]}
-            margin={{ top: 10, right: 60, left: 90, bottom: 90 }}
-            xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-            yScale={{ type: 'linear', min: minVal, max: maxVal }}
-            curve="monotoneX"
-            colors={['var(--color-primary)']}
-            lineWidth={3}
-            enablePoints={false}
-            enableGridX={false}
-            enableGridY={false}
-            axisLeft={null}
-            axisBottom={null}
-            theme={nivoTheme}
-            animate={data.length < 100}
-            layers={['lines', SyntheticOverlay]}
-            tooltip={() => null}
-          />
-        </div>
+      <div className="w-full h-full relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={rechartsData}
+            stackOffset="sign"
+            margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+            onClick={handleChartClick}
+            className="cursor-pointer"
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={{ stroke: 'var(--color-border)' }}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              tickFormatter={(d) => {
+                if (!d) return '';
+                return timeframe === '1m'
+                  ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+              }}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={{ stroke: 'var(--color-border)' }}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              domain={[minVal, maxVal]}
+              ticks={(() => {
+                const step = (maxVal - minVal) / 4;
+                const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                return withZero;
+              })()}
+              tickFormatter={(v: number) => {
+                const absV = Math.abs(v);
+                const sign = v < 0 ? '-' : '';
+                if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                if (absV === 0) return '$0';
+                return `${sign}$${absV.toFixed(0)}`;
+              }}
+            />
+            <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
+            
+            {showBreakdown ? (
+              <>
+                {/* Render assets areas stacked (positive) */}
+                {selectedAssets.map((cat) => (
+                  <Area
+                    key={cat}
+                    type="monotone"
+                    dataKey={cat}
+                    stackId="stack"
+                    stroke="none"
+                    fill={categoryColors[cat] || 'var(--color-chart-1)'}
+                    fillOpacity={0.85}
+                  />
+                ))}
+                
+                {/* Render liabilities areas stacked (negative) */}
+                {selectedLiabilities.map((cat) => (
+                  <Area
+                    key={cat}
+                    type="monotone"
+                    dataKey={cat}
+                    stackId="stack"
+                    stroke="none"
+                    fill={categoryColors[cat] || 'var(--color-destructive)'}
+                    fillOpacity={0.85}
+                  />
+                ))}
+              </>
+            ) : (
+              <>
+                {/* Render total assets area */}
+                <Area
+                  type="monotone"
+                  dataKey="assets"
+                  stackId="stack"
+                  stroke="none"
+                  fill="var(--color-chart-1)"
+                  fillOpacity={0.85}
+                />
+                
+                {/* Render total liabilities area (negative) */}
+                <Area
+                  type="monotone"
+                  dataKey="liabilities"
+                  stackId="stack"
+                  stroke="none"
+                  fill="var(--color-destructive)"
+                  fillOpacity={0.85}
+                />
+              </>
+            )}
+
+            {/* Net Worth actual line (solid) */}
+            <Line
+              type="monotone"
+              dataKey="netWorthActual"
+              stroke="var(--color-primary)"
+              strokeWidth={3}
+              dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
+            />
+
+            {/* Net Worth synthetic line (dashed) */}
+            <Line
+              type="monotone"
+              dataKey="netWorthSynthetic"
+              stroke="var(--color-primary)"
+              strokeWidth={3}
+              strokeDasharray="5 5"
+              dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
     );
   };
