@@ -6,6 +6,8 @@ import TableSelector from './TableSelector';
 import DataToolbar from './DataToolbar';
 import DataTable from './DataTable';
 import ContentWrapper from '@/components/content-wrapper';
+import { PageHeader } from '@/components/page-header';
+import { Database } from 'lucide-react';
 
 type ColumnMeta = {
   field: string;
@@ -239,21 +241,20 @@ export default function DataExplorerPage() {
 
   return (
     <div className="min-h-screen w-full">
+      <PageHeader title="Data Explorer" icon={Database}>
+        {tables.length > 0 && (
+          <div className="w-72">
+            <TableSelector
+              tables={tables}
+              selected={table}
+              onSelect={handleTableChange}
+            />
+          </div>
+        )}
+      </PageHeader>
       <div className="relative z-10">
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
-            <div className="flex items-center justify-between mb-4 gap-4">
-              <h1 className="text-xl font-semibold text-foreground shrink-0">Data Explorer</h1>
-              {tables.length > 0 && (
-                <div className="w-72">
-                  <TableSelector
-                    tables={tables}
-                    selected={table}
-                    onSelect={handleTableChange}
-                  />
-                </div>
-              )}
-            </div>
 
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">

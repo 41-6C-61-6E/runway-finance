@@ -370,6 +370,19 @@ export async function generateAssetHistorySnapshots(
     return 0;
   }
 
+  // Delete all existing synthetic snapshots for this asset account to start with a clean slate
+  try {
+    await db.delete(accountSnapshots).where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, true)
+      )
+    );
+  } catch (err) {
+    logger.warn(`${LOG_TAG} Failed to clear existing synthetic snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   let inserted = 0;
   for (const snap of snapshots) {
     if (snap.date >= today) continue;

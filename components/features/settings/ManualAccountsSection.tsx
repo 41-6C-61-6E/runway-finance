@@ -33,6 +33,16 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   cash: 'Cash',
 };
 
+const PROPERTY_TYPES = [
+  { value: 'single-family', label: 'Single Family Home' },
+  { value: 'condo', label: 'Condo' },
+  { value: 'townhouse', label: 'Townhouse' },
+  { value: 'multi-family', label: 'Multi-Family' },
+  { value: 'land', label: 'Land' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'other', label: 'Other' },
+] as const;
+
 const SYNC_FREQUENCIES = [
   { value: 'manual', label: 'Manual only' },
   { value: 'daily', label: 'Daily' },
@@ -217,9 +227,11 @@ export default function ManualAccountsSection() {
       }
       if (createType === 'realestate') {
         metadata.propertyId = createMeta.propertyId || '';
+        if (createMeta.propertyType) metadata.propertyType = createMeta.propertyType;
         if (createMeta.purchasePrice) metadata.purchasePrice = parseFloat(createMeta.purchasePrice);
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
         if (createMeta.zipCode) metadata.zipCode = createMeta.zipCode;
+        if (createInitialValue) metadata.initialValue = parseFloat(createInitialValue) || 0;
         if (createMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [createMeta.linkedMortgageId];
         }
@@ -403,9 +415,11 @@ export default function ManualAccountsSection() {
 
       if (editAccount.type === 'realestate') {
         metadata.propertyId = editMeta.propertyId || '';
+        if (editMeta.propertyType) metadata.propertyType = editMeta.propertyType;
         if (editMeta.purchasePrice) metadata.purchasePrice = parseFloat(editMeta.purchasePrice);
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
         if (editMeta.zipCode) metadata.zipCode = editMeta.zipCode;
+        if (editMeta.initialValue) metadata.initialValue = parseFloat(editMeta.initialValue) || 0;
         if (editMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [editMeta.linkedMortgageId];
         } else {
@@ -548,12 +562,24 @@ export default function ManualAccountsSection() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
+              <select
+                value={createMeta.propertyType || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, propertyType: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select property type...</option>
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
               <Input
                 value={createMeta.propertyId || ''}
                 onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
                 placeholder="e.g., 446533"
-                required
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -1007,7 +1033,20 @@ export default function ManualAccountsSection() {
             {editAccount?.type === 'realestate' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
+                  <select
+                    value={editMeta.propertyType || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, propertyType: e.target.value }))}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select property type...</option>
+                    {PROPERTY_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
                   <Input
                     value={editMeta.propertyId || ''}
                     onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
@@ -1039,6 +1078,16 @@ export default function ManualAccountsSection() {
                     value={editMeta.zipCode || ''}
                     onChange={(e) => setEditMeta((m) => ({ ...m, zipCode: e.target.value }))}
                     placeholder="e.g., 94105"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Initial Value (optional)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editMeta.initialValue || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, initialValue: e.target.value }))}
+                    placeholder="e.g., 500000"
                   />
                 </div>
                 {linkedMortgageField(editMeta, (m) => setEditMeta(m))}
