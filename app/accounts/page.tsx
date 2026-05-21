@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQuery } from '@tanstack/react-query';
@@ -282,8 +282,43 @@ export default function AccountsPage() {
   const [expandedSubgroups, setExpandedSubgroups] = useState<Record<string, boolean>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
 
-  // Checkbox filters for the chart
-  const [selectedSeriesKeys, setSelectedSeriesKeys] = useState<Set<string>>(new Set());
+  // Dropdown filter selections
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+
+  // Dropdown open states
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const [typesOpen, setTypesOpen] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+
+  // Search filter states
+  const [typeSearch, setTypeSearch] = useState('');
+  const [accountSearch, setAccountSearch] = useState('');
+
+  // Refs for closing dropdowns when clicking outside
+  const groupsRef = useRef<HTMLDivElement>(null);
+  const typesRef = useRef<HTMLDivElement>(null);
+  const accountsRef = useRef<HTMLDivElement>(null);
+
+  // Click outside listener
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (groupsRef.current && !groupsRef.current.contains(e.target as Node)) {
+        setGroupsOpen(false);
+      }
+      if (typesRef.current && !typesRef.current.contains(e.target as Node)) {
+        setTypesOpen(false);
+        setTypeSearch('');
+      }
+      if (accountsRef.current && !accountsRef.current.contains(e.target as Node)) {
+        setAccountsOpen(false);
+        setAccountSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 1. Fetch Accounts list (including hidden ones)
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -320,6 +355,30 @@ export default function AccountsPage() {
     });
   }, [allAccounts, isNetWorthEnabled, isRealEstateEnabled]);
 
+  // Compute available Groups, Types, and Accounts for dropdowns
+  const availableGroups = useMemo(() => {
+    const groups = new Set<string>();
+    for (const acc of filteredAllAccounts) {
+      if (acc.isHidden && !showHidden) continue;
+      groups.add(getHierarchy(acc.type).group);
+    }
+    return Array.from(groups).sort();
+  }, [filteredAllAccounts, showHidden]);
+
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const acc of filteredAllAccounts) {
+      if (acc.isHidden && !showHidden) continue;
+      types.add(getHierarchy(acc.type).subGroup);
+    }
+    return Array.from(types).sort();
+  }, [filteredAllAccounts, showHidden]);
+
+  const availableAccounts = useMemo(() => {
+    const list = filteredAllAccounts.filter(acc => !acc.isHidden || showHidden);
+    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredAllAccounts, showHidden]);
+
   // 2. Fetch Accounts History Chart Data (only reportable accounts)
   const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[]; accounts: any[] }>({
     queryKey: ['accounts-history', timeframe],
@@ -351,12 +410,31 @@ export default function AccountsPage() {
     return Array.from(keys);
   }, [reportableAccounts, groupMode]);
 
-  // Set default selection to all keys on initial load or mode change
-  useEffect(() => {
-    if (uniqueSeriesKeys.length > 0) {
-      setSelectedSeriesKeys(new Set(uniqueSeriesKeys));
+  // Derived selectedSeriesKeys based on Group, Type, and Account dropdown filters
+  const selectedSeriesKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const acc of reportableAccounts) {
+      const hierarchy = getHierarchy(acc.type);
+      
+      // Filter by Group
+      if (selectedGroups.size > 0 && !selectedGroups.has(hierarchy.group)) continue;
+      
+      // Filter by Type (subGroup)
+      if (selectedTypes.size > 0 && !selectedTypes.has(hierarchy.subGroup)) continue;
+      
+      // Filter by Account ID
+      if (selectedAccounts.size > 0 && !selectedAccounts.has(acc.id)) continue;
+
+      if (groupMode === 'group') {
+        keys.add(hierarchy.group);
+      } else if (groupMode === 'type') {
+        keys.add(hierarchy.subGroup);
+      } else {
+        keys.add(acc.id);
+      }
     }
-  }, [uniqueSeriesKeys]);
+    return keys;
+  }, [reportableAccounts, selectedGroups, selectedTypes, selectedAccounts, groupMode]);
 
   const isAssetSeries = useCallback((key: string) => {
     if (groupMode === 'account') {
@@ -566,6 +644,22 @@ export default function AccountsPage() {
       if (acc.isHidden && !showHidden) continue;
 
       const { group, subGroup } = getHierarchy(acc.type);
+
+      // Filter by Group
+      if (selectedGroups.size > 0 && !selectedGroups.has(group)) {
+        continue;
+      }
+      
+      // Filter by Type (subGroup)
+      if (selectedTypes.size > 0 && !selectedTypes.has(subGroup)) {
+        continue;
+      }
+      
+      // Filter by Account ID
+      if (selectedAccounts.size > 0 && !selectedAccounts.has(acc.id)) {
+        continue;
+      }
+
       if (!map.has(group)) map.set(group, new Map());
       const subMap = map.get(group)!;
       if (!subMap.has(subGroup)) subMap.set(subGroup, []);
@@ -573,7 +667,7 @@ export default function AccountsPage() {
     }
 
     return map;
-  }, [filteredAllAccounts, showHidden]);
+  }, [filteredAllAccounts, showHidden, selectedGroups, selectedTypes, selectedAccounts]);
 
   const sortedGroups = useMemo(() => {
     return Array.from(treeHierarchy.keys()).sort((a, b) => {
@@ -586,32 +680,16 @@ export default function AccountsPage() {
     });
   }, [treeHierarchy]);
 
-  // Checkbox helpers
-  const handleToggleSeriesKey = (key: string) => {
-    setSelectedSeriesKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  const handleQuickSelect = (action: 'all' | 'none' | 'assets' | 'liabilities') => {
-    if (action === 'all') {
-      setSelectedSeriesKeys(new Set(uniqueSeriesKeys));
-    } else if (action === 'none') {
-      setSelectedSeriesKeys(new Set());
-    } else if (action === 'assets') {
-      const assets = uniqueSeriesKeys.filter(k => isAssetSeries(k));
-      setSelectedSeriesKeys(new Set(assets));
-    } else if (action === 'liabilities') {
-      const liabilities = uniqueSeriesKeys.filter(k => !isAssetSeries(k));
-      setSelectedSeriesKeys(new Set(liabilities));
-    }
-  };
+  // Grouping mode change helper that resets filter sets and closes popups
+  const handleGroupModeChange = useCallback((mode: GroupingMode) => {
+    setGroupMode(mode);
+    setSelectedGroups(new Set());
+    setSelectedTypes(new Set());
+    setSelectedAccounts(new Set());
+    setGroupsOpen(false);
+    setTypesOpen(false);
+    setAccountsOpen(false);
+  }, []);
 
   // Tooltip helper
   // Tooltip helper
@@ -719,8 +797,8 @@ export default function AccountsPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-5 space-y-5">
-                {/* ── Chart Controls / Groupings ── */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
+                {/* ── Chart Controls / Groupings & Contextual Filters ── */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
                   {/* Mode Pill Selector */}
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Group By</span>
@@ -728,7 +806,7 @@ export default function AccountsPage() {
                       {(['group', 'type', 'account'] as const).map((mode) => (
                         <button
                           key={mode}
-                          onClick={() => setGroupMode(mode)}
+                          onClick={() => handleGroupModeChange(mode)}
                           className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-all ${
                             groupMode === mode
                               ? 'bg-card text-foreground shadow-sm'
@@ -741,65 +819,255 @@ export default function AccountsPage() {
                     </div>
                   </div>
 
-                  {/* Quick Filters */}
-                  <div className="flex flex-wrap gap-2 text-xs font-medium">
-                    <button 
-                      onClick={() => handleQuickSelect('all')}
-                      className="px-2.5 py-1 rounded bg-muted/60 border border-border/40 hover:bg-muted text-foreground transition-all"
-                    >
-                      Select All
-                    </button>
-                    <button 
-                      onClick={() => handleQuickSelect('assets')}
-                      className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 text-emerald-500 transition-all"
-                    >
-                      Assets Only
-                    </button>
-                    <button 
-                      onClick={() => handleQuickSelect('liabilities')}
-                      className="px-2.5 py-1 rounded bg-destructive/10 border border-destructive/20 hover:bg-destructive/15 text-destructive transition-all"
-                    >
-                      Liabilities Only
-                    </button>
-                    <button 
-                      onClick={() => handleQuickSelect('none')}
-                      className="px-2.5 py-1 rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
-                    >
-                      Clear
-                    </button>
+                  {/* Filter Dropdown for the selected group mode */}
+                  <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                    {groupMode === 'group' && (
+                      <div className="relative z-30" ref={groupsRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGroupsOpen(!groupsOpen);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                            selectedGroups.size > 0
+                              ? 'bg-primary/15 border border-primary text-primary'
+                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                          }`}
+                        >
+                          <span>Group</span>
+                          {selectedGroups.size > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                              {selectedGroups.size}
+                            </span>
+                          )}
+                          <svg className={`h-3 w-3 transition-transform ${groupsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {groupsOpen && (
+                          <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                            <div className="overflow-y-auto flex-1 p-1">
+                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedGroups.size === availableGroups.length && availableGroups.length > 0}
+                                  onChange={() => {
+                                    if (selectedGroups.size === availableGroups.length) {
+                                      setSelectedGroups(new Set());
+                                    } else {
+                                      setSelectedGroups(new Set(availableGroups));
+                                    }
+                                  }}
+                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                />
+                                Select All
+                              </label>
+                              {availableGroups.map((group) => (
+                                <label
+                                  key={group}
+                                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedGroups.has(group)}
+                                    onChange={() => {
+                                      const next = new Set(selectedGroups);
+                                      if (next.has(group)) {
+                                        next.delete(group);
+                                      } else {
+                                        next.add(group);
+                                      }
+                                      setSelectedGroups(next);
+                                    }}
+                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                  />
+                                  <span>{group}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {groupMode === 'type' && (
+                      <div className="relative z-30" ref={typesRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTypesOpen(!typesOpen);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                            selectedTypes.size > 0
+                              ? 'bg-primary/15 border border-primary text-primary'
+                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                          }`}
+                        >
+                          <span>Type</span>
+                          {selectedTypes.size > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                              {selectedTypes.size}
+                            </span>
+                          )}
+                          <svg className={`h-3 w-3 transition-transform ${typesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {typesOpen && (
+                          <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                            <div className="p-2 border-b border-border/50">
+                              <input
+                                type="text"
+                                value={typeSearch}
+                                onChange={(e) => setTypeSearch(e.target.value)}
+                                placeholder="Search types..."
+                                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                              />
+                            </div>
+                            <div className="overflow-y-auto flex-1 p-1">
+                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTypes.size === availableTypes.length && availableTypes.length > 0}
+                                  onChange={() => {
+                                    if (selectedTypes.size === availableTypes.length) {
+                                      setSelectedTypes(new Set());
+                                    } else {
+                                      setSelectedTypes(new Set(availableTypes));
+                                    }
+                                  }}
+                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                />
+                                Select All
+                              </label>
+                              {availableTypes
+                                .filter(t => !typeSearch || t.toLowerCase().includes(typeSearch.toLowerCase()))
+                                .map((type) => (
+                                  <label
+                                    key={type}
+                                    className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedTypes.has(type)}
+                                      onChange={() => {
+                                        const next = new Set(selectedTypes);
+                                        if (next.has(type)) {
+                                          next.delete(type);
+                                        } else {
+                                          next.add(type);
+                                        }
+                                        setSelectedTypes(next);
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    <span>{type}</span>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {groupMode === 'account' && (
+                      <div className="relative z-30" ref={accountsRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAccountsOpen(!accountsOpen);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                            selectedAccounts.size > 0
+                              ? 'bg-primary/15 border border-primary text-primary'
+                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                          }`}
+                        >
+                          <span>Account</span>
+                          {selectedAccounts.size > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                              {selectedAccounts.size}
+                            </span>
+                          )}
+                          <svg className={`h-3 w-3 transition-transform ${accountsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {accountsOpen && (
+                          <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                            <div className="p-2 border-b border-border/50">
+                              <input
+                                type="text"
+                                value={accountSearch}
+                                onChange={(e) => setAccountSearch(e.target.value)}
+                                placeholder="Search accounts..."
+                                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                              />
+                            </div>
+                            <div className="overflow-y-auto flex-1 p-1">
+                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAccounts.size === availableAccounts.length && availableAccounts.length > 0}
+                                  onChange={() => {
+                                    if (selectedAccounts.size === availableAccounts.length) {
+                                      setSelectedAccounts(new Set());
+                                    } else {
+                                      setSelectedAccounts(new Set(availableAccounts.map(a => a.id)));
+                                    }
+                                  }}
+                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                />
+                                Select All
+                              </label>
+                              {availableAccounts
+                                .filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(accountSearch.toLowerCase())))
+                                .map((acc) => (
+                                  <label
+                                    key={acc.id}
+                                    className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedAccounts.has(acc.id)}
+                                      onChange={() => {
+                                        const next = new Set(selectedAccounts);
+                                        if (next.has(acc.id)) {
+                                          next.delete(acc.id);
+                                        } else {
+                                          next.add(acc.id);
+                                        }
+                                        setSelectedAccounts(next);
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    <div className="text-left">
+                                      <p className="font-medium text-foreground">{acc.name}</p>
+                                      {acc.institution && <p className="text-[10px] text-muted-foreground">{acc.institution}</p>}
+                                    </div>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reset/Clear button inside the same row if there are selected items */}
+                    {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0) && (
+                      <button
+                        onClick={() => {
+                          setSelectedGroups(new Set());
+                          setSelectedTypes(new Set());
+                          setSelectedAccounts(new Set());
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {/* ── Checkbox filters Bar ── */}
-                {uniqueSeriesKeys.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-2 bg-muted/10 border border-border/20 rounded-xl max-h-24 overflow-y-auto">
-                    {uniqueSeriesKeys.map((key) => {
-                      const info = seriesInfoMap.get(key);
-                      const isChecked = selectedSeriesKeys.has(key);
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => handleToggleSeriesKey(key)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 flex items-center gap-1.5 ${
-                            isChecked
-                              ? 'bg-card text-foreground shadow-sm'
-                              : 'bg-transparent border-border/40 text-muted-foreground hover:text-foreground hover:border-border'
-                          }`}
-                          style={{
-                            borderColor: isChecked ? info?.color : undefined,
-                            borderWidth: '1.5px',
-                          }}
-                        >
-                          <span 
-                            className={`w-2 h-2 rounded-full transition-all ${isChecked ? 'scale-100' : 'scale-50 opacity-40'}`} 
-                            style={{ backgroundColor: info?.color }}
-                          />
-                          {info?.label || key}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
 
                 {/* ── Chart Container ── */}
                 <div className="h-[380px] w-full relative">
@@ -821,159 +1089,209 @@ export default function AccountsPage() {
                     <div className="absolute inset-0 flex items-center justify-center bg-muted/10 border border-dashed border-border/40 rounded-xl">
                       <p className="text-xs text-muted-foreground">Select one or more filters above to render the chart.</p>
                     </div>
-                  ) : chartType === 'bar' ? (
-                    /* Recharts Bar Chart Rendering */
-                    <div className="w-full h-full relative">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={rechartsData}
-                          stackOffset="sign"
-                          margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                          <XAxis
-                            dataKey="date"
-                            tickLine={false}
-                            axisLine={{ stroke: 'var(--color-border)' }}
-                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                            tickFormatter={(d) => {
-                              if (!d) return '';
-                              return timeframe === '1m'
-                                ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                            }}
-                          />
-                          <YAxis
-                            tickLine={false}
-                            axisLine={{ stroke: 'var(--color-border)' }}
-                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                            domain={[minVal, maxVal]}
-                            ticks={(() => {
-                              const step = (maxVal - minVal) / 4;
-                              const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                              const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                              return withZero;
-                            })()}
-                            tickFormatter={(v: number) => {
-                              const absV = Math.abs(v);
-                              const sign = v < 0 ? '-' : '';
-                              if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                              if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                              if (absV === 0) return '$0';
-                              return `${sign}$${absV.toFixed(0)}`;
-                            }}
-                          />
-                          <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                          <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
-                          
-                          {/* Render assets bars (positive stack) */}
-                          {activeAssets.map((key) => {
-                            const info = seriesInfoMap.get(key);
-                            return (
-                              <Bar
-                                key={key}
-                                dataKey={key}
-                                stackId="stack"
-                                fill={info?.color || 'var(--color-chart-1)'}
-                                radius={[0, 0, 0, 0]}
-                              />
-                            );
-                          })}
-
-                          {/* Render liabilities bars (negative stack) */}
-                          {activeLiabilities.map((key) => {
-                            const info = seriesInfoMap.get(key);
-                            return (
-                              <Bar
-                                key={key}
-                                dataKey={key}
-                                stackId="stack"
-                                fill={info?.color || 'var(--color-destructive)'}
-                                radius={[0, 0, 0, 0]}
-                              />
-                            );
-                          })}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
                   ) : (
-                    /* Recharts Area Chart Rendering */
-                    <div className="w-full h-full relative">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                          data={rechartsData}
-                          stackOffset="sign"
-                          margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                          <XAxis
-                            dataKey="date"
-                            tickLine={false}
-                            axisLine={{ stroke: 'var(--color-border)' }}
-                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                            tickFormatter={(d) => {
-                              if (!d) return '';
-                              return timeframe === '1m'
-                                ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                            }}
-                          />
-                          <YAxis
-                            tickLine={false}
-                            axisLine={{ stroke: 'var(--color-border)' }}
-                            tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                            domain={[minVal, maxVal]}
-                            ticks={(() => {
-                              const step = (maxVal - minVal) / 4;
-                              const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                              const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                              return withZero;
-                            })()}
-                            tickFormatter={(v: number) => {
-                              const absV = Math.abs(v);
-                              const sign = v < 0 ? '-' : '';
-                              if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                              if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                              if (absV === 0) return '$0';
-                              return `${sign}$${absV.toFixed(0)}`;
-                            }}
-                          />
-                          <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                          <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
-                          
-                          {/* Render assets areas (positive stack) */}
-                          {activeAssets.map((key) => {
-                            const info = seriesInfoMap.get(key);
-                            return (
-                              <Area
-                                key={key}
-                                type="monotone"
-                                dataKey={key}
-                                stackId="stack"
-                                stroke="none"
-                                fill={info?.color || 'var(--color-chart-1)'}
-                                fillOpacity={0.85}
+                    <div className="flex flex-col md:flex-row gap-4 h-full w-full">
+                      {/* Chart Area */}
+                      <div className="flex-1 min-w-0 h-full relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {chartType === 'bar' ? (
+                            <BarChart
+                              data={rechartsData}
+                              stackOffset="sign"
+                              margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                              <XAxis
+                                dataKey="date"
+                                tickLine={false}
+                                axisLine={{ stroke: 'var(--color-border)' }}
+                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                tickFormatter={(d) => {
+                                  if (!d) return '';
+                                  return timeframe === '1m'
+                                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                }}
                               />
-                            );
-                          })}
+                              <YAxis
+                                tickLine={false}
+                                axisLine={{ stroke: 'var(--color-border)' }}
+                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                domain={[minVal, maxVal]}
+                                ticks={(() => {
+                                  const step = (maxVal - minVal) / 4;
+                                  const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                                  const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                                  return withZero;
+                                })()}
+                                tickFormatter={(v: number) => {
+                                  const absV = Math.abs(v);
+                                  const sign = v < 0 ? '-' : '';
+                                  if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                                  if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                                  if (absV === 0) return '$0';
+                                  return `${sign}$${absV.toFixed(0)}`;
+                                }}
+                              />
+                              <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                              <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                              
+                              {/* Render assets bars (positive stack) */}
+                              {activeAssets.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <Bar
+                                    key={key}
+                                    dataKey={key}
+                                    stackId="stack"
+                                    fill={info?.color || 'var(--color-chart-1)'}
+                                    radius={[0, 0, 0, 0]}
+                                  />
+                                );
+                              })}
 
-                          {/* Render liabilities areas (negative stack) */}
-                          {activeLiabilities.map((key) => {
-                            const info = seriesInfoMap.get(key);
-                            return (
-                              <Area
-                                key={key}
-                                type="monotone"
-                                dataKey={key}
-                                stackId="stack"
-                                stroke="none"
-                                fill={info?.color || 'var(--color-destructive)'}
-                                fillOpacity={0.85}
+                              {/* Render liabilities bars (negative stack) */}
+                              {activeLiabilities.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <Bar
+                                    key={key}
+                                    dataKey={key}
+                                    stackId="stack"
+                                    fill={info?.color || 'var(--color-destructive)'}
+                                    radius={[0, 0, 0, 0]}
+                                  />
+                                );
+                              })}
+                            </BarChart>
+                          ) : (
+                            <ComposedChart
+                              data={rechartsData}
+                              stackOffset="sign"
+                              margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                              <XAxis
+                                dataKey="date"
+                                tickLine={false}
+                                axisLine={{ stroke: 'var(--color-border)' }}
+                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                tickFormatter={(d) => {
+                                  if (!d) return '';
+                                  return timeframe === '1m'
+                                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                }}
                               />
-                            );
-                          })}
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                              <YAxis
+                                tickLine={false}
+                                axisLine={{ stroke: 'var(--color-border)' }}
+                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                domain={[minVal, maxVal]}
+                                ticks={(() => {
+                                  const step = (maxVal - minVal) / 4;
+                                  const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                                  const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                                  return withZero;
+                                })()}
+                                tickFormatter={(v: number) => {
+                                  const absV = Math.abs(v);
+                                  const sign = v < 0 ? '-' : '';
+                                  if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                                  if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                                  if (absV === 0) return '$0';
+                                  return `${sign}$${absV.toFixed(0)}`;
+                                }}
+                              />
+                              <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                              <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
+                              
+                              {/* Render assets areas (positive stack) */}
+                              {activeAssets.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <Area
+                                    key={key}
+                                    type="monotone"
+                                    dataKey={key}
+                                    stackId="stack"
+                                    stroke="none"
+                                    fill={info?.color || 'var(--color-chart-1)'}
+                                    fillOpacity={0.85}
+                                  />
+                                );
+                              })}
+
+                              {/* Render liabilities areas (negative stack) */}
+                              {activeLiabilities.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <Area
+                                    key={key}
+                                    type="monotone"
+                                    dataKey={key}
+                                    stackId="stack"
+                                    stroke="none"
+                                    fill={info?.color || 'var(--color-destructive)'}
+                                    fillOpacity={0.85}
+                                  />
+                                );
+                              })}
+                            </ComposedChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Legend Column */}
+                      <div className="w-full md:w-56 flex-shrink-0 flex flex-col justify-start border-t md:border-t-0 md:border-l border-border/20 pt-3 md:pt-0 md:pl-4 overflow-y-auto max-h-[120px] md:max-h-full gap-3">
+                        {activeAssets.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                              Assets ({activeAssets.length})
+                            </span>
+                            <div className="space-y-1.5">
+                              {activeAssets.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: info?.color || 'var(--color-chart-1)' }}
+                                    />
+                                    <span className="truncate" title={info?.label || key}>
+                                      {info?.label || key}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activeLiabilities.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                              Liabilities ({activeLiabilities.length})
+                            </span>
+                            <div className="space-y-1.5">
+                              {activeLiabilities.map((key) => {
+                                const info = seriesInfoMap.get(key);
+                                return (
+                                  <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: info?.color || 'var(--color-destructive)' }}
+                                    />
+                                    <span className="truncate" title={info?.label || key}>
+                                      {info?.label || key}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

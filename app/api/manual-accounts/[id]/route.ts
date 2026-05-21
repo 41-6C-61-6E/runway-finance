@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { deleteManualAccount } from '@/lib/services/manual-accounts';
+import { deleteManualAccount, readApiConfig } from '@/lib/services/manual-accounts';
+import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
@@ -95,6 +96,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
     const syncFrequency = (meta.syncFrequency as string) || 'manual';
     manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
+
+    // Regenerate synthetic history snapshots if the account type is supported
+    if (['realestate', 'vehicle', 'metals', 'mortgage'].includes(decrypted.type)) {
+      try {
+        const apiConfig = await readApiConfig(userId);
+        await generateAssetHistorySnapshots(id, userId, decrypted.type, meta, apiConfig, dek);
+      } catch (err) {
+        logger.warn(`Failed to regenerate history snapshots on PATCH for account ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
   }
 
   if (body.isHidden !== undefined || body.isExcludedFromNetWorth !== undefined) {

@@ -12,6 +12,8 @@ import { WithdrawalRateSensitivity } from '@/components/fire/withdrawal-rate-sen
 import { RetirementPlanner } from '@/components/fire/retirement/retirement-planner';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
+import { Flame } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 
 export interface FireScenario {
   id?: string;
@@ -58,8 +60,7 @@ function FireContent() {
   return (
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">FIRE</h1>
+      <PageHeader title="FIRE" icon={Flame}>
         <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit">
           <button
             onClick={() => setTab('forecaster')}
@@ -82,7 +83,7 @@ function FireContent() {
             Retirement Planner
           </button>
         </div>
-      </div>
+      </PageHeader>
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 
