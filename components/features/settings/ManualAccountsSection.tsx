@@ -138,6 +138,17 @@ const formatRelativeTime = (date: string | null) => {
   return `${days}d ago`;
 };
 
+const formatTimeUntil = (date: Date): string => {
+  const diff = date.getTime() - Date.now();
+  if (diff <= 0) return 'Overdue';
+  const mins = Math.ceil(diff / 60000);
+  if (mins < 60) return `in ${mins}m`;
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 24) return `in ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `in ${days}d`;
+};
+
 export default function ManualAccountsSection() {
   const [accounts, setAccounts] = useState<ManualAccount[]>([]);
   const [realEstateAccounts, setRealEstateAccounts] = useState<ManualAccount[]>([]);
@@ -484,7 +495,7 @@ export default function ManualAccountsSection() {
   };
 
   const canSync = (account: ManualAccount) => {
-    return ['realestate', 'crypto', 'metals'].includes(account.type);
+    return ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'].includes(account.type);
   };
 
   const canAdjust = (account: ManualAccount) => {
@@ -875,14 +886,14 @@ export default function ManualAccountsSection() {
                       </select>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {syncFrequency === 'manual' ? (
-                        <span>Next sync: Not scheduled</span>
-                      ) : isSyncOverdue ? (
-                        <span className="text-chart-3">Next sync: Overdue</span>
-                      ) : nextSync ? (
-                        <span>Next sync: {formatRelativeTime(nextSync.toISOString())}</span>
+                      {syncingId === account.id ? (
+                        <span className="text-chart-1 animate-pulse">Syncing...</span>
+                      ) : syncFrequency === 'manual' ? (
+                        <span>Not scheduled</span>
+                      ) : nextSync && nextSync.getTime() > Date.now() ? (
+                        <span>Next sync: {formatTimeUntil(nextSync)}</span>
                       ) : (
-                        <span>Next sync: Now</span>
+                        <span className="text-chart-3">Next sync: Overdue</span>
                       )}
                     </div>
                   </div>

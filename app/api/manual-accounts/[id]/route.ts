@@ -98,7 +98,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
 
     // Regenerate synthetic history snapshots if the account type is supported
-    if (['realestate', 'vehicle', 'metals', 'mortgage'].includes(decrypted.type)) {
+    const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
+    if (SNAPSHOT_TYPES.includes(decrypted.type)) {
       try {
         const apiConfig = await readApiConfig(userId);
         await generateAssetHistorySnapshots(id, userId, decrypted.type, meta, apiConfig, dek);
