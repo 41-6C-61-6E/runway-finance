@@ -17,6 +17,7 @@ type ManualAccount = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
+  connectionId?: string | null;
 };
 
 type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
@@ -229,6 +230,11 @@ export default function ManualAccountsSection() {
         metadata.termMonths = parseInt(createMeta.termMonths || '360', 10);
         metadata.monthlyPayment = parseFloat(createMeta.monthlyPayment || '0');
         metadata.escrowAmount = parseFloat(createMeta.escrowAmount || '0');
+        metadata.extraPrincipal = parseFloat(createMeta.extraPrincipal || '0');
+        metadata.principal = parseFloat(createMeta.principal || '0');
+        metadata.interest = parseFloat(createMeta.interest || '0');
+        metadata.pmi = parseFloat(createMeta.pmi || '0');
+        metadata.escrow = parseFloat(createMeta.escrow || '0');
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
         if (createMeta.linkedPropertyId) {
           metadata.linkedPropertyId = createMeta.linkedPropertyId;
@@ -413,6 +419,11 @@ export default function ManualAccountsSection() {
         metadata.termMonths = parseInt(editMeta.termMonths || '360', 10);
         metadata.monthlyPayment = parseFloat(editMeta.monthlyPayment || '0');
         metadata.escrowAmount = parseFloat(editMeta.escrowAmount || '0');
+        metadata.extraPrincipal = parseFloat(editMeta.extraPrincipal || '0');
+        metadata.principal = parseFloat(editMeta.principal || '0');
+        metadata.interest = parseFloat(editMeta.interest || '0');
+        metadata.pmi = parseFloat(editMeta.pmi || '0');
+        metadata.escrow = parseFloat(editMeta.escrow || '0');
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
         if (editMeta.linkedPropertyId) metadata.linkedPropertyId = editMeta.linkedPropertyId;
       }
@@ -739,7 +750,7 @@ export default function ManualAccountsSection() {
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = account.type === 'mortgage';
-            const isSimpleFin = account.type === 'mortgage' && !account.metadata;
+            const isSimpleFin = !!account.connectionId;
             const syncFrequency = canSync(account) && account.metadata
               ? String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')
               : 'manual';
@@ -766,7 +777,7 @@ export default function ManualAccountsSection() {
                         {getSubTypeLabel(account)}
                       </span>
                       {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
-                      {isSimpleFin && <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-1.5 py-0.5 rounded">SimpleFIN</span>}
+                      {isSimpleFin && <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>}
                     </div>
                     <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
                   </div>

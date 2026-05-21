@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator } from 'lucide-react'
+import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
@@ -14,6 +14,7 @@ export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from
 
 const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
   { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
+  { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'netWorth' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow' },
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },

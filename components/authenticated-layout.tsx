@@ -13,6 +13,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/signin';
   const isSettingsPage = pathname === '/settings';
+  const hideAccountsSidebar = isSettingsPage || pathname === '/accounts';
 
   if (isAuthPage) {
     return <>{children}</>;
@@ -25,8 +26,8 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
         <AccountSubheadingsProvider>
           <>
             <ResizableSidebar />
-            {!isSettingsPage && <AccountsSidebar />}
-            <AuthenticatedLayoutContent isSettingsPage={isSettingsPage}>
+            {!hideAccountsSidebar && <AccountsSidebar />}
+            <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
               {children}
             </AuthenticatedLayoutContent>
           </>
@@ -37,7 +38,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function AuthenticatedLayoutContent({ children, isSettingsPage }: { children: ReactNode; isSettingsPage: boolean }) {
+function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { children: ReactNode; hideAccountsSidebar: boolean }) {
   const { accountsWidth, accountsCollapsed } = useSidebar();
   const [mounted, setMounted] = useState(false);
 
@@ -46,7 +47,7 @@ function AuthenticatedLayoutContent({ children, isSettingsPage }: { children: Re
   }, []);
 
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
-  const marginLeft = (!mounted || isSettingsPage || accountsCollapsed) 
+  const marginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
     ? '64px' 
     : `${64 + accountsWidth}px`;
 

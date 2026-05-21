@@ -3,14 +3,6 @@
 # TO DO LIST
 
 ## CHANGES:
-
-
-- In manual accounts, Mortgages that are synced with SimpleFIN show up--this is correct, but put a label that the account is SIimpleFIN synced. ALso in the edit drawer for mortgage accounts, add support for broken out extra principal, prinicpal, interest, PMI, escrow(taxes, insurance) and then make sure that these values populate into the relevane charts in the real estate page. think through the logic and what might need to change on the real estate page. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
-
-- Stacked voume line chart for net worth line chart. The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart. For example Assets shoulld show as stacked volume of real estate, retirement, savings, etc. and liabilities should subract from the volume for loans, credit, etc. Each type 
-
-
-
 - Spending Breakdown pi and bar charts should actually use the category colors (or versions of them depending on theme) rather than the color scheme colors. 
 
 ## NEW FEATUES:
@@ -18,11 +10,11 @@
 - Better PWA support
 - Vuln patch
 
-- Add a backup and restore feature where the user can download or restore all data and settings in a backup file or have the option to export all financial data as a set of csv files or json or whatever makes sense. This featue will be in the advanced settings tab. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
 
-- Plan an accounts page with account balance over time. A previous agent worked on an accounts page but it was not fully finished, so you may run into some remnants of that and need to do some cleanup. The accounts page should have a stacked volume line chart showing account balance over time and should be filterable by accounts, or account type or group type so that the chart updated based on the filtered accounts. There should also be an option to select a bar chart that will show the same data but in stacked bars (showing each account or acount group or type). Below the chart should be an e tree like expandable area showing every account, expandable by group and type, and with relevant statistics about that account, like balance trend, a little simple history chart indicator for just that account, recent activity, etc or whatever makes sense to show. 
 
-- add a SimpeFIN sync frequency setting configurable in the settings area and show when the next sync is scheduled to occur. A previous agent worked on the problem so you may find remnants to use or clean up. 
+
+
+
 
 - Currently there is no way to capture 401k match, tax withholding, other paycheck deductions (union dues, cafeteria, insurance) to be used in the analytics. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes. Understand the schema. There may need to be a manual transaction type feature. Where would it make sense to solicit this data form the user and incorporate it? Possibly a rule the triggers when a paycheck is detected and then the witholdings are auto created or somehting like that. Help me witht he logic and flow. make some proposals and ask quesitons. 
 
@@ -33,42 +25,7 @@
 
 - real estate patoff chart - make sure the x axis shows the totality of both ilines
 
-There is an issue with the way the manual and simpleFIN syncs are happening. Investigate and fix. Ideally the user does not have to log in first and the syncs will start for all users when the server starts. There is an encryption key in the env that should be able to start the syncs without the user logging in.
-[WARN 2026-05-21T14:23:35.392Z] [sync-scheduler] Skipping connection — server DEK unavailable {
-connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
-userId: 'alanracek'
-}
-[INFO 2026-05-21T14:23:35.393Z] [sync-scheduler] Scheduler initialized { total: 1, scheduled: 0, skipped: 1 }
-[INFO 2026-05-21T14:23:35.393Z] [runway-sync] Sync scheduler initialized.
-[WARN 2026-05-21T14:23:35.396Z] [manual-account-scheduler] Skipping account — server DEK unavailable {
-accountId: 'ca3ff7c4-3c10-4f28-8110-5fa0bc22134f',
-userId: 'alanracek'
-}
-[INFO 2026-05-21T14:23:35.396Z] [manual-account-scheduler] Scheduler initialized { total: 1, scheduled: 0, skipped: 1 }
-[INFO 2026-05-21T14:23:35.396Z] [runway-sync] Manual account scheduler initialized.
-...
-PATCH /api/connections/d8d76938-ba80-47c2-8d57-4a30a9bb9377 200 in 632ms (compile: 601ms, render: 31ms)
-[INFO 2026-05-21T14:23:49.228Z] Connection updated {
-connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
-updateData: { syncFrequency: 'daily' }
-}
-[INFO 2026-05-21T14:23:49.229Z] [sync-scheduler] Scheduled {
-connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
-frequency: 'daily',
-delay: '0m'
-}
-PATCH /api/connections/d8d76938-ba80-47c2-8d57-4a30a9bb9377 200 in 44ms (compile: 8ms, render: 36ms)
-[WARN 2026-05-21T14:23:49.249Z] [sync-scheduler] Server DEK unavailable, will not retry {
-connectionId: 'd8d76938-ba80-47c2-8d57-4a30a9bb9377',
-error: 'No server-wrapped encryption key found for user alanracek — serverWrappedDek=true, serverWrappingIv=true, serverWrappingTag=false, wrappedDek=true, salt=true'
-}
-
-
-
-
-
-
-
+- [DONE] There is an issue with the way the manual and simpleFIN syncs are happening. Investigate and fix. Ideally the user does not have to log in first and the syncs will start for all users when the server starts. There is an encryption key in the env that should be able to start the syncs without the user logging in.
 
 
 - [DONE] hover colors in the nav bar of the moonlight theme need to be handled similar to dark mode so the text is readable when the mosue moved over the nav bar items. 
@@ -135,3 +92,13 @@ error: 'No server-wrapped encryption key found for user alanracek — serverWrap
 - [DONE]Make a defaults/config file where all the settings, API keys, and anything else in the projects that is configurable can be pre set upon deployment and onboarding of new users. Once the user changes a setting, store their preference. But for new users the defaults file should be used to populate the settings. Remove the existing APIs tab from settings and replace it with an Advanced tab on the right and have this be a key value listing of all the possible settings that the user can change. Warn the user at the top that changing these settings could cause unexpected behavior. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
 
 - [DONE] Add data explorer and financial logic to the dev mode toggel. remove the dev logging feature. When dev mode is off Financial Logic and Data explorer should not show up in the Nav bar. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- [DONE] add a SimpeFIN sync frequency setting configurable in the settings area and show when the next sync is scheduled to occur. A previous agent worked on the problem so you may find remnants to use or clean up. 
+
+- [DONE] In manual accounts, Mortgages that are synced with SimpleFIN show up--this is correct, but put a label that the account is SIimpleFIN synced. ALso in the edit drawer for mortgage accounts, add support for broken out extra principal, prinicpal, interest, PMI, escrow(taxes, insurance) and then make sure that these values populate into the relevane charts in the real estate page. think through the logic and what might need to change on the real estate page. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- [DONE] Add a backup and restore feature where the user can download or restore all data and settings in a backup file or have the option to export all financial data as a set of csv files or json or whatever makes sense. This featue will be in the advanced settings tab. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes.
+
+- [DONE] Implement a Stacked volume line chart for net worth line chart on the dashboard. The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart. For example Assets should show as stacked volume of real estate, retirement, savings, etc. and liabilities should subract from the volume for loans, credit, etc.
+
+- [DONE] Plan an accounts page with account balance over time. A previous agent worked on an accounts page but it was not fully finished, so you may run into some remnants of that and need to do some cleanup. The accounts page should have a stacked volume line chart showing account balance over time and should be filterable by accounts, or account type or group type so that the chart updated based on the filtered accounts. There should also be an option to select a bar chart that will show the same data but in stacked bars (showing each account or acount group or type). Below the chart should be an tree like expandable area showing every account, expandable by group and type, and with relevant statistics about that account, like balance trend, a little simple history chart indicator for just that account, recent activity, etc or whatever makes sense to show. Make sure to update Nav bar and other areas of the project that may be needed.
