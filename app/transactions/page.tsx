@@ -199,21 +199,24 @@ function TransactionsContent() {
 
   return (
     <div className="min-h-screen w-full overflow-visible">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-foreground">Transactions</h1>
+          {pendingAiCount > 0 && (
+            <Link
+              href="/ai-suggestions"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors"
+            >
+              <Sparkles className="h-3 w-3" />
+              {pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}
+            </Link>
+          )}
+        </div>
+      </div>
       <div className="relative z-10">
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px] overflow-visible">
-            <div className="flex items-center gap-3 mb-4">
-              <h1 className="text-xl font-semibold text-foreground">Transactions</h1>
-              {pendingAiCount > 0 && (
-                <Link
-                  href="/ai-suggestions"
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}
-                </Link>
-              )}
-            </div>
 
             <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
 

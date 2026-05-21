@@ -791,53 +791,54 @@ export default function AiSuggestionsPage() {
   const allPendingIds = proposals.filter((p) => p.status === 'pending').map((p) => p.id);
 
   return (
-    <ContentWrapper>
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-foreground">AI Suggestions</h1>
-            {pendingCount > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
-                {pendingCount} pending
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {feedback && (
-               <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
-
-                {feedback.message}
-              </span>
-            )}
-            {analyzing && (
-              <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap">
-                <Loader2 className="h-3 w-3 inline mr-1 animate-spin" />
-                Running...
-              </span>
-            )}
-            <button
-              onClick={handleTestProvider}
-              disabled={showTestProgress}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all disabled:opacity-50"
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              Test Provider
-            </button>
-            <button
-              onClick={handleAnalyze}
-              disabled={analyzing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
-            >
-              {analyzing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              {analyzing ? 'Analyzing...' : 'Run Analysis'}
-            </button>
-          </div>
+    <div className="min-h-screen w-full">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-foreground">AI Suggestions</h1>
+          {pendingCount > 0 && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
+              {pendingCount} pending
+            </span>
+          )}
         </div>
+        <div className="flex items-center gap-2">
+          {feedback && (
+             <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+
+              {feedback.message}
+            </span>
+          )}
+          {analyzing && (
+            <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap">
+              <Loader2 className="h-3 w-3 inline mr-1 animate-spin" />
+              Running...
+            </span>
+          )}
+          <button
+            onClick={handleTestProvider}
+            disabled={showTestProgress}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all disabled:opacity-50"
+          >
+            <FlaskConical className="h-3.5 w-3.5" />
+            Test Provider
+          </button>
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+          >
+            {analyzing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+          </button>
+        </div>
+      </div>
+      <ContentWrapper>
+      <div className="max-w-3xl mx-auto space-y-6">
 
         {/* Persistent analysis status banner — survives navigation */}
         {(analyzing || savedStatus) && (
@@ -1155,5 +1156,6 @@ export default function AiSuggestionsPage() {
         )}
       </div>
     </ContentWrapper>
+    </div>
   );
 }

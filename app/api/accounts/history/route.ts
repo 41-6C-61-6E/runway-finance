@@ -244,13 +244,24 @@ export async function GET(request: Request) {
       let netWorth = 0;
       for (const account of filteredAccounts) {
         const bal = latestByAccount.get(account.id) ?? 0;
-        point[account.id] = bal;
 
         const accountType = account.type.toLowerCase();
         if (isAssetAccount(accountType)) {
+          // Assets: store as-is (positive balance = positive value)
+          point[account.id] = bal;
           netWorth += bal;
         } else if (isLiabilityAccount(accountType)) {
-          netWorth -= Math.abs(bal);
+          // Liabilities: always store as a positive absolute value.
+          // Some financial data providers (e.g. SimpleFIN) return liabilities
+          // as negative numbers. Normalising to Math.abs here ensures the
+          // client-side negation (-val) always produces the correct downward
+          // direction in charts, matching the net-worth chart API convention.
+          const absBal = Math.abs(bal);
+          point[account.id] = absBal;
+          netWorth -= absBal;
+        } else {
+          // Unknown account type — store raw balance
+          point[account.id] = bal;
         }
       }
       point.netWorth = netWorth;

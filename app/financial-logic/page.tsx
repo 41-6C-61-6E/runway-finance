@@ -328,20 +328,21 @@ export default function FinancialLogicPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground mb-1">Financial Logic Explorer</h1>
-          <p className="text-sm text-muted-foreground">
-            See exactly how every financial metric is calculated — which accounts are included, what types
-            are classified as assets or liabilities, and the step-by-step math behind each number.
-          </p>
-        </div>
+    <div className="min-h-screen w-full">
+      {/* ── Page Header ── */}
+      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-foreground">Financial Logic Explorer</h1>
       </div>
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <p className="text-sm text-muted-foreground">
+          See exactly how every financial metric is calculated — which accounts are included, what types
+          are classified as assets or liabilities, and the step-by-step math behind each number.
+        </p>
 
-      <GroupedTraceTree traces={traces} />
-      <AccountClassificationTable accounts={data?.accounts ?? []} />
-      <TypeReference />
+        <GroupedTraceTree traces={traces} />
+        <AccountClassificationTable accounts={data?.accounts ?? []} />
+        <TypeReference />
+      </div>
     </div>
   );
 }
