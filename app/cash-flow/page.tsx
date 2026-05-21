@@ -9,6 +9,8 @@ import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
+import { TrendingUp } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 
 function CashFlowContent() {
   const { isVisible } = useChartVisibility();
@@ -16,9 +18,7 @@ function CashFlowContent() {
   return (
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Cash Flow</h1>
-      </div>
+      <PageHeader title="Cash Flow" icon={TrendingUp} />
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 

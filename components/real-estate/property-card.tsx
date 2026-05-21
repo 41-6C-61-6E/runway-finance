@@ -4,6 +4,16 @@ import { useState } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { Home, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
 
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  'single-family': 'Single Family',
+  condo: 'Condo',
+  townhouse: 'Townhouse',
+  'multi-family': 'Multi-Family',
+  land: 'Land',
+  commercial: 'Commercial',
+  other: 'Other',
+};
+
 interface MortgageInfo {
   id: string;
   name: string;
@@ -45,6 +55,14 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
   const isWhollyOwned = property.linkedMortgages.length === 0;
   const ltvColor = property.ltv > 80 ? 'text-destructive' : property.ltv > 60 ? 'text-chart-3' : 'text-chart-1';
 
+  const meta = property.metadata || {};
+  const propertyType = meta.propertyType as string | undefined;
+  const propertyId = meta.propertyId as string | undefined;
+  const purchasePrice = meta.purchasePrice as number | undefined;
+  const purchaseDate = meta.purchaseDate as string | undefined;
+  const zipCode = meta.zipCode as string | undefined;
+  const initialValue = meta.initialValue as number | undefined;
+
   const handleSaveValue = () => {
     const val = parseFloat(newValue);
     if (!isNaN(val) && val > 0) {
@@ -61,9 +79,16 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
             <Home className="w-4 h-4 text-chart-3" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">{property.name}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-foreground">{property.name}</h3>
+              {propertyType && (
+                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-chart-3/10 text-chart-3 border border-chart-3/20 uppercase tracking-wider">
+                  {PROPERTY_TYPE_LABELS[propertyType] || propertyType}
+                </span>
+              )}
+            </div>
             {isWhollyOwned && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium">
+              <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium mt-0.5">
                 <BadgeCheck className="w-3 h-3" />
                 Wholly Owned
               </span>
@@ -213,11 +238,58 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
       {isWhollyOwned && (
         <button
           onClick={() => onLinkMortgage(property.id)}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
         >
           <Link2 className="w-3 h-3" />
           Link a mortgage
         </button>
+      )}
+
+      {/* Property Details Section */}
+      {(purchasePrice !== undefined || purchaseDate || zipCode || propertyId || initialValue !== undefined) && (
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Property Details</span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {purchasePrice !== undefined && purchasePrice > 0 && (
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-muted-foreground">Purchase Price</span>
+                <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(purchasePrice)}</span>
+              </div>
+            )}
+            {purchaseDate && (
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-muted-foreground">Purchase Date</span>
+                <span className="text-foreground">{purchaseDate}</span>
+              </div>
+            )}
+            {zipCode && (
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-muted-foreground">ZIP Code</span>
+                <span className="font-mono text-foreground">{zipCode}</span>
+              </div>
+            )}
+            {initialValue !== undefined && initialValue > 0 && (
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-muted-foreground">Initial Value</span>
+                <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(initialValue)}</span>
+              </div>
+            )}
+            {propertyId && (
+              <div className="flex justify-between items-center py-0.5 col-span-2 border-t border-border/30 pt-1.5 mt-1">
+                <span className="text-muted-foreground">Redfin ID</span>
+                <a
+                  href={`https://www.redfin.com/property/${propertyId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  {propertyId}
+                  <Link2 className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

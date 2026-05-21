@@ -1,11 +1,12 @@
 'use client';
 
 import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
-import { Check, Calculator, RefreshCw } from 'lucide-react';
+import { Check, Calculator, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
@@ -25,7 +26,7 @@ const CHART_TYPE_OPTIONS: { value: ChartTypeOption; label: string }[] = [
 const MODULES = [
   {
     key: 'netWorth' as const,
-    label: 'Net Worth',
+    label: 'Net Worth & Accounts',
     description: 'Estimated balance snapshots are generated from your transaction history to fill in days where no automatic snapshot was taken by your financial institution. Disabling this shows only dates with confirmed snapshots.',
   },
   {
@@ -48,6 +49,8 @@ export default function AnalyticsTab() {
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
   const [recalculating, setRecalculating] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
   const [recalcResult, setRecalcResult] = useState<{
     success: boolean;
     message: string;
@@ -58,6 +61,10 @@ export default function AnalyticsTab() {
       errorsEncountered: number;
     };
   } | null>(null);
+
+  const toggleModuleExpanded = (key: string) => {
+    setExpandedModules((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const handleRecalculate = async () => {
     setRecalculating(true);
@@ -118,6 +125,7 @@ export default function AnalyticsTab() {
           {MODULES.map((mod) => {
             const moduleEnabled = isEnabled(mod.key);
             const individuallyChecked = settings[mod.key] !== false;
+            const isExpanded = !!expandedModules[mod.key];
             return (
               <div
                 key={mod.key}
@@ -142,6 +150,96 @@ export default function AnalyticsTab() {
                     Estimated data hidden for {mod.label.toLowerCase()}.
                   </p>
                 )}
+
+                {/* Collapsible details toggle */}
+                <button
+                  type="button"
+                  onClick={() => toggleModuleExpanded(mod.key)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors mt-2"
+                >
+                  <span>{isExpanded ? 'Hide calculation details' : 'How this works (Inputs & Calculations)'}</span>
+                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-border/50 text-[11px] text-muted-foreground space-y-3.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {mod.key === 'netWorth' && (
+                      <>
+                        <div>
+                          <strong className="text-foreground font-semibold">Inputs:</strong>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Real Snapshots:</strong> Confirmed balance snapshots synced from your financial institution or entered manually.</li>
+                            <li><strong className="text-foreground/80">Transaction History:</strong> Confirmed daily transactions associated with your accounts.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Calculations:</strong>
+                          <p className="mt-1 leading-relaxed">
+                            Uses a <strong className="text-foreground/80">two-pass algorithm</strong> anchored to your earliest real snapshot:
+                          </p>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Backward Pass:</strong> Calculates historical balances backward from the first real snapshot using transaction amounts: <code className="text-foreground bg-muted px-1 py-0.5 rounded">Balance_prev = Balance_curr - Transactions</code>.</li>
+                            <li><strong className="text-foreground/80">Forward Pass:</strong> Calculates daily balances forward using transaction amounts, anchoring/resetting to any newer real snapshots.</li>
+                            <li><strong className="text-foreground/80">Fallback:</strong> If no real snapshots exist, it starts from a $0 balance on your earliest transaction date and projects forward.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Outputs:</strong>
+                          <p className="mt-1">Daily historical snapshots to fill in gaps and construct a continuous balance history for Net Worth & Accounts charts.</p>
+                        </div>
+                      </>
+                    )}
+                    {mod.key === 'realEstate' && (
+                      <>
+                        <div>
+                          <strong className="text-foreground font-semibold">Inputs:</strong>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Property Info:</strong> Purchase price, purchase date, current valuation, and zip code.</li>
+                            <li><strong className="text-foreground/80">FHFA House Price Index (HPI):</strong> Metropolitan index (via FRED API) matched to your zip code prefix, or a national index fallback.</li>
+                            <li><strong className="text-foreground/80">Mortgage Details:</strong> Original loan amount, interest rate, term length, start date, and current balance.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Calculations:</strong>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Real Estate Valuation:</strong> Projects historical values using metropolitan or national appreciation indexes.</li>
+                            <li><strong className="text-foreground/80">CAGR Fallback:</strong> If HPI data is unavailable, calculates the compounded annual growth rate to estimate property value every 90 days.</li>
+                            <li><strong className="text-foreground/80">Mortgage Amortization:</strong> Simulates monthly principal paydowns, adjusting interest and principal over time using standard schedules.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Outputs:</strong>
+                          <p className="mt-1">Monthly property value snapshots (positive assets) and monthly mortgage remaining balances (negative liabilities).</p>
+                        </div>
+                      </>
+                    )}
+                    {mod.key === 'cashFlowProjections' && (
+                      <>
+                        <div>
+                          <strong className="text-foreground font-semibold">Inputs:</strong>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Selected Accounts:</strong> Checking and savings account balances.</li>
+                            <li><strong className="text-foreground/80">Active Budgets:</strong> User-defined recurring income and expense budgets.</li>
+                            <li><strong className="text-foreground/80">Lookback Transactions:</strong> Recent transaction history (typically 3 months) to analyze spending patterns.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Calculations:</strong>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong className="text-foreground/80">Historical Mode:</strong> Projects balances using average monthly inflows and outflows.</li>
+                            <li><strong className="text-foreground/80">Budget Mode:</strong> Projects balances using monthly budgets normalized for frequency.</li>
+                            <li><strong className="text-foreground/80">Hybrid Mode (Default):</strong> Combines defined budget targets with historical averages for unbudgeted/uncategorized spending.</li>
+                            <li><strong className="text-foreground/80">Accumulation:</strong> Iteratively computes month-over-month balances: <code className="text-foreground bg-muted px-1 py-0.5 rounded">Balance_next = Balance_curr + Inflows - Outflows</code>.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong className="text-foreground font-semibold">Outputs:</strong>
+                          <p className="mt-1">Monthly projected inflows, outflows, and starting/ending balances up to 24 months in the future.</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -152,7 +250,7 @@ export default function AnalyticsTab() {
           <button
             type="button"
             disabled={recalculating}
-            onClick={handleRecalculate}
+            onClick={() => setShowRecalcConfirm(true)}
             className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin' : ''}`} />
@@ -275,6 +373,31 @@ export default function AnalyticsTab() {
           )}
         </div>
       </div>
+
+      {/* Recalculation Warning Confirmation */}
+      <AlertDialog open={showRecalcConfirm} onOpenChange={setShowRecalcConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recalculate Synthetic &amp; Estimated Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong className="text-destructive font-semibold">permanently delete all previously calculated synthetic snapshots</strong> for your accounts and regenerate them from scratch. Your actual synced or manually entered historical snapshots will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={() => {
+                setShowRecalcConfirm(false);
+                handleRecalculate();
+              }}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
+            >
+              Recalculate
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

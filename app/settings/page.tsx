@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Check } from 'lucide-react';
+import { Check, Settings } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
@@ -26,6 +26,7 @@ import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hook
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
+import { PageHeader } from '@/components/page-header';
 
 type Connection = {
   id: string;
@@ -374,10 +375,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen w-full">
-      {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Settings</h1>
-      </div>
+      <PageHeader title="Settings" icon={Settings} />
       <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
         <div className="max-w-2xl w-full space-y-6">
 

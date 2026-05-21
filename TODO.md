@@ -5,6 +5,8 @@
 ## CHANGES:
 - Spending Breakdown pi and bar charts should actually use the category colors (or versions of them depending on theme) rather than the color scheme colors. 
 
+- 
+
 ## NEW FEATUES:
 - explore the idea of transfer categories, paired tx or tags
 - Better PWA support

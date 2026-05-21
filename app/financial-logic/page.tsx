@@ -14,6 +14,7 @@ import {
 } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay, formatTraceResult } from '@/components/financial-logic/calculation-trace';
 import type { AccountData, CalculationTrace } from '@/lib/types/financial';
+import { PageHeader } from '@/components/page-header';
 
 interface FetchedData {
   accounts: AccountData[];
@@ -329,10 +330,7 @@ export default function FinancialLogicPage() {
 
   return (
     <div className="min-h-screen w-full">
-      {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground">Financial Logic Explorer</h1>
-      </div>
+      <PageHeader title="Financial Logic Explorer" icon={Calculator} />
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         <p className="text-sm text-muted-foreground">
           See exactly how every financial metric is calculated — which accounts are included, what types
