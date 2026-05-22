@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense } from 'react';
-import { CashFlowSummary } from '@/components/cash-flow/cash-flow-summary';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
 import { ExpenseCategoryTrend } from '@/components/cash-flow/expense-category-trend';
 
@@ -21,15 +20,6 @@ function CashFlowContent() {
       <PageHeader title="Cash Flow" icon={TrendingUp} />
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
-
-          {isVisible('cashFlowSummary') && (
-            <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <div>
-                <CashFlowSummary />
-                <MathDescription chartId="cashFlowSummary" />
-              </div>
-            </Suspense>
-          )}
 
           {(isVisible('incomeExpenseChart') || isVisible('netIncomeAnalysis')) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">

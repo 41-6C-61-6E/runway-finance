@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { accounts } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { generateHistoricalAccountSnapshots } from '@/lib/services/account-history';
+import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
+import { readApiConfig } from '@/lib/services/manual-accounts';
+
+const MODEL_SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
 
 export async function POST(request: Request) {
   try {
@@ -22,9 +26,12 @@ export async function POST(request: Request) {
     const dek = await getSessionDEK();
     const db = getDb();
 
-    logger.info('Starting snapshot recalculation', { userId });
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type') || 'netWorth';
+    const today = new Date().toISOString().split('T')[0];
 
-    // Get all user accounts
+    logger.info('Starting snapshot recalculation', { userId, type });
+
     const userAccounts = await db
       .select()
       .from(accounts)
@@ -36,40 +43,67 @@ export async function POST(request: Request) {
     let skippedCount = 0;
     const errors: Array<{ accountId: string; error: string }> = [];
 
-    // Regenerate snapshots for each account
-    for (const account of decrypted) {
-      try {
-        // Generate synthetic snapshots from transaction history
-        // This will fill in missing dates based on transaction data
-        const result = await generateHistoricalAccountSnapshots(
-          account.id,
-          userId,
-          '2023-01-01', // Start from beginning
-          new Date().toISOString().split('T')[0], // Up to today
-          dek
-        );
-
-        syntheticCount += result.syntheticCount;
-        skippedCount += result.skippedRealCount;
-
-        logger.info('Generated snapshots for account', {
-          accountId: account.id,
-          accountName: account.name,
-          syntheticCount: result.syntheticCount,
-          skippedReal: result.skippedRealCount,
-        });
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        errors.push({ accountId: account.id, error: errorMsg });
-        logger.error('Failed to generate snapshots for account', {
-          accountId: account.id,
-          error: errorMsg,
-        });
+    if (type === 'netWorth') {
+      for (const account of decrypted) {
+        try {
+          const result = await generateHistoricalAccountSnapshots(
+            account.id,
+            userId,
+            '2023-01-01',
+            today,
+            dek
+          );
+          syntheticCount += result.syntheticCount;
+          skippedCount += result.skippedRealCount;
+          logger.info('Generated transaction-based snapshots for account', {
+            accountId: account.id,
+            accountName: account.name,
+            syntheticCount: result.syntheticCount,
+            skippedReal: result.skippedRealCount,
+          });
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          errors.push({ accountId: account.id, error: errorMsg });
+          logger.error('Failed to generate transaction-based snapshots for account', {
+            accountId: account.id,
+            error: errorMsg,
+          });
+        }
       }
+    } else if (type === 'realEstate') {
+      const apiConfig = await readApiConfig(userId).catch(() => undefined);
+      const relevant = decrypted.filter((a: any) => MODEL_SNAPSHOT_TYPES.includes(a.type));
+      for (const account of relevant) {
+        try {
+          const meta = typeof account.metadata === 'string'
+            ? JSON.parse(account.metadata)
+            : (typeof account.metadata === 'object' && account.metadata !== null ? account.metadata : {});
+          const count = await generateAssetHistorySnapshots(
+            account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
+          );
+          syntheticCount += count;
+          logger.info('Generated model-based snapshots for account', {
+            accountId: account.id,
+            accountName: account.name,
+            syntheticCount: count,
+          });
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          errors.push({ accountId: account.id, error: errorMsg });
+          logger.error('Failed to generate model-based snapshots for account', {
+            accountId: account.id,
+            error: errorMsg,
+          });
+        }
+      }
+    } else if (type === 'cashFlow') {
+      // Cash flow projections are computed on-the-fly from budgets and
+      // spending patterns; no stored snapshots to regenerate.
     }
 
     logger.info('Snapshot recalculation complete', {
       userId,
+      type,
       syntheticCount,
       skippedCount,
       errorCount: errors.length,
@@ -77,9 +111,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Snapshots recalculated successfully',
+      message: errors.length > 0
+        ? `Completed with ${errors.length} error${errors.length === 1 ? '' : 's'}`
+        : `Recalculated ${type === 'netWorth' ? 'net worth' : type === 'realEstate' ? 'real estate' : 'cash flow'} snapshots successfully`,
       stats: {
-        accountsProcessed: decrypted.length,
+        accountsProcessed: type === 'netWorth'
+          ? decrypted.length
+          : type === 'realEstate'
+            ? decrypted.filter((a: any) => MODEL_SNAPSHOT_TYPES.includes(a.type)).length
+            : 0,
         syntheticSnapshotsCreated: syntheticCount,
         skippedRealSnapshots: skippedCount,
         errorsEncountered: errors.length,

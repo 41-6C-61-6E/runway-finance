@@ -11,8 +11,6 @@ interface MortgageAttributesMeta {
   escrowAmount?: string;
   purchaseDate?: string;
   extraPrincipal?: string;
-  principal?: string;
-  interest?: string;
   pmi?: string;
   escrow?: string;
 }
@@ -77,35 +75,13 @@ export function MortgageAttributesForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment</label>
+          <label className="block text-sm font-medium text-foreground mb-1">Monthly Payment (P&amp;I)</label>
           <Input
             type="number"
             step="0.01"
             value={meta.monthlyPayment || ''}
             onChange={(e) => onChange({ ...meta, monthlyPayment: e.target.value })}
             placeholder="e.g., 2212"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Principal (monthly, optional)</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={meta.principal || ''}
-            onChange={(e) => onChange({ ...meta, principal: e.target.value })}
-            placeholder="e.g., 800"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Interest (monthly, optional)</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={meta.interest || ''}
-            onChange={(e) => onChange({ ...meta, interest: e.target.value })}
-            placeholder="e.g., 1000"
           />
         </div>
       </div>
