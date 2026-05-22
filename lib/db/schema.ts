@@ -107,6 +107,8 @@ export const userSettings = pgTable('user_settings', {
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
+  hideAccountsSidebarByDefault: boolean('hide_accounts_sidebar_by_default').notNull().default(false),
+  chartSelections: jsonb('chart_selections').default({}),
   showMathEnabled: boolean('show_math_enabled').notNull().default(false),
   aiSystemPrompt: text('ai_system_prompt'),
   aiAutoAnalyze: boolean('ai_auto_analyze').notNull().default(false),

@@ -44,6 +44,8 @@ export async function GET() {
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: created?.reduceTransparency ?? DEFAULTS.reduceTransparency,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+      hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+      chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       aiSystemPrompt: created?.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
       aiAutoAnalyze: created?.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
@@ -78,6 +80,8 @@ export async function GET() {
     defaultChartType: settings[0].defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: settings[0].reduceTransparency ?? DEFAULTS.reduceTransparency,
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+    hideAccountsSidebarByDefault: settings[0].hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+    chartSelections: settings[0].chartSelections ?? DEFAULTS.chartSelections,
     showMathEnabled: settings[0].showMathEnabled ?? DEFAULTS.showMathEnabled,
     aiSystemPrompt: settings[0].aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: settings[0].aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
@@ -110,6 +114,8 @@ export async function PATCH(request: Request) {
   const defaultChartType = body.defaultChartType;
   const reduceTransparency = body.reduceTransparency;
   const hideAccountSubheadings = body.hideAccountSubheadings;
+  const hideAccountsSidebarByDefault = body.hideAccountsSidebarByDefault;
+  const chartSelections = body.chartSelections;
 	const showMathEnabled = body.showMathEnabled;
 	const aiSystemPrompt = body.aiSystemPrompt;
 	const aiAutoAnalyze = body.aiAutoAnalyze;
@@ -184,6 +190,14 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid hideAccountSubheadings value' }, { status: 400 });
   }
 
+  if (hideAccountsSidebarByDefault !== undefined && typeof hideAccountsSidebarByDefault !== 'boolean') {
+    return Response.json({ error: 'Invalid hideAccountsSidebarByDefault value' }, { status: 400 });
+  }
+
+  if (chartSelections !== undefined && (typeof chartSelections !== 'object' || chartSelections === null || Array.isArray(chartSelections))) {
+    return Response.json({ error: 'Invalid chartSelections value' }, { status: 400 });
+  }
+
   if (apiKeys !== undefined && (typeof apiKeys !== 'object' || apiKeys === null || Array.isArray(apiKeys))) {
     return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
   }
@@ -253,6 +267,8 @@ export async function PATCH(request: Request) {
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: created?.reduceTransparency ?? DEFAULTS.reduceTransparency,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+      hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+      chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       apiKeys: created?.apiKeys ?? {},
     });
@@ -273,6 +289,11 @@ export async function PATCH(request: Request) {
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
+  if (hideAccountsSidebarByDefault !== undefined) updates.hideAccountsSidebarByDefault = hideAccountsSidebarByDefault;
+  if (chartSelections !== undefined) {
+    const existingSelections = (settings[0].chartSelections as Record<string, any>) || {};
+    updates.chartSelections = { ...existingSelections, ...chartSelections };
+  }
 	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
 	if (aiSystemPrompt !== undefined) updates.aiSystemPrompt = aiSystemPrompt;
 	if (aiAutoAnalyze !== undefined) updates.aiAutoAnalyze = aiAutoAnalyze;
@@ -311,6 +332,8 @@ export async function PATCH(request: Request) {
     defaultChartType: updated.defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: updated.reduceTransparency ?? DEFAULTS.reduceTransparency,
     hideAccountSubheadings: updated.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+    hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+    chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
     showMathEnabled: updated.showMathEnabled ?? DEFAULTS.showMathEnabled,
     aiSystemPrompt: updated.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: updated.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,

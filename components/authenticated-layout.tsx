@@ -7,6 +7,7 @@ import { useSidebar, SidebarProvider, COLLAPSED_WIDTH } from '@/components/sideb
 import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
+import { UserSettingsProvider } from '@/components/user-settings-provider';
 import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -20,21 +21,23 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <PrivacyModeProvider>
-        <ReduceTransparencyProvider>
-        <AccountSubheadingsProvider>
-          <>
-            <ResizableSidebar />
-            {!hideAccountsSidebar && <AccountsSidebar />}
-            <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
-              {children}
-            </AuthenticatedLayoutContent>
-          </>
-        </AccountSubheadingsProvider>
-        </ReduceTransparencyProvider>
-      </PrivacyModeProvider>
-    </SidebarProvider>
+    <UserSettingsProvider>
+      <SidebarProvider>
+        <PrivacyModeProvider>
+          <ReduceTransparencyProvider>
+          <AccountSubheadingsProvider>
+            <>
+              <ResizableSidebar />
+              {!hideAccountsSidebar && <AccountsSidebar />}
+              <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
+                {children}
+              </AuthenticatedLayoutContent>
+            </>
+          </AccountSubheadingsProvider>
+          </ReduceTransparencyProvider>
+        </PrivacyModeProvider>
+      </SidebarProvider>
+    </UserSettingsProvider>
   );
 }
 
