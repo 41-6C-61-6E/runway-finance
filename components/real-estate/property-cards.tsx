@@ -6,6 +6,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { Input } from '@/components/ui/input';
+import { formatCurrency } from '@/lib/utils/format';
 
 const PROPERTY_TYPES = [
   { value: 'single-family', label: 'Single Family Home' },
@@ -71,6 +72,7 @@ export function PropertyCards() {
   // Property details editing
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [propertyEditMeta, setPropertyEditMeta] = useState<Record<string, string>>({});
+  const [selectedMortgageIds, setSelectedMortgageIds] = useState<string[]>([]);
   const [savingProperty, setSavingProperty] = useState(false);
   const [propertyEditError, setPropertyEditError] = useState<string | null>(null);
 
@@ -174,9 +176,9 @@ export function PropertyCards() {
     Object.entries(meta).forEach(([k, v]) => {
       if (v !== undefined && v !== null && !Array.isArray(v)) flat[k] = String(v);
     });
-    // Flatten linked mortgage (first entry)
+    // Set selected mortgage IDs state
     const mortgageIds = (meta.mortgageAccountIds as string[]) ?? [];
-    flat.linkedMortgageId = mortgageIds[0] ?? '';
+    setSelectedMortgageIds(mortgageIds);
     setPropertyEditMeta(flat);
   };
 
@@ -197,11 +199,8 @@ export function PropertyCards() {
       else delete metadata.zipCode;
       if (propertyEditMeta.initialValue) metadata.initialValue = parseFloat(propertyEditMeta.initialValue);
       else delete metadata.initialValue;
-      if (propertyEditMeta.linkedMortgageId) {
-        metadata.mortgageAccountIds = [propertyEditMeta.linkedMortgageId];
-      } else {
-        metadata.mortgageAccountIds = [];
-      }
+      
+      metadata.mortgageAccountIds = selectedMortgageIds;
 
       const res = await fetch(`/api/accounts/${editingProperty.id}`, {
         method: 'PATCH',
@@ -301,7 +300,7 @@ export function PropertyCards() {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5">
         {data.properties.map((property) => (
           <PropertyCard
             key={property.id}
@@ -397,7 +396,7 @@ export function PropertyCards() {
       </Sheet>
 
       {/* Edit Property Details Sheet */}
-      <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); } }}>
+      <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); setSelectedMortgageIds([]); } }}>
         <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Property Details</SheetTitle>
@@ -472,17 +471,56 @@ export function PropertyCards() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Linked Mortgage (optional)</label>
-              <select
-                value={propertyEditMeta.linkedMortgageId || ''}
-                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, linkedMortgageId: e.target.value }))}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">None (wholly owned)</option>
-                {mortgageAccounts.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Linked Mortgages</label>
+              {(() => {
+                const otherPropertiesLinkedMortgages = new Set(
+                  data?.properties
+                    .filter((p) => p.id !== editingProperty?.id)
+                    .flatMap((p) => p.linkedMortgages.map((m) => m.id)) ?? []
+                );
+                const displayMortgages = mortgageAccounts.filter((m) => !otherPropertiesLinkedMortgages.has(m.id));
+
+                if (displayMortgages.length === 0) {
+                  return (
+                    <div className="text-xs text-muted-foreground italic py-2 border border-dashed border-border rounded-lg text-center">
+                      No mortgages available to link
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border border-border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto bg-muted/20">
+                    {displayMortgages.map((m) => {
+                      const isChecked = selectedMortgageIds.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          className="flex items-start gap-2.5 text-xs text-foreground hover:bg-muted/50 p-2 rounded-md cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedMortgageIds((prev) => [...prev, m.id]);
+                              } else {
+                                setSelectedMortgageIds((prev) => prev.filter((id) => id !== m.id));
+                              }
+                            }}
+                            className="rounded border-input text-primary focus:ring-ring mt-0.5 h-4 w-4 cursor-pointer"
+                          />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold">{m.name}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Current Balance: {formatCurrency(Math.abs(parseFloat(m.balance)))}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
             <SheetFooter className="pt-4">
               <SheetClose asChild>

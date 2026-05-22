@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { ResponsiveSankey } from '@nivo/sankey';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -99,33 +98,6 @@ function getMonthRange(timeframe: TimeRange, selectedMonth?: string): { start: s
     end: currentYm,
   };
 }
-
-const sankeyTheme = {
-  background: 'transparent',
-  text: { fill: 'var(--color-foreground)', fontSize: 11, fontWeight: 500 },
-  axis: {
-    domain: { line: { stroke: 'var(--color-border)', strokeWidth: 1 } },
-    ticks: { line: { stroke: 'var(--color-border)' }, text: { fill: 'var(--color-muted-foreground)', fontSize: 11 } },
-  },
-  grid: { line: { stroke: 'var(--color-border)', strokeDasharray: '3 3' } },
-  tooltip: {
-    container: {
-      background: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '0.75rem',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-      color: 'var(--color-foreground)',
-      fontSize: '12px',
-      padding: '10px 14px',
-    },
-  },
-  legends: {
-    text: { fill: 'var(--color-muted-foreground)', fontSize: 11 },
-  },
-  labels: {
-    text: { fill: 'var(--color-foreground)', fontSize: 11, fontWeight: 600 },
-  },
-};
 
 const VIBRANT_COLORS = [
   '#3b82f6',  // blue
@@ -254,19 +226,9 @@ function buildSankeyData(
     const rest = sortedIncome.slice(19);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
     const restIds = rest.map((c) => c.categoryId).join(',');
-
     incomeCategories = [
       ...top19,
-      {
-        categoryId: restIds,
-        categoryName: 'Other Income',
-        categoryColor: '#94a3b8',
-        isIncome: true,
-        amount: restAmount,
-        parentId: null,
-        parentName: null,
-        parentColor: null,
-      },
+      { categoryId: restIds, categoryName: 'Other Income', categoryColor: '#94a3b8', isIncome: true, amount: restAmount, parentId: null, parentName: null, parentColor: null },
     ];
   }
 
@@ -283,29 +245,20 @@ function buildSankeyData(
     const rest = sortedExpense.slice(19);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
     const restIds = rest.map((c) => c.categoryId).join(',');
-
     expenseCategories = [
       ...top19,
-      {
-        categoryId: restIds,
-        categoryName: 'Other Expenses',
-        categoryColor: '#94a3b8',
-        isIncome: false,
-        amount: restAmount,
-        parentId: null,
-        parentName: null,
-        parentColor: null,
-      },
+      { categoryId: restIds, categoryName: 'Other Expenses', categoryColor: '#94a3b8', isIncome: false, amount: restAmount, parentId: null, parentName: null, parentColor: null },
     ];
   }
+
   const savings = Math.max(0, totalIncome - totalExpenses);
-  const deficit = totalExpenses > totalIncome ? totalExpenses - totalIncome : 0;
 
   const nodes: SankeyNode[] = [];
   const links: SankeyLink[] = [];
   const hubId = '__available_funds__';
   const createdParentNodes = new Set<string>();
 
+  // ── Income side ──────────────────────────────────────────────────────────
   if (showParents) {
     const incomeByParent = new Map<string, CategoryData[]>();
     const incomeNoParent: CategoryData[] = [];
@@ -338,7 +291,6 @@ function buildSankeyData(
         });
       }
 
-      let totalForParent = 0;
       children.forEach((cat) => {
         const childNodeId = `inc_${cat.categoryId}`;
         nodes.push({
@@ -350,9 +302,9 @@ function buildSankeyData(
           percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
         });
         links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
-        totalForParent += cat.amount;
       });
 
+      const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
       links.push({ source: parentNodeId, target: hubId, value: totalForParent });
     });
 
@@ -369,6 +321,7 @@ function buildSankeyData(
       links.push({ source: childNodeId, target: hubId, value: cat.amount });
     });
   } else {
+    // Flat: all income categories connect directly to hub
     incomeCategories.forEach((cat) => {
       const childNodeId = `inc_${cat.categoryId}`;
       const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
@@ -390,11 +343,12 @@ function buildSankeyData(
     links.push({ source: fallbackId, target: hubId, value: totalIncome });
   }
 
+  // Hub node
   if (incomeCategories.length > 0 || expenseCategories.length > 0) {
-    const totalFlow = totalIncome;
-    nodes.push({ id: hubId, label: 'Available Funds', color: VIBRANT_COLORS[2], value: totalFlow, percentage: 100 });
+    nodes.push({ id: hubId, label: 'Available Funds', color: VIBRANT_COLORS[2], value: totalIncome, percentage: 100 });
   }
 
+  // ── Expense side ─────────────────────────────────────────────────────────
   if (showParents) {
     const expenseByParent = new Map<string, CategoryData[]>();
     const expenseNoParent: CategoryData[] = [];
@@ -427,7 +381,6 @@ function buildSankeyData(
         });
       }
 
-      let totalForParent = 0;
       children.forEach((cat) => {
         const childNodeId = `exp_${cat.categoryId}`;
         nodes.push({
@@ -439,9 +392,9 @@ function buildSankeyData(
           percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
         });
         links.push({ source: parentNodeId, target: childNodeId, value: cat.amount });
-        totalForParent += cat.amount;
       });
 
+      const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
       links.push({ source: hubId, target: parentNodeId, value: totalForParent });
     });
 
@@ -458,6 +411,7 @@ function buildSankeyData(
       links.push({ source: hubId, target: childNodeId, value: cat.amount });
     });
   } else {
+    // Flat: hub connects directly to all expense categories
     expenseCategories.forEach((cat) => {
       const childNodeId = `exp_${cat.categoryId}`;
       const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
@@ -486,61 +440,161 @@ function buildSankeyData(
     links.push({ source: hubId, target: savingsId, value: savings });
   }
 
-  if (deficit > 0) {
-    const deficitId = '__deficit__';
-    const deficitPercentage = totalIncome > 0 ? (deficit / totalIncome) * 100 : 0;
-    nodes.push({ id: deficitId, label: 'Deficit', color: 'var(--color-destructive)', value: deficit, percentage: deficitPercentage });
-    links.push({ source: hubId, target: deficitId, value: deficit });
-  }
 
   return { nodes, links };
 }
 
-const setOptions = {
-  serialize: (s: Set<string>) => JSON.stringify(Array.from(s)),
-  deserialize: (raw: string) => new Set<string>(JSON.parse(raw)),
+// ── Custom node ────────────────────────────────────────────────────────────────
+// showPercentages is passed in so the label updates when the toggle changes.
+// The node data already has `percentage` baked in from buildSankeyData.
+const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, setHoveredNode, showPercentages }: any) => {
+  const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
+  const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
+
+  const label = payload.label ?? payload.name ?? '';
+  const valueLabel = showPercentages && payload.percentage !== undefined
+    ? `${payload.percentage.toFixed(1)}%`
+    : payload.value !== undefined
+      ? formatCurrency(payload.value)
+      : '';
+
+  return (
+    <g
+      onMouseEnter={() => setHoveredNode(payload.id)}
+      onMouseLeave={() => setHoveredNode(null)}
+      onClick={() => onClick && onClick(payload.id)}
+      className="cursor-pointer"
+    >
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={payload.color || 'var(--color-primary)'}
+        rx={4}
+        fillOpacity={isDimmed ? 0.3 : 0.95}
+        stroke="none"
+      />
+      {/* Name label */}
+      <text
+        x={isRightSide ? x - 8 : x + width + 8}
+        y={y + height / 2 - (valueLabel ? 6 : 0)}
+        textAnchor={isRightSide ? 'end' : 'start'}
+        dominantBaseline="central"
+        fontSize={10}
+        fontWeight={600}
+        fill="currentColor"
+        className="fill-foreground select-none"
+        style={{ opacity: isDimmed ? 0.3 : 1 }}
+      >
+        {label}
+      </text>
+      {/* Value / percentage sub-label */}
+      {valueLabel && (
+        <text
+          x={isRightSide ? x - 8 : x + width + 8}
+          y={y + height / 2 + 7}
+          textAnchor={isRightSide ? 'end' : 'start'}
+          dominantBaseline="central"
+          fontSize={9}
+          fill="currentColor"
+          className="fill-muted-foreground select-none"
+          style={{ opacity: isDimmed ? 0.3 : 0.75 }}
+        >
+          {valueLabel}
+        </text>
+      )}
+    </g>
+  );
 };
 
+// ── Custom link ────────────────────────────────────────────────────────────────
+// Recharts Sankey passes: sourceX, sourceY, targetX, targetY, linkWidth,
+// payload (with source/target node objects), index.
+// sy / ty / dy are NOT passed — those are Nivo-specific props that caused the
+// links to render NaN paths in the original implementation.
+const SankeyCustomLink = ({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  linkWidth,
+  index,
+  payload,
+  onClick,
+  hoveredNode,
+}: any) => {
+  const gradId = `link-grad-${index}`;
+
+  // Cubic bezier: control points at 1/2 x distance for smooth S-curve
+  const midX = (sourceX + targetX) / 2;
+  const halfW = linkWidth / 2;
+
+  const path = [
+    `M ${sourceX},${sourceY - halfW}`,
+    `C ${midX},${sourceY - halfW} ${midX},${targetY - halfW} ${targetX},${targetY - halfW}`,
+    `L ${targetX},${targetY + halfW}`,
+    `C ${midX},${targetY + halfW} ${midX},${sourceY + halfW} ${sourceX},${sourceY + halfW}`,
+    'Z',
+  ].join(' ');
+
+  const sourceColor = payload?.source?.color || '#94a3b8';
+  const targetColor = payload?.target?.color || '#94a3b8';
+
+  const sourceId = payload?.source?.id;
+  const targetId = payload?.target?.id;
+  const isDimmed = hoveredNode !== null && sourceId !== hoveredNode && targetId !== hoveredNode;
+  const opacity = isDimmed ? 0.08 : 0.45;
+
+  return (
+    <g
+      onClick={() => onClick && onClick(sourceId, targetId)}
+      className="cursor-pointer"
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={sourceColor} stopOpacity={opacity} />
+          <stop offset="100%" stopColor={targetColor} stopOpacity={opacity} />
+        </linearGradient>
+      </defs>
+      <path d={path} fill={`url(#${gradId})`} stroke="none" />
+    </g>
+  );
+};
+
+// ── Main component ─────────────────────────────────────────────────────────────
 export function CashFlowSankey() {
   const router = useRouter();
   const currentMonth = getCurrentMonth();
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:sankey:timeframe', '1m');
-  const [month, setMonth] = usePersistentState<string>('runway:sankey:month', currentMonth);
+  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
+  const [month, setMonth] = useState<string>(currentMonth);
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
-  const [excludedAccountIds, setExcludedAccountIds] = usePersistentState<Set<string>>('runway:sankey:excludedAccountIds', new Set(), setOptions);
+  const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
-  const [showParents, setShowParents] = usePersistentState<boolean>('runway:sankey:showParents', true);
-  const [showPercentages, setShowPercentages] = usePersistentState<boolean>('runway:sankey:showPercentages', false);
+  // showParents controls whether category groups are added as intermediate nodes.
+  // Toggling it re-runs the data fetch (which re-calls buildSankeyData with the new value).
+  const [showParents, setShowParents] = useState<boolean>(true);
+  // showPercentages is purely a display toggle — no data refetch needed.
+  // It is passed directly into the node renderer and tooltip.
+  const [showPercentages, setShowPercentages] = useState<boolean>(false);
   const [accountFilterOpen, setAccountFilterOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const accountFilterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (timeframe !== '1m') {
-      setMonth(getCurrentMonth());
-    }
-  }, [timeframe, currentMonth, setMonth]);
-
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const res = await fetch('/api/accounts');
-        if (!res.ok) return;
-        const json = await res.json();
-        setAllAccounts(json);
-      } catch {
-        // Silently fail
-      }
-    };
-    fetchAccounts();
+    fetch('/api/accounts')
+      .then((r) => r.ok ? r.json() : [])
+      .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     fetch('/api/categories')
-      .then((res) => res.json())
+      .then((r) => r.json())
       .then((data) => setAllCategoryInfo(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
@@ -556,65 +610,80 @@ export function CashFlowSankey() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Rebuild sankey colors when theme changes (no refetch needed)
   useEffect(() => {
-    const handleThemeChange = () => {
-      const range = getMonthRange(timeframe, month);
-      const acctParam = getAccountIdsParam();
-      fetchDataWithParams(range, acctParam);
-    };
-    
+    if (!sankeyData) return;
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'data-theme') {
-          handleThemeChange();
+      mutations.forEach((m) => {
+        if (m.attributeName === 'data-theme') {
+          // Re-trigger fetch to regenerate colors with new theme
+          setLoading(true);
         }
       });
     });
-    
     observer.observe(document.documentElement, { attributes: true });
     return () => observer.disconnect();
-  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
+  }, [sankeyData]);
 
-  const fetchDataWithParams = async (range: { start: string; end: string }, acctParam: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      let categories: CategoryData[];
-      let totalIncome = 0;
-      let totalExpenses = 0;
-
-      if (timeframe === '1m') {
-        const [categoriesRes, summaryRes] = await Promise.all([
-          fetch(`/api/cash-flow/categories?month=${range.start}${acctParam}`),
-          fetch('/api/cash-flow/summary'),
-        ]);
-        if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
-        categories = await categoriesRes.json();
-        if (summaryRes.ok) {
-          const summary: SummaryData = await summaryRes.json();
-          const catIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-          const catExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-          totalIncome = catIncome || summary.totalIncome;
-          totalExpenses = catExpenses || summary.totalExpenses;
-        }
-      } else {
-        const res = await fetch(`/api/cash-flow/categories?startMonth=${range.start}&endMonth=${range.end}${acctParam}`);
-        if (!res.ok) throw new Error('Failed to fetch sankey data');
-        categories = await res.json();
-        totalIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-        totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-      }
-
-      const parentLookup = buildParentLookup(allCategoryInfo);
-      const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
-      setSankeyData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
+  const getAccountIdsParam = (excluded: Set<string>, accounts: AccountData[]): string => {
+    if (excluded.size === 0 || excluded.size >= accounts.length) return '';
+    const included = accounts.filter((a) => !excluded.has(a.id));
+    return included.length > 0 ? `&accountIds=${included.map((a) => a.id).join(',')}` : '';
   };
+
+  // Refetch whenever timeframe, month, accounts filter, or grouping mode changes.
+  // showPercentages is intentionally NOT a dep — it only affects rendering, not data.
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const range = getMonthRange(timeframe, month);
+        const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
+
+        let categories: CategoryData[];
+        let totalIncome = 0;
+        let totalExpenses = 0;
+
+        if (timeframe === '1m') {
+          const [categoriesRes, summaryRes] = await Promise.all([
+            fetch(`/api/cash-flow/categories?month=${range.start}${acctParam}`),
+            fetch('/api/cash-flow/summary'),
+          ]);
+          if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
+          categories = await categoriesRes.json();
+          if (summaryRes.ok) {
+            const summary: SummaryData = await summaryRes.json();
+            const catIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+            const catExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+            totalIncome = catIncome || summary.totalIncome;
+            totalExpenses = catExpenses || summary.totalExpenses;
+          }
+        } else {
+          const range2 = getMonthRange(timeframe, month);
+          const res = await fetch(`/api/cash-flow/categories?startMonth=${range2.start}&endMonth=${range2.end}${acctParam}`);
+          if (!res.ok) throw new Error('Failed to fetch sankey data');
+          categories = await res.json();
+          totalIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+          totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
+        }
+
+        const parentLookup = buildParentLookup(allCategoryInfo);
+        const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
+        setSankeyData(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Don't fetch until category info has loaded (needed for parent grouping)
+    if (allCategoryInfo.length > 0 || allAccounts.length >= 0) {
+      fetchData();
+    }
+  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
 
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
@@ -625,21 +694,8 @@ export function CashFlowSankey() {
     });
   };
 
-  const getAccountIdsParam = (): string => {
-    if (excludedAccountIds.size === 0 || excludedAccountIds.size >= allAccounts.length) return '';
-    const includedAccounts = allAccounts.filter((a) => !excludedAccountIds.has(a.id));
-    return includedAccounts.length > 0 ? `&accountIds=${includedAccounts.map((a) => a.id).join(',')}` : '';
-  };
-
-  useEffect(() => {
-    const range = getMonthRange(timeframe, month);
-    const acctParam = getAccountIdsParam();
-    fetchDataWithParams(range, acctParam);
-  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
-
-  const getNodeCategoryId = (nodeName: string): string | undefined => {
-    return sankeyData?.nodes.find((n) => n.id === nodeName)?.categoryId;
-  };
+  const getNodeCategoryId = (nodeId: string): string | undefined =>
+    sankeyData?.nodes.find((n) => n.id === nodeId)?.categoryId;
 
   const navigateToTransactions = (categoryIds: string) => {
     const range = getMonthRange(timeframe, month);
@@ -651,20 +707,16 @@ export function CashFlowSankey() {
   };
 
   const handleNodeClick = (nodeId: string) => {
-    if (nodeId === '__available_funds__' || nodeId === '__savings__' || nodeId === '__deficit__') return;
+    if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
     const categoryId = getNodeCategoryId(nodeId);
-    if (categoryId) {
-      navigateToTransactions(categoryId);
-    }
+    if (categoryId) navigateToTransactions(categoryId);
   };
 
   const handleLinkClick = (sourceId: string, targetId: string) => {
-    const sourceCategoryId = getNodeCategoryId(sourceId);
-    const targetCategoryId = getNodeCategoryId(targetId);
-    const ids = [sourceCategoryId, targetCategoryId].filter(Boolean).join(',');
-    if (ids) {
-      navigateToTransactions(ids);
-    }
+    const s = getNodeCategoryId(sourceId);
+    const t = getNodeCategoryId(targetId);
+    const ids = [s, t].filter(Boolean).join(',');
+    if (ids) navigateToTransactions(ids);
   };
 
   const prevMonth = () => {
@@ -679,22 +731,37 @@ export function CashFlowSankey() {
     const next = new Date(y, m - 1, 1);
     next.setMonth(next.getMonth() + 1);
     const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-    if (nextStr <= currentMonth) {
-      setMonth(nextStr);
-    }
+    if (nextStr <= currentMonth) setMonth(nextStr);
   };
 
   const isNextDisabled = (() => {
     const [y, m] = month.split('-').map(Number);
     const next = new Date(y, m - 1, 1);
     next.setMonth(next.getMonth() + 1);
-    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-    return nextStr > currentMonth;
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}` > currentMonth;
   })();
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const showMonthNav = timeframe === '1m';
 
+  // Convert named-id links → index-based links that Recharts Sankey requires
+  const processedData = useMemo(() => {
+    if (!sankeyData) return { nodes: [], links: [] };
+
+    const nodes = sankeyData.nodes.map((n) => ({ ...n, name: n.label || n.id }));
+
+    const links = sankeyData.links
+      .map((l) => {
+        const sourceIndex = nodes.findIndex((n) => n.id === l.source);
+        const targetIndex = nodes.findIndex((n) => n.id === l.target);
+        return { source: sourceIndex, target: targetIndex, value: l.value };
+      })
+      .filter((l) => l.source !== -1 && l.target !== -1 && l.value > 0);
+
+    return { nodes, links };
+  }, [sankeyData]);
+
+  // ── Loading / error / empty states ─────────────────────────────────────────
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -723,8 +790,10 @@ export function CashFlowSankey() {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-3">Cash Flow Sankey</h3>
-        <ChartEmptyState variant={allAccountsExcluded ? 'empty' : 'nodata'}
-          description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'} />
+        <ChartEmptyState
+          variant={allAccountsExcluded ? 'empty' : 'nodata'}
+          description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
+        />
       </div>
     );
   }
@@ -733,16 +802,18 @@ export function CashFlowSankey() {
     (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()),
   );
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      {/* Header row */}
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
         <div className="flex items-center gap-3">
-          {/* Parent categories toggle */}
+          {/* Groups toggle — rebuilds the graph with/without parent group nodes */}
           <label className="flex items-center gap-1.5 cursor-pointer">
             <span className="text-[10px] text-muted-foreground">Groups</span>
             <button
-              onClick={() => setShowParents(!showParents)}
+              onClick={() => setShowParents((v) => !v)}
               className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
                 showParents ? 'bg-primary' : 'bg-muted-foreground/30'
               }`}
@@ -754,11 +825,11 @@ export function CashFlowSankey() {
               />
             </button>
           </label>
-          {/* Values/Percentages toggle */}
+          {/* % toggle — switches node labels + tooltip between currency and percentage */}
           <label className="flex items-center gap-1.5 cursor-pointer">
             <span className="text-[10px] text-muted-foreground">{showPercentages ? '%' : '$'}</span>
             <button
-              onClick={() => setShowPercentages(!showPercentages)}
+              onClick={() => setShowPercentages((v) => !v)}
               className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
                 showPercentages ? 'bg-primary' : 'bg-muted-foreground/30'
               }`}
@@ -770,7 +841,7 @@ export function CashFlowSankey() {
               />
             </button>
           </label>
-          {/* Account filter dropdown */}
+          {/* Account filter */}
           {allAccounts.length > 0 && (
             <div className="relative" ref={accountFilterRef}>
               <button
@@ -806,11 +877,7 @@ export function CashFlowSankey() {
                             onChange={() => {
                               const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
                               const next = new Set(excludedAccountIds);
-                              if (allSelected) {
-                                filteredAccounts.forEach((a) => next.add(a.id));
-                              } else {
-                                filteredAccounts.forEach((a) => next.delete(a.id));
-                              }
+                              filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
                               setExcludedAccountIds(next);
                             }}
                             className="rounded border-border bg-background text-primary focus:ring-ring"
@@ -818,10 +885,7 @@ export function CashFlowSankey() {
                           Select All
                         </label>
                         {filteredAccounts.map((acc) => (
-                          <label
-                            key={acc.id}
-                            className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer"
-                          >
+                          <label key={acc.id} className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer">
                             <input
                               type="checkbox"
                               checked={!excludedAccountIds.has(acc.id)}
@@ -840,101 +904,114 @@ export function CashFlowSankey() {
           )}
         </div>
       </div>
+
+      {/* Time controls */}
       <div className="px-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <TimeRangeFilter value={timeframe} presets={
-          [{ label: '1M', value: '1m' }, { label: '3M', value: '3m' }, { label: '6M', value: '6m' }, { label: '1Y', value: '1y' }, { label: 'YTD', value: 'ytd' }, { label: 'All', value: 'all' }]
-        } onChange={(tf) => setTimeframe(tf)} />
+        <TimeRangeFilter
+          value={timeframe}
+          presets={[
+            { label: '1M', value: '1m' },
+            { label: '3M', value: '3m' },
+            { label: '6M', value: '6m' },
+            { label: '1Y', value: '1y' },
+            { label: 'YTD', value: 'ytd' },
+            { label: 'All', value: 'all' },
+          ]}
+          onChange={(tf) => setTimeframe(tf)}
+        />
         {showMonthNav && (
           <div className="flex items-center gap-2">
             <button onClick={prevMonth} className="px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all">
               &larr;
             </button>
             <span className="text-xs font-medium text-foreground min-w-[120px] text-center">{monthLabel}</span>
-            <button onClick={nextMonth} disabled={isNextDisabled} className={`px-2 py-0.5 rounded-md text-xs transition-all ${
-              isNextDisabled
-                ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
-                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}>
+            <button
+              onClick={nextMonth}
+              disabled={isNextDisabled}
+              className={`px-2 py-0.5 rounded-md text-xs transition-all ${
+                isNextDisabled
+                  ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
+                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
               &rarr;
             </button>
           </div>
         )}
       </div>
-      <div className={showParents ? 'h-[600px]' : 'h-[450px]'}>
+
+      {/* Chart */}
+      <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
         <div className="financial-chart h-full px-2 pb-2">
-          <ResponsiveSankey
-            data={sankeyData}
-            label="label"
-            margin={{ top: 30, right: 140, bottom: 30, left: 140 }}
-            align="justify"
-            colors={node => (node as unknown as { color: string }).color}
-            nodeOpacity={0.95}
-            nodeHoverOpacity={1}
-            nodeHoverOthersOpacity={0.35}
-            nodeThickness={showParents ? 22 : 26}
-            nodeSpacing={showParents ? 24 : 30}
-            nodeBorderRadius={4}
-            nodeBorderWidth={0}
-            linkOpacity={0.55}
-            linkHoverOpacity={0.85}
-            linkHoverOthersOpacity={0.15}
-            linkContract={2}
-            linkBlendMode="normal"
-            enableLinkGradient={true}
-            labelPosition="outside"
-            labelOrientation="horizontal"
-            labelPadding={16}
-            theme={sankeyTheme}
-            onClick={(datum) => {
-              const d = datum as { id?: string; source?: { id: string }; target?: { id: string } };
-              if (d.source && d.target) {
-                handleLinkClick(d.source.id, d.target.id);
-              } else if (d.id) {
-                handleNodeClick(d.id);
-              }
-            }}
-            nodeTooltip={({ node }) => {
-              const nodeData = node as unknown as { value: number; percentage?: number };
-              const displayValue = showPercentages && nodeData.percentage !== undefined
-                ? `${nodeData.percentage.toFixed(1)}%`
-                : formatCurrency(nodeData.value);
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{node.label}</TooltipHeader>
-                  <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
-                  {showPercentages && nodeData.percentage !== undefined && (
-                    <TooltipRow label="Amount" value={formatCurrency(nodeData.value)} />
-                  )}
-                </ChartTooltip>
-              );
-            }}
-            linkTooltip={({ link }) => {
-              const linkData = link as unknown as { value: number; source: { id: string; label: string }; target: { id: string; label: string } };
-              const sourceNode = sankeyData?.nodes.find(n => n.id === linkData.source.id);
-              const targetNode = sankeyData?.nodes.find(n => n.id === linkData.target.id);
-              const sourceTotal = sourceNode?.value || 0;
-              const targetTotal = targetNode?.value || 0;
-              const percentageOfSource = sourceTotal > 0 ? (linkData.value / sourceTotal) * 100 : 0;
-              const percentageOfTarget = targetTotal > 0 ? (linkData.value / targetTotal) * 100 : 0;
-              
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{linkData.source.label} → {linkData.target.label}</TooltipHeader>
-                  {showPercentages ? (
-                    <>
-                      <TooltipRow label="Of Source" value={`${percentageOfSource.toFixed(1)}%`} />
-                      <TooltipRow label="Of Target" value={`${percentageOfTarget.toFixed(1)}%`} />
-                      <TooltipRow label="Amount" value={formatCurrency(linkData.value)} />
-                    </>
-                  ) : (
-                    <TooltipRow label="Amount" value={formatCurrency(linkData.value)} />
-                  )}
-                </ChartTooltip>
-              );
-            }}
-            animate={true}
-            motionConfig="gentle"
-          />
+          {processedData.nodes.length > 0 && processedData.links.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <Sankey
+                data={processedData}
+                node={
+                  <SankeyCustomNode
+                    onClick={handleNodeClick}
+                    hoveredNode={hoveredNode}
+                    setHoveredNode={setHoveredNode}
+                    showPercentages={showPercentages}
+                  />
+                }
+                link={
+                  <SankeyCustomLink
+                    onClick={handleLinkClick}
+                    hoveredNode={hoveredNode}
+                  />
+                }
+                nodePadding={showParents ? 20 : 28}
+                nodeWidth={showParents ? 20 : 24}
+                margin={{ top: 20, right: 160, bottom: 20, left: 160 }}
+              >
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const data = payload[0].payload;
+
+                    const isLink = data.source && typeof data.source === 'object' && data.target && typeof data.target === 'object';
+
+                    if (isLink) {
+                      const linkValue = data.value;
+                      const sourceNode = data.source;
+                      const targetNode = data.target;
+                      const sourceTotal = sourceNode.value || 0;
+                      const targetTotal = targetNode.value || 0;
+                      const pctOfSource = sourceTotal > 0 ? (linkValue / sourceTotal) * 100 : 0;
+                      const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
+
+                      return (
+                        <ChartTooltip>
+                          <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
+                          <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
+                          {showPercentages && (
+                            <>
+                              <TooltipRow label="Of Source" value={`${pctOfSource.toFixed(1)}%`} />
+                              <TooltipRow label="Of Target" value={`${pctOfTarget.toFixed(1)}%`} />
+                            </>
+                          )}
+                        </ChartTooltip>
+                      );
+                    } else {
+                      const displayValue = showPercentages && data.percentage !== undefined
+                        ? `${data.percentage.toFixed(1)}%`
+                        : formatCurrency(data.value);
+                      return (
+                        <ChartTooltip>
+                          <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
+                          <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
+                          {showPercentages && data.value !== undefined && (
+                            <TooltipRow label="Amount" value={formatCurrency(data.value)} />
+                          )}
+                        </ChartTooltip>
+                      );
+                    }
+                  }}
+                />
+              </Sankey>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

@@ -1,14 +1,21 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ResponsiveLine } from '@nivo/line';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { ChartPoint } from '@/lib/types/financial';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -66,31 +73,20 @@ export function AccountValuesChart() {
     [data, isEnabled]
   );
 
-  const allSeries = useMemo(() => {
-    if (displayData.length === 0) return [];
-    return [
-      {
-        id: 'Net Worth',
-        data: displayData.map((p) => ({ x: p.date, y: p.netWorth, isSynthetic: p.isSynthetic })),
-      },
-      {
-        id: 'Total Assets',
-        data: displayData.map((p) => ({ x: p.date, y: p.totalAssets, isSynthetic: p.isSynthetic })),
-      },
-      {
-        id: 'Total Liabilities',
-        data: displayData.map((p) => ({ x: p.date, y: p.totalLiabilities, isSynthetic: p.isSynthetic })),
-      },
-    ];
+  const chartData = useMemo(() => {
+    return displayData.map((p) => ({
+      date: p.date,
+      isSynthetic: p.isSynthetic,
+      'Net Worth': p.netWorth,
+      'Total Assets': p.totalAssets,
+      'Total Liabilities': p.totalLiabilities,
+      rawPoint: p,
+    }));
   }, [displayData]);
 
   const maxVal = displayData.length > 0
     ? Math.max(...displayData.flatMap((d) => [d.netWorth, d.totalAssets, Math.abs(d.totalLiabilities)]), 1)
     : 1;
-
-  const visibleData = allSeries.filter((s) => activeSeries.has(s.id));
-
-  const hasEstimated = isEnabled('netWorth') && data.some((d) => d.isSynthetic);
 
   const handleSliceClick = useCallback(
     (point: ChartPoint) => {
@@ -99,6 +95,39 @@ export function AccountValuesChart() {
     },
     [router]
   );
+
+  const formatXAxis = (tickStr: string) => {
+    try {
+      const parts = tickStr.split('-');
+      if (parts.length < 3) return tickStr;
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    } catch (e) {
+      return tickStr;
+    }
+  };
+
+  const handleLegendClick = (e: any) => {
+    const { dataKey } = e;
+    setActiveSeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(dataKey)) {
+        next.delete(dataKey);
+      } else {
+        next.add(dataKey);
+      }
+      return next;
+    });
+  };
+
+  const renderLegendText = (value: string) => {
+    const isActive = activeSeries.has(value);
+    return (
+      <span className={`cursor-pointer select-none transition-opacity ${isActive ? 'text-foreground font-medium' : 'text-muted-foreground/40 line-through'}`}>
+        {value}
+      </span>
+    );
+  };
 
   if (loading) {
     return (
@@ -133,112 +162,116 @@ export function AccountValuesChart() {
     );
   }
 
+  const xInterval = displayData.length > 30 ? Math.max(4, Math.floor(displayData.length / 10)) : 0;
+
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">Account Values Over Time</h3>
-
       </div>
       <div className="mb-3">
         <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
       </div>
       <div className="h-[300px]">
-        <ResponsiveLine
-          data={visibleData}
-          margin={{ top: 10, right: 120, left: 60, bottom: 30 }}
-          xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-          yScale={{ type: 'linear', min: 0, max: maxVal * 1.1 }}
-          curve="monotoneX"
-          colors={['var(--color-primary)', 'var(--color-chart-1)', 'var(--color-destructive)']}
-          lineWidth={2}
-          enablePoints={false}
-          enableGridX={false}
-          enableGridY={true}
-          axisBottom={{
-            tickSize: 0, tickPadding: 8,
-            tickValues: displayData.length > 30 ? Math.max(4, Math.floor(displayData.length / 10)) : undefined,
-            format: '%b %y',
-          }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 8,
-            format: (v: number) => {
-              if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-              if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-              return `$${v}`;
-            },
-          }}
-          theme={nivoTheme}
-          useMesh={true}
-          enableSlices="x"
-          layers={[
-            'grid',
-            'axes',
-            ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
-            'lines',
-            'points',
-            'slices',
-            'crosshair',
-            'legends',
-          ] as any}
-          sliceTooltip={({ slice }) => (
-            <ChartTooltip>
-              <TooltipHeader>{String(slice.points[0]?.data.xFormatted)}</TooltipHeader>
-              {slice.points.map((point) => (
-                <TooltipRow
-                  key={point.id}
-                  label={String(point.seriesId)}
-                  value={formatCurrency(Number(point.data.y))}
-                  color={point.color}
-                />
-              ))}
-              {(() => {
-                const p = slice.points[0]?.data.x as any;
-                const dateStr = p instanceof Date
-                  ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`
-                  : String(p);
-                return data.find((d) => d.date === dateStr);
-              })()?.isSynthetic && (
-                <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
-                </div>
-              )}
-            </ChartTooltip>
-          )}
-          onClick={(raw) => {
-            const p = raw as unknown as { data: { x: Date; xFormatted: string } };
-            const d = p.data.x;
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            const pt = data.find((pt) => pt.date === dateStr);
-            if (pt) handleSliceClick(pt);
-          }}
-          animate={displayData.length < 100}
-          legends={[
-            {
-              anchor: 'top-right',
-              direction: 'column',
-              justify: false,
-              translateX: 120,
-              translateY: 0,
-              itemsSpacing: 0,
-              itemDirection: 'left-to-right',
-              itemWidth: 100,
-              itemHeight: 20,
-              itemOpacity: 0.75,
-              symbolSize: 12,
-              symbolShape: 'circle',
-              onClick: (datum: { id: string | number }) => {
-                setActiveSeries((prev) => {
-                  const next = new Set(prev);
-                  const id = String(datum.id);
-                  if (next.has(id)) next.delete(id);
-                  else next.add(id);
-                  return next;
-                });
-              },
-              effects: [{ on: 'hover', style: { itemOpacity: 1 } }],
-            },
-          ]}
-        />
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 10, right: 120, left: 10, bottom: 10 }}
+            onClick={(e: any) => {
+              if (e && e.activePayload && e.activePayload.length > 0) {
+                const pt = e.activePayload[0].payload.rawPoint;
+                if (pt) handleSliceClick(pt);
+              }
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={{ stroke: 'var(--color-border)' }}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              interval={xInterval}
+              tickFormatter={formatXAxis}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              width={65}
+              tickFormatter={(v: number) => {
+                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                return `$${v}`;
+              }}
+              domain={[0, Math.ceil(maxVal * 1.1)]}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const dateStr = payload[0].payload.date;
+                const formattedDate = formatXAxis(dateStr);
+                const isSynthetic = payload[0].payload.isSynthetic;
+
+                return (
+                  <ChartTooltip>
+                    <TooltipHeader>{formattedDate}</TooltipHeader>
+                    {payload.map((p) => (
+                      <TooltipRow
+                        key={p.name}
+                        label={String(p.name)}
+                        value={formatCurrency(Number(p.value))}
+                        color={p.color}
+                      />
+                    ))}
+                    {isSynthetic && (
+                      <div className="text-[10px] text-muted-foreground italic mt-1 border-t border-border pt-1">
+                        (Estimated)
+                      </div>
+                    )}
+                  </ChartTooltip>
+                );
+              }}
+            />
+            <Legend
+              layout="vertical"
+              align="right"
+              verticalAlign="top"
+              wrapperStyle={{ right: 0, paddingLeft: 10, fontSize: 12 }}
+              onClick={handleLegendClick}
+              formatter={renderLegendText}
+            />
+            {activeSeries.has('Net Worth') && (
+              <Line
+                type="monotone"
+                dataKey="Net Worth"
+                stroke="var(--color-primary)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
+            {activeSeries.has('Total Assets') && (
+              <Line
+                type="monotone"
+                dataKey="Total Assets"
+                stroke="var(--color-chart-1)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
+            {activeSeries.has('Total Liabilities') && (
+              <Line
+                type="monotone"
+                dataKey="Total Liabilities"
+                stroke="var(--color-destructive)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

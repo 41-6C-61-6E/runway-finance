@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import type { MonteCarloResult } from '@/lib/services/retirement';
 
@@ -35,7 +34,6 @@ export function RetirementMonteCarlo({
   const grade = useMemo(() => getGrade(monteCarlo.successRate), [monteCarlo.successRate]);
 
   const histData = useMemo(() => {
-    const maxCount = Math.max(...monteCarlo.histogram.map((b) => b.count), 1);
     return monteCarlo.histogram.map((bin) => ({
       id: `${formatCompact(bin.min)}-${formatCompact(bin.max)}`,
       range: `${formatCompact(bin.min)}-${formatCompact(bin.max)}`,
@@ -112,42 +110,45 @@ export function RetirementMonteCarlo({
       <div className="pt-4 border-t border-border">
         <p className="text-xs font-semibold text-foreground mb-3">End Balance Distribution</p>
         <div className="h-[200px]">
-          <ResponsiveBar
-            data={histData}
-            keys={['count']}
-            indexBy="id"
-            margin={{ top: 5, right: 10, left: 40, bottom: 30 }}
-            padding={0.15}
-            borderRadius={1}
-            colors={({ data: d }) => {
-              const bin = d as unknown as { min: number };
-              const legacyGoal = 0;
-              return bin.min >= legacyGoal
-                ? 'var(--color-chart-1)'
-                : 'var(--color-destructive)';
-            }}
-            enableLabel={false}
-            axisLeft={{
-              tickSize: 0, tickPadding: 6,
-              tickValues: 4,
-            }}
-            axisBottom={{
-              tickSize: 0, tickPadding: 6,
-              renderTick: () => null,
-            }}
-            enableGridY={true}
-            enableGridX={false}
-            theme={nivoTheme}
-            tooltip={({ indexValue, value, data: d }) => {
-              const bin = d as unknown as { range: string; pct: string };
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{bin.range}</TooltipHeader>
-                  <TooltipRow label="Simulations" value={`${value} (${bin.pct}%)`} />
-                </ChartTooltip>
-              );
-            }}
-          />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={histData}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
+              <XAxis
+                dataKey="id"
+                tick={false}
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                width={35}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const item = payload[0].payload;
+                  return (
+                    <ChartTooltip>
+                      <TooltipHeader>{item.range}</TooltipHeader>
+                      <TooltipRow label="Simulations" value={`${item.count} (${item.pct}%)`} />
+                    </ChartTooltip>
+                  );
+                }}
+                cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+              />
+              <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                {histData.map((entry, index) => {
+                  const fillCol = entry.min >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+                  return <Cell key={`cell-${index}`} fill={fillCol} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
           <span>{formatCompact(monteCarlo.histogram[0]?.min ?? 0)}</span>
