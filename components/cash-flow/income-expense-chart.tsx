@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import {
   ComposedChart,
   Bar,
@@ -43,8 +44,8 @@ const typeOptions = [
 export function IncomeExpenseChart() {
   const router = useRouter();
   const [allData, setAllData] = useState<MonthlyData[]>([]);
-  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:income-expense:timeframe', '1y');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:income-expense:chartType', 'bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,7 +191,7 @@ export function IncomeExpenseChart() {
         <div className="financial-chart h-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'bar' ? (
-              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+              <ComposedChart data={chartData} barGap="-100%" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 {sharedAxes}
                 <Bar
                   dataKey="income"
@@ -204,7 +205,7 @@ export function IncomeExpenseChart() {
                   dataKey="expenses"
                   name="Expenses"
                   fill="var(--color-destructive)"
-                  radius={[4, 4, 0, 0]}
+                  radius={[0, 0, 4, 4]}
                   maxBarSize={24}
                   onClick={(data: any) => handleClick(data?.payload?.yearMonth)}
                 />

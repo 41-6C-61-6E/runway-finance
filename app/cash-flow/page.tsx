@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
-import { ExpenseCategoryTrend } from '@/components/cash-flow/expense-category-trend';
 
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
@@ -21,24 +20,14 @@ function CashFlowContent() {
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 
-          {(isVisible('incomeExpenseChart') || isVisible('netIncomeAnalysis')) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-              {isVisible('incomeExpenseChart') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                  <div>
-                    <IncomeExpenseChart />
-                    <MathDescription chartId="incomeExpenseChart" />
-                  </div>
-                </Suspense>
-              )}
-              {isVisible('netIncomeAnalysis') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading trend...</div>}>
-                  <div>
-                    <ExpenseCategoryTrend />
-                    <MathDescription chartId="netIncomeAnalysis" />
-                  </div>
-                </Suspense>
-              )}
+          {isVisible('incomeExpenseChart') && (
+            <div className="mt-5">
+              <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
+                <div>
+                  <IncomeExpenseChart />
+                  <MathDescription chartId="incomeExpenseChart" />
+                </div>
+              </Suspense>
             </div>
           )}
 

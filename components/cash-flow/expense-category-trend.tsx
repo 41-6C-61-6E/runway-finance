@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { ResponsiveBar } from '@nivo/bar';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
@@ -34,7 +35,7 @@ function getMonthsInRange(count: number): string[] {
 export function ExpenseCategoryTrend() {
   const router = useRouter();
   const [allCategoryData, setAllCategoryData] = useState<CategoryMonthData[]>([]);
-  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:expense-category-trend:timeframe', '1y');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,15 +89,38 @@ export function ExpenseCategoryTrend() {
       }
     }
 
-    return Array.from(totals.entries())
-      .sort(([, a], [, b]) => b.amount - a.amount)
-      .slice(0, TOP_N)
-      .map(([id, { name, color, amount }]) => ({
+    const sorted = Array.from(totals.entries())
+      .sort(([, a], [, b]) => b.amount - a.amount);
+
+    if (sorted.length <= 20) {
+      return sorted.map(([id, { name, color, amount }]) => ({
         id: name,
         value: amount,
         color,
         categoryId: id,
       }));
+    }
+
+    const top19 = sorted.slice(0, 19);
+    const rest = sorted.slice(19);
+    const restAmount = rest.reduce((sum, [, { amount }]) => sum + amount, 0);
+    const restIds = rest.map(([id]) => id).join(',');
+
+    const mappedTop = top19.map(([id, { name, color, amount }]) => ({
+      id: name,
+      value: amount,
+      color,
+      categoryId: id,
+    }));
+
+    const otherItem = {
+      id: 'Other',
+      value: restAmount,
+      color: '#94a3b8',
+      categoryId: restIds,
+    };
+
+    return [...mappedTop, otherItem];
   }, [allCategoryData]);
 
   const totalSpending = barData.reduce((sum, d) => sum + d.value, 0);
@@ -106,7 +130,11 @@ export function ExpenseCategoryTrend() {
     const endMonth = months[months.length - 1];
     const d = new Date(Number(endMonth.split('-')[0]), Number(endMonth.split('-')[1]), 0);
     const endDate = `${endMonth}-${String(d.getDate()).padStart(2, '0')}`;
-    router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
+    if (categoryId.includes(',')) {
+      router.push(`/transactions?categoryIds=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
+    } else {
+      router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
+    }
   };
 
   if (loading) {

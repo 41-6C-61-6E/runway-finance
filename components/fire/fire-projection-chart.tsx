@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsiveBar } from '@nivo/bar';
 import { formatCurrency } from '@/lib/utils/format';
@@ -8,6 +8,7 @@ import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface FireScenario {
   currentAge: number;
@@ -44,7 +45,7 @@ function sampleTicks(values: string[], maxTicks: number): string[] {
 }
 
 export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
-  const [chartType, setChartType] = useState<ChartType>('line');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:fire-projection:chartType', 'line');
 
   const fireNumber = scenario.safeWithdrawalRate > 0
     ? scenario.targetAnnualExpenses / scenario.safeWithdrawalRate

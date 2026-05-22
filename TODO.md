@@ -13,11 +13,6 @@
 - Vuln patch
 
 
-
-
-
-
-
 - Currently there is no way to capture 401k match, tax withholding, other paycheck deductions (union dues, cafeteria, insurance) to be used in the analytics. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes. Understand the schema. There may need to be a manual transaction type feature. Where would it make sense to solicit this data form the user and incorporate it? Possibly a rule the triggers when a paycheck is detected and then the witholdings are auto created or somehting like that. Help me witht he logic and flow. make some proposals and ask quesitons. 
 
 - investments page with holdings and other metrics
