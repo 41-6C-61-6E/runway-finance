@@ -26,8 +26,6 @@ interface MortgageInfo {
   monthlyPayment: number;
   metadata?: Record<string, unknown>;
   extraPrincipal?: number;
-  principal?: number;
-  interest?: number;
   pmi?: number;
   escrow?: number;
 }
@@ -238,8 +236,6 @@ export function PropertyCards() {
         monthlyPayment: parseFloat(mortgageEditMeta.monthlyPayment || '0'),
         escrowAmount: parseFloat(mortgageEditMeta.escrowAmount || '0'),
         extraPrincipal: parseFloat(mortgageEditMeta.extraPrincipal || '0'),
-        principal: parseFloat(mortgageEditMeta.principal || '0'),
-        interest: parseFloat(mortgageEditMeta.interest || '0'),
         pmi: parseFloat(mortgageEditMeta.pmi || '0'),
         escrow: parseFloat(mortgageEditMeta.escrow || '0'),
       };
