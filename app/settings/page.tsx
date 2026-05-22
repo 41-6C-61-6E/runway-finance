@@ -69,7 +69,7 @@ type Account = {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { sidebarWidth } = useSidebar();
+  const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
   const [loading, setLoading] = useState(false);
@@ -591,6 +591,18 @@ export default function SettingsPage() {
                 <Switch
                   checked={hideSubheadings}
                   onCheckedChange={updateHideSubheadings}
+                />
+              </div>
+
+              {/* Hide Accounts Sidebar by Default */}
+              <div className="flex items-center justify-between pb-5 border-b border-border">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Hide Accounts Sidebar by Default</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Start with the accounts sidebar collapsed on all pages</p>
+                </div>
+                <Switch
+                  checked={hideAccountsSidebarByDefault}
+                  onCheckedChange={updateHideAccountsSidebarByDefault}
                 />
               </div>
 
