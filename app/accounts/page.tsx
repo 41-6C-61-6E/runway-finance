@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
@@ -224,6 +225,11 @@ function AccountTransactions({ accountId }: AccountTransactionsProps) {
   );
 }
 
+const setOptions = {
+  serialize: (s: Set<string>) => JSON.stringify(Array.from(s)),
+  deserialize: (raw: string) => new Set<string>(JSON.parse(raw)),
+};
+
 // ── Main Accounts Dashboard Page ─────────────────────────────────────────────
 export default function AccountsPage() {
   const { data: session } = useSession();
@@ -231,10 +237,10 @@ export default function AccountsPage() {
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
 
-  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
-  const [chartType, setChartType] = useState<ChartType>('line');
-  const [groupMode, setGroupMode] = useState<GroupingMode>('type');
-  const [showHidden, setShowHidden] = useState(false);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:accounts:timeframe', '1m');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:accounts:chartType', 'line');
+  const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('runway:accounts:groupMode', 'type');
+  const [showHidden, setShowHidden] = usePersistentState<boolean>('runway:accounts:showHidden', false);
 
   // Tree expanded states
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -242,9 +248,9 @@ export default function AccountsPage() {
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
 
   // Dropdown filter selections
-  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
-  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+  const [selectedGroups, setSelectedGroups] = usePersistentState<Set<string>>('runway:accounts:selectedGroups', new Set(), setOptions);
+  const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('runway:accounts:selectedTypes', new Set(), setOptions);
+  const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:selectedAccounts', new Set(), setOptions);
 
   // Dropdown open states
   const [groupsOpen, setGroupsOpen] = useState(false);

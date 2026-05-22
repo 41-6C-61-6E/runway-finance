@@ -11,6 +11,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface MonthlyData {
   yearMonth: string;
@@ -31,8 +32,8 @@ const typeOptions = [
 export function NetIncomeAnalysis() {
   const router = useRouter();
   const [allData, setAllData] = useState<MonthlyData[]>([]);
-  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:net-income-analysis:timeframe', '1y');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:net-income-analysis:chartType', 'bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

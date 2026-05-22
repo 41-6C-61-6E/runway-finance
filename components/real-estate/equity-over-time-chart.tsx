@@ -10,6 +10,7 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { EstimatePill } from '@/components/ui/estimate-pill';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface PropertySnapshot {
   date: string;
@@ -35,7 +36,7 @@ export function EquityOverTimeChart() {
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>('1y');
+  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('runway:real-estate:timeRange', '1y');
 
   useEffect(() => {
     fetch('/api/real-estate?months=600', { credentials: 'include' })
