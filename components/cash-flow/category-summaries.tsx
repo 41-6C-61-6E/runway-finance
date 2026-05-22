@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -56,12 +57,42 @@ function getCurrentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getMonthForTimeRange(range: TimeRange): string {
+function getMonthRange(timeframe: TimeRange): { start: string; end: string } {
   const now = new Date();
-  if (range === '1m' || range === '3m' || range === '6m' || range === '1y' || range === 'ytd' || range === 'all') {
-    return getCurrentMonth();
+  const currentYm = getCurrentMonth();
+
+  if (timeframe === '1m') {
+    return { start: currentYm, end: currentYm };
   }
-  return getCurrentMonth();
+
+  let start: Date;
+  switch (timeframe) {
+    case '3m':
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      break;
+    case '6m':
+      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      break;
+    case '1y':
+      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      break;
+    case '5y':
+      start = new Date(now.getFullYear() - 5, now.getMonth() + 1, 1);
+      break;
+    case 'ytd':
+      start = new Date(now.getFullYear(), 0, 1);
+      break;
+    case 'all':
+      start = new Date(2000, 0, 1);
+      break;
+    default:
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  return {
+    start: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+    end: currentYm,
+  };
 }
 
 export function CategorySummaries() {
@@ -70,16 +101,22 @@ export function CategorySummaries() {
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:category-summaries:timeframe', '1m');
 
-  const month = getMonthForTimeRange(timeframe);
+  const queryParams = useMemo(() => {
+    const range = getMonthRange(timeframe);
+    if (timeframe === '1m') {
+      return `month=${range.start}`;
+    }
+    return `startMonth=${range.start}&endMonth=${range.end}`;
+  }, [timeframe]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`/api/cash-flow/categories?month=${month}`);
+        const res = await fetch(`/api/cash-flow/categories?${queryParams}`);
         if (!res.ok) throw new Error('Failed to fetch categories');
         const json = await res.json();
         setAllCategories(json);
@@ -90,7 +127,7 @@ export function CategorySummaries() {
       }
     };
     fetchData();
-  }, [month]);
+  }, [queryParams]);
 
   const income = useMemo(() =>
     allCategories
@@ -107,7 +144,12 @@ export function CategorySummaries() {
   );
 
   const handleCategoryClick = (categoryId: string) => {
-    router.push(`/transactions?categoryId=${categoryId}`);
+    const range = getMonthRange(timeframe);
+    const startDate = `${range.start}-01`;
+    const [endYear, endMonthStr] = range.end.split('-').map(Number);
+    const lastDay = new Date(endYear, endMonthStr, 0).getDate();
+    const endDate = `${range.end}-${String(lastDay).padStart(2, '0')}`;
+    router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
   };
 
   if (loading) {

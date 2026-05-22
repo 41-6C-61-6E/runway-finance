@@ -21,6 +21,7 @@ import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-typ
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { EstimatePill } from '@/components/ui/estimate-pill';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface ChartSummary {
   current: number;
@@ -49,6 +50,7 @@ const CHART_COLOR_MAP = [
   'var(--chart-4)',
   'var(--chart-5)',
   'var(--chart-synthetic)',
+  'var(--destructive-synthetic)',
   'var(--destructive-synthetic)',
 ];
 
@@ -141,15 +143,22 @@ function toDateKey(value: unknown): string | null {
 export function NetWorthChart() {
   const router = useRouter();
   const { isEnabled } = useSyntheticData();
-  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
-  const [chartType, setChartType] = useState<ChartType>('line');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:net-worth:timeframe', '1m');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:net-worth:chartType', 'line');
   const [data, setData] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = usePersistentState<Set<string>>(
+    'runway:net-worth:selectedCategories',
+    new Set(),
+    {
+      serialize: (val) => JSON.stringify(Array.from(val)),
+      deserialize: (raw) => new Set(JSON.parse(raw)),
+    }
+  );
   const [summary, setSummary] = useState<ChartSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showBreakdown, setShowBreakdown] = useState(true);
+  const [showBreakdown, setShowBreakdown] = usePersistentState<boolean>('runway:net-worth:showBreakdown', true);
 
   const displayData = useMemo(
     () => (isEnabled('netWorth') ? data : data.filter((d) => !d.isSynthetic)),
@@ -191,11 +200,13 @@ export function NetWorthChart() {
         setData(normalizedData);
         setCategories(fetchedCats);
         setSelectedCategories((prev) => {
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('runway:net-worth:selectedCategories') : null;
+          if (stored !== null) {
+            return prev;
+          }
           const next = new Set(prev);
           fetchedCats.forEach((c) => {
-            if (prev.size === 0 || !prev.has(c)) {
-              next.add(c);
-            }
+            next.add(c);
           });
           return next;
         });
