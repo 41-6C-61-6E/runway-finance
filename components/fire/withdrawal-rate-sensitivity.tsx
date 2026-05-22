@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
@@ -75,42 +74,50 @@ export function WithdrawalRateSensitivity({ scenario }: { scenario: FireScenario
         How different safe withdrawal rates affect your FIRE number and years to FI
       </p>
       <div className="h-[280px]">
-        <ResponsiveBar
-          data={data as any}
-          keys={['yearsToFI']}
-          indexBy="rate"
-          margin={{ top: 10, right: 10, left: 55, bottom: 30 }}
-          padding={0.25}
-          borderRadius={2}
-          colors={({ data: d }) =>
-            (d as unknown as Record<string, unknown>).isCurrent
-              ? 'var(--color-primary)'
-              : 'var(--color-chart-2)'
-          }
-          axisLeft={{
-            tickSize: 0, tickPadding: 8,
-            format: (v: number) => `${v.toFixed(0)} yrs`,
-          }}
-          axisBottom={{
-            tickSize: 0, tickPadding: 8,
-            legend: 'Safe Withdrawal Rate',
-            legendPosition: 'middle',
-            legendOffset: 22,
-          }}
-          enableGridY={true}
-          enableGridX={false}
-          theme={nivoTheme}
-          tooltip={({ indexValue, value, data: d }) => {
-            const barData = d as unknown as { fireNumber: number; isCurrent: number };
-            return (
-              <ChartTooltip>
-                <TooltipHeader>{String(indexValue)} SWR{barData.isCurrent ? ' (current)' : ''}</TooltipHeader>
-                <TooltipRow label="Years to FI" value={`${value.toFixed(1)} yrs`} />
-                <TooltipRow label="FIRE Number" value={formatCurrency(barData.fireNumber)} />
-              </ChartTooltip>
-            );
-          }}
-        />
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
+            <XAxis
+              dataKey="rate"
+              tickLine={false}
+              axisLine={{ stroke: 'var(--color-border)' }}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              label={{ value: 'Safe Withdrawal Rate', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              tickFormatter={(v: number) => `${v.toFixed(0)} yrs`}
+              width={50}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const item = payload[0].payload;
+                return (
+                  <ChartTooltip>
+                    <TooltipHeader>{String(item.rate)} SWR{item.isCurrent ? ' (current)' : ''}</TooltipHeader>
+                    <TooltipRow label="Years to FI" value={`${item.yearsToFI.toFixed(1)} yrs`} />
+                    <TooltipRow label="FIRE Number" value={formatCurrency(item.fireNumber)} />
+                  </ChartTooltip>
+                );
+              }}
+              cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+            />
+            <Bar dataKey="yearsToFI" radius={[2, 2, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.isCurrent ? 'var(--color-primary)' : 'var(--color-chart-2)'}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

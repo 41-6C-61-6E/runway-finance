@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ResponsivePie } from '@nivo/pie';
-import { ResponsiveBar } from '@nivo/bar';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -323,70 +321,95 @@ export function SpendingBreakdown() {
                 const dynamicLeft = Math.max(80, maxLabelLen * 7 + 12);
                 
                 return (
-                  <ResponsiveBar
-                    data={pieData}
-                    keys={['value']}
-                    indexBy="id"
-                    margin={{ top: 10, right: 10, left: dynamicLeft, bottom: 20 }}
-                    padding={0.3}
-                    borderRadius={2}
-                    enableLabel={false}
-                    colors={{ datum: 'data.color' }}
-                    axisLeft={{
-                      tickSize: 0,
-                      tickPadding: 8,
-                      format: (v) => {
-                        const str = String(v);
-                        return str.length > 20 ? `${str.slice(0, 20)}...` : str;
-                      },
-                    }}
-                    axisBottom={{
-                      tickSize: 0,
-                      tickPadding: 8,
-                      renderTick: () => null,
-                    }}
-                    enableGridY={true}
-                    enableGridX={false}
-                    layout="horizontal"
-                    theme={nivoTheme}
-                    onClick={({ data: barData }) => handleClick(barData.categoryId)}
-                    tooltip={({ indexValue, value }) => {
-                      const pct = totalSpending > 0 ? ((value / totalSpending) * 100).toFixed(1) : '0';
-                      return (
-                        <ChartTooltip>
-                          <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                          <TooltipRow label="Amount" value={formatCurrency(value)} />
-                          <TooltipRow label="Percent" value={`${pct}%`} />
-                        </ChartTooltip>
-                      );
-                    }}
-                  />
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      layout="vertical"
+                      data={pieData}
+                      margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="id"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        width={dynamicLeft}
+                        tickFormatter={(v) => v.length > 20 ? `${v.slice(0, 20)}...` : v}
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[0, 2, 2, 0]}
+                        onClick={(data: any) => {
+                          const catId = data.categoryId || (data.payload && data.payload.categoryId);
+                          if (catId) handleClick(catId);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload || !payload.length) return null;
+                          const datum = payload[0].payload;
+                          const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
+                          return (
+                            <ChartTooltip>
+                              <TooltipHeader>{String(datum.id)}</TooltipHeader>
+                              <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
+                              <TooltipRow label="Percent" value={`${pct}%`} />
+                            </ChartTooltip>
+                          );
+                        }}
+                        cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 );
               })() : (
                 <>
-                  <ResponsivePie
-                    data={pieData}
-                    margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                    innerRadius={0.65}
-                    padAngle={0.5}
-                    cornerRadius={3}
-                    colors={{ datum: 'data.color' }}
-                    borderWidth={0}
-                    enableArcLinkLabels={false}
-                    enableArcLabels={false}
-                    theme={nivoTheme}
-                    onClick={(datum) => handleClick(datum.data.categoryId)}
-                    tooltip={({ datum }) => {
-                      const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
-                      return (
-                        <ChartTooltip>
-                          <TooltipHeader>{datum.label}</TooltipHeader>
-                          <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-                          <TooltipRow label="Percent" value={`${pct}%`} />
-                        </ChartTooltip>
-                      );
-                    }}
-                  />
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="id"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="65%"
+                        outerRadius="80%"
+                        paddingAngle={0.5}
+                        cornerRadius={3}
+                        stroke="none"
+                        onClick={(data: any) => {
+                          const catId = data.categoryId || (data.payload && data.payload.categoryId);
+                          if (catId) handleClick(catId);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload || !payload.length) return null;
+                          const datum = payload[0].payload;
+                          const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
+                          return (
+                            <ChartTooltip>
+                              <TooltipHeader>{datum.label}</TooltipHeader>
+                              <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
+                              <TooltipRow label="Percent" value={`${pct}%`} />
+                            </ChartTooltip>
+                          );
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
                     <div className="text-xl font-bold text-foreground blur-number font-mono">{formatCurrency(totalSpending)}</div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Spending</div>

@@ -2,8 +2,8 @@
 
 import { Suspense } from 'react';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
-
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
+
 import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -30,8 +30,6 @@ function CashFlowContent() {
               </Suspense>
             </div>
           )}
-
-
 
           {isVisible('cashFlowSankey') && (
             <div className="mt-5">

@@ -1,13 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ResponsiveLine } from '@nivo/line';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -23,8 +29,12 @@ interface PropertyData {
   name: string;
   value: number;
   snapshots: PropertySnapshot[];
-  mortgageSnapshots: PropertySnapshot[];
+  mortgageSnapshots: (PropertySnapshot & { accountId?: string })[];
   linkedMortgages: { id: string; name: string; balance: number }[];
+  metadata?: {
+    purchaseDate?: string;
+    [key: string]: any;
+  };
 }
 
 interface RealEstateData {
@@ -36,7 +46,8 @@ export function EquityOverTimeChart() {
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('runway:real-estate:timeRange', '1y');
+  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('runway:real-estate:timeRange', 'all');
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
   useEffect(() => {
     fetch('/api/real-estate?months=600', { credentials: 'include' })
@@ -48,6 +59,190 @@ export function EquityOverTimeChart() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const properties = data?.properties ?? [];
+
+  // Compute timelines once data is loaded
+  const { propTimelines, combinedTimeline } = useMemo(() => {
+    if (properties.length === 0) return { propTimelines: [], combinedTimeline: [] };
+
+    const parsedTimelines = properties.map((prop) => {
+      // Group mortgage snapshots by date and accountId to avoid double counting and handle multiple mortgages correctly
+      const sortedPropSnaps = [...prop.snapshots].sort((a, b) => a.date.localeCompare(b.date));
+      const sortedMortSnaps = [...prop.mortgageSnapshots].sort((a, b) => a.date.localeCompare(b.date));
+
+      const mortgageSnapshotsByDate: Record<string, Record<string, { value: number; isSynthetic: boolean }>> = {};
+      for (const snap of sortedMortSnaps) {
+        const accId = snap.accountId || 'default';
+        if (!mortgageSnapshotsByDate[snap.date]) {
+          mortgageSnapshotsByDate[snap.date] = {};
+        }
+        mortgageSnapshotsByDate[snap.date][accId] = {
+          value: Math.abs(snap.value),
+          isSynthetic: snap.isSynthetic ?? false,
+        };
+      }
+
+      // Group property snapshots by date
+      const propSnapshotsByDate: Record<string, { value: number; isSynthetic: boolean }> = {};
+      for (const snap of sortedPropSnaps) {
+        propSnapshotsByDate[snap.date] = {
+          value: snap.value,
+          isSynthetic: snap.isSynthetic ?? false,
+        };
+      }
+
+      // All unique dates for this property
+      const allDates = Array.from(new Set([
+        ...Object.keys(propSnapshotsByDate),
+        ...Object.keys(mortgageSnapshotsByDate)
+      ])).sort();
+
+      if (allDates.length === 0) {
+        allDates.push(new Date().toISOString().split('T')[0]);
+      }
+
+      // Chronologically forward-fill values
+      let lastPropValue = prop.value;
+      if (sortedPropSnaps.length > 0) {
+        lastPropValue = sortedPropSnaps[0].value;
+      }
+
+      // Map from mortgage account ID to its last known balance
+      const lastMortgageBalances: Record<string, number> = {};
+      for (const m of prop.linkedMortgages) {
+        lastMortgageBalances[m.id] = Math.abs(m.balance);
+      }
+
+      const timeline = allDates.map((date) => {
+        // Update property value if there's a snapshot
+        if (propSnapshotsByDate[date]) {
+          lastPropValue = propSnapshotsByDate[date].value;
+        }
+
+        // Update mortgage balances if there's a snapshot on this date
+        if (mortgageSnapshotsByDate[date]) {
+          for (const [accId, snapInfo] of Object.entries(mortgageSnapshotsByDate[date])) {
+            lastMortgageBalances[accId] = snapInfo.value;
+          }
+        }
+
+        // Sum current mortgage balances
+        const totalMortgageBalance = Object.values(lastMortgageBalances).reduce((s, b) => s + b, 0);
+        const equity = lastPropValue - totalMortgageBalance;
+
+        // Is synthetic if property snapshot or any current mortgage snapshot on this date is synthetic
+        const isSyntheticProp = propSnapshotsByDate[date]?.isSynthetic ?? false;
+        const isSyntheticMort = mortgageSnapshotsByDate[date]
+          ? Object.values(mortgageSnapshotsByDate[date]).some(s => s.isSynthetic)
+          : false;
+        const isSynthetic = isSyntheticProp || isSyntheticMort;
+
+        return {
+          date,
+          homeValue: Math.round(lastPropValue * 100) / 100,
+          equity: Math.round(equity * 100) / 100,
+          mortgage: Math.round(totalMortgageBalance * 100) / 100,
+          isSynthetic,
+        };
+      });
+
+      // Filter by purchaseDate if available
+      const purchaseDate = prop.metadata?.purchaseDate;
+      const filteredTimeline = timeline.filter((pt) => !purchaseDate || pt.date >= purchaseDate);
+
+      // Ensure at least one data point
+      if (filteredTimeline.length === 0) {
+        const date = purchaseDate || new Date().toISOString().split('T')[0];
+        const totalMort = prop.linkedMortgages.reduce((sum, m) => sum + Math.abs(m.balance), 0);
+        filteredTimeline.push({
+          date,
+          homeValue: prop.value,
+          equity: prop.value - totalMort,
+          mortgage: totalMort,
+          isSynthetic: false,
+        });
+      }
+
+      return {
+        id: prop.id,
+        name: prop.name,
+        purchaseDate,
+        timeline: filteredTimeline,
+      };
+    });
+
+    // Generate Combined Timeline
+    const allCombinedDates = Array.from(new Set(
+      parsedTimelines.flatMap((pt) => pt.timeline.map((item) => item.date))
+    )).sort();
+
+    if (allCombinedDates.length === 0) {
+      allCombinedDates.push(new Date().toISOString().split('T')[0]);
+    }
+
+    const combined = allCombinedDates.map((date) => {
+      let totalHomeValue = 0;
+      let totalEquity = 0;
+      let totalMortgage = 0;
+      let isSynthetic = false;
+
+      for (const pt of parsedTimelines) {
+        // Find latest point <= date
+        const matches = pt.timeline.filter((item) => item.date <= date);
+        if (matches.length > 0) {
+          const latestPoint = matches[matches.length - 1];
+          totalHomeValue += latestPoint.homeValue;
+          totalEquity += latestPoint.equity;
+          totalMortgage += latestPoint.mortgage;
+          if (latestPoint.isSynthetic) {
+            isSynthetic = true;
+          }
+        }
+      }
+
+      return {
+        date,
+        homeValue: Math.round(totalHomeValue * 100) / 100,
+        equity: Math.round(totalEquity * 100) / 100,
+        mortgage: Math.round(totalMortgage * 100) / 100,
+        isSynthetic,
+      };
+    });
+
+    return { propTimelines: parsedTimelines, combinedTimeline: combined };
+  }, [properties]);
+
+  const showSynth = isEnabled('realEstate');
+
+  const activeTimeline = useMemo(() => {
+    const rawTimeline = selectedPropertyId === 'all'
+      ? combinedTimeline
+      : (propTimelines.find((p) => p.id === selectedPropertyId)?.timeline ?? []);
+
+    // Filter synthetic data if showSynth is false
+    const synthFiltered = rawTimeline.filter((pt) => showSynth || !pt.isSynthetic);
+
+    // Calculate cutoff date string
+    let cutoffStr = '1970-01-01';
+    if (timeRange !== 'all') {
+      const cutoffDate = new Date();
+      if (timeRange === '1m') cutoffDate.setMonth(cutoffDate.getMonth() - 1);
+      else if (timeRange === '3m') cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+      else if (timeRange === '6m') cutoffDate.setMonth(cutoffDate.getMonth() - 6);
+      else if (timeRange === '1y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+      else if (timeRange === '5y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
+      else if (timeRange === 'ytd') {
+        cutoffDate.setMonth(0, 1);
+      }
+      const y = cutoffDate.getFullYear();
+      const m = String(cutoffDate.getMonth() + 1).padStart(2, '0');
+      const d = String(cutoffDate.getDate()).padStart(2, '0');
+      cutoffStr = `${y}-${m}-${d}`;
+    }
+
+    return synthFiltered.filter((pt) => pt.date >= cutoffStr);
+  }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeRange]);
 
   if (loading) {
     return (
@@ -71,7 +266,6 @@ export function EquityOverTimeChart() {
     );
   }
 
-  const properties = data?.properties ?? [];
   if (properties.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-5">
@@ -81,75 +275,78 @@ export function EquityOverTimeChart() {
     );
   }
 
-  // Build equity series per property using mortgage snapshots as canonical timeline
-  // Forward-fill property values from nearest prior property snapshot to avoid
-  // mixing historical and current data (which caused ~90-day spike artifacts).
-  const chartData = properties.map((prop) => {
-    const totalMortgage = prop.linkedMortgages.reduce((s, m) => s + Math.abs(m.balance), 0);
+  const hasEstimated = showSynth && activeTimeline.some((pt) => pt.isSynthetic);
+  const maxVal = Math.max(...activeTimeline.map((pt) => pt.homeValue), 1);
 
-    const sortedPropSnaps = [...prop.snapshots].sort((a, b) => a.date.localeCompare(b.date));
-    const sortedMortSnaps = [...prop.mortgageSnapshots].sort((a, b) => a.date.localeCompare(b.date));
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    
+    const point = payload[0].payload;
+    const dateStr = point.date;
 
-    const data: Array<{ x: string; y: number; isSynthetic: boolean }> = [];
-
-    if (sortedMortSnaps.length > 0) {
-      let propIdx = 0;
-      for (const mortSnap of sortedMortSnaps) {
-        while (propIdx < sortedPropSnaps.length - 1 && sortedPropSnaps[propIdx + 1].date <= mortSnap.date) {
-          propIdx++;
-        }
-        const propSnap = propIdx < sortedPropSnaps.length && sortedPropSnaps[propIdx].date <= mortSnap.date
-          ? sortedPropSnaps[propIdx]
-          : null;
-        const propValue = propSnap ? propSnap.value : prop.value;
-        const equity = propValue - Math.abs(mortSnap.value);
-        data.push({
-          x: mortSnap.date,
-          y: Math.round(equity * 100) / 100,
-          isSynthetic: (propSnap?.isSynthetic ?? false) || (mortSnap.isSynthetic ?? false),
+    const formatPointDate = (d: string) => {
+      const parts = d.split('-');
+      if (parts.length === 3) {
+        const date = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: '2-digit',
+          timeZone: 'UTC'
         });
       }
-    } else if (sortedPropSnaps.length > 0) {
-      for (const propSnap of sortedPropSnaps) {
-        data.push({
-          x: propSnap.date,
-          y: propSnap.value - totalMortgage,
-          isSynthetic: propSnap.isSynthetic ?? false,
-        });
-      }
-    }
+      return new Date(d).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: '2-digit',
+      });
+    };
 
-    if (data.length === 0) {
-      data.push({ x: new Date().toISOString().split('T')[0], y: prop.value - totalMortgage, isSynthetic: false });
-    }
+    const mortgage = point.homeValue - point.equity;
 
-    return { id: prop.name, data };
-  });
-
-  const cutoffDate = new Date();
-  if (timeRange === '1m') cutoffDate.setMonth(cutoffDate.getMonth() - 1);
-  else if (timeRange === '3m') cutoffDate.setMonth(cutoffDate.getMonth() - 3);
-  else if (timeRange === '6m') cutoffDate.setMonth(cutoffDate.getMonth() - 6);
-  else if (timeRange === '1y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-  else if (timeRange === '5y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
-
-  const showSynth = isEnabled('realEstate');
-
-  const filtered = chartData.map((series) => ({
-    ...series,
-    data: series.data.filter((d) => (showSynth || !d.isSynthetic) && new Date(d.x) >= cutoffDate),
-  })).filter((s) => s.data.length > 0);
-
-  // Check if any snapshot data contains synthetic (estimated) values
-  const hasEstimated = showSynth && chartData.some((series) =>
-    series.data.some((d) => d.isSynthetic)
-  );
+    return (
+      <ChartTooltip>
+        <TooltipHeader>{formatPointDate(String(dateStr))}</TooltipHeader>
+        <TooltipRow
+          label="Home Value"
+          value={formatCurrency(point.homeValue)}
+          color="var(--color-chart-2)"
+        />
+        <TooltipRow
+          label="Equity"
+          value={formatCurrency(point.equity)}
+          color="var(--color-chart-1)"
+        />
+        {mortgage > 0 && (
+          <TooltipRow
+            label="Mortgage Balance"
+            value={formatCurrency(mortgage)}
+            color="var(--color-muted-foreground)"
+          />
+        )}
+      </ChartTooltip>
+    );
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm relative">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {properties.length > 1 && (
+            <select
+              value={selectedPropertyId}
+              onChange={(e) => setSelectedPropertyId(e.target.value)}
+              className="bg-card text-foreground hover:bg-muted text-xs font-medium px-3 py-1.5 rounded-lg border border-border focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer transition-colors"
+            >
+              <option value="all">All Properties</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
           <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
         </div>
       </div>
@@ -160,49 +357,81 @@ export function EquityOverTimeChart() {
           </div>
         )}
         <div className="financial-chart h-full">
-          <ResponsiveLine
-            data={filtered}
-            margin={{ top: 10, right: 20, left: 80, bottom: 30 }}
-            xScale={{ type: 'time', format: '%Y-%m-%d', useUTC: false, precision: 'day' }}
-            yScale={{ type: 'linear', min: 0, max: Math.max(...filtered.flatMap((s) => s.data.map((d) => d.y)), 1) * 1.1 }}
-            curve="monotoneX"
-            axisLeft={{
-              tickSize: 0, tickPadding: 8,
-              format: (v: number) => {
-                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                return `$${v}`;
-              },
-            }}
-            axisBottom={{
-              tickSize: 0, tickPadding: 8, tickValues: 4,
-              format: '%b %y',
-            }}
-            enableGridY={true}
-            enableGridX={false}
-            enablePoints={false}
-            enableArea={true}
-            areaOpacity={0.06}
-            colors={['var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)']}
-            theme={nivoTheme}
-            animate={filtered[0]?.data.length < 100}
-            layers={[
-              'grid',
-              'axes',
-              ...(hasEstimated ? [(props: any) => <SyntheticLineLayer key="synthetic" {...props} />] : []),
-              'lines',
-              'points',
-              'slices',
-              'crosshair',
-              'legends',
-            ] as any}
-            tooltip={({ point }) => (
-              <ChartTooltip>
-                <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
-                <TooltipRow label={String(point.seriesId)} value={formatCurrency(point.data.y as number)} />
-              </ChartTooltip>
-            )}
-          />
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={activeTimeline}
+              margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
+            >
+              <defs>
+                <linearGradient id="colorHomeValue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.12}/>
+                  <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.01}/>
+                </linearGradient>
+                <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
+                  <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={(d) => {
+                  if (!d) return '';
+                  const parts = d.split('-');
+                  if (parts.length === 3) {
+                    const date = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+                    return timeRange === '1m'
+                      ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+                      : date.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+                  }
+                  return timeRange === '1m'
+                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                domain={[0, maxVal * 1.05]}
+                tickFormatter={(v: number) => {
+                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                  if (v === 0) return '$0';
+                  return `$${v.toFixed(0)}`;
+                }}
+              />
+              <RechartsTooltip
+                content={<CustomTooltip />}
+                cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }}
+              />
+              
+              {/* Home Value Area (renders behind) */}
+              <Area
+                type="monotone"
+                dataKey="homeValue"
+                name="Home Value"
+                stroke="var(--color-chart-2)"
+                strokeWidth={2}
+                fill="url(#colorHomeValue)"
+                dot={false}
+              />
+              
+              {/* Equity Area (renders in front) */}
+              <Area
+                type="monotone"
+                dataKey="equity"
+                name="Equity"
+                stroke="var(--color-chart-1)"
+                strokeWidth={2}
+                fill="url(#colorEquity)"
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
@@ -130,49 +129,59 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
         Baseline: {baseline === Infinity ? '∞' : `${baseline.toFixed(1)} yrs`} to FI
       </p>
       <div className="h-[280px]">
-        <ResponsiveBar
-          data={chartData as any}
-          keys={['years']}
-          indexBy="scenario"
-          margin={{ top: 10, right: 80, left: 110, bottom: 40 }}
-          padding={0.3}
-          borderRadius={2}
-          layout="horizontal"
-          colors={({ data: d }) =>
-            (d as unknown as { isFaster: number }).isFaster
-              ? 'var(--color-chart-1)'
-              : 'var(--color-destructive)'
-          }
-          axisLeft={{
-            tickSize: 0, tickPadding: 8,
-            format: (v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v,
-          }}
-          axisBottom={{
-            tickSize: 0, tickPadding: 8,
-            legend: 'Years to FI',
-            legendPosition: 'middle',
-            legendOffset: 30,
-          }}
-          enableGridY={false}
-          enableGridX={true}
-          theme={nivoTheme}
-          tooltip={({ indexValue, value, data: d }) => {
-            const barData = d as unknown as { diff: number; isFaster: boolean };
-            return (
-              <ChartTooltip>
-                <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                <TooltipRow label="Years to FI" value={`${value.toFixed(1)} yrs`} />
-                {barData.isFaster ? (
-                  <TooltipRow label="vs Baseline" value={`-${barData.diff.toFixed(1)} yrs`} color="var(--color-chart-1)" />
-                ) : !barData.diff ? (
-                  <TooltipRow label="vs Baseline" value="Same" color="var(--color-muted-foreground)" />
-                ) : (
-                  <TooltipRow label="vs Baseline" value={`+${Math.abs(barData.diff).toFixed(1)} yrs`} color="var(--color-destructive)" />
-                )}
-              </ChartTooltip>
-            );
-          }}
-        />
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            layout="vertical"
+            data={chartData}
+            margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+            <XAxis
+              type="number"
+              tickLine={false}
+              axisLine={{ stroke: 'var(--color-border)' }}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              label={{ value: 'Years to FI', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+            />
+            <YAxis
+              type="category"
+              dataKey="scenario"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v}
+              width={110}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const item = payload[0].payload;
+                return (
+                  <ChartTooltip>
+                    <TooltipHeader>{String(item.scenario)}</TooltipHeader>
+                    <TooltipRow label="Years to FI" value={`${item.years.toFixed(1)} yrs`} />
+                    {item.isFaster ? (
+                      <TooltipRow label="vs Baseline" value={`-${item.diff.toFixed(1)} yrs`} color="var(--color-chart-1)" />
+                    ) : !item.diff ? (
+                      <TooltipRow label="vs Baseline" value="Same" color="var(--color-muted-foreground)" />
+                    ) : (
+                      <TooltipRow label="vs Baseline" value={`+${Math.abs(item.diff).toFixed(1)} yrs`} color="var(--color-destructive)" />
+                    )}
+                  </ChartTooltip>
+                );
+              }}
+              cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+            />
+            <Bar dataKey="years" radius={[0, 4, 4, 0]}>
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.isFaster ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
