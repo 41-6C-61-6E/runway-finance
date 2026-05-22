@@ -14,8 +14,6 @@ interface MortgageInfo {
   termMonths?: number;
   metadata?: Record<string, unknown>;
   extraPrincipal?: number;
-  principal?: number;
-  interest?: number;
   pmi?: number;
   escrow?: number;
 }

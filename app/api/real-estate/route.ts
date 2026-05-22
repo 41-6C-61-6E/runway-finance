@@ -134,8 +134,6 @@ export async function GET(request: Request) {
               monthlyPayment: parseFloat(String(mortgageMeta?.monthlyPayment ?? '0')),
               termMonths: parseInt(String(mortgageMeta?.termMonths ?? '360'), 10),
               extraPrincipal: parseFloat(String(mortgageMeta?.extraPrincipal ?? '0')),
-              principal: parseFloat(String(mortgageMeta?.principal ?? '0')),
-              interest: parseFloat(String(mortgageMeta?.interest ?? '0')),
               pmi: parseFloat(String(mortgageMeta?.pmi ?? '0')),
               escrow: parseFloat(String(mortgageMeta?.escrow ?? mortgageMeta?.escrowAmount ?? '0')),
               metadata: mortgageMeta ?? {},
