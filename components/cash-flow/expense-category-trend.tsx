@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { ResponsiveBar } from '@nivo/bar';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -168,7 +167,6 @@ export function ExpenseCategoryTrend() {
     );
   }
 
-  const maxValue = Math.max(...barData.map((d) => d.value));
   const formatTick = (v: number) => {
     if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
     if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
@@ -187,41 +185,60 @@ export function ExpenseCategoryTrend() {
       </div>
       <div className="h-[350px] px-2 pb-2">
         <div className="financial-chart h-full">
-          <ResponsiveBar
-            data={barData}
-            keys={['value']}
-            indexBy="id"
-            margin={{ top: 10, right: 10, left: leftMargin, bottom: 50 }}
-            padding={0.3}
-            borderRadius={2}
-            enableLabel={false}
-            colors={{ datum: 'data.color' }}
-            axisLeft={{
-              tickSize: 0,
-              tickPadding: 8,
-              format: (v: string) => v.length > 20 ? v.slice(0, 20) + '\u2026' : v,
-            }}
-            axisBottom={{
-              tickSize: 0,
-              tickPadding: 8,
-              format: formatTick,
-            }}
-            enableGridY={true}
-            enableGridX={false}
-            layout="horizontal"
-            theme={nivoTheme}
-            onClick={({ data: barData }) => handleClick(barData.categoryId)}
-            tooltip={({ indexValue, value, data: barData }) => {
-              const pct = totalSpending > 0 ? ((value / totalSpending) * 100).toFixed(1) : '0';
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                  <TooltipRow label="Amount" value={formatCurrency(value)} />
-                  <TooltipRow label="Percent" value={`${pct}%`} />
-                </ChartTooltip>
-              );
-            }}
-          />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              layout="vertical"
+              data={barData}
+              margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+              onClick={(state: any) => {
+                if (state && state.activePayload && state.activePayload.length > 0) {
+                  const clickedData = state.activePayload[0].payload;
+                  if (clickedData.categoryId) {
+                    handleClick(clickedData.categoryId);
+                  }
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={formatTick}
+              />
+              <YAxis
+                type="category"
+                dataKey="id"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 20) + '\u2026' : v}
+                width={leftMargin}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const item = payload[0].payload;
+                  const pct = totalSpending > 0 ? ((item.value / totalSpending) * 100).toFixed(1) : '0';
+                  return (
+                    <ChartTooltip>
+                      <TooltipHeader>{String(item.id)}</TooltipHeader>
+                      <TooltipRow label="Amount" value={formatCurrency(item.value)} />
+                      <TooltipRow label="Percent" value={`${pct}%`} />
+                    </ChartTooltip>
+                  );
+                }}
+                cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+              />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                {barData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color || 'var(--color-primary)'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

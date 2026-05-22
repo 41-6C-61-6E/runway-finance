@@ -114,11 +114,6 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
   },
 
   // ── Real Estate ───────────────────────────────────────────────
-  realEstateSummary: {
-    title: 'Real Estate Summary',
-    description:
-      'Total Value = sum of all property balances. Total Mortgage = sum of absolute mortgage balances. Total Equity = sum of (property value − |mortgage balance|) per property. LTV Ratio = total mortgage / total value × 100.',
-  },
   equityOverTimeChart: {
     title: 'Equity Over Time',
     description:

@@ -111,6 +111,7 @@ export async function GET(request: Request) {
           : [];
 
         const decryptedMortgageSnapshots = await Promise.all(mortgageSnapshots.map(async (s) => ({
+          accountId: s.accountId,
           date: s.snapshotDate,
           value: parseFloat(await decryptField(s.balance, dek)),
           isSynthetic: s.isSynthetic,

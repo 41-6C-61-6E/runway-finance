@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 
@@ -55,6 +54,7 @@ export function BudgetVsActual() {
       actual: d.actual,
       percentUsed: d.percentUsed,
       categoryId: d.categoryId,
+      categoryColor: d.categoryColor,
       type: d.type ?? 'expense',
     }));
 
@@ -109,9 +109,9 @@ export function BudgetVsActual() {
         <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
       </div>
       {/* Category filter chips */}
-      {chartData.length > 0 && (
+      {data.length > 0 && (
         <div className="px-5 pb-2 flex flex-wrap gap-1 max-w-full">
-          {chartData.map((d) => (
+          {data.map((d) => (
             <button
               key={d.categoryId}
               onClick={() => toggleCategory(d.categoryId)}
@@ -121,61 +121,88 @@ export function BudgetVsActual() {
                   : 'border-border/50 text-muted-foreground hover:border-foreground/30'
               }`}
             >
-              {d.category}
+              {d.categoryName}
             </button>
           ))}
         </div>
       )}
       <div className="h-[300px] px-2 pb-2">
         <div className="financial-chart h-full">
-          <ResponsiveBar
-            data={chartData}
-            keys={['spent', 'remaining', 'overage']}
-            indexBy="category"
-            groupMode="stacked"
-            layout="horizontal"
-            margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
-            padding={0.3}
-            borderRadius={4}
-            enableLabel={false}
-            colors={({ id }) => {
-              if (id === 'spent') return 'var(--color-primary)';
-              if (id === 'remaining') return 'var(--color-muted)';
-              return 'var(--color-destructive)';
-            }}
-            axisLeft={{
-              tickSize: 0, tickPadding: 8,
-              tickValues: 'start',
-            }}
-            axisBottom={{
-              tickSize: 0, tickPadding: 8,
-              format: (v: number) => {
-                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                return `$${v}`;
-              },
-            }}
-            enableGridY={false}
-            enableGridX={true}
-            theme={nivoTheme}
-            onClick={({ data: barData }) => handleClick(barData.categoryId)}
-            tooltip={({ id, value, indexValue }) => {
-              const item = chartData.find((d) => d.category === indexValue);
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                  <TooltipRow label="Budgeted" value={formatCurrency(item?.budgeted ?? 0)} />
-                  <TooltipRow label="Actual" value={formatCurrency(item?.actual ?? 0)} />
-                  <TooltipRow label="Used" value={`${(item?.percentUsed ?? 0).toFixed(0)}%`} />
-                  {item && item.overage > 0 && (
-                    <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
-                      ⚠ Over budget by {formatCurrency(item.overage)}
-                    </div>
-                  )}
-                </ChartTooltip>
-              );
-            }}
-          />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              layout="vertical"
+              data={chartData}
+              margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
+              onClick={(state: any) => {
+                if (state && state.activePayload && state.activePayload.length > 0) {
+                  const clickedData = state.activePayload[0].payload;
+                  if (clickedData.categoryId) {
+                    handleClick(clickedData.categoryId);
+                  }
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={(v: number) => {
+                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                  return `$${v}`;
+                }}
+              />
+              <YAxis
+                type="category"
+                dataKey="category"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                width={90}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const item = payload[0].payload;
+                  return (
+                    <ChartTooltip>
+                      <TooltipHeader>{String(item.category)}</TooltipHeader>
+                      <TooltipRow label="Budgeted" value={formatCurrency(item.budgeted)} />
+                      <TooltipRow label="Actual" value={formatCurrency(item.actual)} />
+                      <TooltipRow label="Used" value={`${(item.percentUsed).toFixed(0)}%`} />
+                      {item.overage > 0 && (
+                        <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
+                          ⚠ Over budget by {formatCurrency(item.overage)}
+                        </div>
+                      )}
+                    </ChartTooltip>
+                  );
+                }}
+                cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+              />
+              <Bar
+                dataKey="spent"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+                fill="var(--color-primary)"
+              />
+              <Bar
+                dataKey="remaining"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+                fill="var(--color-muted)"
+              />
+              <Bar
+                dataKey="overage"
+                stackId="a"
+                radius={[0, 4, 4, 0]}
+                fill="var(--color-destructive)"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
