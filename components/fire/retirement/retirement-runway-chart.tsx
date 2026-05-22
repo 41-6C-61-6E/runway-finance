@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsiveBar } from '@nivo/bar';
 import { formatCurrency } from '@/lib/utils/format';
@@ -9,6 +9,7 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import type { ProjectionResult, MonteCarloResult } from '@/lib/services/retirement';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 const typeOptions = [
   { value: 'line' as ChartType, label: 'Line' },
@@ -22,7 +23,7 @@ export function RetirementRunwayChart({
   projection: ProjectionResult;
   monteCarlo?: MonteCarloResult;
 }) {
-  const [chartType, setChartType] = useState<ChartType>('line');
+  const [chartType, setChartType] = usePersistentState<ChartType>('runway:retirement-runway:chartType', 'line');
 
   const lineData = useMemo(() => {
     const mainLine = {

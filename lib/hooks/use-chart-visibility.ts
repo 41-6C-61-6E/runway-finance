@@ -17,7 +17,6 @@ export const CHARTS = {
     charts: {
       cashFlowSummary: 'Summary Cards',
       incomeExpenseChart: 'Income vs Expense Chart',
-      netIncomeAnalysis: 'Expense Category Trend',
       budgetVsActual: 'Budget vs Actual',
       cashFlowSankey: 'Sankey Diagram',
       cashFlowForecast: 'Cash Flow Forecast',

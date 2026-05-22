@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
@@ -240,8 +241,63 @@ function buildSankeyData(
     return cat;
   });
 
-  const incomeCategories = enriched.filter((c) => c.isIncome && c.amount > 0);
-  const expenseCategories = enriched.filter((c) => !c.isIncome && c.amount > 0);
+  // Sort and limit income categories to 20 items
+  const sortedIncome = enriched
+    .filter((c) => c.isIncome && c.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+
+  let incomeCategories: CategoryData[] = [];
+  if (sortedIncome.length <= 20) {
+    incomeCategories = sortedIncome;
+  } else {
+    const top19 = sortedIncome.slice(0, 19);
+    const rest = sortedIncome.slice(19);
+    const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
+    const restIds = rest.map((c) => c.categoryId).join(',');
+
+    incomeCategories = [
+      ...top19,
+      {
+        categoryId: restIds,
+        categoryName: 'Other Income',
+        categoryColor: '#94a3b8',
+        isIncome: true,
+        amount: restAmount,
+        parentId: null,
+        parentName: null,
+        parentColor: null,
+      },
+    ];
+  }
+
+  // Sort and limit expense categories to 20 items
+  const sortedExpense = enriched
+    .filter((c) => !c.isIncome && c.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+
+  let expenseCategories: CategoryData[] = [];
+  if (sortedExpense.length <= 20) {
+    expenseCategories = sortedExpense;
+  } else {
+    const top19 = sortedExpense.slice(0, 19);
+    const rest = sortedExpense.slice(19);
+    const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
+    const restIds = rest.map((c) => c.categoryId).join(',');
+
+    expenseCategories = [
+      ...top19,
+      {
+        categoryId: restIds,
+        categoryName: 'Other Expenses',
+        categoryColor: '#94a3b8',
+        isIncome: false,
+        amount: restAmount,
+        parentId: null,
+        parentName: null,
+        parentColor: null,
+      },
+    ];
+  }
   const savings = Math.max(0, totalIncome - totalExpenses);
   const deficit = totalExpenses > totalIncome ? totalExpenses - totalIncome : 0;
 
@@ -440,19 +496,24 @@ function buildSankeyData(
   return { nodes, links };
 }
 
+const setOptions = {
+  serialize: (s: Set<string>) => JSON.stringify(Array.from(s)),
+  deserialize: (raw: string) => new Set<string>(JSON.parse(raw)),
+};
+
 export function CashFlowSankey() {
   const router = useRouter();
   const currentMonth = getCurrentMonth();
-  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
-  const [month, setMonth] = useState(currentMonth);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:sankey:timeframe', '1m');
+  const [month, setMonth] = usePersistentState<string>('runway:sankey:month', currentMonth);
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
-  const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
+  const [excludedAccountIds, setExcludedAccountIds] = usePersistentState<Set<string>>('runway:sankey:excludedAccountIds', new Set(), setOptions);
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
-  const [showParents, setShowParents] = useState(true);
-  const [showPercentages, setShowPercentages] = useState(false);
+  const [showParents, setShowParents] = usePersistentState<boolean>('runway:sankey:showParents', true);
+  const [showPercentages, setShowPercentages] = usePersistentState<boolean>('runway:sankey:showPercentages', false);
   const [accountFilterOpen, setAccountFilterOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const accountFilterRef = useRef<HTMLDivElement>(null);
@@ -461,7 +522,7 @@ export function CashFlowSankey() {
     if (timeframe !== '1m') {
       setMonth(getCurrentMonth());
     }
-  }, [timeframe]);
+  }, [timeframe, currentMonth, setMonth]);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -470,7 +531,6 @@ export function CashFlowSankey() {
         if (!res.ok) return;
         const json = await res.json();
         setAllAccounts(json);
-        setExcludedAccountIds(new Set());
       } catch {
         // Silently fail
       }

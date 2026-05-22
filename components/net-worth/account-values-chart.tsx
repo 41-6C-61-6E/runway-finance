@@ -11,6 +11,7 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { SyntheticLineLayer } from '@/components/charts/synthetic-line-layer';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { ChartPoint } from '@/lib/types/financial';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 function getMonthRange(point: ChartPoint): { startDate: string; endDate: string } {
   const d = new Date(point.date);
@@ -25,13 +26,18 @@ function getMonthRange(point: ChartPoint): { startDate: string; endDate: string 
 export function AccountValuesChart() {
   const router = useRouter();
   const { isEnabled } = useSyntheticData();
-  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
-  const [includeExcluded, setIncludeExcluded] = useState(true);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:account-values:timeframe', '1y');
+  const [includeExcluded, setIncludeExcluded] = usePersistentState<boolean>('runway:account-values:includeExcluded', true);
   const [data, setData] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSeries, setActiveSeries] = useState<Set<string>>(
-    new Set(['Net Worth', 'Total Assets', 'Total Liabilities'])
+  const [activeSeries, setActiveSeries] = usePersistentState<Set<string>>(
+    'runway:account-values:activeSeries',
+    new Set(['Net Worth', 'Total Assets', 'Total Liabilities']),
+    {
+      serialize: (val) => JSON.stringify(Array.from(val)),
+      deserialize: (raw) => new Set(JSON.parse(raw)),
+    }
   );
 
   useEffect(() => {

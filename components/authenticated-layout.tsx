@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import AccountsSidebar from '@/components/accounts-sidebar';
 import ResizableSidebar from '@/components/resizable-sidebar';
-import { useSidebar, SidebarProvider } from '@/components/sidebar-context';
+import { useSidebar, SidebarProvider, COLLAPSED_WIDTH } from '@/components/sidebar-context';
 import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
@@ -49,7 +49,7 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
   const marginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
     ? `${sidebarWidth}px` 
-    : `${sidebarWidth + accountsWidth}px`;
+    : `${Math.max(sidebarWidth, COLLAPSED_WIDTH + accountsWidth)}px`;
 
   return (
     <>
