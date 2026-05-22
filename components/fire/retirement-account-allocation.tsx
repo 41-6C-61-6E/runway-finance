@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ResponsivePie } from '@nivo/pie';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
@@ -127,40 +126,45 @@ export function RetirementAccountAllocation() {
         </p>
       </div>
       <div className="h-[280px]">
-        <ResponsivePie
-          data={pieData}
-          margin={{ top: 10, right: 100, bottom: 10, left: 100 }}
-          innerRadius={0.55}
-          padAngle={0.5}
-          cornerRadius={3}
-          colors={{ datum: 'data.color' }}
-          borderWidth={0}
-          enableArcLinkLabels={false}
-          enableArcLabels={false}
-          theme={nivoTheme}
-          tooltip={({ datum }) => (
-            <ChartTooltip>
-              <TooltipHeader>{String(datum.label)}</TooltipHeader>
-              <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-              <TooltipRow label="Share" value={`${((datum.value / totalInvested) * 100).toFixed(1)}%`} />
-            </ChartTooltip>
-          )}
-          legends={[
-            {
-              anchor: 'bottom',
-              direction: 'row',
-              justify: false,
-              translateY: 40,
-              itemsSpacing: 4,
-              itemWidth: 120,
-              itemHeight: 18,
-              itemDirection: 'left-to-right',
-              itemOpacity: 1,
-              symbolSize: 10,
-              symbolShape: 'circle',
-            },
-          ]}
-        />
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="id"
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="80%"
+              paddingAngle={0.5}
+              cornerRadius={3}
+              stroke="none"
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const datum = payload[0].payload;
+                return (
+                  <ChartTooltip>
+                    <TooltipHeader>{String(datum.id)}</TooltipHeader>
+                    <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
+                    <TooltipRow label="Share" value={`${((datum.value / totalInvested) * 100).toFixed(1)}%`} />
+                  </ChartTooltip>
+                );
+              }}
+            />
+            <Legend
+              verticalAlign="bottom"
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 10, color: 'var(--color-muted-foreground)', paddingTop: 10 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </div>
       <div className="px-5 pb-4 pt-2 border-t border-border mt-2">
         <div className="space-y-1.5">

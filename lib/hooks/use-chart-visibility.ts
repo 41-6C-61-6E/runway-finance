@@ -55,11 +55,10 @@ export const CHARTS = {
   realEstate: {
     label: 'Real Estate',
     charts: {
-      realEstateSummary: 'Summary Cards',
       equityOverTimeChart: 'Equity Over Time Chart',
       portfolioAllocationChart: 'Portfolio Allocation Chart',
       propertyCards: 'Property Cards',
-      mortgagePaydown: 'Mortgage Paydown Chart',
+      mortgagePaydown: 'Property Payoff Projections',
     },
   },
   budgets: {

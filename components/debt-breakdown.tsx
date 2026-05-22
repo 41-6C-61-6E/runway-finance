@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ResponsivePie } from '@nivo/pie';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
@@ -244,31 +243,49 @@ export function DebtBreakdown() {
       <div className="flex gap-6 items-start">
         <div className="h-[220px] flex-shrink-0 w-[45%]">
           {pieData.length > 0 ? (
-            <ResponsivePie
-              data={pieData}
-              margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
-              innerRadius={0.65}
-              padAngle={0.5}
-              cornerRadius={3}
-              colors={{ datum: 'data.color' }}
-              borderWidth={0}
-              enableArcLinkLabels={false}
-              enableArcLabels={false}
-              theme={nivoTheme}
-              onClick={(datum) => handleClick(datum.data.key as string)}
-              tooltip={({ datum }) => (
-                <ChartTooltip>
-                  <TooltipHeader>{String(datum.label)}</TooltipHeader>
-                  <TooltipRow label="Amount" value={formatCompact(datum.data.amount as number)} />
-                  {activeTotal > 0 && (
-                    <TooltipRow
-                      label="Share"
-                      value={`${((datum.data.amount as number / activeTotal) * 100).toFixed(1)}%`}
-                    />
-                  )}
-                </ChartTooltip>
-              )}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="id"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="65%"
+                  outerRadius="100%"
+                  paddingAngle={0.5}
+                  cornerRadius={3}
+                  stroke="none"
+                  onClick={(data) => {
+                    const key = data.key || (data.payload && data.payload.key);
+                    if (key) handleClick(key);
+                  }}
+                  className="cursor-pointer"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const datum = payload[0].payload;
+                    return (
+                      <ChartTooltip>
+                        <TooltipHeader>{String(datum.id)}</TooltipHeader>
+                        <TooltipRow label="Amount" value={formatCompact(datum.amount)} />
+                        {activeTotal > 0 && (
+                          <TooltipRow
+                            label="Share"
+                            value={`${((datum.amount / activeTotal) * 100).toFixed(1)}%`}
+                          />
+                        )}
+                      </ChartTooltip>
+                    );
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
               No {activeTab} categories

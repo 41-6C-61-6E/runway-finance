@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 
@@ -124,56 +123,91 @@ export function BudgetVsActualChart() {
       </div>
       <div className="h-[350px] px-2 pb-2">
         <div className="financial-chart h-full">
-          <ResponsiveBar
-            data={allChartData}
-            keys={['spent', 'remaining', 'overage']}
-            indexBy="category"
-            groupMode="stacked"
-            layout="horizontal"
-            margin={{ top: 10, right: 60, left: 90, bottom: 40 }}
-            padding={0.3}
-            borderRadius={4}
-            enableLabel={false}
-            colors={({ id, data }) => {
-              const catColor = (data as unknown as Record<string, string>).categoryColor;
-              if (id === 'spent') return catColor || 'var(--color-primary)';
-              if (id === 'remaining') return catColor ? `${catColor}66` : 'var(--color-primary)';
-              return 'var(--color-destructive)';
-            }}
-            axisLeft={{
-              tickSize: 0, tickPadding: 8,
-              tickValues: 'start',
-            }}
-            axisBottom={{
-              tickSize: 0, tickPadding: 8,
-              format: (v: number) => {
-                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                return `$${v}`;
-              },
-            }}
-            enableGridY={false}
-            enableGridX={true}
-            theme={nivoTheme}
-            animate={allChartData.length < 50}
-            onClick={({ data: barData }) => router.push(`/transactions?categoryId=${(barData as unknown as Record<string, string>).categoryId}`)}
-            tooltip={({ id, value, indexValue }) => {
-              const item = allChartData.find((d) => d.category === indexValue);
-              return (
-                <ChartTooltip>
-                  <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                  <TooltipRow label="Budgeted" value={formatCurrency(item?.budgeted ?? 0)} />
-                  <TooltipRow label="Actual" value={formatCurrency(item?.actual ?? 0)} />
-                  <TooltipRow label="Used" value={`${(item?.percentUsed ?? 0).toFixed(0)}%`} />
-                  {item && item.overage > 0 && (
-                    <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
-                      Over budget by {formatCurrency(item.overage)}
-                    </div>
-                  )}
-                </ChartTooltip>
-              );
-            }}
-          />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              layout="vertical"
+              data={allChartData}
+              margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
+              onClick={(state: any) => {
+                if (state && state.activePayload && state.activePayload.length > 0) {
+                  const clickedData = state.activePayload[0].payload;
+                  if (clickedData.categoryId) {
+                    router.push(`/transactions?categoryId=${clickedData.categoryId}`);
+                  }
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                tickFormatter={(v: number) => {
+                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                  return `$${v}`;
+                }}
+              />
+              <YAxis
+                type="category"
+                dataKey="category"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                width={90}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const item = payload[0].payload;
+                  return (
+                    <ChartTooltip>
+                      <TooltipHeader>{String(item.category)}</TooltipHeader>
+                      <TooltipRow label="Budgeted" value={formatCurrency(item.budgeted)} />
+                      <TooltipRow label="Actual" value={formatCurrency(item.actual)} />
+                      <TooltipRow label="Used" value={`${(item.percentUsed).toFixed(0)}%`} />
+                      {item.overage > 0 && (
+                        <div style={{ color: 'var(--color-destructive)', fontSize: 10, marginTop: 2, fontWeight: 600 }}>
+                          Over budget by {formatCurrency(item.overage)}
+                        </div>
+                      )}
+                    </ChartTooltip>
+                  );
+                }}
+                cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+              />
+              <Bar
+                dataKey="spent"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+              >
+                {allChartData.map((entry, index) => (
+                  <Cell key={`cell-spent-${index}`} fill={entry.categoryColor || 'var(--color-primary)'} />
+                ))}
+              </Bar>
+              <Bar
+                dataKey="remaining"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+              >
+                {allChartData.map((entry, index) => {
+                  const catColor = entry.categoryColor;
+                  const fillCol = catColor
+                    ? (catColor.startsWith('var(') ? `color-mix(in oklch, ${catColor}, transparent 60%)` : `${catColor}66`)
+                    : 'color-mix(in oklch, var(--color-primary), transparent 60%)';
+                  return <Cell key={`cell-remaining-${index}`} fill={fillCol} />;
+                })}
+              </Bar>
+              <Bar
+                dataKey="overage"
+                stackId="a"
+                radius={[0, 4, 4, 0]}
+                fill="var(--color-destructive)"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
       <div className="px-5 py-2.5 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">

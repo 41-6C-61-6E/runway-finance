@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
-import { ResponsiveLine } from '@nivo/line';
+import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface MonthlyData {
@@ -81,6 +78,12 @@ export function NetIncomeAnalysis() {
     router.push(`/transactions?startDate=${startDate}&endDate=${endDate}`);
   };
 
+  const formatTick = (v: number) => {
+    if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+    return `$${v}`;
+  };
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -125,80 +128,109 @@ export function NetIncomeAnalysis() {
       </div>
       <div className="h-[300px] px-2 pb-2">
         <div className="financial-chart h-full">
-          {chartType === 'line' ? (
-            <ResponsiveLine
-              data={[{
-                id: 'Net Income',
-                data: chartData.map((d) => ({ x: d.month, y: d.netCashFlow })),
-              }]}
-              margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
-              xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-              curve="monotoneX"
-              colors={['var(--color-chart-1)']}
-              lineWidth={2}
-              enablePoints={false}
-              enableGridX={false}
-              axisLeft={{
-                tickSize: 0, tickPadding: 8,
-                format: (v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                },
-              }}
-              axisBottom={{ tickSize: 0, tickPadding: 8 }}
-              theme={nivoTheme}
-              useMesh={true}
-              onClick={(raw) => {
-                const p = raw as unknown as { data: { xFormatted: string } };
-                const matched = chartData.find((d) => d.month === String(p.data.xFormatted));
-                if (matched) handleClick(matched.yearMonth);
-              }}
-              tooltip={({ point }) => (
-                <ChartTooltip>
-                  <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
-                  <TooltipRow label="Net" value={formatCurrency(Number(point.data.y))} />
-                </ChartTooltip>
-              )}
-            />
-          ) : (
-            <ResponsiveBar
-              data={chartData}
-              keys={['netCashFlow']}
-              indexBy="month"
-              margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
-              padding={0.3}
-              borderRadius={2}
-              enableLabel={false}
-              valueScale={{ type: 'linear', min: 'auto' }}
-              colors={({ value }) =>
-                value >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'
-              }
-              axisLeft={{
-                tickSize: 0, tickPadding: 8,
-                format: (v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                },
-              }}
-              axisBottom={{ tickSize: 0, tickPadding: 8 }}
-              enableGridY={true}
-              enableGridX={false}
-              theme={nivoTheme}
-              onClick={({ data: barData }) => {
-                const matched = chartData.find((d) => d.month === barData.month);
-                if (matched) handleClick(matched.yearMonth);
-              }}
-              tooltip={({ indexValue, value }) => (
-                <ChartTooltip>
-                  <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                  <TooltipRow label="Net" value={formatCurrency(value)} />
-                </ChartTooltip>
-              )}
-            />
-          )}
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === 'line' ? (
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                onClick={(state: any) => {
+                  if (state && state.activePayload && state.activePayload.length > 0) {
+                    const clickedData = state.activePayload[0].payload;
+                    if (clickedData.yearMonth) {
+                      handleClick(clickedData.yearMonth);
+                    }
+                  }
+                }}
+                className="cursor-pointer"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                  width={60}
+                  tickFormatter={formatTick}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const item = payload[0].payload;
+                    return (
+                      <ChartTooltip>
+                        <TooltipHeader>{String(item.month)}</TooltipHeader>
+                        <TooltipRow label="Net" value={formatCurrency(item.netCashFlow)} />
+                      </ChartTooltip>
+                    );
+                  }}
+                  cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="netCashFlow"
+                  stroke="var(--color-chart-1)"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                />
+              </LineChart>
+            ) : (
+              <BarChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                onClick={(state: any) => {
+                  if (state && state.activePayload && state.activePayload.length > 0) {
+                    const clickedData = state.activePayload[0].payload;
+                    if (clickedData.yearMonth) {
+                      handleClick(clickedData.yearMonth);
+                    }
+                  }
+                }}
+                className="cursor-pointer"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                  width={60}
+                  tickFormatter={formatTick}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const item = payload[0].payload;
+                    return (
+                      <ChartTooltip>
+                        <TooltipHeader>{String(item.month)}</TooltipHeader>
+                        <TooltipRow label="Net" value={formatCurrency(item.netCashFlow)} />
+                      </ChartTooltip>
+                    );
+                  }}
+                  cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+                />
+                <Bar dataKey="netCashFlow" radius={[2, 2, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.netCashFlow >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
         </div>
       </div>
       <div className="px-5 py-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-4">
