@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, createContext, useContext, type ReactNode } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 512;
@@ -19,6 +20,8 @@ export const SidebarContext = createContext<{
   setAccountsWidth: (width: number) => void;
   accountsCollapsed: boolean;
   toggleAccountsCollapsed: () => void;
+  hideAccountsSidebarByDefault: boolean;
+  updateHideAccountsSidebarByDefault: (val: boolean) => Promise<void>;
   handleNavResizeDown: (e: React.MouseEvent) => void;
   handleMouseEnter: () => void;
   handleMouseLeave: () => void;
@@ -30,6 +33,8 @@ export const SidebarContext = createContext<{
   setAccountsWidth: () => {},
   accountsCollapsed: false,
   toggleAccountsCollapsed: () => {},
+  hideAccountsSidebarByDefault: false,
+  updateHideAccountsSidebarByDefault: async () => {},
   handleNavResizeDown: () => {},
   handleMouseEnter: () => {},
   handleMouseLeave: () => {},
@@ -40,34 +45,70 @@ export function useSidebar() {
 }
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
+  const userSettings = useUserSettings();
+  const hideAccountsSidebarByDefault = userSettings?.settings?.hideAccountsSidebarByDefault === true;
+
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
   const [accountsCollapsed, setAccountsCollapsed] = useState(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
     return false;
   });
+  const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false);
+
+  useEffect(() => {
+    if (userSettings && !userSettings.loading && !hasInitializedCollapse) {
+      setHasInitializedCollapse(true);
+      if (userSettings.settings.hideAccountsSidebarByDefault) {
+        setAccountsCollapsed(true);
+      }
+    }
+  }, [userSettings, hasInitializedCollapse]);
+
+  const updateHideAccountsSidebarByDefault = useCallback(async (val: boolean) => {
+    setAccountsCollapsed(val);
+    if (userSettings) {
+      await userSettings.updateSetting('hideAccountsSidebarByDefault', val);
+    }
+  }, [userSettings]);
   const [isResizing, setIsResizing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [forceExpanded, setForceExpanded] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(DEFAULT_WIDTH);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverEnterTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isExpanded = isHovering || forceExpanded;
   const sidebarWidth = isExpanded ? width : COLLAPSED_WIDTH;
 
   const handleMouseEnter = useCallback(() => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setIsHovering(true);
+    if (hoverLeaveTimeoutRef.current) clearTimeout(hoverLeaveTimeoutRef.current);
+    if (hoverEnterTimeoutRef.current) clearTimeout(hoverEnterTimeoutRef.current);
+    
+    hoverEnterTimeoutRef.current = setTimeout(() => {
+      setIsHovering(true);
+    }, 750);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
+    if (hoverEnterTimeoutRef.current) clearTimeout(hoverEnterTimeoutRef.current);
+    if (hoverLeaveTimeoutRef.current) clearTimeout(hoverLeaveTimeoutRef.current);
+    
     if (isResizing) return;
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => {
+    
+    hoverLeaveTimeoutRef.current = setTimeout(() => {
       setIsHovering(false);
     }, 150);
   }, [isResizing]);
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverEnterTimeoutRef.current) clearTimeout(hoverEnterTimeoutRef.current);
+      if (hoverLeaveTimeoutRef.current) clearTimeout(hoverLeaveTimeoutRef.current);
+    };
+  }, []);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -121,6 +162,8 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
         setAccountsWidth,
         accountsCollapsed,
         toggleAccountsCollapsed,
+        hideAccountsSidebarByDefault,
+        updateHideAccountsSidebarByDefault,
         handleNavResizeDown: handleMouseDown,
         handleMouseEnter,
         handleMouseLeave,

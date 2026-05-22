@@ -74,6 +74,8 @@ export async function POST(request: Request) {
       defaultChartType: DEFAULTS.defaultChartType,
       reduceTransparency: DEFAULTS.reduceTransparency,
       hideAccountSubheadings: DEFAULTS.hideAccountSubheadings,
+      hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
+      chartSelections: DEFAULTS.chartSelections,
       showMathEnabled: DEFAULTS.showMathEnabled,
     });
 
