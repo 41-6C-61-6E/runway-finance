@@ -254,8 +254,6 @@ export default function ManualAccountsSection() {
         metadata.monthlyPayment = parseFloat(createMeta.monthlyPayment || '0');
         metadata.escrowAmount = parseFloat(createMeta.escrowAmount || '0');
         metadata.extraPrincipal = parseFloat(createMeta.extraPrincipal || '0');
-        metadata.principal = parseFloat(createMeta.principal || '0');
-        metadata.interest = parseFloat(createMeta.interest || '0');
         metadata.pmi = parseFloat(createMeta.pmi || '0');
         metadata.escrow = parseFloat(createMeta.escrow || '0');
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
@@ -445,8 +443,6 @@ export default function ManualAccountsSection() {
         metadata.monthlyPayment = parseFloat(editMeta.monthlyPayment || '0');
         metadata.escrowAmount = parseFloat(editMeta.escrowAmount || '0');
         metadata.extraPrincipal = parseFloat(editMeta.extraPrincipal || '0');
-        metadata.principal = parseFloat(editMeta.principal || '0');
-        metadata.interest = parseFloat(editMeta.interest || '0');
         metadata.pmi = parseFloat(editMeta.pmi || '0');
         metadata.escrow = parseFloat(editMeta.escrow || '0');
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;

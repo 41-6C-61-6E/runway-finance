@@ -462,8 +462,8 @@ export async function syncManualAccount(
   await createAccountSnapshotsForUser(userId, dek);
   await updateNetWorthSnapshot(userId, dek);
 
-  // Regenerate synthetic history for real estate to keep HPI curve aligned
-  const REAL_ESTATE_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate'];
+  // Regenerate synthetic history for real estate and mortgages to keep HPI/amortization curves aligned
+  const REAL_ESTATE_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'mortgage'];
   if (REAL_ESTATE_TYPES.includes(account.type) || account.type === 'metals') {
     try {
       let rawMeta: string | Record<string, unknown>;

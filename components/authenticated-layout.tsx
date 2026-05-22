@@ -39,7 +39,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 }
 
 function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { children: ReactNode; hideAccountsSidebar: boolean }) {
-  const { accountsWidth, accountsCollapsed } = useSidebar();
+  const { sidebarWidth, accountsWidth, accountsCollapsed } = useSidebar();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -48,12 +48,12 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
 
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
   const marginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
-    ? '64px' 
-    : `${64 + accountsWidth}px`;
+    ? `${sidebarWidth}px` 
+    : `${sidebarWidth + accountsWidth}px`;
 
   return (
     <>
-      <div style={{ marginLeft }}>
+      <div style={{ marginLeft }} className="transition-all duration-200">
         {children}
       </div>
     </>

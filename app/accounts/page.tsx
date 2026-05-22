@@ -18,6 +18,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { PageHeader } from '@/components/page-header';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -26,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 
+import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
 import { 
@@ -127,49 +129,6 @@ const getSeriesColor = (key: string, mode: GroupingMode, index: number, isAsset:
     }
   }
 };
-
-// ── Inline Sparkline SVG ────────────────────────────────────────────────────
-interface SparklineProps {
-  data: number[];
-  width?: number;
-  height?: number;
-  isPositive: boolean;
-}
-
-export function Sparkline({ data, width = 120, height = 30, isPositive }: SparklineProps) {
-  if (!data || data.length < 2) {
-    return (
-      <div className="w-[120px] h-[30px] flex items-center justify-center text-[10px] text-muted-foreground/40 italic">
-        No history
-      </div>
-    );
-  }
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min;
-
-  const points = data.map((val, index) => {
-    const x = (index / (data.length - 1)) * width;
-    const y = range === 0 ? height / 2 : height - ((val - min) / range) * height;
-    return `${x},${y}`;
-  });
-
-  const path = `M ${points.join(' L ')}`;
-  const strokeColor = isPositive ? '#10b981' : '#ef4444';
-
-  return (
-    <svg width={width} height={height} className="overflow-visible">
-      <path
-        d={path}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 // ── On-demand Transaction Sub-row Component ──────────────────────────────────
 interface AccountTransactionsProps {
@@ -758,15 +717,7 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
-      {/* ── Page Header ── */}
-      <div className="border-b border-border/40 bg-card/10 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Landmark className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Accounts</h1>
-        </div>
-        
-
-      </div>
+      <PageHeader title="Accounts" icon={Landmark} />
 
       <div className="max-w-6xl mx-auto px-6 mt-6 space-y-6">
         <>

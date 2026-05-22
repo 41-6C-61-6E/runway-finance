@@ -1,11 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ResponsiveBar } from '@nivo/bar';
-import { ResponsiveLine } from '@nivo/line';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  ComposedChart,
+  Bar,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ReferenceLine,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { nivoTheme } from '@/components/charts/shared-chart-theme';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -27,7 +37,7 @@ const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m',
 
 const typeOptions = [
   { value: 'bar' as ChartType, label: 'Bar' },
-  { value: 'line' as ChartType, label: 'Line' },
+  { value: 'line' as ChartType, label: 'Area' },
 ];
 
 export function IncomeExpenseChart() {
@@ -65,7 +75,14 @@ export function IncomeExpenseChart() {
     yearMonth: d.yearMonth,
   }));
 
-  const maxValue = Math.max(...data.flatMap((d) => [d.income, d.expenses]), 1);
+  const chartData = useMemo(() => data.map((d) => ({
+    ...d,
+    expenses: -Math.abs(d.expenses),
+  })), [data]);
+
+  const allValues = chartData.flatMap((d) => [d.income, d.expenses, d.net]);
+  const minVal = Math.min(...allValues, 0);
+  const maxVal = Math.max(...allValues, 1);
 
   const handleClick = (yearMonth: string) => {
     const startDate = yearMonth + '-01';
@@ -74,6 +91,58 @@ export function IncomeExpenseChart() {
     const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
     router.push(`/transactions?startDate=${startDate}&endDate=${endDate}`);
   };
+
+  const formatTick = (v: number) => {
+    const absV = Math.abs(v);
+    if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
+    if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
+    return `$${absV}`;
+  };
+
+  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const point = payload[0]?.payload;
+    if (!point) return null;
+    return (
+      <ChartTooltip>
+        <TooltipHeader>{label}</TooltipHeader>
+        <TooltipRow label="Income" value={formatCurrency(point.income)} color="var(--color-chart-1)" />
+        <TooltipRow label="Expenses" value={formatCurrency(Math.abs(point.expenses))} color="var(--color-destructive)" />
+        <TooltipRow label="Net Income" value={formatCurrency(point.net)} color="var(--color-primary)" />
+      </ChartTooltip>
+    );
+  }, []);
+
+  const sharedAxes = (
+    <>
+      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+      <XAxis
+        dataKey="month"
+        tickLine={false}
+        axisLine={{ stroke: 'var(--color-border)' }}
+        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+        interval={data.length > 30 ? Math.floor(data.length / 6) : 0}
+      />
+      <YAxis
+        tickLine={false}
+        axisLine={{ stroke: 'var(--color-border)' }}
+        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+        domain={[minVal * 1.15, maxVal * 1.15]}
+        tickFormatter={formatTick}
+      />
+      <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+      <Legend
+        verticalAlign="bottom"
+        iconType="circle"
+        iconSize={10}
+        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+        formatter={(value: string) => (
+          <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+        )}
+      />
+    </>
+  );
 
   if (loading) {
     return (
@@ -119,100 +188,71 @@ export function IncomeExpenseChart() {
       </div>
       <div className="h-[320px] px-2 pb-2">
         <div className="financial-chart h-full">
-          {chartType === 'line' ? (
-            <ResponsiveLine
-              data={[
-                { id: 'Income', data: data.map((d) => ({ x: d.month, y: d.income })) },
-                { id: 'Expenses', data: data.map((d) => ({ x: d.month, y: d.expenses })) },
-              ]}
-              margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
-              xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: 0, max: maxValue * 1.1 }}
-              curve="monotoneX"
-              colors={['var(--color-chart-1)', 'var(--color-destructive)']}
-              lineWidth={2}
-              enablePoints={false}
-              enableGridX={false}
-              enableGridY={true}
-              axisLeft={{
-                tickSize: 0, tickPadding: 8,
-                format: (v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                },
-              }}
-              axisBottom={{
-                tickSize: 0, tickPadding: 8,
-                tickValues: data.length > 30 ? Math.max(4, Math.floor(data.length / 6)) : undefined,
-              }}
-              theme={nivoTheme}
-              useMesh={true}
-              animate={data.length < 100}
-              onClick={(raw) => {
-                const p = raw as unknown as { data: { xFormatted: string } };
-                const matched = data.find((d) => d.month === String(p.data.xFormatted));
-                if (matched) handleClick(matched.yearMonth);
-              }}
-              tooltip={({ point }) => (
-                <ChartTooltip>
-                  <TooltipHeader>{String(point.data.xFormatted)}</TooltipHeader>
-                  <TooltipRow
-                    label={String(point.seriesId)}
-                    value={formatCurrency(Number(point.data.y))}
-                    color={point.color}
-                  />
-                </ChartTooltip>
-              )}
-            />
-          ) : (
-            <ResponsiveBar
-              data={data}
-              keys={['income', 'expenses']}
-              indexBy="month"
-              groupMode="grouped"
-              margin={{ top: 10, right: 10, left: 60, bottom: 30 }}
-              padding={0.2}
-              innerPadding={2}
-              colors={['var(--color-chart-1)', 'var(--color-destructive)']}
-              borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-              enableLabel={false}
-              axisLeft={{
-                tickSize: 0, tickPadding: 8,
-                format: (v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                },
-              }}
-              axisBottom={{
-                tickSize: 0, tickPadding: 8,
-                tickValues: data.length > 30 ? Math.max(4, Math.floor(data.length / 6)) : undefined,
-              }}
-              enableGridY={true}
-              enableGridX={false}
-              theme={nivoTheme}
-              animate={data.length < 100}
-              onClick={({ data: barData }) => {
-                const matched = data.find((d) => d.month === barData.month);
-                if (matched) handleClick(matched.yearMonth);
-              }}
-              tooltip={({ id, value, indexValue, data: pointData }) => {
-                const net = (pointData as unknown as Record<string, number>).net || 0;
-                return (
-                  <ChartTooltip>
-                    <TooltipHeader>{String(indexValue)}</TooltipHeader>
-                    <TooltipRow
-                      label={id === 'income' ? 'Income' : 'Expenses'}
-                      value={formatCurrency(value)}
-                      color={id === 'income' ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
-                    />
-                    <TooltipRow label="Net" value={formatCurrency(net)} />
-                  </ChartTooltip>
-                );
-              }}
-            />
-          )}
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === 'bar' ? (
+              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+                {sharedAxes}
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  fill="var(--color-chart-1)"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={24}
+                  onClick={(data: any) => handleClick(data?.payload?.yearMonth)}
+                />
+                <Bar
+                  dataKey="expenses"
+                  name="Expenses"
+                  fill="var(--color-destructive)"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={24}
+                  onClick={(data: any) => handleClick(data?.payload?.yearMonth)}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  name="Net Income"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </ComposedChart>
+            ) : (
+              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+                {sharedAxes}
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  name="Income"
+                  fill="var(--color-chart-1)"
+                  fillOpacity={0.25}
+                  stroke="var(--color-chart-1)"
+                  strokeWidth={2}
+                  activeDot={{ r: 4 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expenses"
+                  name="Expenses"
+                  fill="var(--color-destructive)"
+                  fillOpacity={0.25}
+                  stroke="var(--color-destructive)"
+                  strokeWidth={2}
+                  activeDot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  name="Net Income"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </ComposedChart>
+            )}
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

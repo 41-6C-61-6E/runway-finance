@@ -180,7 +180,7 @@ export async function estimateRealEstateHistory(
       date: cursor.toISOString().split('T')[0],
       value: Math.round(estimatedValue * 100) / 100,
     });
-    cursor.setDate(cursor.getDate() + 90);
+    cursor.setDate(cursor.getDate() + 30);
   }
 
   return snapshots;
@@ -276,23 +276,44 @@ export function generateMortgagePaydownHistory(
   currentBalance: number,
   currentDate: string
 ): Array<{ date: string; balance: number }> {
-  const schedule = calculateAmortizationSchedule(params);
+  const { originalBalance, annualRate, termMonths, monthlyPayment, startDate } = params;
+  const monthlyRate = annualRate / 100 / 12;
   const snapshots: Array<{ date: string; balance: number }> = [];
 
-  for (const row of schedule) {
-    if (row.date > currentDate) break;
-    snapshots.push({ date: row.date, balance: row.remainingBalance });
+  let effectivePayment = monthlyPayment;
+  if (effectivePayment <= 0 && monthlyRate > 0) {
+    effectivePayment = originalBalance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
   }
 
-  // Ensure current balance matches
-  if (snapshots.length > 0) {
-    snapshots[snapshots.length - 1] = {
-      ...snapshots[snapshots.length - 1],
-      balance: currentBalance,
-    };
+  const end = new Date(currentDate + 'T00:00:00');
+  const start = new Date(startDate + 'T00:00:00');
+
+  // Walk backward from current balance to origination date
+  // using reverse amortization: balance_prev = (balance_curr + payment) / (1 + rate)
+  let balance = currentBalance;
+  const cursor = new Date(end);
+
+  while (cursor >= start) {
+    snapshots.push({
+      date: cursor.toISOString().split('T')[0],
+      balance: Math.round(balance * 100) / 100,
+    });
+
+    cursor.setMonth(cursor.getMonth() - 1);
+    if (cursor < start) break;
+
+    if (monthlyRate > 0) {
+      balance = (balance + effectivePayment) / (1 + monthlyRate);
+    } else {
+      balance += effectivePayment;
+    }
+
+    if (balance > originalBalance) {
+      balance = originalBalance;
+    }
   }
 
-  return snapshots;
+  return snapshots.reverse();
 }
 
 // ─── Main Dispatcher ─────────────────────────────────────────────────────────
@@ -307,6 +328,22 @@ export async function generateAssetHistorySnapshots(
 ): Promise<number> {
   const { getDb } = await import(/* @vite-ignore */ '@/lib/db');
   const db = getDb();
+
+  // Delete existing synthetic snapshots first. If this fails, abort —
+  // otherwise old data (potentially from a different amortization
+  // range or property) lingers alongside new data.
+  try {
+    await db.delete(accountSnapshots).where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, true)
+      )
+    );
+  } catch (err) {
+    logger.error(`${LOG_TAG} Failed to clear existing synthetic snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
 
   let snapshots: Array<{ date: string; value: number }> = [];
   const today = new Date().toISOString().split('T')[0];
@@ -350,12 +387,15 @@ export async function generateAssetHistorySnapshots(
       const interestRate = metadata.interestRate as number ?? 0;
       const termMonths = metadata.termMonths as number ?? 360;
       const monthlyPayment = metadata.monthlyPayment as number ?? 0;
+      const pmi = (metadata.pmi as number) ?? 0;
+      const escrow = (metadata.escrow as number ?? metadata.escrowAmount as number) ?? 0;
+      const monthlyPI = Math.max(0, monthlyPayment - escrow - pmi);
       const startDate = metadata.purchaseDate as string ?? metadata.startDate as string ?? today;
       const currentBalance = await getAccountCurrentBalance(accountId, dek);
 
       if (originalLoanAmount > 0 && interestRate > 0) {
         const history = generateMortgagePaydownHistory(
-          { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment, startDate },
+          { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
           Math.abs(currentBalance),
           today
         );
@@ -368,19 +408,6 @@ export async function generateAssetHistorySnapshots(
   if (snapshots.length === 0) {
     logger.debug(`${LOG_TAG} No synthetic snapshots generated for account ${accountId}`);
     return 0;
-  }
-
-  // Delete all existing synthetic snapshots for this asset account to start with a clean slate
-  try {
-    await db.delete(accountSnapshots).where(
-      and(
-        eq(accountSnapshots.accountId, accountId),
-        eq(accountSnapshots.userId, userId),
-        eq(accountSnapshots.isSynthetic, true)
-      )
-    );
-  } catch (err) {
-    logger.warn(`${LOG_TAG} Failed to clear existing synthetic snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   let inserted = 0;

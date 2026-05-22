@@ -8,7 +8,8 @@ import { useShowMath } from '@/lib/hooks/use-show-math';
 import { buildNetWorthTraces } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { EstimatePill } from '@/components/ui/estimate-pill';
-import type { AccountData, ChartPoint } from '@/lib/types/financial';
+import { Sparkline } from '@/components/ui/sparkline';
+import type { AccountData, ChartPoint, CalculationTrace } from '@/lib/types/financial';
 
 interface ChartResponse {
   data: ChartPoint[];
@@ -78,10 +79,27 @@ export function NetWorthSummary() {
 
   const traces = useMemo(() => showMath ? buildNetWorthTraces(accounts) : [], [accounts, showMath]);
 
+  const assetHistory = useMemo(() => chartData.map((d) => d.totalAssets), [chartData]);
+  const liabilityHistory = useMemo(() => chartData.map((d) => d.totalLiabilities), [chartData]);
+  const netWorthHistory = useMemo(() => chartData.map((d) => d.netWorth), [chartData]);
+
+  const assetTrendPositive = useMemo(
+    () => assetHistory.length >= 2 && assetHistory[assetHistory.length - 1] >= assetHistory[0],
+    [assetHistory]
+  );
+  const liabilityTrendPositive = useMemo(
+    () => liabilityHistory.length >= 2 && liabilityHistory[liabilityHistory.length - 1] >= liabilityHistory[0],
+    [liabilityHistory]
+  );
+  const netWorthTrendPositive = useMemo(
+    () => netWorthHistory.length >= 2 && netWorthHistory[netWorthHistory.length - 1] >= netWorthHistory[0],
+    [netWorthHistory]
+  );
+
   const deltas = useMemo(() => {
     if (chartData.length < 2) return { assets: 0, liabilities: 0, netWorth: 0, pctAssets: 0, pctLiabilities: 0, pctNetWorth: 0 };
     const cur = chartData[chartData.length - 1];
-    const prev = chartData[chartData.length - 2];
+    const prev = chartData[0];
     const dAssets = cur.totalAssets - prev.totalAssets;
     const dLiabilities = cur.totalLiabilities - prev.totalLiabilities;
     const dNetWorth = cur.netWorth - prev.netWorth;
@@ -95,89 +113,53 @@ export function NetWorthSummary() {
     };
   }, [chartData]);
 
-  const totalLabel = (id: string, value: number, delta: number, pct: number, timeframe?: string) => (
-    <>
+  const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean, trace?: CalculationTrace) => (
+    <div className="p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+        <Sparkline data={history} width={80} height={20} isPositive={trendPositive} />
+      </div>
       <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
       <div className={`flex items-center gap-1 mt-1 text-sm font-medium ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
         <span>{delta >= 0 ? '↑' : '↓'}</span>
         <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
         <span className="text-xs opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
       </div>
-      {timeframe && (
-        <div className="text-xs text-muted-foreground mt-1">
-          in the last {timeframe}
-        </div>
-      )}
-    </>
+      <div className="text-xs text-muted-foreground mt-1">in the last 1 year</div>
+      {showMath && trace && <CalculationTraceOverlay trace={trace} />}
+    </div>
   );
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {[1, 2].map((i) => (
-          <div key={i} className="bg-card border border-border rounded-xl p-5 shadow-sm animate-pulse">
-            <div className="h-4 bg-muted rounded w-24 mb-3"></div>
-            <div className="h-8 bg-muted rounded w-32 mb-2"></div>
-            <div className="h-4 bg-muted rounded w-20"></div>
-          </div>
-        ))}
+      <div className="bg-card border border-border rounded-xl shadow-sm animate-pulse h-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border h-full">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-5 space-y-3">
+              <div className="h-4 bg-muted rounded w-24" />
+              <div className="h-8 bg-muted rounded w-32" />
+              <div className="h-4 bg-muted rounded w-20" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm h-full">
         <p className="text-sm text-muted-foreground">{error}</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm sm:col-span-1">
-          <div className="grid grid-cols-1 gap-5">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Assets</h3>
-              {totalLabel('assets', totals.totalAssets, deltas.assets, deltas.pctAssets, '1 year')}
-              {showMath && traces[0] && <CalculationTraceOverlay trace={traces[0]} />}
-            </div>
-            <div className="border-t border-border pt-5">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Liabilities</h3>
-              {totalLabel('liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, '1 year')}
-              {showMath && traces[1] && <CalculationTraceOverlay trace={traces[1]} />}
-            </div>
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm sm:col-span-2">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Net Worth</h3>
-          <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(totals.netWorth)}</div>
-          <div className="flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)' }}>
-            <span>{deltas.netWorth >= 0 ? '↑' : '↓'}</span>
-            <span className="financial-value">{formatCurrency(Math.abs(deltas.netWorth))}</span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            in the last 1 year
-          </div>
-          <div className="mt-3 pt-3 border-t border-border">
-            <p className="text-xs text-muted-foreground mb-2">Asset Allocation</p>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
-              <div
-                className="bg-chart-1 h-full transition-all"
-                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
-              />
-              <div
-                className="bg-destructive h-full transition-all"
-                style={{ width: `${totals.totalAssets + totals.totalLiabilities > 0 ? (totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100 : 0}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-              <span>Assets {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalAssets / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
-              <span>Liabilities {totals.totalAssets + totals.totalLiabilities > 0 ? ((totals.totalLiabilities / (totals.totalAssets + totals.totalLiabilities)) * 100).toFixed(0) : '0'}%</span>
-            </div>
-          </div>
-        </div>
+    <div className="bg-card border border-border rounded-xl shadow-sm h-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
+        {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, liabilityTrendPositive, traces[1])}
+        {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
       </div>
     </div>
   );

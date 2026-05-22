@@ -22,8 +22,6 @@ interface MortgageInfo {
   interestRate: number;
   monthlyPayment: number;
   extraPrincipal?: number;
-  principal?: number;
-  interest?: number;
   pmi?: number;
   escrow?: number;
 }
@@ -203,24 +201,10 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                   {m.interestRate > 0 && <span className="blur-number">{m.interestRate.toFixed(2)}% APR</span>}
                   {m.monthlyPayment > 0 && <span className="blur-number">{formatCurrency(m.monthlyPayment)}/mo</span>}
                 </div>
-                {((m.principal !== undefined && m.principal > 0) ||
-                  (m.interest !== undefined && m.interest > 0) ||
-                  (m.escrow !== undefined && m.escrow > 0) ||
+                {((m.escrow !== undefined && m.escrow > 0) ||
                   (m.pmi !== undefined && m.pmi > 0) ||
                   (m.extraPrincipal !== undefined && m.extraPrincipal > 0)) && (
                   <div className="mt-2 pt-2 border-t border-border/50 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                    {m.principal !== undefined && m.principal > 0 && (
-                      <div className="flex justify-between">
-                        <span>Principal</span>
-                        <span className="font-mono blur-number">{formatCurrency(m.principal)}</span>
-                      </div>
-                    )}
-                    {m.interest !== undefined && m.interest > 0 && (
-                      <div className="flex justify-between">
-                        <span>Interest</span>
-                        <span className="font-mono blur-number">{formatCurrency(m.interest)}</span>
-                      </div>
-                    )}
                     {m.escrow !== undefined && m.escrow > 0 && (
                       <div className="flex justify-between">
                         <span>Escrow</span>

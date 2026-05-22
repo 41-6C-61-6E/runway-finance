@@ -7,6 +7,7 @@ import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
 import { Check, Calculator, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
@@ -41,42 +42,36 @@ const MODULES = [
   },
 ];
 
-import { useState } from 'react';
+interface ModuleRecalcState {
+  recalculating: boolean;
+  showConfirm: boolean;
+  result: { success: boolean; message: string; stats?: Record<string, number> } | null;
+}
+
+const INIT_RECALC: ModuleRecalcState = { recalculating: false, showConfirm: false, result: null };
 
 export default function AnalyticsTab() {
   const { visibility, loading: visLoading, updateVisibility } = useChartVisibility();
   const { settings, loading: synthLoading, isEnabled, updateSettings } = useSyntheticData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
-  const [recalculating, setRecalculating] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
-  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
-  const [recalcResult, setRecalcResult] = useState<{
-    success: boolean;
-    message: string;
-    stats?: {
-      accountsProcessed: number;
-      syntheticSnapshotsCreated: number;
-      skippedRealSnapshots: number;
-      errorsEncountered: number;
-    };
-  } | null>(null);
+  const [netWorthState, setNetWorthState] = useState<ModuleRecalcState>(INIT_RECALC);
+  const [realEstateState, setRealEstateState] = useState<ModuleRecalcState>(INIT_RECALC);
+  const [cashFlowState, setCashFlowState] = useState<ModuleRecalcState>(INIT_RECALC);
 
   const toggleModuleExpanded = (key: string) => {
     setExpandedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleRecalculate = async () => {
-    setRecalculating(true);
-    setRecalcResult(null);
+  const handleRecalculate = async (type: string, state: ModuleRecalcState, setState: (s: ModuleRecalcState) => void) => {
+    setState({ ...state, recalculating: true, result: null, showConfirm: false });
     try {
-      const res = await fetch('/api/analytics/recalculate-snapshots', { method: 'POST', credentials: 'include' });
+      const res = await fetch(`/api/analytics/recalculate-snapshots?type=${type}`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
-      setRecalcResult(data);
+      setState({ recalculating: false, showConfirm: false, result: data });
     } catch (error: any) {
-      setRecalcResult({ success: false, message: error.message || 'Failed to recalculate snapshots' });
-    } finally {
-      setRecalculating(false);
+      setState({ recalculating: false, showConfirm: false, result: { success: false, message: error.message || 'Failed to recalculate snapshots' } });
     }
   };
 
@@ -85,6 +80,28 @@ export default function AnalyticsTab() {
   if (loading) {
     return <div className="text-muted-foreground py-4">Loading...</div>;
   }
+
+  const moduleState = (key: string): ModuleRecalcState => {
+    if (key === 'netWorth') return netWorthState;
+    if (key === 'realEstate') return realEstateState;
+    return cashFlowState;
+  };
+
+  const setModuleState = (key: string) => {
+    if (key === 'netWorth') return setNetWorthState;
+    if (key === 'realEstate') return setRealEstateState;
+    return setCashFlowState;
+  };
+
+  const recalcConfirmText = (key: string) => {
+    if (key === 'netWorth') {
+      return 'This will permanently delete all previously calculated synthetic snapshots for your accounts and regenerate them from scratch. Your actual synced or manually entered historical snapshots will not be deleted.';
+    }
+    if (key === 'realEstate') {
+      return 'This will permanently delete all estimated property value and mortgage paydown snapshots and regenerate them from your current property and mortgage details. This is useful if you have updated loan terms, corrected a purchase date, or added a new mortgage.';
+    }
+    return 'Cash flow projections are computed in real-time from your budgets and spending patterns. No stored snapshots need to be recalculated.';
+  };
 
   return (
     <div className="space-y-10">      {/* ── Show the Math ──────────────────────────────────────────────── */}
@@ -126,6 +143,8 @@ export default function AnalyticsTab() {
             const moduleEnabled = isEnabled(mod.key);
             const individuallyChecked = settings[mod.key] !== false;
             const isExpanded = !!expandedModules[mod.key];
+            const state = moduleState(mod.key);
+            const setState = setModuleState(mod.key);
             return (
               <div
                 key={mod.key}
@@ -150,6 +169,80 @@ export default function AnalyticsTab() {
                     Estimated data hidden for {mod.label.toLowerCase()}.
                   </p>
                 )}
+
+                {/* Recalculate button + result */}
+                <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                  <button
+                    type="button"
+                    disabled={state.recalculating}
+                    onClick={() => {
+                      if (mod.key === 'cashFlowProjections') {
+                        handleRecalculate('cashFlow', state, setState);
+                      } else {
+                        setState({ ...state, showConfirm: true });
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${state.recalculating ? 'animate-spin' : ''}`} />
+                    {state.recalculating
+                      ? 'Recalculating...'
+                      : `Recalculate ${mod.label.split(' ')[0]} Snapshots`}
+                  </button>
+                  {mod.key === 'cashFlowProjections' && state.result?.success && (
+                    <span className="text-[11px] text-muted-foreground">Computed in real-time &mdash; no stored data</span>
+                  )}
+                </div>
+
+                {state.result && (
+                  <div className={`mt-2 p-2.5 rounded-lg border text-[11px] ${
+                    state.result.success
+                      ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
+                      : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
+                  }`}>
+                    <p className="font-medium">{state.result.message}</p>
+                    {state.result.stats && (
+                      <ul className="mt-1 space-y-0.5">
+                        <li>Synthetic snapshots created: {state.result.stats.syntheticSnapshotsCreated}</li>
+                        {state.result.stats.skippedRealSnapshots !== undefined && (
+                          <li>Real snapshots skipped: {state.result.stats.skippedRealSnapshots}</li>
+                        )}
+                        {state.result.stats.errorsEncountered > 0 && (
+                          <li className="text-red-600 dark:text-red-400">Errors: {state.result.stats.errorsEncountered}</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Confirmation dialog per module */}
+                <AlertDialog
+                  open={state.showConfirm}
+                  onOpenChange={(open) => setState({ ...state, showConfirm: open })}
+                >
+                  <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Recalculate {mod.label} Data?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {recalcConfirmText(mod.key)}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <button
+                        type="button"
+                        onClick={() => handleRecalculate(
+                          mod.key === 'cashFlowProjections' ? 'cashFlow' : mod.key,
+                          state,
+                          setState
+                        )}
+                        className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
+                      >
+                        Recalculate
+                      </button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Collapsible details toggle */}
                 <button
@@ -203,7 +296,7 @@ export default function AnalyticsTab() {
                           <strong className="text-foreground font-semibold">Calculations:</strong>
                           <ul className="list-disc pl-4 mt-1 space-y-1">
                             <li><strong className="text-foreground/80">Real Estate Valuation:</strong> Projects historical values using metropolitan or national appreciation indexes.</li>
-                            <li><strong className="text-foreground/80">CAGR Fallback:</strong> If HPI data is unavailable, calculates the compounded annual growth rate to estimate property value every 90 days.</li>
+                            <li><strong className="text-foreground/80">CAGR Fallback:</strong> If HPI data is unavailable, calculates the compounded annual growth rate to estimate property value every 30 days.</li>
                             <li><strong className="text-foreground/80">Mortgage Amortization:</strong> Simulates monthly principal paydowns, adjusting interest and principal over time using standard schedules.</li>
                           </ul>
                         </div>
@@ -243,39 +336,6 @@ export default function AnalyticsTab() {
               </div>
             );
           })}
-        </div>
-
-        {/* Recalculate Button */}
-        <div className="mt-4">
-          <button
-            type="button"
-            disabled={recalculating}
-            onClick={() => setShowRecalcConfirm(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin' : ''}`} />
-            {recalculating ? 'Recalculating...' : 'Recalculate Synthetic & Estimated Data'}
-          </button>
-
-          {recalcResult && (
-            <div className={`mt-3 p-3 rounded-lg border text-xs ${
-              recalcResult.success
-                ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
-                : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
-            }`}>
-              <p className="font-medium">{recalcResult.message}</p>
-              {recalcResult.stats && (
-                <ul className="mt-1 space-y-0.5">
-                  <li>Accounts processed: {recalcResult.stats.accountsProcessed}</li>
-                  <li>Synthetic snapshots created: {recalcResult.stats.syntheticSnapshotsCreated}</li>
-                  <li>Real snapshots skipped: {recalcResult.stats.skippedRealSnapshots}</li>
-                  {recalcResult.stats.errorsEncountered > 0 && (
-                    <li className="text-red-600 dark:text-red-400">Errors: {recalcResult.stats.errorsEncountered}</li>
-                  )}
-                </ul>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -373,31 +433,6 @@ export default function AnalyticsTab() {
           )}
         </div>
       </div>
-
-      {/* Recalculation Warning Confirmation */}
-      <AlertDialog open={showRecalcConfirm} onOpenChange={setShowRecalcConfirm}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Recalculate Synthetic &amp; Estimated Data?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will <strong className="text-destructive font-semibold">permanently delete all previously calculated synthetic snapshots</strong> for your accounts and regenerate them from scratch. Your actual synced or manually entered historical snapshots will not be deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <button
-              type="button"
-              onClick={() => {
-                setShowRecalcConfirm(false);
-                handleRecalculate();
-              }}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
-            >
-              Recalculate
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

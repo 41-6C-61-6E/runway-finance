@@ -38,7 +38,7 @@ export function EquityOverTimeChart() {
   const [timeRange, setTimeRange] = useState<TimeRange>('1y');
 
   useEffect(() => {
-    fetch('/api/real-estate', { credentials: 'include' })
+    fetch('/api/real-estate?months=600', { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();
@@ -80,60 +80,49 @@ export function EquityOverTimeChart() {
     );
   }
 
-  // Build dateMap (equity values) and synthMap (synthetic status per date per property)
-  const dateMap = new Map<string, Map<string, number>>();
-  const synthMap = new Map<string, Map<string, boolean>>();
-
-  for (const prop of properties) {
-    const totalMortgage = prop.linkedMortgages.reduce((s, m) => s + Math.abs(m.balance), 0);
-    const propSnapMap = new Map(prop.snapshots.map((s) => [s.date, s]));
-    const mortSnapMap = new Map(prop.mortgageSnapshots.map((s) => [s.date, s]));
-    const allDates = new Set([...prop.snapshots.map((s) => s.date), ...prop.mortgageSnapshots.map((s) => s.date)]);
-
-    if (allDates.size === 0) {
-      if (!dateMap.has('today')) {
-        dateMap.set('today', new Map());
-        synthMap.set('today', new Map());
-      }
-      dateMap.get('today')!.set(prop.id, prop.value - totalMortgage);
-      synthMap.get('today')!.set(prop.id, false);
-      continue;
-    }
-
-    for (const date of allDates) {
-      if (!dateMap.has(date)) {
-        dateMap.set(date, new Map());
-        synthMap.set(date, new Map());
-      }
-      const propSnap = propSnapMap.get(date);
-      const mortSnap = mortSnapMap.get(date);
-      const val = propSnap ? propSnap.value : prop.value;
-      const mort = mortSnap ? Math.abs(mortSnap.value) : totalMortgage;
-      const equity = val - mort;
-      dateMap.get(date)!.set(prop.id, equity);
-      // If either property or mortgage snapshot for this date is synthetic, mark as synthetic
-      const isSynth = (propSnap?.isSynthetic ?? false) || (mortSnap?.isSynthetic ?? false);
-      synthMap.get(date)!.set(prop.id, isSynth);
-    }
-  }
-
+  // Build equity series per property using mortgage snapshots as canonical timeline
+  // Forward-fill property values from nearest prior property snapshot to avoid
+  // mixing historical and current data (which caused ~90-day spike artifacts).
   const chartData = properties.map((prop) => {
-    const sortedEntries = Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const data = sortedEntries.map(([date, props]) => ({
-      x: date,
-      y: props.get(prop.id) ?? 0,
-      isSynthetic: synthMap.get(date)?.get(prop.id) ?? false,
-    }));
-
     const totalMortgage = prop.linkedMortgages.reduce((s, m) => s + Math.abs(m.balance), 0);
+
+    const sortedPropSnaps = [...prop.snapshots].sort((a, b) => a.date.localeCompare(b.date));
+    const sortedMortSnaps = [...prop.mortgageSnapshots].sort((a, b) => a.date.localeCompare(b.date));
+
+    const data: Array<{ x: string; y: number; isSynthetic: boolean }> = [];
+
+    if (sortedMortSnaps.length > 0) {
+      let propIdx = 0;
+      for (const mortSnap of sortedMortSnaps) {
+        while (propIdx < sortedPropSnaps.length - 1 && sortedPropSnaps[propIdx + 1].date <= mortSnap.date) {
+          propIdx++;
+        }
+        const propSnap = propIdx < sortedPropSnaps.length && sortedPropSnaps[propIdx].date <= mortSnap.date
+          ? sortedPropSnaps[propIdx]
+          : null;
+        const propValue = propSnap ? propSnap.value : prop.value;
+        const equity = propValue - Math.abs(mortSnap.value);
+        data.push({
+          x: mortSnap.date,
+          y: Math.round(equity * 100) / 100,
+          isSynthetic: (propSnap?.isSynthetic ?? false) || (mortSnap.isSynthetic ?? false),
+        });
+      }
+    } else if (sortedPropSnaps.length > 0) {
+      for (const propSnap of sortedPropSnaps) {
+        data.push({
+          x: propSnap.date,
+          y: propSnap.value - totalMortgage,
+          isSynthetic: propSnap.isSynthetic ?? false,
+        });
+      }
+    }
+
     if (data.length === 0) {
       data.push({ x: new Date().toISOString().split('T')[0], y: prop.value - totalMortgage, isSynthetic: false });
     }
 
-    return {
-      id: prop.name,
-      data,
-    };
+    return { id: prop.name, data };
   });
 
   const cutoffDate = new Date();
