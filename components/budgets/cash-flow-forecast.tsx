@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ForecastChart } from '@/components/cash-flow/forecast-chart';
@@ -76,6 +76,9 @@ export function CashFlowForecast() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
   const [allAccounts, setAllAccounts] = useState<ForecastAccount[]>([]);
   const [accountFilter, setAccountFilter] = useState<'all' | 'selected'>('all');
+  const accountsLoaded = useRef(false);
+  const selectedIdsRef = useRef<Set<string>>(new Set<string>());
+  const allAccountsRef = useRef<ForecastAccount[]>([]);
 
   const fetchForecast = useCallback(async () => {
     setLoading(true);
@@ -86,8 +89,8 @@ export function CashFlowForecast() {
         forecastMode,
         lookbackMonths: String(lookbackMonths),
       });
-      if (accountFilter === 'selected' && selectedAccountIds.size > 0) {
-        params.set('accountIds', Array.from(selectedAccountIds).join(','));
+      if (accountFilter === 'selected' && selectedIdsRef.current.size > 0) {
+        params.set('accountIds', Array.from(selectedIdsRef.current).join(','));
       }
       if (accountFilter === 'all') {
         params.set('accountType', 'banking');
@@ -97,16 +100,20 @@ export function CashFlowForecast() {
       if (!res.ok) throw new Error('Failed to fetch forecast');
       const json = await res.json();
       setData(json);
-      if (allAccounts.length === 0 && json.accounts) {
+      if (!accountsLoaded.current && json.accounts) {
+        accountsLoaded.current = true;
+        const ids: Set<string> = new Set(json.accounts.map((a: ForecastAccount) => a.id));
+        selectedIdsRef.current = ids;
+        allAccountsRef.current = json.accounts;
         setAllAccounts(json.accounts);
-        setSelectedAccountIds(new Set(json.accounts.map((a: ForecastAccount) => a.id)));
+        setSelectedAccountIds(ids);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch forecast');
     } finally {
       setLoading(false);
     }
-  }, [forecastMode, lookbackMonths, forecastMonths, accountFilter, selectedAccountIds, allAccounts.length]);
+  }, [forecastMode, lookbackMonths, forecastMonths, accountFilter]);
 
   useEffect(() => {
     fetchForecast();
@@ -117,6 +124,7 @@ export function CashFlowForecast() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      selectedIdsRef.current = next;
       return next;
     });
   };
