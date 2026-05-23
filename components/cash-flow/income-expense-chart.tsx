@@ -191,7 +191,7 @@ export function IncomeExpenseChart() {
         <div className="financial-chart h-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'bar' ? (
-              <ComposedChart data={chartData} barGap="-100%" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+              <ComposedChart data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 {sharedAxes}
                 <Bar
                   dataKey="income"
@@ -199,6 +199,7 @@ export function IncomeExpenseChart() {
                   fill="var(--color-chart-1)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={24}
+                  stackId="a"
                   onClick={(data: any) => handleClick(data?.payload?.yearMonth)}
                 />
                 <Bar
@@ -207,6 +208,7 @@ export function IncomeExpenseChart() {
                   fill="var(--color-destructive)"
                   radius={[0, 0, 4, 4]}
                   maxBarSize={24}
+                  stackId="a"
                   onClick={(data: any) => handleClick(data?.payload?.yearMonth)}
                 />
                 <Line
