@@ -9,6 +9,7 @@ import { MathDescription } from '@/components/features/settings/math-description
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { ChartErrorBoundary } from '@/components/chart-error-boundary';
 
 function CashFlowContent() {
   const { isVisible } = useChartVisibility();
@@ -23,10 +24,12 @@ function CashFlowContent() {
           {isVisible('incomeExpenseChart') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                <div>
-                  <IncomeExpenseChart />
-                  <MathDescription chartId="incomeExpenseChart" />
-                </div>
+                <ChartErrorBoundary name="Income vs Expenses">
+                  <div>
+                    <IncomeExpenseChart />
+                    <MathDescription chartId="incomeExpenseChart" />
+                  </div>
+                </ChartErrorBoundary>
               </Suspense>
             </div>
           )}
@@ -34,10 +37,12 @@ function CashFlowContent() {
           {isVisible('cashFlowSankey') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading sankey...</div>}>
-                <div>
-                  <CashFlowSankey />
-                  <MathDescription chartId="cashFlowSankey" />
-                </div>
+                <ChartErrorBoundary name="Cash Flow Sankey">
+                  <div>
+                    <CashFlowSankey />
+                    <MathDescription chartId="cashFlowSankey" />
+                  </div>
+                </ChartErrorBoundary>
               </Suspense>
             </div>
           )}
@@ -45,10 +50,12 @@ function CashFlowContent() {
           {isVisible('cashFlowForecast') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading forecast...</div>}>
-                <div>
-                  <CashFlowForecast />
-                  <MathDescription chartId="cashFlowForecast" />
-                </div>
+                <ChartErrorBoundary name="Cash Flow Forecast">
+                  <div>
+                    <CashFlowForecast />
+                    <MathDescription chartId="cashFlowForecast" />
+                  </div>
+                </ChartErrorBoundary>
               </Suspense>
             </div>
           )}
