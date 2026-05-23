@@ -574,9 +574,8 @@ export function CashFlowSankey() {
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
-  // showParents controls whether category groups are added as intermediate nodes.
-  // Toggling it re-runs the data fetch (which re-calls buildSankeyData with the new value).
-  const [showParents, setShowParents] = useState<boolean>(true);
+  // showParents is permanently true (always show category groups)
+  const showParents = true;
   // showPercentages is purely a display toggle — no data refetch needed.
   // It is passed directly into the node renderer and tooltip.
   const [showPercentages, setShowPercentages] = useState<boolean>(false);
@@ -682,7 +681,7 @@ export function CashFlowSankey() {
     if (allCategoryInfo.length > 0 || allAccounts.length >= 0) {
       fetchData();
     }
-  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
+  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo]);
 
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
@@ -873,22 +872,7 @@ export function CashFlowSankey() {
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
         <div className="flex items-center gap-3">
-          {/* Groups toggle — rebuilds the graph with/without parent group nodes */}
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <span className="text-[10px] text-muted-foreground">Groups</span>
-            <button
-              onClick={() => setShowParents((v) => !v)}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                showParents ? 'bg-primary' : 'bg-muted-foreground/30'
-              }`}
-            >
-              <span
-                className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
-                  showParents ? 'translate-x-[14px]' : 'translate-x-[2px]'
-                }`}
-              />
-            </button>
-          </label>
+
           {/* % toggle — switches node labels + tooltip between currency and percentage */}
           <label className="flex items-center gap-1.5 cursor-pointer">
             <span className="text-[10px] text-muted-foreground">{showPercentages ? '%' : '$'}</span>
