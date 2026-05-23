@@ -51,8 +51,8 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
 
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
   const marginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
-    ? `${sidebarWidth}px` 
-    : `${Math.max(sidebarWidth, COLLAPSED_WIDTH + accountsWidth)}px`;
+    ? `${COLLAPSED_WIDTH}px` 
+    : `${COLLAPSED_WIDTH + accountsWidth}px`;
 
   return (
     <>

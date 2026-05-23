@@ -58,7 +58,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
 
-  const [startDate, endDate] = getDateRange(timeframe);
+  let [startDate, endDate] = getDateRange(timeframe);
+  if (timeframe === 'all') {
+    const earliestSnap = await getDb()
+      .select({ snapshotDate: accountSnapshots.snapshotDate })
+      .from(accountSnapshots)
+      .where(eq(accountSnapshots.userId, userId))
+      .orderBy(accountSnapshots.snapshotDate)
+      .limit(1);
+    if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
+      startDate = new Date(earliestSnap[0].snapshotDate + 'T00:00:00Z');
+    } else {
+      startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+  }
   const startStr = startDate.toISOString().split('T')[0];
   const endStr = endDate.toISOString().split('T')[0];
 
@@ -243,7 +257,10 @@ export async function GET(request: Request) {
       const point: AggregatablePoint = { date: dateStr };
       let netWorth = 0;
       for (const account of filteredAccounts) {
-        const bal = latestByAccount.get(account.id) ?? 0;
+        if (!latestByAccount.has(account.id)) {
+          continue;
+        }
+        const bal = latestByAccount.get(account.id)!;
 
         const accountType = account.type.toLowerCase();
         if (isAssetAccount(accountType)) {

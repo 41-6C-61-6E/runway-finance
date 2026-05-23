@@ -11,6 +11,7 @@ import {
   Tooltip as RechartsTooltip,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -244,6 +245,10 @@ export function EquityOverTimeChart() {
     return synthFiltered.filter((pt) => pt.date >= cutoffStr);
   }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeRange]);
 
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicks(activeTimeline, timeRange, 'date');
+  }, [activeTimeline, timeRange]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -284,23 +289,11 @@ export function EquityOverTimeChart() {
     const point = payload[0].payload;
     const dateStr = point.date;
 
-    const formatPointDate = (d: string) => {
-      const parts = d.split('-');
-      if (parts.length === 3) {
-        const date = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: '2-digit',
-          timeZone: 'UTC'
-        });
-      }
-      return new Date(d).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: '2-digit',
-      });
-    };
+    const formatPointDate = (d: string) => formatSafeUTCDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: '2-digit',
+    });
 
     const mortgage = point.homeValue - point.equity;
 
@@ -382,18 +375,16 @@ export function EquityOverTimeChart() {
                 tickLine={false}
                 axisLine={{ stroke: 'var(--color-border)' }}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                ticks={xAxisTicks}
                 tickFormatter={(d) => {
                   if (!d) return '';
-                  const parts = d.split('-');
-                  if (parts.length === 3) {
-                    const date = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
-                    return timeRange === '1m'
-                      ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-                      : date.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+                  if (timeRange === '1m') {
+                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                  } else if (timeRange === '5y' || timeRange === 'all') {
+                    return formatSafeUTCDate(d, { year: 'numeric' });
+                  } else {
+                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
                   }
-                  return timeRange === '1m'
-                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 }}
               />
               <YAxis

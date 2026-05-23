@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import {
@@ -148,14 +149,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
   const hasExtraPayments = showProjection && (parseFloat(extraMonthly) > 0 || parseFloat(lumpSum) > 0 || biweekly);
 
   const formatXAxis = (tickStr: string) => {
-    try {
-      const parts = tickStr.split('-');
-      if (parts.length < 3) return tickStr;
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    } catch (e) {
-      return tickStr;
-    }
+    return formatSafeUTCDate(tickStr, { month: 'short', year: 'numeric' });
   };
 
   const xInterval = Math.max(1, Math.floor(chartDataPoints.length / 6));
@@ -308,8 +302,8 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                     <div className="text-xs">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Payoff:</span>
-                        <span className="font-medium text-chart-1">{acceleratedSummary.payoffDate}</span>
-                        <span className="text-muted-foreground">(vs {standardSummary.payoffDate})</span>
+                        <span className="font-medium text-chart-1">{formatSafeUTCDate(acceleratedSummary.payoffDate, { month: 'short', year: 'numeric' })}</span>
+                        <span className="text-muted-foreground">(vs {formatSafeUTCDate(standardSummary.payoffDate, { month: 'short', year: 'numeric' })})</span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-muted-foreground">Interest saved:</span>
