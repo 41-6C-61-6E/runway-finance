@@ -201,7 +201,7 @@ export function SpendingBreakdown() {
 
   const pieData = useMemo(() => {
     const sorted = [...visibleCategories].sort((a, b) => b.amount - a.amount);
-    if (sorted.length <= 20) {
+    if (sorted.length <= 15) {
       return sorted.map((c) => ({
         id: c.categoryName,
         label: c.categoryName,
@@ -211,12 +211,12 @@ export function SpendingBreakdown() {
       }));
     }
 
-    const top19 = sorted.slice(0, 19);
-    const rest = sorted.slice(19);
+    const top14 = sorted.slice(0, 14);
+    const rest = sorted.slice(14);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
     const restIds = rest.map((c) => c.categoryId).join(',');
 
-    const mappedTop = top19.map((c) => ({
+    const mappedTop = top14.map((c) => ({
       id: c.categoryName,
       label: c.categoryName,
       value: c.amount,

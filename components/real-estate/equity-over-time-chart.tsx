@@ -371,6 +371,10 @@ export function EquityOverTimeChart() {
                   <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
                   <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
                 </linearGradient>
+                <linearGradient id="colorMortgage" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-chart-3)" stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor="var(--color-chart-3)" stopOpacity={0.02}/>
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
@@ -430,8 +434,37 @@ export function EquityOverTimeChart() {
                 fill="url(#colorEquity)"
                 dot={false}
               />
+              
+              {/* Mortgage Balance Area */}
+              <Area
+                type="monotone"
+                dataKey="mortgage"
+                name="Mortgage Balance"
+                stroke="var(--color-chart-3)"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                fill="url(#colorMortgage)"
+                dot={false}
+              />
             </ComposedChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+      <div className="px-5 pb-4 flex items-center justify-center gap-6 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-2)' }} />
+          <span className="text-muted-foreground">Home Value</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-1)' }} />
+          <span className="text-muted-foreground">Equity</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-0.5 rounded" style={{
+            background: 'var(--color-chart-3)',
+            backgroundImage: 'repeating-linear-gradient(90deg, var(--color-chart-3) 0, var(--color-chart-3) 4px, transparent 4px, transparent 6px)'
+          }} />
+          <span className="text-muted-foreground">Mortgage Balance</span>
         </div>
       </div>
     </div>

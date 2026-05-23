@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
@@ -583,6 +583,7 @@ export function CashFlowSankey() {
   const [accountFilterOpen, setAccountFilterOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [themeVersion, setThemeVersion] = useState(0);
   const accountFilterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -610,20 +611,18 @@ export function CashFlowSankey() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Rebuild sankey colors when theme changes (no refetch needed)
+  // Rebuild sankey colors when theme changes
   useEffect(() => {
-    if (!sankeyData) return;
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((m) => {
         if (m.attributeName === 'data-theme') {
-          // Re-trigger fetch to regenerate colors with new theme
-          setLoading(true);
+          setThemeVersion((v) => v + 1);
         }
       });
     });
     observer.observe(document.documentElement, { attributes: true });
     return () => observer.disconnect();
-  }, [sankeyData]);
+  }, []);
 
   const getAccountIdsParam = (excluded: Set<string>, accounts: AccountData[]): string => {
     if (excluded.size === 0 || excluded.size >= accounts.length) return '';
@@ -706,18 +705,18 @@ export function CashFlowSankey() {
     router.push(`/transactions?startDate=${startDate}&endDate=${endDate}&categoryIds=${categoryIds}`);
   };
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
     if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) navigateToTransactions(categoryId);
-  };
+  }, [sankeyData, timeframe, month]);
 
-  const handleLinkClick = (sourceId: string, targetId: string) => {
+  const handleLinkClick = useCallback((sourceId: string, targetId: string) => {
     const s = getNodeCategoryId(sourceId);
     const t = getNodeCategoryId(targetId);
     const ids = [s, t].filter(Boolean).join(',');
     if (ids) navigateToTransactions(ids);
-  };
+  }, [sankeyData, timeframe, month]);
 
   const prevMonth = () => {
     const [y, m] = month.split('-').map(Number);
@@ -759,7 +758,72 @@ export function CashFlowSankey() {
       .filter((l) => l.source !== -1 && l.target !== -1 && l.value > 0);
 
     return { nodes, links };
-  }, [sankeyData]);
+  }, [sankeyData, themeVersion]);
+
+  // Stabilize Sankey child elements to avoid recomputing layout on every render
+  // NOTE: must be before early returns to maintain consistent hook order
+  const sankeyNode = useMemo(() => (
+    <SankeyCustomNode
+      onClick={handleNodeClick}
+      hoveredNode={hoveredNode}
+      setHoveredNode={setHoveredNode}
+      showPercentages={showPercentages}
+    />
+  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion]);
+
+  const sankeyLink = useMemo(() => (
+    <SankeyCustomLink
+      onClick={handleLinkClick}
+      hoveredNode={hoveredNode}
+    />
+  ), [handleLinkClick, hoveredNode, themeVersion]);
+
+  const sankeyTooltip = useMemo(() => (
+    <Tooltip
+      content={({ active, payload }) => {
+        if (!active || !payload || !payload.length) return null;
+        const data = payload[0].payload;
+
+        const isLink = data.source && typeof data.source === 'object' && data.target && typeof data.target === 'object';
+
+        if (isLink) {
+          const linkValue = data.value;
+          const sourceNode = data.source;
+          const targetNode = data.target;
+          const sourceTotal = sourceNode.value || 0;
+          const targetTotal = targetNode.value || 0;
+          const pctOfSource = sourceTotal > 0 ? (linkValue / sourceTotal) * 100 : 0;
+          const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
+
+          return (
+            <ChartTooltip>
+              <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
+              <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
+              {showPercentages && (
+                <>
+                  <TooltipRow label="Of Source" value={`${pctOfSource.toFixed(1)}%`} />
+                  <TooltipRow label="Of Target" value={`${pctOfTarget.toFixed(1)}%`} />
+                </>
+              )}
+            </ChartTooltip>
+          );
+        } else {
+          const displayValue = showPercentages && data.percentage !== undefined
+            ? `${data.percentage.toFixed(1)}%`
+            : formatCurrency(data.value);
+          return (
+            <ChartTooltip>
+              <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
+              <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
+              {showPercentages && data.value !== undefined && (
+                <TooltipRow label="Amount" value={formatCurrency(data.value)} />
+              )}
+            </ChartTooltip>
+          );
+        }
+      }}
+    />
+  ), [showPercentages, themeVersion]);
 
   // ── Loading / error / empty states ─────────────────────────────────────────
   if (loading) {
@@ -944,71 +1008,16 @@ export function CashFlowSankey() {
       <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
         <div className="financial-chart h-full px-2 pb-2">
           {processedData.nodes.length > 0 && processedData.links.length > 0 && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={0}>
               <Sankey
                 data={processedData}
-                node={
-                  <SankeyCustomNode
-                    onClick={handleNodeClick}
-                    hoveredNode={hoveredNode}
-                    setHoveredNode={setHoveredNode}
-                    showPercentages={showPercentages}
-                  />
-                }
-                link={
-                  <SankeyCustomLink
-                    onClick={handleLinkClick}
-                    hoveredNode={hoveredNode}
-                  />
-                }
+                node={sankeyNode}
+                link={sankeyLink}
                 nodePadding={showParents ? 20 : 28}
                 nodeWidth={showParents ? 20 : 24}
                 margin={{ top: 20, right: 160, bottom: 20, left: 160 }}
               >
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload || !payload.length) return null;
-                    const data = payload[0].payload;
-
-                    const isLink = data.source && typeof data.source === 'object' && data.target && typeof data.target === 'object';
-
-                    if (isLink) {
-                      const linkValue = data.value;
-                      const sourceNode = data.source;
-                      const targetNode = data.target;
-                      const sourceTotal = sourceNode.value || 0;
-                      const targetTotal = targetNode.value || 0;
-                      const pctOfSource = sourceTotal > 0 ? (linkValue / sourceTotal) * 100 : 0;
-                      const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
-
-                      return (
-                        <ChartTooltip>
-                          <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
-                          <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
-                          {showPercentages && (
-                            <>
-                              <TooltipRow label="Of Source" value={`${pctOfSource.toFixed(1)}%`} />
-                              <TooltipRow label="Of Target" value={`${pctOfTarget.toFixed(1)}%`} />
-                            </>
-                          )}
-                        </ChartTooltip>
-                      );
-                    } else {
-                      const displayValue = showPercentages && data.percentage !== undefined
-                        ? `${data.percentage.toFixed(1)}%`
-                        : formatCurrency(data.value);
-                      return (
-                        <ChartTooltip>
-                          <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
-                          <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
-                          {showPercentages && data.value !== undefined && (
-                            <TooltipRow label="Amount" value={formatCurrency(data.value)} />
-                          )}
-                        </ChartTooltip>
-                      );
-                    }
-                  }}
-                />
+                {sankeyTooltip}
               </Sankey>
             </ResponsiveContainer>
           )}
