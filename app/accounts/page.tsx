@@ -31,6 +31,7 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
+import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
 import { 
   ChevronRight, 
   ChevronDown, 
@@ -469,22 +470,35 @@ export default function AccountsPage() {
       const point: Record<string, any> = { date: d.date };
       let totalAssets = 0;
       let totalLiabilities = 0;
+      let anySelectedHasData = false;
 
       selectedSeriesKeys.forEach((key) => {
         const accs = seriesAccountsMap.get(key) || [];
-        const sum = accs.reduce((s, acc) => s + (d[acc.id] || 0), 0);
-        point[key] = sum;
+        let sum = 0;
+        let hasData = false;
+        accs.forEach((acc) => {
+          const val = d[acc.id];
+          if (val !== undefined) {
+            sum += val;
+            hasData = true;
+          }
+        });
 
-        if (isAssetSeries(key)) {
-          totalAssets += sum;
-        } else {
-          totalLiabilities += sum;
+        if (hasData) {
+          point[key] = sum;
+          anySelectedHasData = true;
+          if (isAssetSeries(key)) {
+            totalAssets += sum;
+          } else {
+            totalLiabilities += sum;
+          }
         }
       });
 
       point.netWorth = totalAssets - totalLiabilities;
       point.totalAssets = totalAssets;
       point.totalLiabilities = totalLiabilities;
+      point._hasData = anySelectedHasData;
       return point;
     });
 
@@ -499,7 +513,7 @@ export default function AccountsPage() {
     });
 
     // Create the final data for Recharts, where liability keys are negative
-    const rechartsData = processedPoints.map((d) => {
+    const rechartsDataRaw = processedPoints.map((d) => {
       const row: Record<string, any> = {
         date: d.date,
         netWorth: d.netWorth,
@@ -507,14 +521,39 @@ export default function AccountsPage() {
         totalLiabilities: -d.totalLiabilities,
       };
       selectedSeriesKeys.forEach((k) => {
-        const val = d[k] || 0;
-        row[k] = isAssetSeries(k) ? val : -val;
+        const val = d[k];
+        if (val !== undefined) {
+          row[k] = isAssetSeries(k) ? val : -val;
+        }
       });
+      row._hasData = d._hasData;
       return row;
     });
 
+    let startIdx = 0;
+    if (timeframe === 'all') {
+      const firstDataIdx = rechartsDataRaw.findIndex(d => d._hasData);
+      if (firstDataIdx !== -1) {
+        startIdx = firstDataIdx;
+      }
+    }
+    let rechartsData = rechartsDataRaw.slice(startIdx);
+
+    if (timeframe === 'all' && rechartsData.length > 100) {
+      const sampled: typeof rechartsData = [];
+      const len = rechartsData.length;
+      for (let i = 0; i < 100; i++) {
+        const index = Math.min(
+          Math.floor((i * (len - 1)) / 99),
+          len - 1
+        );
+        sampled.push(rechartsData[index]);
+      }
+      rechartsData = sampled;
+    }
+
     // Find bounds
-    const allValues = processedPoints.flatMap((d) => [
+    const allValues = rechartsData.flatMap((d) => [
       d.netWorth,
       d.totalAssets,
       -d.totalLiabilities
@@ -529,11 +568,15 @@ export default function AccountsPage() {
       rechartsData,
       activeAssets,
       activeLiabilities,
-      processedChartData: processedPoints,
+      processedChartData: processedPoints.slice(startIdx),
       maxVal: maxValue,
       minVal: minValue,
     };
-  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries]);
+  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries, timeframe]);
+
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicks(rechartsData, timeframe, 'date');
+  }, [rechartsData, timeframe]);
 
 
   // Hierarchy statistics calculations
@@ -664,7 +707,7 @@ export default function AccountsPage() {
     const point = payload[0].payload;
     const dateStr = point.date;
 
-    const formatPointDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
+    const formatPointDate = (d: string) => formatSafeUTCDate(d, {
       month: 'short',
       day: 'numeric',
       year: '2-digit',
@@ -1063,11 +1106,16 @@ export default function AccountsPage() {
                                 tickLine={false}
                                 axisLine={{ stroke: 'var(--color-border)' }}
                                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                ticks={xAxisTicks}
                                 tickFormatter={(d) => {
                                   if (!d) return '';
-                                  return timeframe === '1m'
-                                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                  if (timeframe === '1m') {
+                                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                                  } else if (timeframe === '5y' || timeframe === 'all') {
+                                    return formatSafeUTCDate(d, { year: 'numeric' });
+                                  } else {
+                                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                                  }
                                 }}
                               />
                               <YAxis
@@ -1127,17 +1175,35 @@ export default function AccountsPage() {
                               stackOffset="sign"
                               margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
                             >
+                              <defs>
+                                {[...activeAssets, ...activeLiabilities].map((key) => {
+                                  const info = seriesInfoMap.get(key);
+                                  const color = info?.color || (activeAssets.includes(key) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
+                                  const id = `gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                                  return (
+                                    <linearGradient key={key} id={id} x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+                                      <stop offset="95%" stopColor={color} stopOpacity={0.03} />
+                                    </linearGradient>
+                                  );
+                                })}
+                              </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                               <XAxis
                                 dataKey="date"
                                 tickLine={false}
                                 axisLine={{ stroke: 'var(--color-border)' }}
                                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                ticks={xAxisTicks}
                                 tickFormatter={(d) => {
                                   if (!d) return '';
-                                  return timeframe === '1m'
-                                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                  if (timeframe === '1m') {
+                                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                                  } else if (timeframe === '5y' || timeframe === 'all') {
+                                    return formatSafeUTCDate(d, { year: 'numeric' });
+                                  } else {
+                                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                                  }
                                 }}
                               />
                               <YAxis
@@ -1172,9 +1238,10 @@ export default function AccountsPage() {
                                     type="monotone"
                                     dataKey={key}
                                     stackId="stack"
-                                    stroke="none"
-                                    fill={info?.color || 'var(--color-chart-1)'}
-                                    fillOpacity={0.85}
+                                    stroke={info?.color || 'var(--color-chart-1)'}
+                                    strokeWidth={2}
+                                    fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                                    dot={false}
                                   />
                                 );
                               })}
@@ -1188,9 +1255,10 @@ export default function AccountsPage() {
                                     type="monotone"
                                     dataKey={key}
                                     stackId="stack"
-                                    stroke="none"
-                                    fill={info?.color || 'var(--color-destructive)'}
-                                    fillOpacity={0.85}
+                                    stroke={info?.color || 'var(--color-destructive)'}
+                                    strokeWidth={2}
+                                    fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                                    dot={false}
                                   />
                                 );
                               })}

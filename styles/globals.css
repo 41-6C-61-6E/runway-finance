@@ -203,57 +203,84 @@ body,
 }
 
 /* ── Chart Color Schemes ──────────────────────────────────────────────────── */
+[data-chart-scheme="forest"] {
+  --chart-1: oklch(0.68 0.22 140);
+  --chart-2: oklch(0.76 0.18 110);
+  --chart-3: oklch(0.62 0.22 315);
+  --chart-4: oklch(0.65 0.18 190);
+  --chart-5: oklch(0.60 0.18 270);
+  --chart-synthetic: oklch(0.83 0.11 140);
+  --destructive-synthetic: oklch(0.65 0.1 25);
+}
 [data-chart-scheme="nord"] {
-  --chart-1: oklch(0.65 0.08 240);
-  --chart-2: oklch(0.7 0.1 40);
-  --chart-3: oklch(0.6 0.12 180);
-  --chart-4: oklch(0.55 0.06 280);
-  --chart-5: oklch(0.7 0.08 80);
-  --chart-synthetic: oklch(0.7 0.05 240);
+  --chart-1: oklch(0.66 0.12 225);
+  --chart-2: oklch(0.75 0.14 135);
+  --chart-3: oklch(0.76 0.12 205);
+  --chart-4: oklch(0.65 0.13 315);
+  --chart-5: oklch(0.74 0.08 180);
+  --chart-synthetic: oklch(0.81 0.06 225);
+  --destructive-synthetic: oklch(0.65 0.08 25);
+}
+[data-chart-scheme="earth"] {
+  --chart-1: oklch(0.64 0.13 36);
+  --chart-2: oklch(0.68 0.10 125);
+  --chart-3: oklch(0.74 0.13 82);
+  --chart-4: oklch(0.58 0.09 195);
+  --chart-5: oklch(0.58 0.11 345);
+  --chart-synthetic: oklch(0.79 0.065 36);
+  --destructive-synthetic: oklch(0.65 0.1 25);
+}
+[data-chart-scheme="pastel"] {
+  --chart-1: oklch(0.78 0.08 150);
+  --chart-2: oklch(0.75 0.10 18);
+  --chart-3: oklch(0.76 0.09 255);
+  --chart-4: oklch(0.79 0.10 65);
+  --chart-5: oklch(0.74 0.08 300);
+  --chart-synthetic: oklch(0.93 0.05 150);
   --destructive-synthetic: oklch(0.65 0.08 25);
 }
 [data-chart-scheme="skittles"] {
-  --chart-1: oklch(0.65 0.22 25);
-  --chart-2: oklch(0.7 0.2 55);
-  --chart-3: oklch(0.78 0.18 90);
-  --chart-4: oklch(0.65 0.18 145);
-  --chart-5: oklch(0.6 0.2 300);
-  --chart-synthetic: oklch(0.75 0.12 25);
+  --chart-1: oklch(0.66 0.22 28);
+  --chart-2: oklch(0.74 0.21 62);
+  --chart-3: oklch(0.80 0.19 115);
+  --chart-4: oklch(0.72 0.19 198);
+  --chart-5: oklch(0.64 0.21 315);
+  --chart-synthetic: oklch(0.81 0.11 28);
   --destructive-synthetic: oklch(0.65 0.12 25);
 }
 [data-chart-scheme="fauntleroy"] {
-  --chart-1: oklch(0.45 0.12 165);
-  --chart-2: oklch(0.6 0.14 195);
-  --chart-3: oklch(0.7 0.1 185);
-  --chart-4: oklch(0.55 0.08 255);
-  --chart-5: oklch(0.85 0.02 90);
-  --chart-synthetic: oklch(0.55 0.07 165);
+  --chart-1: oklch(0.62 0.20 160);
+  --chart-2: oklch(0.72 0.16 195);
+  --chart-3: oklch(0.58 0.18 240);
+  --chart-4: oklch(0.66 0.10 290);
+  --chart-5: oklch(0.74 0.15 30);
+  --chart-synthetic: oklch(0.77 0.10 160);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 [data-chart-scheme="tahoma"] {
-  --chart-1: oklch(0.75 0.06 220);
-  --chart-2: oklch(0.9 0.01 240);
-  --chart-3: oklch(0.5 0.02 260);
-  --chart-4: oklch(0.65 0.08 210);
-  --chart-5: oklch(0.35 0.03 270);
-  --chart-synthetic: oklch(0.8 0.04 220);
+  --chart-1: oklch(0.80 0.06 220);
+  --chart-2: oklch(0.92 0.02 210);
+  --chart-3: oklch(0.70 0.15 210);
+  --chart-4: oklch(0.48 0.03 240);
+  --chart-5: oklch(0.63 0.18 285);
+  --chart-synthetic: oklch(0.95 0.05 220);
   --destructive-synthetic: oklch(0.65 0.08 25);
 }
 [data-chart-scheme="evergreen"] {
-  --chart-1: oklch(0.45 0.15 150);
-  --chart-2: oklch(0.55 0.12 130);
-  --chart-3: oklch(0.5 0.1 160);
-  --chart-4: oklch(0.6 0.13 140);
-  --chart-5: oklch(0.4 0.12 155);
-  --chart-synthetic: oklch(0.55 0.08 150);
+  --chart-1: oklch(0.52 0.12 145);
+  --chart-2: oklch(0.68 0.14 130);
+  --chart-3: oklch(0.75 0.12 105);
+  --chart-4: oklch(0.58 0.09 50);
+  --chart-5: oklch(0.55 0.08 280);
+  --chart-synthetic: oklch(0.67 0.06 145);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 [data-chart-scheme="kabosu"] {
-  --chart-1: oklch(0.7 0.2 65);
-  --chart-2: oklch(0.75 0.18 80);
-  --chart-3: oklch(0.65 0.2 55);
-  --chart-4: oklch(0.8 0.15 85);
-  --chart-5: oklch(0.55 0.2 45);
-  --chart-synthetic: oklch(0.75 0.12 65);
+  --chart-1: oklch(0.68 0.18 45);
+  --chart-2: oklch(0.75 0.14 70);
+  --chart-3: oklch(0.77 0.15 115);
+  --chart-4: oklch(0.52 0.04 65);
+  --chart-5: oklch(0.68 0.05 220);
+  --chart-synthetic: oklch(0.83 0.09 45);
   --destructive-synthetic: oklch(0.65 0.12 25);
 }
