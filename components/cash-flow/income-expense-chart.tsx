@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -69,7 +70,7 @@ export function IncomeExpenseChart() {
 
   const numMonths = MONTH_MAP[timeframe] || 12;
   const data = allData.slice(-numMonths).map((d) => ({
-    month: new Date(d.yearMonth + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+    month: formatSafeUTCDate(d.yearMonth + '-01', { month: 'short', year: '2-digit' }),
     income: d.income,
     expenses: d.expenses,
     net: d.netCashFlow,
@@ -223,13 +224,22 @@ export function IncomeExpenseChart() {
               </ComposedChart>
             ) : (
               <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03} />
+                  </linearGradient>
+                  <linearGradient id="expensesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
                 {sharedAxes}
                 <Area
                   type="monotone"
                   dataKey="income"
                   name="Income"
-                  fill="var(--color-chart-1)"
-                  fillOpacity={0.25}
+                  fill="url(#incomeGrad)"
                   stroke="var(--color-chart-1)"
                   strokeWidth={2}
                   activeDot={{ r: 4 }}
@@ -238,8 +248,7 @@ export function IncomeExpenseChart() {
                   type="monotone"
                   dataKey="expenses"
                   name="Expenses"
-                  fill="var(--color-destructive)"
-                  fillOpacity={0.25}
+                  fill="url(#expensesGrad)"
                   stroke="var(--color-destructive)"
                   strokeWidth={2}
                   activeDot={{ r: 4 }}

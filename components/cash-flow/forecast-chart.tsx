@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
 interface ChartSeries {
@@ -64,8 +65,7 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
               interval={chartData.length > 30 ? Math.max(4, Math.floor(chartData.length / 6)) : 0}
               tickFormatter={(v: string) => {
-                const d = new Date(v + '-01');
-                return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                return formatSafeUTCDate(v + '-01', { month: 'short', year: '2-digit' });
               }}
             />
             <YAxis
@@ -82,8 +82,7 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                const d = new Date(label + '-01');
-                const xFormatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const xFormatted = formatSafeUTCDate(label + '-01', { month: 'short', year: '2-digit' });
                 return (
                   <ChartTooltip>
                     <TooltipHeader>{xFormatted}</TooltipHeader>

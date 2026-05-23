@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
+import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -236,7 +237,7 @@ export function NetWorthChart() {
     [router]
   );
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
+  const fmtDate = (d: string) => formatSafeUTCDate(d, {
     month: 'short',
     day: 'numeric',
     year: '2-digit',
@@ -289,19 +290,44 @@ export function NetWorthChart() {
 
     // Compute Net Worth for each date based on selected categories
     const processedPoints = displayData.map((d) => {
-      const nw = showBreakdown
-        ? selectedAssets.reduce((sum, cat) => sum + (d[cat] || 0), 0) -
-          selectedLiabilities.reduce((sum, cat) => sum + (d[cat] || 0), 0)
-        : d.netWorth;
+      let totalAssetsVal = 0;
+      let totalLiabilitiesVal = 0;
+      let hasAssetsData = false;
+      let hasLiabilitiesData = false;
+
+      if (showBreakdown) {
+        selectedAssets.forEach((cat) => {
+          const val = d[cat];
+          if (val !== undefined) {
+            totalAssetsVal += val;
+            hasAssetsData = true;
+          }
+        });
+        selectedLiabilities.forEach((cat) => {
+          const val = d[cat];
+          if (val !== undefined) {
+            totalLiabilitiesVal += val;
+            hasLiabilitiesData = true;
+          }
+        });
+      } else {
+        totalAssetsVal = d.totalAssets;
+        totalLiabilitiesVal = d.totalLiabilities;
+        hasAssetsData = true;
+        hasLiabilitiesData = true;
+      }
+
+      const nw = totalAssetsVal - totalLiabilitiesVal;
 
       return {
         ...d,
         netWorth: nw,
+        _hasData: hasAssetsData || hasLiabilitiesData,
       };
     });
 
     // Create the final data for Recharts, where liability keys are negative
-    const rechartsData = processedPoints.map((d, index) => {
+    const rechartsDataRaw = processedPoints.map((d, index) => {
       const row: Record<string, any> = {
         date: d.date,
         netWorth: d.netWorth,
@@ -320,25 +346,57 @@ export function NetWorthChart() {
 
       if (showBreakdown) {
         selectedAssets.forEach((cat) => {
-          row[cat] = d[cat] || 0;
+          const val = d[cat];
+          if (val !== undefined) {
+            row[cat] = val;
+          }
         });
         selectedLiabilities.forEach((cat) => {
-          row[cat] = -(d[cat] || 0); // Negate liabilities!
+          const val = d[cat];
+          if (val !== undefined) {
+            row[cat] = -val; // Negate liabilities!
+          }
         });
       } else {
         row.assets = d.totalAssets;
         row.liabilities = -d.totalLiabilities; // Negate liabilities!
       }
+      row._hasData = d._hasData;
       return row;
     });
 
+    let startIdx = 0;
+    if (timeframe === 'all') {
+      const firstDataIdx = rechartsDataRaw.findIndex(d => d._hasData);
+      if (firstDataIdx !== -1) {
+        startIdx = firstDataIdx;
+      }
+    }
+    let rechartsData = rechartsDataRaw.slice(startIdx);
+
+    if (timeframe === 'all' && rechartsData.length > 100) {
+      const sampled: typeof rechartsData = [];
+      const len = rechartsData.length;
+      for (let i = 0; i < 100; i++) {
+        const index = Math.min(
+          Math.floor((i * (len - 1)) / 99),
+          len - 1
+        );
+        sampled.push(rechartsData[index]);
+      }
+      rechartsData = sampled;
+    }
+
     // Calculate Y scale bounds dynamically
-    const allValues = processedPoints.flatMap((d) => {
+    const allValues = rechartsData.flatMap((d) => {
       const vals = [d.netWorth];
       if (showBreakdown) {
-        const assetsVal = selectedAssets.reduce((sum, cat) => sum + (d[cat] || 0), 0);
-        const liabVal = selectedLiabilities.reduce((sum, cat) => sum + (d[cat] || 0), 0);
-        vals.push(assetsVal, -liabVal);
+        selectedAssets.forEach((cat) => {
+          if (d[cat] !== undefined) vals.push(d[cat]);
+        });
+        selectedLiabilities.forEach((cat) => {
+          if (d[cat] !== undefined) vals.push(d[cat]);
+        });
       } else {
         vals.push(d.totalAssets, -d.totalLiabilities);
       }
@@ -352,11 +410,15 @@ export function NetWorthChart() {
 
     return {
       rechartsData,
-      processedChartData: processedPoints,
+      processedChartData: processedPoints.slice(startIdx),
       maxVal: maxValue,
       minVal: minValue,
     };
-  }, [displayData, selectedAssets, selectedLiabilities, showBreakdown]);
+  }, [displayData, selectedAssets, selectedLiabilities, showBreakdown, timeframe]);
+
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicks(rechartsData, timeframe, 'date');
+  }, [rechartsData, timeframe]);
 
   // Recalculated summary stats matching the filtered selection
   const filteredSummary = useMemo(() => {
@@ -532,11 +594,16 @@ export function NetWorthChart() {
                 tickLine={false}
                 axisLine={{ stroke: 'var(--color-border)' }}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                ticks={xAxisTicks}
                 tickFormatter={(d) => {
                   if (!d) return '';
-                  return timeframe === '1m'
-                    ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                  if (timeframe === '1m') {
+                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                  } else if (timeframe === '5y' || timeframe === 'all') {
+                    return formatSafeUTCDate(d, { year: 'numeric' });
+                  } else {
+                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                  }
                 }}
               />
               <YAxis
@@ -642,17 +709,49 @@ export function NetWorthChart() {
             onClick={handleChartClick}
             className="cursor-pointer"
           >
+            <defs>
+              {showBreakdown ? (
+                <>
+                  {[...selectedAssets, ...selectedLiabilities].map((cat) => {
+                    const color = categoryColors[cat] || (isAssetCategory(cat) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
+                    const id = `gradient-${cat.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    return (
+                      <linearGradient key={cat} id={id} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+                        <stop offset="95%" stopColor={color} stopOpacity={0.03} />
+                      </linearGradient>
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  <linearGradient id="gradient-assets" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03} />
+                  </linearGradient>
+                  <linearGradient id="gradient-liabilities" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.03} />
+                  </linearGradient>
+                </>
+              )}
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
             <XAxis
               dataKey="date"
               tickLine={false}
               axisLine={{ stroke: 'var(--color-border)' }}
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+              ticks={xAxisTicks}
               tickFormatter={(d) => {
                 if (!d) return '';
-                return timeframe === '1m'
-                  ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : new Date(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                if (timeframe === '1m') {
+                  return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                } else if (timeframe === '5y' || timeframe === 'all') {
+                  return formatSafeUTCDate(d, { year: 'numeric' });
+                } else {
+                  return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                }
               }}
             />
             <YAxis
@@ -687,9 +786,10 @@ export function NetWorthChart() {
                     type="monotone"
                     dataKey={cat}
                     stackId="stack"
-                    stroke="none"
-                    fill={categoryColors[cat] || 'var(--color-chart-1)'}
-                    fillOpacity={0.85}
+                    stroke={categoryColors[cat] || 'var(--color-chart-1)'}
+                    strokeWidth={2}
+                    fill={`url(#gradient-${cat.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                    dot={false}
                   />
                 ))}
                 
@@ -700,9 +800,10 @@ export function NetWorthChart() {
                     type="monotone"
                     dataKey={cat}
                     stackId="stack"
-                    stroke="none"
-                    fill={categoryColors[cat] || 'var(--color-destructive)'}
-                    fillOpacity={0.85}
+                    stroke={categoryColors[cat] || 'var(--color-destructive)'}
+                    strokeWidth={2}
+                    fill={`url(#gradient-${cat.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                    dot={false}
                   />
                 ))}
               </>
@@ -713,9 +814,10 @@ export function NetWorthChart() {
                   type="monotone"
                   dataKey="assets"
                   stackId="stack"
-                  stroke="none"
-                  fill="var(--color-chart-1)"
-                  fillOpacity={0.85}
+                  stroke="var(--color-chart-1)"
+                  strokeWidth={2}
+                  fill="url(#gradient-assets)"
+                  dot={false}
                 />
                 
                 {/* Render total liabilities area (negative) */}
@@ -723,9 +825,10 @@ export function NetWorthChart() {
                   type="monotone"
                   dataKey="liabilities"
                   stackId="stack"
-                  stroke="none"
-                  fill="var(--color-destructive)"
-                  fillOpacity={0.85}
+                  stroke="var(--color-destructive)"
+                  strokeWidth={2}
+                  fill="url(#gradient-liabilities)"
+                  dot={false}
                 />
               </>
             )}
