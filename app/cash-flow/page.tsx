@@ -21,19 +21,6 @@ function CashFlowContent() {
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 
-          {isVisible('incomeExpenseChart') && (
-            <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
-                <ChartErrorBoundary name="Income vs Expenses">
-                  <div>
-                    <IncomeExpenseChart />
-                    <MathDescription chartId="incomeExpenseChart" />
-                  </div>
-                </ChartErrorBoundary>
-              </Suspense>
-            </div>
-          )}
-
           {isVisible('cashFlowSankey') && (
             <div className="mt-5">
               <Suspense fallback={<div className="text-muted-foreground">Loading sankey...</div>}>
@@ -41,6 +28,19 @@ function CashFlowContent() {
                   <div>
                     <CashFlowSankey />
                     <MathDescription chartId="cashFlowSankey" />
+                  </div>
+                </ChartErrorBoundary>
+              </Suspense>
+            </div>
+          )}
+
+          {isVisible('incomeExpenseChart') && (
+            <div className="mt-5">
+              <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
+                <ChartErrorBoundary name="Income vs Expenses">
+                  <div>
+                    <IncomeExpenseChart />
+                    <MathDescription chartId="incomeExpenseChart" />
                   </div>
                 </ChartErrorBoundary>
               </Suspense>
