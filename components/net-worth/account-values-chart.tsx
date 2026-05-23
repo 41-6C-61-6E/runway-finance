@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -84,6 +85,14 @@ export function AccountValuesChart() {
     }));
   }, [displayData]);
 
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicks(chartData, timeframe, 'date');
+  }, [chartData, timeframe]);
+
+  const formatTooltipDate = useCallback((tickStr: string) => {
+    return formatSafeUTCDate(tickStr, { month: 'short', day: 'numeric', year: '2-digit' });
+  }, []);
+
   const maxVal = displayData.length > 0
     ? Math.max(...displayData.flatMap((d) => [d.netWorth, d.totalAssets, Math.abs(d.totalLiabilities)]), 1)
     : 1;
@@ -96,16 +105,15 @@ export function AccountValuesChart() {
     [router]
   );
 
-  const formatXAxis = (tickStr: string) => {
-    try {
-      const parts = tickStr.split('-');
-      if (parts.length < 3) return tickStr;
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    } catch (e) {
-      return tickStr;
+  const formatXAxis = useCallback((tickStr: string) => {
+    if (timeframe === '1m') {
+      return formatSafeUTCDate(tickStr, { month: 'short', day: 'numeric' });
+    } else if (timeframe === '5y' || timeframe === 'all') {
+      return formatSafeUTCDate(tickStr, { year: 'numeric' });
+    } else {
+      return formatSafeUTCDate(tickStr, { month: 'short', year: '2-digit' });
     }
-  };
+  }, [timeframe]);
 
   const handleLegendClick = (e: any) => {
     const { dataKey } = e;
@@ -190,7 +198,7 @@ export function AccountValuesChart() {
               tickLine={false}
               axisLine={{ stroke: 'var(--color-border)' }}
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-              interval={xInterval}
+              ticks={xAxisTicks}
               tickFormatter={formatXAxis}
             />
             <YAxis
@@ -209,7 +217,7 @@ export function AccountValuesChart() {
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const dateStr = payload[0].payload.date;
-                const formattedDate = formatXAxis(dateStr);
+                const formattedDate = formatTooltipDate(dateStr);
                 const isSynthetic = payload[0].payload.isSynthetic;
 
                 return (

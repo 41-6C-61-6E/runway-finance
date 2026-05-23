@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -55,7 +56,7 @@ export function NetIncomeAnalysis() {
   const numMonths = MONTH_MAP[timeframe] || 12;
   const sliced = allData.slice(-numMonths);
   const chartData = sliced.map((d) => ({
-    month: new Date(d.yearMonth + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+    month: formatSafeUTCDate(d.yearMonth + '-01', { month: 'short', year: '2-digit' }),
     netCashFlow: d.netCashFlow,
     yearMonth: d.yearMonth,
   }));
