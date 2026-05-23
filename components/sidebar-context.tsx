@@ -44,6 +44,18 @@ export function useSidebar() {
   return useContext(SidebarContext);
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[2]) : undefined;
+}
+
+function setCookie(name: string, value: string, days = 365) {
+  if (typeof document === 'undefined') return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const userSettings = useUserSettings();
   const hideAccountsSidebarByDefault = userSettings?.settings?.hideAccountsSidebarByDefault === true;
@@ -52,21 +64,21 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
   const [accountsCollapsed, setAccountsCollapsed] = useState(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
-    return false;
+    if (getCookie('hideAccountsSidebarByDefault') === 'true') return true;
+    return true;
   });
   const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false);
 
   useEffect(() => {
     if (userSettings && !userSettings.loading && !hasInitializedCollapse) {
       setHasInitializedCollapse(true);
-      if (userSettings.settings.hideAccountsSidebarByDefault) {
-        setAccountsCollapsed(true);
-      }
+      setAccountsCollapsed(userSettings.settings.hideAccountsSidebarByDefault === true);
     }
   }, [userSettings, hasInitializedCollapse]);
 
   const updateHideAccountsSidebarByDefault = useCallback(async (val: boolean) => {
     setAccountsCollapsed(val);
+    setCookie('hideAccountsSidebarByDefault', val ? 'true' : 'false');
     if (userSettings) {
       await userSettings.updateSetting('hideAccountsSidebarByDefault', val);
     }
