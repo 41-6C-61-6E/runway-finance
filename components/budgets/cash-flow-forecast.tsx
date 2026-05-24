@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ForecastChart } from '@/components/cash-flow/forecast-chart';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { TrendingUp, TrendingDown, BarChart3, Table2 } from 'lucide-react';
 import { EstimatePill } from '@/components/ui/estimate-pill';
@@ -134,9 +135,7 @@ export function CashFlowForecast() {
       <div className="p-5 pb-2">
         <h3 className="text-sm font-semibold text-foreground">Cash Flow Forecast</h3>
       </div>
-      <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-        <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-      </div>
+      <LoadingSpinner category="forecast" className="h-[200px]" />
     </div>
   );
 
@@ -319,9 +318,7 @@ export function CashFlowForecast() {
       {viewMode === 'table' && (
         <>
           {loading && (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-              <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-            </div>
+            <LoadingSpinner category="forecast" className="h-[200px]" />
           )}
           {!loading && (
             <div className="overflow-x-auto">

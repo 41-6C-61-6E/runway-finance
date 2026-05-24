@@ -6,6 +6,7 @@ import { CategorySummaries } from '@/components/cash-flow/category-summaries';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { DollarSign } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 function SpendingContent() {
@@ -20,7 +21,7 @@ function SpendingContent() {
 
           {isVisible('spendingBreakdown') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading breakdown...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
                   <SpendingBreakdown />
                   <MathDescription chartId="spendingBreakdown" />
@@ -31,7 +32,7 @@ function SpendingContent() {
 
           {isVisible('categorySummaries') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading categories...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
                   <CategorySummaries />
                   <MathDescription chartId="categorySummaries" />
@@ -47,7 +48,7 @@ function SpendingContent() {
 
 export default function SpendingPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <SpendingContent />
     </Suspense>
   );

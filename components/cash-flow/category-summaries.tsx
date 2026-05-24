@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 interface CategoryData {
@@ -159,9 +160,7 @@ export function CategorySummaries() {
           <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
           <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
         </div>
-        <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner category="chart" className="h-[350px]" />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { BudgetTable } from '@/components/budgets/budget-table';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Wallet } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 function BudgetsContent() {
@@ -23,7 +24,7 @@ function BudgetsContent() {
         <div className="mx-auto max-w-[1600px]">
 
           {isVisible('budgetSummary') && (
-            <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
+            <Suspense fallback={<LoadingSpinner category="summary" />}>
               <div>
                 <BudgetSummary />
                 <MathDescription chartId="budgetSummary" />
@@ -33,7 +34,7 @@ function BudgetsContent() {
 
           {isVisible('budgetVsActualChart') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
                   <BudgetVsActualChart />
                   <MathDescription chartId="budgetVsActualChart" />
@@ -44,7 +45,7 @@ function BudgetsContent() {
 
           {isVisible('budgetTable') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading budgets...</div>}>
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <div>
                   <BudgetTable />
                   <MathDescription chartId="budgetTable" />
@@ -60,7 +61,7 @@ function BudgetsContent() {
 
 export default function BudgetsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <BudgetPeriodProvider>
         <BudgetsContent />
       </BudgetPeriodProvider>

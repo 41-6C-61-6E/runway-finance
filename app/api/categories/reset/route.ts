@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { categories } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { categories, transactions, budgets, categoryRules, categorySpendingSummary, categoryIncomeSummary } from '@/lib/db/schema';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { DEFAULT_CATEGORIES } from '@/lib/db/seed-categories';
 import { logger } from '@/lib/logger';
 
@@ -15,42 +15,112 @@ export async function POST() {
   const userId = session.user.id;
   const db = getDb();
 
-  // Delete all user categories (both system and custom)
-  await db
-    .delete(categories)
+  // Collect all category IDs referenced by transactions, budgets, rules, and summaries
+  const [txRefs, budgetRefs, ruleRefs, spendingRefs, incomeRefs] = await Promise.all([
+    db
+      .select({ categoryId: transactions.categoryId })
+      .from(transactions)
+      .where(and(eq(transactions.userId, userId), sql`${transactions.categoryId} IS NOT NULL`)),
+    db
+      .select({ categoryId: budgets.categoryId })
+      .from(budgets)
+      .where(eq(budgets.userId, userId)),
+    db
+      .select({ categoryId: categoryRules.setCategoryId })
+      .from(categoryRules)
+      .where(and(eq(categoryRules.userId, userId), sql`${categoryRules.setCategoryId} IS NOT NULL`)),
+    db
+      .select({ categoryId: categorySpendingSummary.categoryId })
+      .from(categorySpendingSummary)
+      .where(eq(categorySpendingSummary.userId, userId)),
+    db
+      .select({ categoryId: categoryIncomeSummary.categoryId })
+      .from(categoryIncomeSummary)
+      .where(eq(categoryIncomeSummary.userId, userId)),
+  ]);
+
+  const referencedIds = new Set<string>();
+  for (const r of txRefs.concat(budgetRefs, ruleRefs, spendingRefs, incomeRefs)) {
+    if (r.categoryId) referencedIds.add(r.categoryId);
+  }
+
+  // Load all user categories and walk up parent chains so ancestors are preserved
+  const allCats = await db
+    .select({ id: categories.id, parentId: categories.parentId, name: categories.name, displayOrder: categories.displayOrder })
+    .from(categories)
     .where(eq(categories.userId, userId));
 
-  // Re-seed with defaults
-  let order = 0;
+  const catById = new Map(allCats.map((c) => [c.id, c]));
+
+  const stack = [...referencedIds];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    const cat = catById.get(id);
+    if (cat?.parentId && !referencedIds.has(cat.parentId)) {
+      referencedIds.add(cat.parentId);
+      stack.push(cat.parentId);
+    }
+  }
+
+  // Delete unreferenced categories
+  const toDelete = allCats.filter((c) => !referencedIds.has(c.id)).map((c) => c.id);
+  if (toDelete.length > 0) {
+    await db.delete(categories).where(
+      and(eq(categories.userId, userId), inArray(categories.id, toDelete))
+    );
+  }
+
+  // Determine which of the kept categories are parents and which are children
+  const kept = allCats.filter((c) => referencedIds.has(c.id));
+  const keptNames = new Set(kept.map((c) => c.name));
+
+  // Seed missing default categories
+  let order = allCats.length > 0 ? Math.max(...allCats.map((c) => c.displayOrder)) + 1 : 0;
+  let createdCount = 0;
 
   for (const group of DEFAULT_CATEGORIES) {
-    const [parent] = await db
-      .insert(categories)
-      .values({
-        userId,
-        name: group.name,
-        color: group.color,
-        isIncome: group.isIncome,
-        isSystem: true,
-        displayOrder: order++,
-      })
-      .returning();
+    const existingParent = kept.find((c) => c.name === group.name);
+    let parentId: string | null = existingParent?.id ?? null;
 
-    if (group.children && parent) {
-      for (const child of group.children) {
-        await db.insert(categories).values({
+    if (!existingParent) {
+      const [parent] = await db
+        .insert(categories)
+        .values({
           userId,
-          parentId: parent.id,
-          name: child.name,
-          color: child.color,
+          name: group.name,
+          color: group.color,
           isIncome: group.isIncome,
           isSystem: true,
+          excludeFromReports: group.excludeFromReports ?? false,
           displayOrder: order++,
-        });
+        })
+        .returning();
+      parentId = parent.id;
+      createdCount++;
+    }
+
+    if (group.children && parentId) {
+      const keptChildren = kept.filter((c) => c.parentId === parentId);
+      const keptChildNames = new Set(keptChildren.map((c) => c.name));
+
+      for (const child of group.children) {
+        if (!keptChildNames.has(child.name)) {
+          await db.insert(categories).values({
+            userId,
+            parentId,
+            name: child.name,
+            color: child.color,
+            isIncome: group.isIncome,
+            isSystem: true,
+            excludeFromReports: child.excludeFromReports ?? false,
+            displayOrder: order++,
+          });
+          createdCount++;
+        }
       }
     }
   }
 
-  logger.info('POST /api/categories/reset', { userId });
-  return NextResponse.json({ success: true, message: 'Categories reset to defaults' });
+  logger.info('POST /api/categories/reset', { userId, kept: referencedIds.size, deleted: toDelete.length, created: createdCount });
+  return NextResponse.json({ success: true, message: 'Categories reset to defaults', kept: referencedIds.size, deleted: toDelete.length, created: createdCount });
 }
