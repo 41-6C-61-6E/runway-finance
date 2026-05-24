@@ -45,8 +45,8 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
   const start = new Date(startDate);
 
   for (let month = 1; month <= termMonths; month++) {
-    const paymentDate = new Date(start);
-    paymentDate.setMonth(start.getMonth() + month - 1);
+    const paymentDate = new Date(start.getTime());
+    paymentDate.setUTCMonth(start.getUTCMonth() + month - 1);
 
     if (balance <= 0) {
       schedule.push({
@@ -109,6 +109,7 @@ export function calculateAmortizationWithExtraPayments(
   let extraMonthly = extra.monthlyExtra ?? 0;
   const lumpSum = extra.lumpSumAmount ?? 0;
   const lumpSumDate = extra.lumpSumDate;
+  let lumpSumApplied = false;
 
   if (extra.biweekly) {
     extraMonthly += effectivePayment / 12;
@@ -118,8 +119,8 @@ export function calculateAmortizationWithExtraPayments(
   const start = new Date(startDate);
 
   for (let month = 1; month <= termMonths; month++) {
-    const paymentDate = new Date(start);
-    paymentDate.setMonth(start.getMonth() + month - 1);
+    const paymentDate = new Date(start.getTime());
+    paymentDate.setUTCMonth(start.getUTCMonth() + month - 1);
 
     if (balance <= 0) {
       accelerated.push({
@@ -136,10 +137,11 @@ export function calculateAmortizationWithExtraPayments(
     const interest = balance * monthlyRate;
     let principal = effectivePayment - interest + extraMonthly;
 
-    if (lumpSum > 0 && lumpSumDate) {
+    if (lumpSum > 0 && lumpSumDate && !lumpSumApplied) {
       const lumpDate = new Date(lumpSumDate);
       if (paymentDate >= lumpDate) {
         principal += lumpSum;
+        lumpSumApplied = true;
       }
     }
 
@@ -158,9 +160,13 @@ export function calculateAmortizationWithExtraPayments(
     });
   }
 
-  const lastStandard = standard[standard.length - 1];
-  const lastAccelerated = accelerated[accelerated.length - 1];
   const defaultDate = new Date().toISOString().split('T')[0];
+
+  const lastActiveStandard = standard.filter((r) => r.payment > 0).pop();
+  const lastActiveAccelerated = accelerated.filter((r) => r.payment > 0).pop();
+
+  const standardTotalPayments = standard.filter((r) => r.payment > 0).length;
+  const acceleratedTotalPayments = accelerated.filter((r) => r.payment > 0).length;
 
   const standardTotalInterest = standard.reduce((s, r) => s + r.interest, 0);
   const acceleratedTotalInterest = accelerated.reduce((s, r) => s + r.interest, 0);
@@ -169,16 +175,16 @@ export function calculateAmortizationWithExtraPayments(
     standard,
     accelerated,
     standardSummary: {
-      payoffDate: lastStandard?.date ?? defaultDate,
+      payoffDate: lastActiveStandard?.date ?? defaultDate,
       totalInterest: Math.round(standardTotalInterest * 100) / 100,
-      totalPayments: standard.length,
+      totalPayments: standardTotalPayments,
     },
     acceleratedSummary: {
-      payoffDate: lastAccelerated?.date ?? defaultDate,
+      payoffDate: lastActiveAccelerated?.date ?? defaultDate,
       totalInterest: Math.round(acceleratedTotalInterest * 100) / 100,
-      totalPayments: accelerated.length,
+      totalPayments: acceleratedTotalPayments,
       interestSaved: Math.round((standardTotalInterest - acceleratedTotalInterest) * 100) / 100,
-      monthsSaved: standard.length - accelerated.length,
+      monthsSaved: standardTotalPayments - acceleratedTotalPayments,
     },
   };
 }

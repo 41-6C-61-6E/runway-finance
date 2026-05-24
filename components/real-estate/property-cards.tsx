@@ -237,16 +237,27 @@ export function PropertyCards() {
         extraPrincipal: parseFloat(mortgageEditMeta.extraPrincipal || '0'),
         pmi: parseFloat(mortgageEditMeta.pmi || '0'),
         escrow: parseFloat(mortgageEditMeta.escrow || '0'),
+        mortgageStatus: mortgageEditMeta.mortgageStatus || 'active',
       };
       if (mortgageEditMeta.purchaseDate) {
         metadata.purchaseDate = mortgageEditMeta.purchaseDate;
+      }
+      if (mortgageEditMeta.mortgageStatus === 'paid_off') {
+        metadata.payoffDate = mortgageEditMeta.payoffDate;
+      } else if (mortgageEditMeta.mortgageStatus === 'refinanced') {
+        metadata.refinanceDate = mortgageEditMeta.refinanceDate;
+        metadata.payoffBalance = parseFloat(mortgageEditMeta.payoffBalance || '0');
+        metadata.refinancedByLoanId = mortgageEditMeta.refinancedByLoanId || '';
       }
 
       const res = await fetch(`/api/accounts/${editingMortgage.accountId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ metadata }),
+        body: JSON.stringify({
+          metadata,
+          balance: ['paid_off', 'refinanced'].includes(mortgageEditMeta.mortgageStatus) ? '0' : undefined
+        }),
       });
 
       if (!res.ok) {
@@ -373,6 +384,7 @@ export function PropertyCards() {
             <MortgageAttributesForm
               meta={mortgageEditMeta}
               onChange={(meta) => setMortgageEditMeta(meta as Record<string, string>)}
+              allMortgages={mortgageAccounts.filter((m) => m.id !== editingMortgage?.id)}
             />
             <SheetFooter className="pt-4">
               <SheetClose asChild>

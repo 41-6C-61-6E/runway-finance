@@ -130,6 +130,32 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const decrypted = await decryptRow('accounts', updated, dek);
 
+  if (body.metadata !== undefined && updated) {
+    const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
+    const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
+    if (SNAPSHOT_TYPES.includes(decrypted.type)) {
+      try {
+        const { readApiConfig } = await import('@/lib/services/manual-accounts');
+        const { generateAssetHistorySnapshots } = await import('@/lib/services/asset-estimator');
+        const apiConfig = await readApiConfig(userId);
+        const oldDecrypted = await decryptRow('accounts', account, dek);
+        const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
+        await generateAssetHistorySnapshots(
+          id,
+          userId,
+          decrypted.type,
+          meta,
+          apiConfig,
+          dek,
+          oldMeta.purchaseDate as string | undefined,
+          oldMeta.purchasePrice as number | undefined
+        );
+      } catch (err) {
+        logger.warn(`Failed to regenerate history snapshots on PATCH for account ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
   if (
     body.isHidden !== undefined ||
     body.isExcludedFromNetWorth !== undefined ||

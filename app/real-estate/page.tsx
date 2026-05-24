@@ -20,26 +20,26 @@ function RealEstateContent() {
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 
-          {isVisible('propertyCards') && (
+          {isVisible('equityOverTimeChart') && (
             <div className="mb-5">
               <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
-                  <PropertyCards />
-                  <MathDescription chartId="propertyCards" />
+                  <EquityOverTimeChart />
+                  <MathDescription chartId="equityOverTimeChart" />
                 </div>
               </Suspense>
             </div>
           )}
 
-          {(isVisible('equityOverTimeChart') || isVisible('portfolioAllocationChart')) && (
+          {(isVisible('propertyCards') || isVisible('portfolioAllocationChart')) && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {isVisible('equityOverTimeChart') && (
-                <Suspense fallback={<LoadingSpinner category="chart" />}>
-                  <div className="lg:col-span-2">
-                    <EquityOverTimeChart />
-                    <MathDescription chartId="equityOverTimeChart" />
-                  </div>
-                </Suspense>
+              {isVisible('propertyCards') && (
+                <div className="lg:col-span-2">
+                  <Suspense fallback={<LoadingSpinner category="chart" />}>
+                    <PropertyCards />
+                    <MathDescription chartId="propertyCards" />
+                  </Suspense>
+                </div>
               )}
               {isVisible('portfolioAllocationChart') && (
                 <Suspense fallback={<LoadingSpinner category="chart" />}>

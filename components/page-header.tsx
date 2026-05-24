@@ -41,7 +41,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       </div>
       
       {children && (
-        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto no-scrollbar justify-start md:justify-end pb-1 md:pb-0">
+        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto md:overflow-visible no-scrollbar justify-start md:justify-end pb-1 md:pb-0">
           {children}
         </div>
       )}
