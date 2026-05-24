@@ -18,6 +18,20 @@
 - investments page with holdings and other metrics
 - screen grab projection lab and do that stuff
 
+
+- #Import feature
+    - Plan an import engine that will allow users to import transaciotns and account snapshots into the database. Thnk through the logic of things like what shoudl be required on import, how the data will be stored, what options the user needs to make this easy to use and manage, how it impacts charts and analytics, etc. Fully think through the logic of this feature. Ask guiding questions to get it right. 
+    - It should mark the data as 'imported' rather than real or synthetic so that it can be filtered out later if needed, possibly with something like "IsImported" in the database
+    - there are two import types allowed, account snapshots and transacitons 
+    - the import engine should accept csv files, then display a column mapping tool to map columns from old values to new ones
+    - there should be an account mapping step / tool to map accounts, or, if no existing account matches the data to add as a new manual account
+    - there should be a category mapping step that allows category mapping or the option to add as new
+    - the "Synthetic & Estimated Data" section in the settings needs to be updated with toggles for imported data to be turned on or off
+    - after an import, there needs to be a listing of all imported datafiles and the option to remove them from the database later if desired
+    - for now, the import engine can be on its own settigns tab
+
+
+
 ## BUGS:
 
 - real estate patoff chart - make sure the x axis shows the totality of both ilines

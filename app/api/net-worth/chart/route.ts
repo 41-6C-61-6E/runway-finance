@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, netWorthSnapshots, accountSnapshots } from '@/lib/db/schema';
+import { accounts, netWorthSnapshots, accountSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, gte, lte, lt, desc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
@@ -96,12 +96,37 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
+
+  // Fetch user settings to respect imported data toggles
+  const userSettingsList = await getDb()
+    .select()
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  const userSetting = userSettingsList[0];
+  const rawShowImported = userSetting?.showImportedData;
+  const importSettings = {
+    global: true,
+    netWorth: true,
+    realEstate: true,
+    cashFlowProjections: true,
+    ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+  } as Record<string, boolean>;
+
+  const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
+
   let [startDate, endDate] = getDateRange(timeframe);
   if (timeframe === 'all') {
+    const earliestSnapConditions = [eq(accountSnapshots.userId, userId)];
+    if (!isImportNetWorthEnabled) {
+      earliestSnapConditions.push(eq(accountSnapshots.isImported, false));
+    }
+
     const earliestSnap = await getDb()
       .select({ snapshotDate: accountSnapshots.snapshotDate })
       .from(accountSnapshots)
-      .where(eq(accountSnapshots.userId, userId))
+      .where(and(...earliestSnapConditions))
       .orderBy(accountSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -124,21 +149,25 @@ export async function GET(request: Request) {
     const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
     // Primary path: aggregate from account_snapshots (includes both real and synthetic)
+    const snapshotsConditionsInRange = [
+      eq(accountSnapshots.userId, userId),
+      gte(accountSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
+      lte(accountSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
+    ];
+    if (!isImportNetWorthEnabled) {
+      snapshotsConditionsInRange.push(eq(accountSnapshots.isImported, false));
+    }
+
     const accountSnapshotsInRange = await getDb()
       .select({
         snapshotDate: accountSnapshots.snapshotDate,
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
         isSynthetic: accountSnapshots.isSynthetic,
+        isImported: accountSnapshots.isImported,
       })
       .from(accountSnapshots)
-      .where(
-        and(
-          eq(accountSnapshots.userId, userId),
-          gte(accountSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
-          lte(accountSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
-        )
-      )
+      .where(and(...snapshotsConditionsInRange))
       .orderBy(accountSnapshots.snapshotDate);
 
     // Decrypt snapshot balances with error handling
@@ -165,7 +194,7 @@ export async function GET(request: Request) {
     }));
 
     // Group snapshots by date for forward-fill
-    const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean }>>();
+    const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean; isImported: boolean }>>();
     for (const snap of decryptedSnapshots) {
       const dateStr = String(snap.snapshotDate);
       if (!snapshotsByDate.has(dateStr)) {
@@ -175,26 +204,28 @@ export async function GET(request: Request) {
         accountId: snap.accountId,
         balance: snap.balance,
         isSynthetic: snap.isSynthetic,
+        isImported: snap.isImported,
       });
     }
 
     // Forward-fill: carry forward latest known balance per account,
     // so sparse accounts (e.g. mortgage only snapshotted on the 7th)
     // still contribute to totals on intervening dates.
-    const latestByAccount = new Map<string, { balance: number; isSynthetic: boolean }>();
-    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean; breakdown: Record<string, number> }>();
+    const latestByAccount = new Map<string, { balance: number; isSynthetic: boolean; isImported: boolean }>();
+    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean; isImported: boolean; breakdown: Record<string, number> }>();
 
     const sortedDates = Array.from(snapshotsByDate.keys()).sort((a, b) => a.localeCompare(b));
     const allBreakdownCategories = new Set<string>();
 
     for (const dateStr of sortedDates) {
       for (const snap of snapshotsByDate.get(dateStr)!) {
-        latestByAccount.set(snap.accountId, { balance: snap.balance, isSynthetic: snap.isSynthetic });
+        latestByAccount.set(snap.accountId, { balance: snap.balance, isSynthetic: snap.isSynthetic, isImported: snap.isImported });
       }
 
       let assets = 0;
       let liabilities = 0;
       let allSynthetic = true;
+      let anyImported = false;
       const breakdown: Record<string, number> = {};
 
       for (const account of reportableAccounts) {
@@ -219,21 +250,25 @@ export async function GET(request: Request) {
         if (!latest.isSynthetic) {
           allSynthetic = false;
         }
+        if (latest.isImported) {
+          anyImported = true;
+        }
       }
 
-      balancesByDate.set(dateStr, { assets, liabilities, isSynthetic: allSynthetic, breakdown });
+      balancesByDate.set(dateStr, { assets, liabilities, isSynthetic: allSynthetic, isImported: anyImported, breakdown });
     }
 
     // Build formatted data
     const formattedData: AggregatablePoint[] = Array.from(balancesByDate.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, { assets, liabilities, isSynthetic, breakdown }]) => {
+      .map(([date, { assets, liabilities, isSynthetic, isImported, breakdown }]) => {
         const point: AggregatablePoint = {
           date,
           netWorth: assets - liabilities,
           totalAssets: assets,
           totalLiabilities: liabilities,
           isSynthetic,
+          isImported,
         };
         for (const cat of allBreakdownCategories) {
           if (cat in breakdown) {

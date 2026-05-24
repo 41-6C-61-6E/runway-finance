@@ -103,6 +103,7 @@ export const userSettings = pgTable('user_settings', {
   hiddenPages: jsonb('hidden_pages').default({}),
   cardStyle: text('card_style').notNull().default('default'),
   showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
+  showImportedData: jsonb('show_imported_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
   defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
@@ -209,6 +210,26 @@ export const categories = pgTable('categories', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Import Log ────────────────────────────────────────────────────────────────
+export const importLog = pgTable('import_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  fileName: text('file_name').notNull(),
+  importType: text('import_type').notNull(), // 'transactions' | 'account_snapshots'
+  status: text('status').notNull().default('completed'), // 'completed' | 'failed' | 'partial'
+  recordsImported: integer('records_imported').notNull().default(0),
+  recordsSkipped: integer('records_skipped').notNull().default(0),
+  recordsErrored: integer('records_errored').notNull().default(0),
+  columnMapping: jsonb('column_mapping'), // { csvColumn: systemField }
+  accountMapping: jsonb('account_mapping'), // { csvAccountRef: accountId }
+  categoryMapping: jsonb('category_mapping'), // { csvCategoryName: categoryId }
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  dataStartDate: date('data_start_date'),
+  dataEndDate: date('data_end_date'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Transactions ─────────────────────────────────────────────────────────────
 export const transactions = pgTable(
   'transactions',
@@ -231,6 +252,8 @@ export const transactions = pgTable(
     reviewed: boolean('reviewed').notNull().default(false),
     categorizedByAi: boolean('categorized_by_ai').notNull().default(false),
     ignored: boolean('ignored').notNull().default(false),
+    isImported: boolean('is_imported').notNull().default(false),
+    importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -301,6 +324,8 @@ export const accountSnapshots = pgTable(
     snapshotDate: date('snapshot_date').notNull(),
     balance: text('balance').notNull(),
     isSynthetic: boolean('is_synthetic').notNull().default(false),
+    isImported: boolean('is_imported').notNull().default(false),
+    importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.userId, t.accountId, t.snapshotDate)]

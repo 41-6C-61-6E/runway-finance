@@ -3,10 +3,8 @@
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import SignOutForm from '@/components/sign-out-form'
-import { ChartSpline, Receipt, Settings, Key, LogOut, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark } from 'lucide-react'
+import { ChartSpline, Receipt, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
-import ChangePasswordDrawer from '@/components/change-password-drawer'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
 
@@ -25,7 +23,6 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
-  { href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
 ]
 
 function SimpleTooltip({ children, label, show }: { children: React.ReactNode; label: string; show: boolean }) {
@@ -46,7 +43,7 @@ export default function ResizableSidebar() {
   const [isResizing, setIsResizing] = useState(false)
   const { data: session } = useSession()
   const [mounted, setMounted] = useState(false)
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
   const [devMode, setDevMode] = useState<boolean | null>(null)
@@ -224,20 +221,6 @@ export default function ResizableSidebar() {
               </div>
             )}
 
-            {!isCollapsed && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setChangePasswordOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent rounded-lg border border-sidebar-border transition-all"
-                >
-                  <Key className="h-4 w-4" />
-                  Change Password
-                </button>
-                <SignOutForm iconOnly={false} />
-              </>
-            )}
-
             {isCollapsed && session?.user?.name && (
               <SimpleTooltip label={session.user.name} show={isCollapsed}>
                 <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mb-1">
@@ -246,22 +229,6 @@ export default function ResizableSidebar() {
                   </span>
                 </div>
               </SimpleTooltip>
-            )}
-            {isCollapsed && (
-              <div className="flex flex-col items-center gap-1">
-                <SimpleTooltip label="Change Password" show={isCollapsed}>
-                  <button
-                    type="button"
-                    onClick={() => setChangePasswordOpen(true)}
-                    className="p-2 rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                  >
-                    <Key className="h-4 w-4" />
-                  </button>
-                </SimpleTooltip>
-                <SimpleTooltip label="Sign Out" show={isCollapsed}>
-                  <SignOutForm iconOnly={isCollapsed} />
-                </SimpleTooltip>
-              </div>
             )}
           </div>
         )}
@@ -288,8 +255,6 @@ export default function ResizableSidebar() {
         </div>
       )}
 
-      {/* Change Password Drawer */}
-      <ChangePasswordDrawer open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </>
   )
 }

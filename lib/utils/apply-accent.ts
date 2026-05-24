@@ -64,6 +64,10 @@ export function applyAccent(name: string) {
   currentAccent = name;
   initThemeObserver();
 
+  try {
+    localStorage.setItem('runway-accent', name);
+  } catch { /* localStorage unavailable */ }
+
   const r = document.documentElement;
   const theme = r.getAttribute('data-theme');
   const isDark = theme === 'dark' || theme === 'moonlight';

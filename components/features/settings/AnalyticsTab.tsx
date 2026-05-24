@@ -4,9 +4,10 @@ import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { useImportedData } from '@/lib/hooks/use-imported-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
-import { Check, Calculator, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Calculator, RefreshCw, ChevronDown, ChevronUp, Database } from 'lucide-react';
 import { useState } from 'react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
@@ -42,6 +43,24 @@ const MODULES = [
   },
 ];
 
+const IMPORTED_MODULES = [
+  {
+    key: 'netWorth' as const,
+    label: 'Net Worth & Accounts',
+    description: 'Imported account snapshots and transactions included in net worth calculations. Disabling this hides imported balance data from net worth charts.',
+  },
+  {
+    key: 'realEstate' as const,
+    label: 'Real Estate',
+    description: 'Imported account snapshots for real estate accounts. Disabling this hides imported property snapshots from real estate charts.',
+  },
+  {
+    key: 'cashFlowProjections' as const,
+    label: 'Cash Flow Projections',
+    description: 'Imported transactions included in cash flow analysis. Disabling this excludes imported transactions from cash flow projections and spending charts.',
+  },
+];
+
 interface ModuleRecalcState {
   recalculating: boolean;
   showConfirm: boolean;
@@ -53,12 +72,14 @@ const INIT_RECALC: ModuleRecalcState = { recalculating: false, showConfirm: fals
 export default function AnalyticsTab() {
   const { visibility, loading: visLoading, updateVisibility } = useChartVisibility();
   const { settings, loading: synthLoading, isEnabled, updateSettings } = useSyntheticData();
+  const { settings: importSettings, loading: importLoading, isEnabled: isImportEnabled, updateSettings: updateImportSettings } = useImportedData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [netWorthState, setNetWorthState] = useState<ModuleRecalcState>(INIT_RECALC);
   const [realEstateState, setRealEstateState] = useState<ModuleRecalcState>(INIT_RECALC);
   const [cashFlowState, setCashFlowState] = useState<ModuleRecalcState>(INIT_RECALC);
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'data' | 'charts'>('general');
 
   const toggleModuleExpanded = (key: string) => {
     setExpandedModules((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -75,7 +96,7 @@ export default function AnalyticsTab() {
     }
   };
 
-  const loading = visLoading || synthLoading || defaultsLoading || mathLoading;
+  const loading = visLoading || synthLoading || importLoading || defaultsLoading || mathLoading;
 
   if (loading) {
     return <div className="text-muted-foreground py-4">Loading...</div>;
@@ -104,38 +125,129 @@ export default function AnalyticsTab() {
   };
 
   return (
-    <div className="space-y-10">      {/* ── Show the Math ──────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Show the Math</h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          When enabled, displays a description of the logic and math used to calculate
-          each analytics card&rsquo;s values below the card.
-        </p>
-        <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
-          <div className="flex items-center gap-2">
-            <Calculator className="w-4 h-4 text-muted-foreground" />
-            <div>
-              <span className="text-sm font-medium text-foreground">Show math explanations on cards</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Explains the formulas and data sources behind each chart and summary card.
-              </p>
+    <div>
+      {/* Sub-Tabs */}
+      <div className="flex rounded-lg bg-card border border-border overflow-hidden mb-6">
+        {([
+          { key: 'general' as const, label: 'General' },
+          { key: 'data' as const, label: 'Data Sources' },
+          { key: 'charts' as const, label: 'Chart Visibility' },
+        ]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSubTab(tab.key)}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              activeSubTab === tab.key
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: General */}
+      {activeSubTab === 'general' && (
+        <div className="space-y-8">
+          {/* ── Show the Math ──────────────────────────────────────────────── */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Show the Math</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              When enabled, displays a description of the logic and math used to calculate
+              each analytics card&rsquo;s values below the card.
+            </p>
+            <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <span className="text-sm font-medium text-foreground">Show math explanations on cards</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Explains the formulas and data sources behind each chart and summary card.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={showMathEnabled}
+                onCheckedChange={updateShowMath}
+              />
             </div>
           </div>
-          <Switch
-            checked={showMathEnabled}
-            onCheckedChange={updateShowMath}
-          />
+
+          {/* ── Chart Defaults ──────────────────────────────────────────────── */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Chart Defaults</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Choose default view options for all charts. These can be changed per-chart when viewing.
+            </p>
+
+            <div className="space-y-6">
+              {/* Default Time Range */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Default Time Range</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {TIME_RANGE_OPTIONS.map((opt) => {
+                    const isActive = defaults.defaultTimeRange === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateDefaults({ defaultTimeRange: opt.value })}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                          isActive
+                            ? 'border-foreground bg-muted/50 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Default Chart Type */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Default Chart Type</h3>
+                <div className="flex gap-2">
+                  {CHART_TYPE_OPTIONS.map((opt) => {
+                    const isActive = defaults.defaultChartType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateDefaults({ defaultChartType: opt.value })}
+                        className={`flex-1 flex items-center justify-center gap-1.5 p-2.5 text-sm font-medium rounded-lg border transition-all ${
+                          isActive
+                            ? 'border-foreground bg-muted/50 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+                        }`}
+                      >
+                        <span className="w-4 h-0.5 rounded-full bg-current" style={opt.value === 'bar' ? { height: '0.375rem', width: '0.125rem' } : undefined} />
+                        {opt.label}
+                        {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      {/* ── Synthetic & Estimated Data ─────────────────────────────────── */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Synthetic &amp; Estimated Data</h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          Synthetic or estimated data fills in gaps where no live snapshot from your financial institution
-          is available. When enabled, estimated values appear with dashed lines and &ldquo;estimated&rdquo;
-          labels in charts. Disabling a module hides those data points entirely, showing only confirmed
-          data from your accounts.
-        </p>
+      )}
+
+      {/* Tab: Data Sources */}
+      {activeSubTab === 'data' && (
+        <div className="space-y-8">
+          {/* ── Synthetic & Estimated Data ─────────────────────────────────── */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Synthetic &amp; Estimated Data</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Synthetic or estimated data fills in gaps where no live snapshot from your financial institution
+              is available. When enabled, estimated values appear with dashed lines and &ldquo;estimated&rdquo;
+              labels in charts. Disabling a module hides those data points entirely, showing only confirmed
+              data from your accounts.
+            </p>
 
         {/* Module Toggles */}
         <div className="space-y-2">
@@ -339,100 +451,82 @@ export default function AnalyticsTab() {
         </div>
       </div>
 
-      {/* ── Chart Defaults ──────────────────────────────────────────────── */}
+      {/* ── Imported Data ─────────────────────────────────────────────── */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Chart Defaults</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Imported Data</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Choose default view options for all charts. These can be changed per-chart when viewing.
+          Data imported via CSV files can be toggled on or off per module. Disabling a module hides
+          all imported data points from that area while keeping the data in the database.
         </p>
 
-        <div className="space-y-4">
-          {/* Default Time Range */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-2">Default Time Range</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {TIME_RANGE_OPTIONS.map((opt) => {
-                const isActive = defaults.defaultTimeRange === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateDefaults({ defaultTimeRange: opt.value })}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                      isActive
-                        ? 'border-foreground bg-muted/50 text-foreground'
-                        : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Default Chart Type */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-2">Default Chart Type</h3>
-            <div className="flex gap-2">
-              {CHART_TYPE_OPTIONS.map((opt) => {
-                const isActive = defaults.defaultChartType === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateDefaults({ defaultChartType: opt.value })}
-                    className={`flex-1 flex items-center justify-center gap-1.5 p-2.5 text-sm font-medium rounded-lg border transition-all ${
-                      isActive
-                        ? 'border-foreground bg-muted/50 text-foreground'
-                        : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
-                    }`}
-                  >
-                    <span className="w-4 h-0.5 rounded-full bg-current" style={opt.value === 'bar' ? { height: '0.375rem', width: '0.125rem' } : undefined} />
-                    {opt.label}
-                    {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Chart Visibility ───────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>
-        <p className="text-xs text-muted-foreground mb-6">
-          Toggle charts on or off per page. Hidden charts will not be displayed.
-        </p>
-
-        <div className="space-y-8">
-          {(Object.entries(CHARTS) as [string, { label: string; charts: Record<string, string> }][]).map(
-            ([pageKey, page]) => (
-              <div key={pageKey}>
-                <h3 className="text-sm font-semibold text-foreground mb-3">{page.label}</h3>
-                <div className="space-y-2">
-                  {Object.entries(page.charts).map(([chartId, chartLabel]) => {
-                    const visible = visibility[chartId] !== false;
-                    return (
-                      <div
-                        key={chartId}
-                        className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg"
-                      >
-                        <span className="text-sm text-foreground">{chartLabel}</span>
-                        <Switch
-                          checked={visible}
-                          onCheckedChange={(checked) => updateVisibility(chartId, checked)}
-                        />
-                      </div>
-                    );
-                  })}
+        <div className="space-y-2">
+          {IMPORTED_MODULES.map((mod) => {
+            const moduleEnabled = isImportEnabled(mod.key);
+            return (
+              <div
+                key={mod.key}
+                className="p-3 bg-muted/30 border border-border rounded-lg"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Database className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                  </div>
+                  <Switch
+                    checked={moduleEnabled}
+                    onCheckedChange={(checked) => updateImportSettings({ [mod.key]: checked })}
+                  />
                 </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{mod.description}</p>
+                {!moduleEnabled && (
+                  <p className="text-[10px] text-chart-3 italic mt-1">
+                    Imported data hidden for {mod.label.toLowerCase()}.
+                  </p>
+                )}
               </div>
-            )
-          )}
-        </div>
+            );
+          })}
+         </div>
+       </div>
       </div>
+      )}
+
+      {/* Tab: Chart Visibility */}
+      {activeSubTab === 'charts' && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>
+          <p className="text-xs text-muted-foreground mb-6">
+            Toggle charts on or off per page. Hidden charts will not be displayed.
+          </p>
+
+          <div className="space-y-8">
+            {(Object.entries(CHARTS) as [string, { label: string; charts: Record<string, string> }][]).map(
+              ([pageKey, page]) => (
+                <div key={pageKey}>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">{page.label}</h3>
+                  <div className="space-y-2">
+                    {Object.entries(page.charts).map(([chartId, chartLabel]) => {
+                      const visible = visibility[chartId] !== false;
+                      return (
+                        <div
+                          key={chartId}
+                          className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg"
+                        >
+                          <span className="text-sm text-foreground">{chartLabel}</span>
+                          <Switch
+                            checked={visible}
+                            onCheckedChange={(checked) => updateVisibility(chartId, checked)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

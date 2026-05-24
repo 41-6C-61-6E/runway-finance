@@ -27,10 +27,27 @@ export async function GET(request: Request) {
   try {
     // ── Fetch user settings for forecast mode ──────────────────────────
     const settingsRows = await db
-      .select({ forecastMode: userSettings.forecastMode, forecastLookbackMonths: userSettings.forecastLookbackMonths })
+      .select({
+        forecastMode: userSettings.forecastMode,
+        forecastLookbackMonths: userSettings.forecastLookbackMonths,
+        showImportedData: userSettings.showImportedData,
+      })
       .from(userSettings)
       .where(eq(userSettings.userId, userId))
       .limit(1);
+
+    const userSetting = settingsRows[0];
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
+
+    const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+    const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
 
     // Allow query params to override settings
     const forecastMode = searchParams.get('forecastMode') || settingsRows[0]?.forecastMode || 'hybrid';
@@ -102,18 +119,21 @@ export async function GET(request: Request) {
       .where(eq(categories.userId, userId));
     const catById = new Map(allCategories.map((cat) => [cat.id.toString(), cat]));
 
+    const txConditions = [
+      eq(transactions.userId, userId),
+      sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
+      inArray(transactions.accountId, fundingAccountIds),
+      eq(transactions.pending, false),
+      eq(transactions.ignored, false),
+    ];
+    if (!isImportTransactionsEnabled) {
+      txConditions.push(eq(transactions.isImported, false));
+    }
+
     const allTxns = await db
       .select({ amount: transactions.amount, accountId: transactions.accountId, categoryId: transactions.categoryId })
       .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
-          inArray(transactions.accountId, fundingAccountIds),
-          eq(transactions.pending, false),
-          eq(transactions.ignored, false),
-        )
-      );
+      .where(and(...txConditions));
 
     // Decrypt all transaction amounts and categorize
     const incomeByAccount = new Map<string, number[]>();
@@ -264,16 +284,19 @@ export async function GET(request: Request) {
     // ── Fetch historical snapshots for chart ────────────────────────────
     const snapshotStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const snapshotStartStr = snapshotStart.toISOString().split('T')[0];
+    const snapshotConditions = [
+      eq(accountSnapshots.userId, userId),
+      sql`${accountSnapshots.snapshotDate} >= ${snapshotStartStr}`,
+      inArray(accountSnapshots.accountId, fundingAccountIds),
+    ];
+    if (!isImportNetWorthEnabled) {
+      snapshotConditions.push(eq(accountSnapshots.isImported, false));
+    }
+
     const snapshotRows = await db
       .select()
       .from(accountSnapshots)
-      .where(
-        and(
-          eq(accountSnapshots.userId, userId),
-          sql`${accountSnapshots.snapshotDate} >= ${snapshotStartStr}`,
-          inArray(accountSnapshots.accountId, fundingAccountIds),
-        )
-      )
+      .where(and(...snapshotConditions))
       .orderBy(accountSnapshots.snapshotDate);
 
     // Decrypt snapshot balances
