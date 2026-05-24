@@ -77,7 +77,7 @@ export function RetirementMonteCarlo({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">P10 (Worst)</p>
           <p className="text-sm font-semibold text-destructive">
