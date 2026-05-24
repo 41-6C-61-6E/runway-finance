@@ -8,6 +8,7 @@ import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
 import { UserSettingsProvider } from '@/components/user-settings-provider';
+import { MobileNav } from '@/components/mobile-nav';
 import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -32,6 +33,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
               <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
                 {children}
               </AuthenticatedLayoutContent>
+              <MobileNav />
             </>
           </AccountSubheadingsProvider>
           </ReduceTransparencyProvider>
@@ -50,15 +52,21 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
   }, []);
 
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
-  const marginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
+  const desktopMarginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
     ? `${COLLAPSED_WIDTH}px` 
     : `${COLLAPSED_WIDTH + accountsWidth}px`;
 
   return (
     <>
-      <div style={{ marginLeft }} className="transition-all duration-200">
+      <div 
+        style={{ 
+          '--sidebar-margin-left': desktopMarginLeft 
+        } as React.CSSProperties} 
+        className="transition-all duration-200 ml-0 md:ml-[var(--sidebar-margin-left)] pb-20 md:pb-0"
+      >
         {children}
       </div>
     </>
   );
 }
+

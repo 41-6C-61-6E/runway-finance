@@ -16,7 +16,9 @@ export function ChartTooltip({ children }: ChartTooltipProps) {
         fontSize: '10px',
         padding: '8px 12px',
         lineHeight: 1.5,
-        maxWidth: 220,
+        minWidth: 160,
+        maxWidth: 380,
+        width: 'max-content',
       }}
     >
       {children}

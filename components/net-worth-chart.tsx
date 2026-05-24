@@ -576,7 +576,7 @@ export function NetWorthChart() {
     if (chartType === 'bar') {
       return (
         <div className="w-full h-full relative">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <ComposedChart
               data={rechartsData}
               stackOffset="sign"
@@ -697,7 +697,7 @@ export function NetWorthChart() {
 
     return (
       <div className="w-full h-full relative">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
           <ComposedChart
             data={rechartsData}
             stackOffset="sign"

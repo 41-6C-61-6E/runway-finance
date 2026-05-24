@@ -106,6 +106,7 @@ function SortableHeader({
   title: string;
   dragHandleProps?: any;
 }) {
+  const canSort = column.getCanSort();
   return (
     <div className="flex items-center gap-1">
       {dragHandleProps && (
@@ -113,17 +114,20 @@ function SortableHeader({
           <GripVertical className="h-3 w-3" />
         </span>
       )}
-      <button
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="flex items-center gap-1 hover:text-foreground transition-colors"
-      >
-        {title}
-        {column.getCanSort() && (
-          column.getIsSorted() === 'asc' ? <ChevronUp className="ml-0.5 h-3 w-3" /> :
-          column.getIsSorted() === 'desc' ? <ChevronDown className="ml-0.5 h-3 w-3" /> :
-          <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-50" />
-        )}
-      </button>
+      {canSort ? (
+        <button
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          {title}
+          {column.getIsSorted() === 'asc' ? <ChevronUp className="ml-0.5 h-3 w-3" /> :
+           column.getIsSorted() === 'desc' ? <ChevronDown className="ml-0.5 h-3 w-3" /> :
+           <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-50" />
+          }
+        </button>
+      ) : (
+        <span>{title}</span>
+      )}
     </div>
   );
 }
@@ -447,6 +451,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
             </span>
           );
         },
+        enableSorting: false,
       },
       {
         accessorKey: 'description',
@@ -483,20 +488,24 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         enableSorting: false,
       },
       {
+        id: 'account',
         accessorKey: 'accountName',
         header: ({ column }) => (
           <SortableHeader column={column} title="Account" />
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground truncate block">{row.getValue('accountName') || '—'}</span>
+          <span className="text-sm text-muted-foreground truncate block">{row.original.accountName || '—'}</span>
         ),
+        enableSorting: false,
       },
       {
+        id: 'category',
         accessorKey: 'categoryName',
         header: ({ column }) => (
           <SortableHeader column={column} title="Category" />
         ),
         meta: { className: 'overflow-visible' },
+        enableSorting: false,
         cell: ({ row }) => {
           const tx = row.original;
           const isOpen = openCategoryTx === tx.id;
