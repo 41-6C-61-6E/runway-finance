@@ -86,6 +86,7 @@ export default function DataTable({
   const [dragColId, setDragColId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [tableWidth, setTableWidth] = useState<number | string>('100%');
 
   const visibleFields = useMemo(
     () => new Set(columns.map((c) => c.field)),
@@ -144,6 +145,9 @@ export default function DataTable({
       if (JSON.stringify(prev) === JSON.stringify(sizes)) return prev;
       return sizes;
     });
+
+    const totalWidth = visibleCols.reduce((sum, id) => sum + (sizes[id] || 80), 32);
+    setTableWidth(Math.max(containerWidth, totalWidth));
   }, [columnOrder, columnVisibility, visibleFields]);
 
   useEffect(() => {
@@ -279,8 +283,8 @@ export default function DataTable({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="text-sm border-collapse" style={{ tableLayout: 'fixed', width: tableWidth }}>
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b border-border">

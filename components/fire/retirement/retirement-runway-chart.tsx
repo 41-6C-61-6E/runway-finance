@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -33,6 +33,16 @@ export function RetirementRunwayChart({
   monteCarlo?: MonteCarloResult;
 }) {
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:retirement-runway:chartType', 'line');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const chartData = useMemo(() => {
     return projection.years.map((y, idx) => {
@@ -84,7 +94,7 @@ export function RetirementRunwayChart({
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <BarChart
               data={projection.years.map((y) => ({ age: String(y.age), balance: y.endBalance }))}
-              margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+              margin={{ top: 10, right: 10, left: 10, bottom: isMobile ? 10 : 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
               <XAxis
@@ -93,7 +103,7 @@ export function RetirementRunwayChart({
                 axisLine={{ stroke: 'var(--color-border)' }}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                 interval={xInterval}
-                label={{ value: 'Age', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                label={isMobile ? undefined : { value: 'Age', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
               />
               <YAxis
                 tickLine={false}
@@ -130,7 +140,12 @@ export function RetirementRunwayChart({
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
               data={chartData}
-              margin={{ top: 10, right: monteCarlo ? 120 : 30, left: 10, bottom: 20 }}
+              margin={{
+                top: 10,
+                right: isMobile ? 10 : (monteCarlo ? 120 : 30),
+                left: 10,
+                bottom: isMobile ? (monteCarlo ? 45 : 20) : 20
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={true} horizontal={true} />
               <XAxis
@@ -139,7 +154,7 @@ export function RetirementRunwayChart({
                 axisLine={{ stroke: 'var(--color-border)' }}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                 interval={xInterval}
-                label={{ value: 'Age', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                label={isMobile ? undefined : { value: 'Age', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
               />
               <YAxis
                 tickLine={false}
@@ -173,10 +188,10 @@ export function RetirementRunwayChart({
               />
               {monteCarlo && (
                 <Legend
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="top"
-                  wrapperStyle={{ right: 0, paddingLeft: 10, fontSize: 12 }}
+                  layout={isMobile ? "horizontal" : "vertical"}
+                  align={isMobile ? "center" : "right"}
+                  verticalAlign={isMobile ? "bottom" : "top"}
+                  wrapperStyle={isMobile ? { fontSize: 10, paddingTop: 10, position: 'relative' } : { right: 0, paddingLeft: 10, fontSize: 12 }}
                 />
               )}
               <Line

@@ -162,7 +162,18 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const [tableWidth, setTableWidth] = useState<number | string>('100%');
   const limit = 50;
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setColumnVisibility((prev) => ({
+        ...prev,
+        account: false,
+        category: false,
+      }));
+    }
+  }, []);
 
   const [dragColId, setDragColId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -177,8 +188,12 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const calculateSizes = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    const containerWidth = el.clientWidth;
-    if (containerWidth <= 0) return;
+    const clientWidth = el.clientWidth;
+    if (clientWidth <= 0) return;
+
+    const isMobileSize = clientWidth < 768;
+    const containerWidth = isMobileSize ? Math.max(clientWidth, 650) : clientWidth;
+    setTableWidth(containerWidth);
 
     const visibleCols = columnOrder.filter((id) => columnVisibility[id] !== false);
     const fixedSizes: Record<string, number> = { select: 40 };
@@ -748,8 +763,8 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
             </div>
 
             {/* Table */}
-            <div className="overflow-x-hidden">
-              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="text-sm border-collapse" style={{ tableLayout: 'fixed', width: tableWidth }}>
                 <thead>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id} className="border-b border-border">
