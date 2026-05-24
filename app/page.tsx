@@ -8,6 +8,7 @@ import { DebtBreakdown } from '@/components/debt-breakdown';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 function NetWorthContent() {
@@ -26,7 +27,7 @@ function NetWorthContent() {
           {showSummary && showRatio && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
-                <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
+                <Suspense fallback={<LoadingSpinner category="summary" />}>
                   <div className="h-full space-y-5">
                     <NetWorthSummary />
                     <MathDescription chartId="netWorthSummary" />
@@ -34,7 +35,7 @@ function NetWorthContent() {
                 </Suspense>
               </div>
               <div className="h-full">
-                <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
+                <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <div className="h-full space-y-5">
                     <DebtToAssetRatio />
                     <MathDescription chartId="debtToAssetRatio" />
@@ -64,7 +65,7 @@ function NetWorthContent() {
 
           {showSummary && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <AssetAllocation />
               </Suspense>
             </div>
@@ -72,7 +73,7 @@ function NetWorthContent() {
 
           {showRatio && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading breakdown...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <DebtBreakdown />
               </Suspense>
             </div>
@@ -86,7 +87,7 @@ function NetWorthContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <NetWorthContent />
     </Suspense>
   );

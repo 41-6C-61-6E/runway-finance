@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
 
@@ -90,9 +91,7 @@ export function RetirementAccountAllocation() {
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground mb-3">Investment Account Allocation</h3>
-        <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner category="chart" className="h-[280px]" />
       </div>
     );
   }

@@ -13,6 +13,7 @@ import { RetirementPlanner } from '@/components/fire/retirement/retirement-plann
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Flame } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 export interface FireScenario {
@@ -90,7 +91,7 @@ function FireContent() {
           {tab === 'forecaster' && (
             <>
               {isVisible('fireMetrics') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading metrics...</div>}>
+                <Suspense fallback={<LoadingSpinner category="analysis" />}>
                   <div>
                     <FireMetrics scenario={scenario} />
                     <MathDescription chartId="fireMetrics" />
@@ -102,7 +103,7 @@ function FireContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
                   {isVisible('fireProjectionChart') && (
                     <div className="lg:col-span-2">
-                      <Suspense fallback={<div className="text-muted-foreground">Loading projection...</div>}>
+                      <Suspense fallback={<LoadingSpinner category="forecast" />}>
                         <div>
                           <FireProjectionChart scenario={scenario} />
                           <MathDescription chartId="fireProjectionChart" />
@@ -127,7 +128,7 @@ function FireContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
                 <FireCalculator scenario={scenario} onUpdate={handleScenarioUpdate} />
                 {isVisible('whatIfAnalysis') && (
-                  <Suspense fallback={<div className="text-muted-foreground">Loading analysis...</div>}>
+                  <Suspense fallback={<LoadingSpinner category="analysis" />}>
                     <div>
                       <WhatIfAnalysis baseScenario={scenario} />
                       <MathDescription chartId="whatIfAnalysis" />
@@ -137,7 +138,7 @@ function FireContent() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-                <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
+                <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <RetirementAccountAllocation />
                 </Suspense>
                 <WithdrawalRateSensitivity scenario={scenario} />
@@ -165,7 +166,7 @@ function FireContent() {
 
 export default function FirePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <FireContent />
     </Suspense>
   );
