@@ -55,9 +55,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
   const escrow = mortgage.escrow ?? 0;
   const pmi = mortgage.pmi ?? 0;
 
-  const monthlyPI = useMemo(() => {
-    return Math.max(0, monthlyPayment - escrow - pmi);
-  }, [escrow, pmi, monthlyPayment]);
+  const monthlyPI = monthlyPayment;
 
   useEffect(() => {
     const ep = mortgage.extraPrincipal ?? 0;

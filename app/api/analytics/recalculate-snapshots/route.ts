@@ -44,27 +44,43 @@ export async function POST(request: Request) {
     const errors: Array<{ accountId: string; error: string }> = [];
 
     if (type === 'netWorth') {
+      const apiConfig = await readApiConfig(userId).catch(() => undefined);
       for (const account of decrypted) {
         try {
-          const result = await generateHistoricalAccountSnapshots(
-            account.id,
-            userId,
-            '2023-01-01',
-            today,
-            dek
-          );
-          syntheticCount += result.syntheticCount;
-          skippedCount += result.skippedRealCount;
-          logger.info('Generated transaction-based snapshots for account', {
-            accountId: account.id,
-            accountName: account.name,
-            syntheticCount: result.syntheticCount,
-            skippedReal: result.skippedRealCount,
-          });
+          if (MODEL_SNAPSHOT_TYPES.includes(account.type)) {
+            const meta = typeof account.metadata === 'string'
+              ? JSON.parse(account.metadata)
+              : (typeof account.metadata === 'object' && account.metadata !== null ? account.metadata : {});
+            const count = await generateAssetHistorySnapshots(
+              account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
+            );
+            syntheticCount += count;
+            logger.info('Generated model-based snapshots for account during netWorth recalculate', {
+              accountId: account.id,
+              accountName: account.name,
+              syntheticCount: count,
+            });
+          } else {
+            const result = await generateHistoricalAccountSnapshots(
+              account.id,
+              userId,
+              '2023-01-01',
+              today,
+              dek
+            );
+            syntheticCount += result.syntheticCount;
+            skippedCount += result.skippedRealCount;
+            logger.info('Generated transaction-based snapshots for account', {
+              accountId: account.id,
+              accountName: account.name,
+              syntheticCount: result.syntheticCount,
+              skippedReal: result.skippedRealCount,
+            });
+          }
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           errors.push({ accountId: account.id, error: errorMsg });
-          logger.error('Failed to generate transaction-based snapshots for account', {
+          logger.error('Failed to generate snapshots for account', {
             accountId: account.id,
             error: errorMsg,
           });

@@ -189,20 +189,7 @@ export default function ManualAccountsSection() {
       const manualData = await res.json();
       const mortgageData = mRes.ok ? await mRes.json() : [];
       
-      // Merge manual accounts with SimpleFIN mortgages
-      // Manual accounts already include manually-created mortgages
-      // We need to add SimpleFIN mortgages that aren't already in manual accounts
-      const manualIds = new Set((Array.isArray(manualData) ? manualData : []).map((a: any) => a.id));
-      const simplefinMortgages = Array.isArray(mortgageData) 
-        ? mortgageData.filter((m: any) => !manualIds.has(m.id))
-        : [];
-      
-      const allAccounts = [
-        ...(Array.isArray(manualData) ? manualData : []),
-        ...simplefinMortgages,
-      ];
-      
-      setAccounts(allAccounts);
+      setAccounts(Array.isArray(manualData) ? manualData : []);
       if (reRes.ok) setRealEstateAccounts(await reRes.json());
       if (mRes.ok) setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
     } catch {
@@ -260,6 +247,14 @@ export default function ManualAccountsSection() {
         if (createMeta.linkedPropertyId) {
           metadata.linkedPropertyId = createMeta.linkedPropertyId;
         }
+        metadata.mortgageStatus = createMeta.mortgageStatus || 'active';
+        if (createMeta.mortgageStatus === 'paid_off') {
+          metadata.payoffDate = createMeta.payoffDate;
+        } else if (createMeta.mortgageStatus === 'refinanced') {
+          metadata.refinanceDate = createMeta.refinanceDate;
+          metadata.payoffBalance = parseFloat(createMeta.payoffBalance || '0');
+          metadata.refinancedByLoanId = createMeta.refinancedByLoanId || '';
+        }
       }
       if (createType === 'crypto') {
         metadata.xpub = createMeta.xpub || '';
@@ -279,7 +274,9 @@ export default function ManualAccountsSection() {
           name: createName,
           type: createType,
           metadata,
-          initialValue: parseFloat(createInitialValue) || 0,
+          initialValue: (createType === 'mortgage' && ['paid_off', 'refinanced'].includes(createMeta.mortgageStatus))
+            ? 0
+            : (parseFloat(createInitialValue) || 0),
         }),
       });
 
@@ -447,6 +444,14 @@ export default function ManualAccountsSection() {
         metadata.escrow = parseFloat(editMeta.escrow || '0');
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
         if (editMeta.linkedPropertyId) metadata.linkedPropertyId = editMeta.linkedPropertyId;
+        metadata.mortgageStatus = editMeta.mortgageStatus || 'active';
+        if (editMeta.mortgageStatus === 'paid_off') {
+          metadata.payoffDate = editMeta.payoffDate;
+        } else if (editMeta.mortgageStatus === 'refinanced') {
+          metadata.refinanceDate = editMeta.refinanceDate;
+          metadata.payoffBalance = parseFloat(editMeta.payoffBalance || '0');
+          metadata.refinancedByLoanId = editMeta.refinancedByLoanId || '';
+        }
       }
       else if (editAccount.type === 'vehicle') {
         metadata.make = editMeta.make || '';
@@ -473,7 +478,13 @@ export default function ManualAccountsSection() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: editName, metadata }),
+        body: JSON.stringify({ 
+          name: editName, 
+          metadata,
+          balance: (editAccount.type === 'mortgage' && ['paid_off', 'refinanced'].includes(editMeta.mortgageStatus)) 
+            ? '0' 
+            : undefined
+        }),
       });
 
       if (!res.ok) {
@@ -625,7 +636,11 @@ export default function ManualAccountsSection() {
         return (
           <>
             {linkedPropertyField(createMeta, setCreateMeta)}
-            <MortgageAttributesForm meta={createMeta} onChange={(m) => setCreateMeta(m)} />
+            <MortgageAttributesForm
+              meta={createMeta}
+              onChange={(m) => setCreateMeta(m)}
+              allMortgages={allMortgageAccounts}
+            />
           </>
         );
       case 'vehicle':
@@ -1105,7 +1120,11 @@ export default function ManualAccountsSection() {
             {editAccount?.type === 'mortgage' && (
               <>
                 {linkedPropertyField(editMeta, (m) => setEditMeta(m))}
-                <MortgageAttributesForm meta={editMeta} onChange={(m) => setEditMeta(m)} />
+                <MortgageAttributesForm
+                  meta={editMeta}
+                  onChange={(m) => setEditMeta(m)}
+                  allMortgages={allMortgageAccounts.filter((m) => m.id !== editAccount?.id)}
+                />
               </>
             )}
 
