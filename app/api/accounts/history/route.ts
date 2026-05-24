@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte, lt, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc, or } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -104,14 +104,30 @@ export async function GET(request: Request) {
       ...(typeof rawShowSynthetic === 'object' && rawShowSynthetic !== null ? rawShowSynthetic : {}),
     } as Record<string, boolean>;
 
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
+
     const isGlobalEnabled = synthSettings.global !== false;
     const isNetWorthEnabled = isGlobalEnabled && synthSettings.netWorth !== false;
     const isRealEstateEnabled = isGlobalEnabled && synthSettings.realEstate !== false;
+    const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
+    const isImportRealEstateEnabled = importSettings.global !== false && importSettings.realEstate !== false;
 
     // Filter reportable accounts based on settings
     let filteredAccounts = reportableAccounts;
     if (!isNetWorthEnabled) {
-      filteredAccounts = filteredAccounts.filter(acc => acc.connectionId !== null);
+      filteredAccounts = filteredAccounts.filter(acc => {
+        if (acc.connectionId !== null) return true;
+        const isImported = acc.externalId?.startsWith('imported-');
+        if (isImported && isImportNetWorthEnabled) return true;
+        return false;
+      });
     }
     const realEstateTypes = [
       'realestate',
@@ -147,7 +163,10 @@ export async function GET(request: Request) {
       lt(accountSnapshots.snapshotDate, startStr),
     ];
     if (!isNetWorthEnabled) {
-      snapshotsConditionsBefore.push(eq(accountSnapshots.isSynthetic, false));
+      snapshotsConditionsBefore.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
+    }
+    if (!isImportNetWorthEnabled) {
+      snapshotsConditionsBefore.push(eq(accountSnapshots.isImported, false));
     }
 
     const snapshotsBefore = await getDb()
@@ -168,7 +187,10 @@ export async function GET(request: Request) {
       lte(accountSnapshots.snapshotDate, endStr),
     ];
     if (!isNetWorthEnabled) {
-      snapshotsConditionsInRange.push(eq(accountSnapshots.isSynthetic, false));
+      snapshotsConditionsInRange.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
+    }
+    if (!isImportNetWorthEnabled) {
+      snapshotsConditionsInRange.push(eq(accountSnapshots.isImported, false));
     }
 
     const snapshotsInRange = await getDb()

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { transactions, accounts, categories } from '@/lib/db/schema';
+import { transactions, accounts, categories, userSettings } from '@/lib/db/schema';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNull } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
@@ -51,6 +51,25 @@ export async function GET(request: Request) {
 
   const filters = parsed.data;
 
+  // Fetch user settings to respect imported data toggles
+  const userSettingsList = await getDb()
+    .select()
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  const userSetting = userSettingsList[0];
+  const rawShowImported = userSetting?.showImportedData;
+  const importSettings = {
+    global: true,
+    netWorth: true,
+    realEstate: true,
+    cashFlowProjections: true,
+    ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+  } as Record<string, boolean>;
+
+  const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+
   logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset });
 
   // Build where clause (excluding encrypted field filters — applied in memory).
@@ -60,6 +79,10 @@ export async function GET(request: Request) {
     eq(accounts.isHidden, false),
     eq(accounts.isExcludedFromNetWorth, false),
   ];
+
+  if (!isImportTransactionsEnabled) {
+    whereConditions.push(eq(transactions.isImported, false));
+  }
 
   if (filters.accountIds) {
     const ids = filters.accountIds.split(',').map(id => id.trim()).filter(Boolean);

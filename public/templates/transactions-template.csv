@@ -1,0 +1,7 @@
+Date,Account,Payee,Category,Amount,Description,Memo,Notes
+"May 23, 2026",Checking Account,Example Payee,Food & Dining,-25.50,"(Month DD, YYYY) Grocery store",Monthly groceries,
+"June 1, 2026",Savings Account,Employer Inc,Income,3500.00,"(Month DD, YYYY) Monthly salary",,Bonus
+"June 15, 2026",Credit Card,Amazon,Shopping,-89.99,"(Month DD, YYYY) Online order",Prime shipping,
+"July 2026",Savings Account,Interest Payment,Income,12.50,"(Month YYYY) Interest earned",,
+"08/15/2026",Checking Account,Utility Co,Utilities,-95.00,"(MM/DD/YYYY) Electric bill",,
+2026-09-01,Credit Card,Netflix,Entertainment,-15.99,"(YYYY-MM-DD) Streaming service",Auto-pay,

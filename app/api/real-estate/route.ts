@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots } from '@/lib/db/schema';
+import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, inArray, asc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -53,8 +53,35 @@ export async function GET(request: Request) {
     // Decrypt all accounts
     const decryptedAccounts = await decryptRows('accounts', allAccounts, dek);
 
-    const realEstateAccounts = decryptedAccounts.filter((a: any) => a.type === 'realestate');
-    const mortgageAccounts = decryptedAccounts.filter((a: any) => a.type === 'mortgage');
+    // Fetch user settings to respect imported data toggles
+    const userSettingsList = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    const userSetting = userSettingsList[0];
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
+
+    const isImportRealEstateEnabled = importSettings.global !== false && importSettings.realEstate !== false;
+
+    const realEstateAccounts = decryptedAccounts.filter((a: any) => {
+      const isImported = a.externalId?.startsWith('imported-');
+      if (isImported && !isImportRealEstateEnabled) return false;
+      return a.type === 'realestate';
+    });
+    const mortgageAccounts = decryptedAccounts.filter((a: any) => {
+      const isImported = a.externalId?.startsWith('imported-');
+      if (isImported && !isImportRealEstateEnabled) return false;
+      return a.type === 'mortgage';
+    });
     const mortgageMap = new Map(mortgageAccounts.map((m: any) => [m.id, m]));
 
     const properties = await Promise.all(
@@ -74,6 +101,15 @@ export async function GET(request: Request) {
         const ltv = propertyValue > 0 ? (Math.abs(totalMortgageBalance) / propertyValue) * 100 : 0;
         const saleProceeds = propertyValue * 0.92 - Math.abs(totalMortgageBalance);
 
+        const snapshotsConditions = [
+          eq(accountSnapshots.userId, userId),
+          eq(accountSnapshots.accountId, property.id),
+          sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
+        ];
+        if (!isImportRealEstateEnabled) {
+          snapshotsConditions.push(eq(accountSnapshots.isImported, false));
+        }
+
         const snapshots = await db
           .select({
             snapshotDate: accountSnapshots.snapshotDate,
@@ -81,13 +117,7 @@ export async function GET(request: Request) {
             isSynthetic: accountSnapshots.isSynthetic,
           })
           .from(accountSnapshots)
-          .where(
-            and(
-              eq(accountSnapshots.userId, userId),
-              eq(accountSnapshots.accountId, property.id),
-              sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
-            )
-          )
+          .where(and(...snapshotsConditions))
           .orderBy(asc(accountSnapshots.snapshotDate));
 
         const decryptedSnapshots = await Promise.all(snapshots.map(async (s) => ({
@@ -96,17 +126,20 @@ export async function GET(request: Request) {
           isSynthetic: s.isSynthetic,
         })));
 
+        const mortgageSnapshotsConditions = [
+          eq(accountSnapshots.userId, userId),
+          inArray(accountSnapshots.accountId, linkedMortgageIds),
+          sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
+        ];
+        if (!isImportRealEstateEnabled) {
+          mortgageSnapshotsConditions.push(eq(accountSnapshots.isImported, false));
+        }
+
         const mortgageSnapshots = linkedMortgageIds.length > 0
           ? await db
               .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance, accountId: accountSnapshots.accountId, isSynthetic: accountSnapshots.isSynthetic })
               .from(accountSnapshots)
-              .where(
-                and(
-                  eq(accountSnapshots.userId, userId),
-                  inArray(accountSnapshots.accountId, linkedMortgageIds),
-                  sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
-                )
-              )
+              .where(and(...mortgageSnapshotsConditions))
               .orderBy(asc(accountSnapshots.snapshotDate))
           : [];
 

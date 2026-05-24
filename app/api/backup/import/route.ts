@@ -21,6 +21,7 @@ import {
   simplifinConnections,
   aiProviders,
   aiProposals,
+  importLog,
   userSettings,
 } from '@/lib/db/schema';
 import { getPool } from '@/lib/db';
@@ -34,6 +35,7 @@ interface BackupPayload {
 const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: transactions, dbName: 'transactions' },
   { table: accountSnapshots, dbName: 'account_snapshots' },
+  { table: importLog, dbName: 'import_log' },
   { table: budgets, dbName: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals' },
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
@@ -65,6 +67,7 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: retirementProjections, dbName: 'retirement_projections' },
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
+  { table: importLog, dbName: 'import_log' },
   { table: transactions, dbName: 'transactions' },
   { table: accountSnapshots, dbName: 'account_snapshots' },
 ];
