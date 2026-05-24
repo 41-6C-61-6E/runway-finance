@@ -368,10 +368,9 @@ export async function GET(request: Request) {
     }
 
     // Decrypt summary data for previous month
-    async function fetchPreviousSummary(table: typeof categorySpendingSummary | typeof categoryIncomeSummary, catIds: string[]): Promise<Map<string, number>> {
+    async function fetchPreviousSummary(table: typeof categorySpendingSummary | typeof categoryIncomeSummary): Promise<Map<string, number>> {
       const map = new Map<string, number>();
-      if (catIds.length === 0) return map;
-      const idCol = 'categoryId' in table ? table.categoryId : categorySpendingSummary.categoryId;
+      const idCol = table.categoryId;
       const rows = await db
         .select({ categoryId: idCol, amount: table.amount })
         .from(table)
@@ -386,8 +385,8 @@ export async function GET(request: Request) {
     }
 
     const [prevExpenseMap, prevIncomeMap] = await Promise.all([
-      fetchPreviousSummary(categorySpendingSummary, []),
-      fetchPreviousSummary(categoryIncomeSummary, []),
+      fetchPreviousSummary(categorySpendingSummary),
+      fetchPreviousSummary(categoryIncomeSummary),
     ]);
 
     const prevMap = new Map<string, number>();

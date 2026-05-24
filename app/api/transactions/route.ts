@@ -149,13 +149,19 @@ export async function GET(request: Request) {
       selectFields.description = transactions.description;
       selectFields.payee = transactions.payee;
       selectFields.notes = transactions.notes;
+      selectFields.categoryName = categories.name;
     }
 
-    const result = await getDb()
+    let query = getDb()
       .select(selectFields)
       .from(transactions)
-      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-      .where(and(...whereConditions));
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id));
+
+    if (filters.search) {
+      query = query.leftJoin(categories, eq(transactions.categoryId, categories.id)) as any;
+    }
+
+    const result = await query.where(and(...whereConditions));
 
     let filtered = await Promise.all(result.map(async (row: any) => {
       const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
@@ -165,7 +171,8 @@ export async function GET(request: Request) {
         const descDec = (await decryptField(row.description, dek)).toLowerCase();
         const payeeDec = row.payee ? (await decryptField(row.payee, dek)).toLowerCase() : '';
         const notesDec = row.notes ? (await decryptField(row.notes, dek)).toLowerCase() : '';
-        matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q);
+        const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
+        matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
       }
       return { amount, matchesSearch };
     }));
@@ -287,7 +294,8 @@ export async function GET(request: Request) {
     filtered = filtered.filter((t: any) =>
       (t.description?.toLowerCase().includes(q) ?? false) ||
       (t.payee?.toLowerCase().includes(q) ?? false) ||
-      (t.notes?.toLowerCase().includes(q) ?? false)
+      (t.notes?.toLowerCase().includes(q) ?? false) ||
+      (t.category?.name?.toLowerCase().includes(q) ?? false)
     );
   }
 
