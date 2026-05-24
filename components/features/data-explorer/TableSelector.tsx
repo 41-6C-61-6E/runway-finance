@@ -1,33 +1,31 @@
 'use client';
-
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Search, Database, ChevronDown, Check } from 'lucide-react';
-
+ 
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Database, ChevronDown, Check } from 'lucide-react';
+ 
 interface TableMeta {
   key: string;
   label: string;
   group: string;
 }
-
+ 
 interface TableSelectorProps {
   tables: TableMeta[];
   selected: string;
   onSelect: (key: string) => void;
 }
-
+ 
 const GROUP_ORDER = ['Accounts', 'Transactions', 'Cash Flow', 'Budgets', 'FIRE', 'System'];
-
+ 
 export default function TableSelector({ tables, selected, onSelect }: TableSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-
+ 
   const selectedTable = tables.find((t) => t.key === selected);
-
+ 
   const grouped = useMemo(() => {
     const groups = new Map<string, TableMeta[]>();
     for (const t of tables) {
-      if (search && !t.label.toLowerCase().includes(search.toLowerCase())) continue;
       if (!groups.has(t.group)) groups.set(t.group, []);
       groups.get(t.group)!.push(t);
     }
@@ -40,14 +38,8 @@ export default function TableSelector({ tables, selected, onSelect }: TableSelec
         if (bi !== -1) return 1;
         return a.localeCompare(b);
       });
-  }, [tables, search]);
-
-  useEffect(() => {
-    if (!open) {
-      setSearch('');
-    }
-  }, [open]);
-
+  }, [tables]);
+ 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -57,7 +49,7 @@ export default function TableSelector({ tables, selected, onSelect }: TableSelec
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
+ 
   return (
     <div ref={ref} className="relative min-w-[240px]">
       <button
@@ -70,20 +62,10 @@ export default function TableSelector({ tables, selected, onSelect }: TableSelec
         </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       </button>
-
+ 
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 max-h-80 flex flex-col">
-          <div className="relative p-2 border-b border-border">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tables..."
-              className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              autoFocus
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto py-1">
             {grouped.length === 0 ? (
               <div className="px-3 py-6 text-xs text-muted-foreground text-center">No tables found</div>
             ) : (

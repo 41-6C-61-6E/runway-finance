@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 
 type Account = {
   id: string;
@@ -96,31 +97,91 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [isHidden, setIsHidden] = useState(account?.isHidden ?? false);
   const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account?.isExcludedFromNetWorth ?? false);
   const [saving, setSaving] = useState(false);
+  const [mortgageMeta, setMortgageMeta] = useState<Record<string, string>>({});
+  const [allAccounts, setAllAccounts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!account) return;
+    if (!account || !open) return;
     setName(account.name);
     setType(account.type);
     setMajorType(findMajorType(account.type));
     setIsHidden(account.isHidden);
     setIsExcludedFromNetWorth(account.isExcludedFromNetWorth);
-  }, [account]);
+
+    if (account.type === 'mortgage') {
+      const meta = account.metadata ?? {};
+      const flat: Record<string, string> = {};
+      Object.entries(meta).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) flat[k] = String(v);
+      });
+      setMortgageMeta(flat);
+
+      fetch('/api/accounts?includeHidden=true', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          setAllAccounts(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {});
+    } else {
+      setMortgageMeta({});
+      setAllAccounts([]);
+    }
+  }, [account, open]);
 
   const handleSave = useCallback(async () => {
     if (!account) return;
     setSaving(true);
     try {
+      const payload: Record<string, any> = {
+        name,
+        type,
+        isHidden,
+        isExcludedFromNetWorth,
+      };
+
+      if (type === 'mortgage') {
+        const metadata: Record<string, unknown> = {
+          originalLoanAmount: parseFloat(mortgageMeta.originalLoanAmount || '0'),
+          interestRate: parseFloat(mortgageMeta.interestRate || '0'),
+          termMonths: parseInt(mortgageMeta.termMonths || '360', 10),
+          monthlyPayment: parseFloat(mortgageMeta.monthlyPayment || '0'),
+          escrowAmount: parseFloat(mortgageMeta.escrowAmount || '0'),
+          extraPrincipal: parseFloat(mortgageMeta.extraPrincipal || '0'),
+          pmi: parseFloat(mortgageMeta.pmi || '0'),
+          escrow: parseFloat(mortgageMeta.escrow || '0'),
+          mortgageStatus: mortgageMeta.mortgageStatus || 'active',
+        };
+        if (mortgageMeta.purchaseDate) {
+          metadata.purchaseDate = mortgageMeta.purchaseDate;
+        }
+        if (mortgageMeta.linkedPropertyId) {
+          metadata.linkedPropertyId = mortgageMeta.linkedPropertyId;
+        }
+        if (mortgageMeta.mortgageStatus === 'paid_off') {
+          metadata.payoffDate = mortgageMeta.payoffDate;
+        } else if (mortgageMeta.mortgageStatus === 'refinanced') {
+          metadata.refinanceDate = mortgageMeta.refinanceDate;
+          metadata.payoffBalance = parseFloat(mortgageMeta.payoffBalance || '0');
+          metadata.refinancedByLoanId = mortgageMeta.refinancedByLoanId || '';
+        }
+        payload.metadata = metadata;
+
+        if (['paid_off', 'refinanced'].includes(mortgageMeta.mortgageStatus)) {
+          payload.balance = '0';
+        }
+      }
+
       await fetch(`/api/accounts/${account.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, type, isHidden, isExcludedFromNetWorth }),
+        body: JSON.stringify(payload),
       });
       onSuccess();
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, onSuccess]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, mortgageMeta, onSuccess]);
 
   if (!account || !open) return null;
 
@@ -141,11 +202,39 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     };
   };
 
+  const renderLinkedPropertyField = () => {
+    const realEstateAccounts = allAccounts.filter((a) => a.type === 'realestate');
+    const alreadyLinked = new Set(
+      allAccounts
+        .filter((a) => a.type === 'mortgage' && a.id !== account?.id)
+        .flatMap((m) => {
+          const meta = m.metadata ?? {};
+          return meta.linkedPropertyId ? [meta.linkedPropertyId as string] : [];
+        })
+    );
+    const available = realEstateAccounts.filter((re) => !alreadyLinked.has(re.id) || mortgageMeta.linkedPropertyId === re.id);
+    return (
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Linked Property (optional)</label>
+        <select
+          value={mortgageMeta.linkedPropertyId || ''}
+          onChange={(e) => setMortgageMeta({ ...mortgageMeta, linkedPropertyId: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">None</option>
+          {available.map((re) => (
+            <option key={re.id} value={re.id}>{re.name}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   const { text } = formatBalance(account.balance, account.currency);
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px]">
+      <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle>Account Details</SheetTitle>
         </SheetHeader>
@@ -215,8 +304,20 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
               </div>
             </div>
 
+            {/* Mortgage attributes form */}
+            {type === 'mortgage' && (
+              <>
+                {renderLinkedPropertyField()}
+                <MortgageAttributesForm
+                  meta={mortgageMeta}
+                  onChange={setMortgageMeta}
+                  allMortgages={allAccounts.filter((a) => a.type === 'mortgage' && a.id !== account.id)}
+                />
+              </>
+            )}
+
             {/* Metadata display for manual accounts */}
-            {account.metadata && Object.keys(account.metadata).length > 0 && (
+            {type !== 'mortgage' && account.metadata && Object.keys(account.metadata).length > 0 && (
               <div className="p-3 bg-muted/30 border border-border rounded-lg">
                 <div className="text-xs text-muted-foreground mb-1">Asset Details</div>
                 {Object.entries(account.metadata).map(([key, value]) => (

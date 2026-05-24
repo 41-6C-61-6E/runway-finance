@@ -1092,6 +1092,7 @@ function SettingsPageBody() {
                                   account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
                                   isInvestmentAccount(account.type) ? 'bg-chart-3/20 text-chart-3' :
                                   account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
+                                  account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
                                   'bg-muted text-muted-foreground'
                                 }`}>
                                   {account.type}
@@ -1115,41 +1116,52 @@ function SettingsPageBody() {
                                 </div>
                                 <div className="text-xs text-muted-foreground/60">{account.currency}</div>
                               </div>
-                              <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleToggleAccount(account.id, 'isHidden')}
-                                    disabled={togglingAccount === account.id}
-                                    className={`relative w-10 h-5 rounded-full transition-colors ${
-                                      account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    } disabled:opacity-50`}
-                                    title={account.isHidden ? 'Show account' : 'Hide account'}
-                                  >
-                                    <span
-                                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                        account.isHidden ? 'translate-x-5' : 'translate-x-0'
-                                      }`}
-                                    />
-                                  </button>
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-1.5 font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={handleToggleAccount(account.id, 'isHidden')}
+                                      disabled={togglingAccount === account.id}
+                                      className={`relative w-10 h-5 rounded-full transition-colors ${
+                                        account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                                      } disabled:opacity-50`}
+                                      title={account.isHidden ? 'Show account' : 'Hide account'}
+                                    >
+                                      <span
+                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                          account.isHidden ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                      disabled={togglingAccount === account.id}
+                                      className={`relative w-10 h-5 rounded-full transition-colors ${
+                                        account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
+                                      } disabled:opacity-50`}
+                                      title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                                    >
+                                      <span
+                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
+                                          account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                    disabled={togglingAccount === account.id}
-                                    className={`relative w-10 h-5 rounded-full transition-colors ${
-                                      account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    } disabled:opacity-50`}
-                                    title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                                  >
-                                    <span
-                                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                        account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
-                                      }`}
-                                    />
-                                  </button>
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
-                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAccountDrawer(account);
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                                >
+                                  Edit
+                                </button>
                               </div>
                             </div>
                           </div>

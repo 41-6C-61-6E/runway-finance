@@ -32,7 +32,16 @@ interface PropertyData {
   value: number;
   snapshots: PropertySnapshot[];
   mortgageSnapshots: (PropertySnapshot & { accountId?: string })[];
-  linkedMortgages: { id: string; name: string; balance: number }[];
+  linkedMortgages: {
+    id: string;
+    name: string;
+    balance: number;
+    originalLoanAmount?: number;
+    interestRate?: number;
+    monthlyPayment?: number;
+    termMonths?: number;
+    metadata?: Record<string, any>;
+  }[];
   metadata?: {
     purchaseDate?: string;
     [key: string]: any;
@@ -110,10 +119,15 @@ export function EquityOverTimeChart() {
         lastPropValue = sortedPropSnaps[0].value;
       }
 
-      // Map from mortgage account ID to its last known balance
+      // Map from mortgage account ID to its last known balance, starting with the earliest snapshot or original loan amount
       const lastMortgageBalances: Record<string, number> = {};
       for (const m of prop.linkedMortgages) {
-        lastMortgageBalances[m.id] = Math.abs(m.balance);
+        const snaps = sortedMortSnaps.filter((s) => s.accountId === m.id);
+        if (snaps.length > 0) {
+          lastMortgageBalances[m.id] = Math.abs(snaps[0].value);
+        } else {
+          lastMortgageBalances[m.id] = (m.originalLoanAmount ?? 0) > 0 ? (m.originalLoanAmount ?? 0) : Math.abs(m.balance);
+        }
       }
 
       const timeline = allDates.map((date) => {
@@ -129,8 +143,20 @@ export function EquityOverTimeChart() {
           }
         }
 
-        // Sum current mortgage balances
-        const totalMortgageBalance = Object.values(lastMortgageBalances).reduce((s, b) => s + b, 0);
+        // Deconstruct individual mortgage balances by key (zero-out prior to loan origination)
+        const mortgageBalances: Record<string, number> = {};
+        let totalMortgageBalance = 0;
+        for (const m of prop.linkedMortgages) {
+          const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
+          if (date < origDate) {
+            mortgageBalances[`mortgage_${m.id}`] = 0;
+          } else {
+            const bal = lastMortgageBalances[m.id] ?? 0;
+            mortgageBalances[`mortgage_${m.id}`] = Math.round(bal * 100) / 100;
+            totalMortgageBalance += bal;
+          }
+        }
+
         const equity = lastPropValue - totalMortgageBalance;
 
         // Is synthetic if property snapshot or any current mortgage snapshot on this date is synthetic
@@ -145,6 +171,7 @@ export function EquityOverTimeChart() {
           homeValue: Math.round(lastPropValue * 100) / 100,
           equity: Math.round(equity * 100) / 100,
           mortgage: Math.round(totalMortgageBalance * 100) / 100,
+          ...mortgageBalances,
           isSynthetic,
         };
       });
@@ -156,12 +183,21 @@ export function EquityOverTimeChart() {
       // Ensure at least one data point
       if (filteredTimeline.length === 0) {
         const date = purchaseDate || new Date().toISOString().split('T')[0];
-        const totalMort = prop.linkedMortgages.reduce((sum, m) => sum + Math.abs(m.balance), 0);
+        const totalMort = prop.linkedMortgages.reduce((sum, m) => {
+          const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
+          return sum + (date >= origDate ? Math.abs(m.balance) : 0);
+        }, 0);
+        const mortgageBalances: Record<string, number> = {};
+        for (const m of prop.linkedMortgages) {
+          const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
+          mortgageBalances[`mortgage_${m.id}`] = date >= origDate ? Math.abs(m.balance) : 0;
+        }
         filteredTimeline.push({
           date,
           homeValue: prop.value,
           equity: prop.value - totalMort,
           mortgage: totalMort,
+          ...mortgageBalances,
           isSynthetic: false,
         });
       }
@@ -188,6 +224,7 @@ export function EquityOverTimeChart() {
       let totalEquity = 0;
       let totalMortgage = 0;
       let isSynthetic = false;
+      const combinedMortgageBalances: Record<string, number> = {};
 
       for (const pt of parsedTimelines) {
         // Find latest point <= date
@@ -200,6 +237,12 @@ export function EquityOverTimeChart() {
           if (latestPoint.isSynthetic) {
             isSynthetic = true;
           }
+          // Sum up individual mortgages by key
+          for (const key of Object.keys(latestPoint)) {
+            if (key.startsWith('mortgage_')) {
+              combinedMortgageBalances[key] = (combinedMortgageBalances[key] || 0) + (latestPoint[key] as number);
+            }
+          }
         }
       }
 
@@ -208,6 +251,7 @@ export function EquityOverTimeChart() {
         homeValue: Math.round(totalHomeValue * 100) / 100,
         equity: Math.round(totalEquity * 100) / 100,
         mortgage: Math.round(totalMortgage * 100) / 100,
+        ...combinedMortgageBalances,
         isSynthetic,
       };
     });
@@ -225,21 +269,21 @@ export function EquityOverTimeChart() {
     // Filter synthetic data if showSynth is false
     const synthFiltered = rawTimeline.filter((pt) => showSynth || !pt.isSynthetic);
 
-    // Calculate cutoff date string
+    // Calculate cutoff date string in UTC to match database date format (YYYY-MM-DD)
     let cutoffStr = '1970-01-01';
     if (timeRange !== 'all') {
       const cutoffDate = new Date();
-      if (timeRange === '1m') cutoffDate.setMonth(cutoffDate.getMonth() - 1);
-      else if (timeRange === '3m') cutoffDate.setMonth(cutoffDate.getMonth() - 3);
-      else if (timeRange === '6m') cutoffDate.setMonth(cutoffDate.getMonth() - 6);
-      else if (timeRange === '1y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-      else if (timeRange === '5y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
+      if (timeRange === '1m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 1);
+      else if (timeRange === '3m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 3);
+      else if (timeRange === '6m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 6);
+      else if (timeRange === '1y') cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 1);
+      else if (timeRange === '5y') cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 5);
       else if (timeRange === 'ytd') {
-        cutoffDate.setMonth(0, 1);
+        cutoffDate.setUTCMonth(0, 1);
       }
-      const y = cutoffDate.getFullYear();
-      const m = String(cutoffDate.getMonth() + 1).padStart(2, '0');
-      const d = String(cutoffDate.getDate()).padStart(2, '0');
+      const y = cutoffDate.getUTCFullYear();
+      const m = String(cutoffDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(cutoffDate.getUTCDate()).padStart(2, '0');
       cutoffStr = `${y}-${m}-${d}`;
     }
 
@@ -249,6 +293,37 @@ export function EquityOverTimeChart() {
   const xAxisTicks = useMemo(() => {
     return getChartXTicks(activeTimeline, timeRange, 'date');
   }, [activeTimeline, timeRange]);
+
+  // Map mortgage account IDs to their readable names
+  const mortgageNamesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    properties.forEach((prop) => {
+      prop.linkedMortgages.forEach((m) => {
+        map.set(`mortgage_${m.id}`, m.name);
+      });
+    });
+    return map;
+  }, [properties]);
+
+  // Gather all unique mortgage keys present in the filtered timeline
+  const activeMortgageKeys = useMemo(() => {
+    const keysSet = new Set<string>();
+    for (const point of activeTimeline) {
+      for (const key of Object.keys(point)) {
+        if (key.startsWith('mortgage_') && (point[key] as number) > 0) {
+          keysSet.add(key);
+        }
+      }
+    }
+    return Array.from(keysSet).sort();
+  }, [activeTimeline]);
+
+  // Color palette for individual mortgages
+  const mortgageColors = useMemo(() => [
+    'var(--color-chart-3)',
+    'var(--color-chart-4)',
+    'var(--color-chart-5)',
+  ], []);
 
   if (loading) {
     return (
@@ -294,8 +369,6 @@ export function EquityOverTimeChart() {
       year: '2-digit',
     });
 
-    const mortgage = point.homeValue - point.equity;
-
     return (
       <ChartTooltip>
         <TooltipHeader>{formatPointDate(String(dateStr))}</TooltipHeader>
@@ -309,21 +382,31 @@ export function EquityOverTimeChart() {
           value={formatCurrency(point.equity)}
           color="var(--color-chart-1)"
         />
-        {mortgage > 0 && (
-          <TooltipRow
-            label="Mortgage Balance"
-            value={formatCurrency(mortgage)}
-            color="var(--color-muted-foreground)"
-          />
-        )}
+        {activeMortgageKeys.map((key, index) => {
+          const val = point[key];
+          if (val === undefined || val <= 0) return null;
+          const color = mortgageColors[index % mortgageColors.length];
+          const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
+          return (
+            <TooltipRow
+              key={key}
+              label={name}
+              value={formatCurrency(val)}
+              color={color}
+            />
+          );
+        })}
       </ChartTooltip>
     );
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm relative">
+    <div className="bg-card border border-border rounded-xl shadow-sm">
       <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
+          {hasEstimated && <EstimatePill />}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {properties.length > 1 && (
             <select
@@ -343,11 +426,6 @@ export function EquityOverTimeChart() {
         </div>
       </div>
       <div className="h-[300px] px-2 pb-2">
-        {hasEstimated && (
-          <div className="absolute top-2 right-2 z-10">
-            <EstimatePill />
-          </div>
-        )}
         <div className="financial-chart h-full">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <ComposedChart
@@ -363,10 +441,15 @@ export function EquityOverTimeChart() {
                   <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
                   <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
                 </linearGradient>
-                <linearGradient id="colorMortgage" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-chart-3)" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="var(--color-chart-3)" stopOpacity={0.02}/>
-                </linearGradient>
+                {activeMortgageKeys.map((key, index) => {
+                  const color = mortgageColors[index % mortgageColors.length];
+                  return (
+                    <linearGradient key={key} id={`color_${key}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={color} stopOpacity={0.12}/>
+                      <stop offset="95%" stopColor={color} stopOpacity={0.01}/>
+                    </linearGradient>
+                  );
+                })}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
@@ -425,22 +508,29 @@ export function EquityOverTimeChart() {
                 dot={false}
               />
               
-              {/* Mortgage Balance Area */}
-              <Area
-                type="monotone"
-                dataKey="mortgage"
-                name="Mortgage Balance"
-                stroke="var(--color-chart-3)"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                fill="url(#colorMortgage)"
-                dot={false}
-              />
+              {/* Mortgage Balance Areas */}
+              {activeMortgageKeys.map((key, index) => {
+                const color = mortgageColors[index % mortgageColors.length];
+                const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
+                return (
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    name={name}
+                    stroke={color}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    fill={`url(#color_${key})`}
+                    dot={false}
+                  />
+                );
+              })}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
-      <div className="px-5 pb-4 flex items-center justify-center gap-6 text-xs">
+      <div className="px-5 pb-4 flex items-center justify-center gap-6 flex-wrap text-xs">
         <div className="flex items-center gap-2">
           <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-2)' }} />
           <span className="text-muted-foreground">Home Value</span>
@@ -449,13 +539,19 @@ export function EquityOverTimeChart() {
           <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-1)' }} />
           <span className="text-muted-foreground">Equity</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 rounded" style={{
-            background: 'var(--color-chart-3)',
-            backgroundImage: 'repeating-linear-gradient(90deg, var(--color-chart-3) 0, var(--color-chart-3) 4px, transparent 4px, transparent 6px)'
-          }} />
-          <span className="text-muted-foreground">Mortgage Balance</span>
-        </div>
+        {activeMortgageKeys.map((key, index) => {
+          const color = mortgageColors[index % mortgageColors.length];
+          const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
+          return (
+            <div key={key} className="flex items-center gap-2">
+              <div className="w-3 h-0.5 rounded" style={{
+                background: color,
+                backgroundImage: `repeating-linear-gradient(90deg, ${color} 0, ${color} 4px, transparent 4px, transparent 6px)`
+              }} />
+              <span className="text-muted-foreground">{name}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
