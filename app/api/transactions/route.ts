@@ -7,6 +7,7 @@ import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/valid
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, decryptRows } from '@/lib/crypto';
+import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -119,7 +120,7 @@ export async function GET(request: Request) {
   if (filters.categoryIds) {
     const ids = filters.categoryIds.split(',').map(id => id.trim()).filter(Boolean);
     if (ids.length > 0) {
-      const uncategorizedIdx = ids.indexOf('uncategorized');
+      const uncategorizedIdx = ids.findIndex(id => id === 'uncategorized' || id === 'uncategorized_income');
         if (uncategorizedIdx !== -1) {
         const otherIds = ids.filter((_, i) => i !== uncategorizedIdx);
         if (otherIds.length > 0) {
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
       }
     }
   } else if (filters.categoryId) {
-    if (filters.categoryId === 'uncategorized') {
+    if (filters.categoryId === 'uncategorized' || filters.categoryId === 'uncategorized_income') {
       whereConditions.push(isNull(transactions.categoryId));
     } else {
       whereConditions.push(eq(transactions.categoryId, filters.categoryId));
@@ -331,6 +332,7 @@ export async function PATCH(request: Request) {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   let body: unknown;
   try {
@@ -372,6 +374,15 @@ export async function PATCH(request: Request) {
     .set(updateData)
     .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)))
     .returning();
+
+  // Rebuild summaries since categories/transactions changed (non-blocking background task)
+  Promise.all([
+    updateCategorySpendingSummaries(userId, dek),
+    updateCategoryIncomeSummaries(userId, dek),
+    updateMonthlyCashFlowSummaries(userId, dek),
+  ]).catch((err) => {
+    logger.error('Background summaries rebuild failed', { userId, error: err });
+  });
 
   logger.info('Transactions patched', { updatedCount: updated.length });
   return NextResponse.json({ updated: updated.length });

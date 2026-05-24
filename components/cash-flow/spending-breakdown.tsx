@@ -136,6 +136,20 @@ function getMonthRange(timeframe: TimeRange): { start: string; end: string } {
   };
 }
 
+function formatMonth(ym: string): string {
+  const [year, month] = ym.split('-').map(Number);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function formatRange(timeframe: TimeRange): string {
+  const { start, end } = getMonthRange(timeframe);
+  if (start === end) {
+    return formatMonth(start);
+  }
+  return `${formatMonth(start)} - ${formatMonth(end)}`;
+}
+
 const typeOptions = [
   { value: 'pie' as ChartType, label: 'Pie' },
   { value: 'bar' as ChartType, label: 'Bar' },
@@ -300,7 +314,9 @@ export function SpendingBreakdown() {
       <div className="p-5 border-b border-border flex items-center justify-between flex-wrap gap-4">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Spending Breakdown</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Analyze your expenses by category</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Analyze your expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <TimeRangeFilter value={timeframe} onChange={setTimeframe} />

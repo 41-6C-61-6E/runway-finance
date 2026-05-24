@@ -4,7 +4,7 @@ import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { userSettings } from '@/lib/db/schema';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
@@ -202,26 +202,30 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
 
   await getDb().delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
 
+  const insertValues = [];
   for (const [yearMonth, data] of Object.entries(monthlyData)) {
     const netCashFlow = data.income - data.expenses;
+    insertValues.push({
+      userId,
+      yearMonth,
+      totalIncome: String(data.income),
+      totalExpenses: String(data.expenses),
+      netCashFlow: String(netCashFlow),
+      transactionCount: String(data.count),
+    });
+  }
 
+  if (insertValues.length > 0) {
     await getDb()
       .insert(monthlyCashFlow)
-      .values({
-        userId,
-        yearMonth,
-        totalIncome: String(data.income),
-        totalExpenses: String(data.expenses),
-        netCashFlow: String(netCashFlow),
-        transactionCount: String(data.count),
-      })
+      .values(insertValues)
       .onConflictDoUpdate({
         target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
         set: {
-          totalIncome: String(data.income),
-          totalExpenses: String(data.expenses),
-          netCashFlow: String(netCashFlow),
-          transactionCount: String(data.count),
+          totalIncome: sql`excluded.total_income`,
+          totalExpenses: sql`excluded.total_expenses`,
+          netCashFlow: sql`excluded.net_cash_flow`,
+          transactionCount: sql`excluded.transaction_count`,
           updatedAt: new Date(),
         },
       });
@@ -313,29 +317,34 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
 
   await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
 
+  const insertValues = [];
   for (const catMap of Object.values(categoryByMonthAndAccount)) {
     for (const accountMap of Object.values(catMap)) {
       for (const catData of Object.values(accountMap)) {
-        await getDb()
-          .insert(categorySpendingSummary)
-          .values({
-            userId,
-            categoryId: catData.categoryId as any,
-            accountId: catData.accountId as any,
-            yearMonth: catData.yearMonth,
-            amount: String(catData.amount),
-            transactionCount: String(catData.count),
-          })
-          .onConflictDoUpdate({
-            target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
-            set: {
-              amount: String(catData.amount),
-              transactionCount: String(catData.count),
-              updatedAt: new Date(),
-            },
-          });
+        insertValues.push({
+          userId,
+          categoryId: catData.categoryId as any,
+          accountId: catData.accountId as any,
+          yearMonth: catData.yearMonth,
+          amount: String(catData.amount),
+          transactionCount: String(catData.count),
+        });
       }
     }
+  }
+
+  if (insertValues.length > 0) {
+    await getDb()
+      .insert(categorySpendingSummary)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
+        set: {
+          amount: sql`excluded.amount`,
+          transactionCount: sql`excluded.transaction_count`,
+          updatedAt: new Date(),
+        },
+      });
   }
 }
 
@@ -424,29 +433,34 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
   await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
 
+  const insertValues = [];
   for (const catMap of Object.values(categoryByMonthAndAccount)) {
     for (const accountMap of Object.values(catMap)) {
       for (const catData of Object.values(accountMap)) {
-        await getDb()
-          .insert(categoryIncomeSummary)
-          .values({
-            userId,
-            categoryId: catData.categoryId as any,
-            accountId: catData.accountId as any,
-            yearMonth: catData.yearMonth,
-            amount: String(catData.amount),
-            transactionCount: String(catData.count),
-          })
-          .onConflictDoUpdate({
-            target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
-            set: {
-              amount: String(catData.amount),
-              transactionCount: String(catData.count),
-              updatedAt: new Date(),
-            },
-          });
+        insertValues.push({
+          userId,
+          categoryId: catData.categoryId as any,
+          accountId: catData.accountId as any,
+          yearMonth: catData.yearMonth,
+          amount: String(catData.amount),
+          transactionCount: String(catData.count),
+        });
       }
     }
+  }
+
+  if (insertValues.length > 0) {
+    await getDb()
+      .insert(categoryIncomeSummary)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
+        set: {
+          amount: sql`excluded.amount`,
+          transactionCount: sql`excluded.transaction_count`,
+          updatedAt: new Date(),
+        },
+      });
   }
 }
 
