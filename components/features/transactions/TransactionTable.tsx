@@ -131,8 +131,9 @@ function SortableHeader({
 export default function TransactionTable({ filters, onSelectAll, onTransactionClick }: TransactionTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastTotalParamsRef = useRef<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -275,8 +276,12 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         params.set('sort', sort.id);
         params.set('order', sort.desc ? 'desc' : 'asc');
       }
+      const totalParams = new URLSearchParams();
       for (const [key, value] of Object.entries(filters)) {
-        if (value) params.set(key, value);
+        if (value) {
+          params.set(key, value);
+          totalParams.set(key, value);
+        }
       }
       const res = await fetch(`/api/transactions?${params.toString()}`, { credentials: 'include' });
       const data = await res.json();
@@ -286,7 +291,25 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         categoryColor: tx.category?.color ?? null,
       })));
       setTotal(data.total ?? 0);
-      setTotalAmount(data.totalAmount ?? 0);
+
+      // Lazy load total amount
+      if (data.totalAmount !== null && data.totalAmount !== undefined) {
+        setTotalAmount(data.totalAmount);
+      } else {
+        const totalParamsStr = totalParams.toString();
+        const filtersChanged = totalParamsStr !== lastTotalParamsRef.current;
+        if (filtersChanged || totalAmount === null) {
+          lastTotalParamsRef.current = totalParamsStr;
+          setTotalAmount(null); // Show "Calculating..."
+          totalParams.set('totalAmountOnly', 'true');
+          fetch(`/api/transactions?${totalParams.toString()}`, { credentials: 'include' })
+            .then((res) => res.json())
+            .then((totalData) => {
+              setTotalAmount(totalData.totalAmount ?? 0);
+            })
+            .catch(() => setTotalAmount(0));
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -800,11 +823,15 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
               <span className="text-xs text-muted-foreground">
                 {total > 0 ? `${page * limit + 1}–${Math.min((page + 1) * limit, total)} of ${total}` : '0 transactions'}
-                {totalAmount > 0 && (
+                {totalAmount === null ? (
+                  <span className="ml-3 pl-3 border-l border-border text-muted-foreground animate-pulse">
+                    Total: Calculating...
+                  </span>
+                ) : totalAmount > 0 ? (
                   <span className="ml-3 pl-3 border-l border-border font-medium text-foreground">
                     Total: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(totalAmount)}
                   </span>
-                )}
+                ) : null}
               </span>
               {totalPages > 1 && (
                 <div className="flex gap-1.5">

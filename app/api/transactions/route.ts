@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories, userSettings } from '@/lib/db/schema';
-import { eq, and, or, sql, gte, lte, desc, inArray, isNull } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, asc, inArray, isNull } from 'drizzle-orm';
 import { TransactionFilterSchema, BulkPatchTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -39,6 +39,7 @@ export async function GET(request: Request) {
     offset: parseInt(searchParams.get('offset') ?? '0', 10),
     sort: searchParams.get('sort') ?? 'date',
     order: searchParams.get('order') ?? 'desc',
+    totalAmountOnly: searchParams.get('totalAmountOnly') === 'true' ? true : undefined,
   });
 
   if (!parsed.success) {
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
 
   const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
-  logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset });
+  logger.info('Fetching transactions', { accountId: filters.accountId, categoryId: filters.categoryId, search: filters.search, startDate: filters.startDate, endDate: filters.endDate, limit: filters.limit, offset: filters.offset, totalAmountOnly: filters.totalAmountOnly });
 
   // Build where clause (excluding encrypted field filters — applied in memory).
   // Hidden and excluded accounts are global exclusions for user-facing data.
@@ -140,8 +141,47 @@ export async function GET(request: Request) {
     }
   }
 
-  // Note: search (FTS), minAmount, maxAmount filters are applied in memory after decryption
-  // Note: sort by amount or description is also done in memory
+  // Optimized path for calculating total amount of matching transactions (Option A)
+  if (filters.totalAmountOnly) {
+    const selectFields: any = { amount: transactions.amount };
+    if (filters.search) {
+      selectFields.description = transactions.description;
+      selectFields.payee = transactions.payee;
+      selectFields.notes = transactions.notes;
+    }
+
+    const result = await getDb()
+      .select(selectFields)
+      .from(transactions)
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .where(and(...whereConditions));
+
+    let filtered = await Promise.all(result.map(async (row: any) => {
+      const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+      let matchesSearch = true;
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const descDec = (await decryptField(row.description, dek)).toLowerCase();
+        const payeeDec = row.payee ? (await decryptField(row.payee, dek)).toLowerCase() : '';
+        const notesDec = row.notes ? (await decryptField(row.notes, dek)).toLowerCase() : '';
+        matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q);
+      }
+      return { amount, matchesSearch };
+    }));
+
+    if (filters.search) {
+      filtered = filtered.filter((f) => f.matchesSearch);
+    }
+    if (filters.minAmount !== undefined) {
+      filtered = filtered.filter((f) => f.amount > filters.minAmount!);
+    }
+    if (filters.maxAmount !== undefined) {
+      filtered = filtered.filter((f) => f.amount <= filters.maxAmount!);
+    }
+
+    const totalAmount = filtered.reduce((sum, f) => sum + f.amount, 0);
+    return NextResponse.json({ totalAmount });
+  }
 
   // Get total count (before in-memory filters)
   const [totalRow] = await getDb()
@@ -153,7 +193,60 @@ export async function GET(request: Request) {
 
   const totalBeforeFilters = totalRow?.count ?? 0;
 
-  // Fetch all matching rows (we need to decrypt before filtering/sorting by encrypted fields)
+  const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined);
+  const isEncryptedSort = filters.sort === 'amount' || filters.sort === 'description';
+
+  // If we can paginate in the database, do so! (Massive speedup for page loads/nav)
+  if (!hasEncryptedFilters && !isEncryptedSort) {
+    const orderByClause = filters.sort === 'date'
+      ? (filters.order === 'asc' ? asc(transactions.date) : desc(transactions.date))
+      : desc(transactions.date);
+
+    const result = await getDb()
+      .select({
+        transaction: transactions,
+        account: {
+          name: accounts.name,
+        },
+        category: {
+          id: categories.id,
+          name: categories.name,
+          color: categories.color,
+        },
+      })
+      .from(transactions)
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(...whereConditions))
+      .orderBy(orderByClause)
+      .limit(filters.limit)
+      .offset(filters.offset);
+
+    // Decrypt only the sliced paginated records (exactly 50 items)
+    const decryptedTxns = await Promise.all(result.map(async (row) => {
+      const tx = await decryptRow('transactions', row.transaction, dek);
+      let accountName: string | null = null;
+      if (row.account?.name) {
+        accountName = await decryptField(row.account.name, dek);
+      }
+      let category = row.category;
+      if (category?.name) {
+        category = { ...category, name: await decryptField(category.name, dek) };
+      }
+      return { ...tx, accountName, category };
+    }));
+
+    logger.info('Transactions fetched (SQL Paginated)', { total: totalBeforeFilters, returned: decryptedTxns.length });
+    return NextResponse.json({
+      data: decryptedTxns,
+      total: totalBeforeFilters,
+      totalAmount: null, // calculated lazily by client
+      limit: filters.limit,
+      offset: filters.offset,
+    });
+  }
+
+  // Fallback path: fetch all matching rows (we need to decrypt before filtering/sorting by encrypted fields)
   const result = await getDb()
     .select({
       transaction: transactions,
@@ -206,7 +299,6 @@ export async function GET(request: Request) {
   }
 
   // Sort in memory
-  const isEncryptedSort = filters.sort === 'amount' || filters.sort === 'description';
   if (isEncryptedSort) {
     filtered.sort((a: any, b: any) => {
       const aVal = filters.sort === 'amount' ? Math.abs(parseFloat(a.amount) || 0) : (a.description ?? '');
@@ -225,7 +317,7 @@ export async function GET(request: Request) {
   // Paginate
   const sliced = filtered.slice(filters.offset, filters.offset + filters.limit);
 
-  logger.info('Transactions fetched', { total, returned: sliced.length });
+  logger.info('Transactions fetched (In-Memory Fallback)', { total, returned: sliced.length });
   return NextResponse.json({ data: sliced, total, totalAmount, limit: filters.limit, offset: filters.offset });
 }
 

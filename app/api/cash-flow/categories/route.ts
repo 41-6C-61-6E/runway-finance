@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       let rows: any[];
       let incomeRows: any[];
 
-      if (accountIdList.length > 0 || !isImportTransactionsEnabled) {
+      if (!isImportTransactionsEnabled) {
         const [spending, income] = await Promise.all([
           fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, false),
           fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, true),
@@ -159,6 +159,25 @@ export async function GET(request: Request) {
         incomeRows = income;
       } else {
         // Use summary tables (pre-computed, but encrypted)
+        const spendingConditions = [
+          eq(categorySpendingSummary.userId, session.user.id),
+          gte(categorySpendingSummary.yearMonth, startMonth!),
+          lte(categorySpendingSummary.yearMonth, endMonth!),
+          eq(categories.excludeFromReports, false),
+        ];
+
+        const incomeConditions = [
+          eq(categoryIncomeSummary.userId, session.user.id),
+          gte(categoryIncomeSummary.yearMonth, startMonth!),
+          lte(categoryIncomeSummary.yearMonth, endMonth!),
+          eq(categories.excludeFromReports, false),
+        ];
+
+        if (accountIdList.length > 0) {
+          spendingConditions.push(inArray(categorySpendingSummary.accountId, accountIdList));
+          incomeConditions.push(inArray(categoryIncomeSummary.accountId, accountIdList));
+        }
+
         rows = await db
           .select({
             categoryId: categorySpendingSummary.categoryId,
@@ -170,14 +189,7 @@ export async function GET(request: Request) {
           })
           .from(categorySpendingSummary)
           .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
-          .where(
-            and(
-              eq(categorySpendingSummary.userId, session.user.id),
-              gte(categorySpendingSummary.yearMonth, startMonth!),
-              lte(categorySpendingSummary.yearMonth, endMonth!),
-              eq(categories.excludeFromReports, false),
-            )
-          );
+          .where(and(...spendingConditions));
 
         incomeRows = await db
           .select({
@@ -190,21 +202,14 @@ export async function GET(request: Request) {
           })
           .from(categoryIncomeSummary)
           .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
-          .where(
-            and(
-              eq(categoryIncomeSummary.userId, session.user.id),
-              gte(categoryIncomeSummary.yearMonth, startMonth!),
-              lte(categoryIncomeSummary.yearMonth, endMonth!),
-              eq(categories.excludeFromReports, false),
-            )
-          );
+          .where(and(...incomeConditions));
       }
 
       const { total: uncategorizedTotal } = await fetchUncategorizedTotal(startMonth!, endMonth!, accountIdList);
 
       // Decrypt and aggregate by categoryId
       const categoryMap = new Map<string, any>();
-      if (accountIdList.length === 0 && isImportTransactionsEnabled) {
+      if (isImportTransactionsEnabled) {
         for (const r of [...rows, ...incomeRows]) {
           const decryptedAmt = await decryptField(r.amount, dek);
           const catId = r.categoryId ?? '';
@@ -258,7 +263,7 @@ export async function GET(request: Request) {
     let currentRows: any[];
     let currentIncomeRows: any[];
 
-    if (accountIdList.length > 0 || !isImportTransactionsEnabled) {
+    if (!isImportTransactionsEnabled) {
       const [spending, income] = await Promise.all([
         fetchTransactionsAggregated(resolvedMonth, resolvedMonth, accountIdList, false),
         fetchTransactionsAggregated(resolvedMonth, resolvedMonth, accountIdList, true),
@@ -266,6 +271,22 @@ export async function GET(request: Request) {
       currentRows = spending;
       currentIncomeRows = income;
     } else {
+      const spendingConditions = [
+        eq(categorySpendingSummary.userId, session.user.id),
+        eq(categorySpendingSummary.yearMonth, resolvedMonth),
+        eq(categories.excludeFromReports, false)
+      ];
+      const incomeConditions = [
+        eq(categoryIncomeSummary.userId, session.user.id),
+        eq(categoryIncomeSummary.yearMonth, resolvedMonth),
+        eq(categories.excludeFromReports, false)
+      ];
+
+      if (accountIdList.length > 0) {
+        spendingConditions.push(inArray(categorySpendingSummary.accountId, accountIdList));
+        incomeConditions.push(inArray(categoryIncomeSummary.accountId, accountIdList));
+      }
+
       currentRows = await db
         .select({
           categoryId: categorySpendingSummary.categoryId,
@@ -277,13 +298,7 @@ export async function GET(request: Request) {
         })
         .from(categorySpendingSummary)
         .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
-        .where(
-          and(
-            eq(categorySpendingSummary.userId, session.user.id),
-            eq(categorySpendingSummary.yearMonth, resolvedMonth),
-            eq(categories.excludeFromReports, false)
-          )
-        );
+        .where(and(...spendingConditions));
 
       currentIncomeRows = await db
         .select({
@@ -296,13 +311,7 @@ export async function GET(request: Request) {
         })
         .from(categoryIncomeSummary)
         .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
-        .where(
-          and(
-            eq(categoryIncomeSummary.userId, session.user.id),
-            eq(categoryIncomeSummary.yearMonth, resolvedMonth),
-            eq(categories.excludeFromReports, false)
-          )
-        );
+        .where(and(...incomeConditions));
     }
 
     const { total: uncategorizedAmountStr, count: uncategorizedCount, isIncome: uncategorizedIsIncome } = await fetchUncategorizedTotal(resolvedMonth, resolvedMonth, accountIdList);
@@ -358,14 +367,14 @@ export async function GET(request: Request) {
     for (const row of currentRows) {
       const amount = row.categoryId === 'uncategorized'
         ? uncategorizedAmount
-        : (accountIdList.length === 0 && isImportTransactionsEnabled)
+        : isImportTransactionsEnabled
         ? parseFloat(await decryptField(row.amount, dek))
         : row.amount;
       const prevAmount = prevMap.get(row.categoryId) || 0;
       const change = amount - prevAmount;
       const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
-      const categoryName = (accountIdList.length === 0 && isImportTransactionsEnabled)
+      const categoryName = isImportTransactionsEnabled
         ? await decryptField(row.categoryName || 'Uncategorized', dek)
         : (row.categoryName || 'Uncategorized');
       data.push({
@@ -383,14 +392,14 @@ export async function GET(request: Request) {
 
     // Process income rows (only for summary-table mode; in transaction mode income is already included)
     for (const row of currentIncomeRows) {
-      const amount = (accountIdList.length === 0 && isImportTransactionsEnabled)
+      const amount = isImportTransactionsEnabled
         ? parseFloat(await decryptField(row.amount, dek))
         : row.amount;
       const prevAmount = prevMap.get(row.categoryId) || 0;
       const change = amount - prevAmount;
       const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
-      const incomeCategoryName = (accountIdList.length === 0 && isImportTransactionsEnabled)
+      const incomeCategoryName = isImportTransactionsEnabled
         ? await decryptField(row.categoryName || 'Uncategorized', dek)
         : (row.categoryName || 'Uncategorized');
       data.push({

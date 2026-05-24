@@ -358,12 +358,15 @@ export const categorySpendingSummary = pgTable(
     categoryId: uuid('category_id')
       .notNull()
       .references(() => categories.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
     yearMonth: text('year_month').notNull(),
     amount: text('amount').notNull(),
     transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
+  (t) => [unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth)]
 );
 
 // ── Category Income Summary ──────────────────────────────────────────────────
@@ -376,12 +379,15 @@ export const categoryIncomeSummary = pgTable(
     categoryId: uuid('category_id')
       .notNull()
       .references(() => categories.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
     yearMonth: text('year_month').notNull(),
     amount: text('amount').notNull(),
     transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.categoryId, t.yearMonth)]
+  (t) => [unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth)]
 );
 
 // ── Budgets ──────────────────────────────────────────────────────────────────
