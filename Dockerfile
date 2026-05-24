@@ -15,7 +15,7 @@ FROM deps AS builder
 WORKDIR /app
 COPY . .
 
-RUN pnpm build
+RUN DISABLE_WORKER_THREADS=true pnpm build
 
 # Production image, copy all the files and run next
 FROM base AS runner
