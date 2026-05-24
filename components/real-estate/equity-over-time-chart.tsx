@@ -349,7 +349,7 @@ export function EquityOverTimeChart() {
           </div>
         )}
         <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <ComposedChart
               data={activeTimeline}
               margin={{ top: 15, right: 10, left: 10, bottom: 5 }}

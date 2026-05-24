@@ -125,7 +125,7 @@ export function RetirementAccountAllocation() {
         </p>
       </div>
       <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
           <PieChart>
             <Pie
               data={pieData}

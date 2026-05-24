@@ -243,7 +243,7 @@ export function DebtBreakdown() {
       <div className="flex gap-6 items-start">
         <div className="h-[220px] flex-shrink-0 w-[45%]">
           {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               <PieChart>
                 <Pie
                   data={pieData}

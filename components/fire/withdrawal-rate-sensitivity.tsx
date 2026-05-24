@@ -74,7 +74,7 @@ export function WithdrawalRateSensitivity({ scenario }: { scenario: FireScenario
         How different safe withdrawal rates affect your FIRE number and years to FI
       </p>
       <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
           <BarChart
             data={data}
             margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
