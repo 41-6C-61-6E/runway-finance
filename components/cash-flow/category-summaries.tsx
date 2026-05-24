@@ -21,9 +21,10 @@ interface CategoryData {
   percentChange: number;
 }
 
-function MiniSparkline({ value, prev, isIncome }: { value: number; prev: number; isIncome: boolean }) {
+function MiniSparkline({ value, prev: rawPrev, isIncome }: { value: number; prev?: number; isIncome: boolean }) {
   const w = 60;
   const h = 24;
+  const prev = rawPrev === undefined || rawPrev === null || isNaN(rawPrev) ? value : rawPrev;
   const max = Math.max(value, prev, 1);
   const x1 = 0;
   const x2 = w;
@@ -94,6 +95,20 @@ function getMonthRange(timeframe: TimeRange): { start: string; end: string } {
     start: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
     end: currentYm,
   };
+}
+
+function formatMonth(ym: string): string {
+  const [year, month] = ym.split('-').map(Number);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function formatRange(timeframe: TimeRange): string {
+  const { start, end } = getMonthRange(timeframe);
+  if (start === end) {
+    return formatMonth(start);
+  }
+  return `${formatMonth(start)} - ${formatMonth(end)}`;
 }
 
 export function CategorySummaries() {
@@ -274,8 +289,13 @@ export function CategorySummaries() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+      <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
+          </p>
+        </div>
         <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
       </div>
       {income.length > 0 && renderSection(income, true)}
