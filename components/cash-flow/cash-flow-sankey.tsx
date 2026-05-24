@@ -448,11 +448,15 @@ function buildSankeyData(
 // ── Custom node ────────────────────────────────────────────────────────────────
 // showPercentages is passed in so the label updates when the toggle changes.
 // The node data already has `percentage` baked in from buildSankeyData.
-const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, setHoveredNode, showPercentages }: any) => {
+const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, setHoveredNode, showPercentages, isMobile }: any) => {
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
-  const label = payload.label ?? payload.name ?? '';
+  const rawLabel = payload.label ?? payload.name ?? '';
+  const isMobileSize = isMobile || (typeof window !== 'undefined' && window.innerWidth < 768);
+  const maxLabelLen = isMobileSize ? 8 : 22;
+  const label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
+
   const valueLabel = showPercentages && payload.percentage !== undefined
     ? `${payload.percentage.toFixed(1)}%`
     : payload.value !== undefined
@@ -482,7 +486,7 @@ const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, 
         y={y + height / 2 - (valueLabel ? 6 : 0)}
         textAnchor={isRightSide ? 'end' : 'start'}
         dominantBaseline="central"
-        fontSize={10}
+        fontSize={isMobileSize ? 8 : 10}
         fontWeight={600}
         fill="currentColor"
         className="fill-foreground select-none"
@@ -497,7 +501,7 @@ const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, 
           y={y + height / 2 + 7}
           textAnchor={isRightSide ? 'end' : 'start'}
           dominantBaseline="central"
-          fontSize={9}
+          fontSize={isMobileSize ? 7 : 9}
           fill="currentColor"
           className="fill-muted-foreground select-none"
           style={{ opacity: isDimmed ? 0.3 : 0.75 }}
@@ -585,6 +589,16 @@ export function CashFlowSankey() {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
   const accountFilterRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     fetch('/api/accounts')
@@ -768,8 +782,9 @@ export function CashFlowSankey() {
       hoveredNode={hoveredNode}
       setHoveredNode={setHoveredNode}
       showPercentages={showPercentages}
+      isMobile={isMobile}
     />
-  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion]);
+  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile]);
 
   const sankeyLink = useMemo(() => (
     <SankeyCustomLink
@@ -996,9 +1011,9 @@ export function CashFlowSankey() {
                 data={processedData}
                 node={sankeyNode}
                 link={sankeyLink}
-                nodePadding={showParents ? 20 : 28}
-                nodeWidth={showParents ? 20 : 24}
-                margin={{ top: 20, right: 160, bottom: 20, left: 160 }}
+                nodePadding={isMobile ? (showParents ? 12 : 16) : (showParents ? 20 : 28)}
+                nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
+                margin={isMobile ? { top: 15, right: 65, bottom: 15, left: 65 } : { top: 20, right: 160, bottom: 20, left: 160 }}
               >
                 {sankeyTooltip}
               </Sankey>

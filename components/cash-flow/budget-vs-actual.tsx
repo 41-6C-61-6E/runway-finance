@@ -25,6 +25,16 @@ export function BudgetVsActual() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [excludedCategoryIds, setExcludedCategoryIds] = useState<Set<string>>(new Set());
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -131,7 +141,7 @@ export function BudgetVsActual() {
             <BarChart
               layout="vertical"
               data={chartData}
-              margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
+              margin={isMobile ? { top: 10, right: 15, left: 10, bottom: 10 } : { top: 10, right: 60, left: 10, bottom: 10 }}
               onClick={(state: any) => {
                 if (state && state.activePayload && state.activePayload.length > 0) {
                   const clickedData = state.activePayload[0].payload;
@@ -160,7 +170,8 @@ export function BudgetVsActual() {
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                width={90}
+                width={isMobile ? 65 : 90}
+                tickFormatter={(v: string) => isMobile && v.length > 10 ? `${v.slice(0, 10)}...` : v}
               />
               <Tooltip
                 content={({ active, payload }) => {

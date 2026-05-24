@@ -947,8 +947,8 @@ export default function AiSuggestionsPage() {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 rounded-lg bg-muted p-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
             {['all', 'pending', 'approved', 'rejected'].map((s) => (
               <button
                 key={s}
@@ -961,8 +961,8 @@ export default function AiSuggestionsPage() {
               </button>
             ))}
           </div>
-          <div className="w-px h-5 bg-border" />
-          <div className="flex items-center gap-1.5 rounded-lg bg-muted p-1">
+          <div className="hidden sm:block w-px h-5 bg-border" />
+          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
             {[
               { value: 'all', label: 'All Types' },
               { value: 'categorize', label: 'Categorize' },

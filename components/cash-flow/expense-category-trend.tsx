@@ -38,6 +38,16 @@ export function ExpenseCategoryTrend() {
   const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:expense-category-trend:timeframe', '1y');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const numMonths = MONTH_MAP[timeframe] || 12;
   const months = useMemo(() => getMonthsInRange(numMonths), [numMonths]);
@@ -171,8 +181,8 @@ export function ExpenseCategoryTrend() {
     if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
     return `$${v}`;
   };
-  const maxLabelLen = Math.min(22, Math.max(...barData.map((d) => d.id.length)));
-  const leftMargin = Math.min(200, Math.max(90, maxLabelLen * 7 + 12));
+  const maxLabelLen = barData.length > 0 ? Math.min(isMobile ? 10 : 22, Math.max(...barData.map((d) => d.id.length))) : 0;
+  const leftMargin = Math.min(isMobile ? 100 : 200, Math.max(isMobile ? 65 : 90, maxLabelLen * (isMobile ? 6 : 7) + 12));
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -188,7 +198,7 @@ export function ExpenseCategoryTrend() {
             <BarChart
               layout="vertical"
               data={barData}
-              margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+              margin={isMobile ? { top: 10, right: 10, left: 5, bottom: 10 } : { top: 10, right: 20, left: 10, bottom: 10 }}
               onClick={(state: any) => {
                 if (state && state.activePayload && state.activePayload.length > 0) {
                   const clickedData = state.activePayload[0].payload;
@@ -213,7 +223,10 @@ export function ExpenseCategoryTrend() {
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 20) + '\u2026' : v}
+                tickFormatter={(v: string) => {
+                  const maxLen = isMobile ? 10 : 20;
+                  return v.length > maxLen ? v.slice(0, maxLen) + '\u2026' : v;
+                }}
                 width={leftMargin}
               />
               <Tooltip

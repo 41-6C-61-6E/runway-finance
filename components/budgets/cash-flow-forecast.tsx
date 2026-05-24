@@ -322,7 +322,7 @@ export function CashFlowForecast() {
           )}
           {!loading && (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[800px] md:min-w-full">
                 <thead>
                   <tr className="border-t border-border">
                     <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Account</th>

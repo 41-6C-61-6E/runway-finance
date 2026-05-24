@@ -24,7 +24,7 @@ export function RetirementYearlyTable({
 
       {expanded && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs min-w-[800px] md:min-w-full">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-2 pr-3 text-muted-foreground font-medium">Age</th>

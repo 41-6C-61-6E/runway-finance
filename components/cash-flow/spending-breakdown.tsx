@@ -148,6 +148,16 @@ export function SpendingBreakdown() {
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:spending-breakdown:chartType', 'pie');
   const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:spending-breakdown:timeframe', '1m');
@@ -315,16 +325,16 @@ export function SpendingBreakdown() {
             <div className="financial-chart h-full w-full relative">
               {chartType === 'bar' ? (() => {
                 const maxLabelLen = pieData.length > 0
-                  ? Math.max(...pieData.map(d => Math.min(20, d.id.length)))
+                  ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
                   : 0;
-                const dynamicLeft = Math.max(80, maxLabelLen * 7 + 12);
+                const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
                 
                 return (
                   <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                     <BarChart
                       layout="vertical"
                       data={pieData}
-                      margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                      margin={isMobile ? { top: 10, right: 10, left: 5, bottom: 10 } : { top: 10, right: 10, left: 10, bottom: 10 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
                       <XAxis type="number" hide />
@@ -335,7 +345,10 @@ export function SpendingBreakdown() {
                         axisLine={false}
                         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                         width={dynamicLeft}
-                        tickFormatter={(v) => v.length > 20 ? `${v.slice(0, 20)}...` : v}
+                        tickFormatter={(v) => {
+                          const maxLen = isMobile ? 10 : 20;
+                          return v.length > maxLen ? `${v.slice(0, maxLen)}...` : v;
+                        }}
                       />
                       <Bar
                         dataKey="value"

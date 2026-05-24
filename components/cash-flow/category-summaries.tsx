@@ -215,13 +215,13 @@ export function CategorySummaries() {
           <span className="text-sm font-semibold text-foreground financial-value w-24 text-right">
             {formatCurrency(cat.amount)}
           </span>
-          <span className={`text-xs font-medium w-20 text-right financial-value ${changeColor}`}>
+          <span className={`text-xs font-medium w-20 text-right financial-value ${changeColor} hidden sm:inline-block`}>
             {formatCurrency(cat.change)}
           </span>
           <span className={`text-xs font-medium w-14 text-right financial-value ${changeColor}`}>
             {formatPercent(cat.percentChange)}
           </span>
-          <div className="w-[60px]">
+          <div className="w-[60px] hidden sm:block">
             <MiniSparkline value={cat.amount} prev={cat.previousAmount} isIncome={isIncome} />
           </div>
         </div>
@@ -243,9 +243,9 @@ export function CategorySummaries() {
         <span>Category</span>
         <div className="flex items-center gap-4 flex-shrink-0">
           <span className="w-24 text-right">Amount</span>
-          <span className="w-20 text-right">Change</span>
+          <span className="w-20 text-right hidden sm:inline-block">Change</span>
           <span className="w-14 text-right">%</span>
-          <span className="w-[60px] text-right">Trend</span>
+          <span className="w-[60px] text-right hidden sm:inline-block">Trend</span>
         </div>
       </div>
     );
