@@ -18,6 +18,7 @@ export const TransactionFilterSchema = z.object({
   offset: z.coerce.number().min(0).default(0),
   sort: z.enum(['date', 'amount', 'description']).default('date'),
   order: z.enum(['asc', 'desc']).default('desc'),
+  totalAmountOnly: z.coerce.boolean().optional(),
 });
 
 export const PatchTransactionSchema = z.object({

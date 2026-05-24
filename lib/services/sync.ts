@@ -265,9 +265,12 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
 
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
-  const categoryByMonth: Record<
+  const categoryByMonthAndAccount: Record<
     string,
-    Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
+    Record<
+      string,
+      Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>
+    >
   > = {};
 
   for (const tx of decryptedTxns) {
@@ -286,45 +289,52 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
+    const accountId = tx.accountId.toString();
 
-    if (!categoryByMonth[yearMonth]) {
-      categoryByMonth[yearMonth] = {};
+    if (!categoryByMonthAndAccount[yearMonth]) {
+      categoryByMonthAndAccount[yearMonth] = {};
     }
-
-    if (!categoryByMonth[yearMonth][catId]) {
-      categoryByMonth[yearMonth][catId] = {
+    if (!categoryByMonthAndAccount[yearMonth][catId]) {
+      categoryByMonthAndAccount[yearMonth][catId] = {};
+    }
+    if (!categoryByMonthAndAccount[yearMonth][catId][accountId]) {
+      categoryByMonthAndAccount[yearMonth][catId][accountId] = {
         amount: 0,
         count: 0,
         categoryId: catId,
+        accountId,
         yearMonth,
       };
     }
 
-    categoryByMonth[yearMonth][catId].amount += Math.abs(parseFloat(tx.amount));
-    categoryByMonth[yearMonth][catId].count++;
+    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += Math.abs(parseFloat(tx.amount));
+    categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
   await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
 
-  for (const monthData of Object.values(categoryByMonth)) {
-    for (const catData of Object.values(monthData)) {
-      await getDb()
-        .insert(categorySpendingSummary)
-        .values({
-          userId,
-          categoryId: catData.categoryId as any,
-          yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
-          transactionCount: String(catData.count),
-        })
-        .onConflictDoUpdate({
-          target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.yearMonth],
-          set: {
+  for (const catMap of Object.values(categoryByMonthAndAccount)) {
+    for (const accountMap of Object.values(catMap)) {
+      for (const catData of Object.values(accountMap)) {
+        await getDb()
+          .insert(categorySpendingSummary)
+          .values({
+            userId,
+            categoryId: catData.categoryId as any,
+            accountId: catData.accountId as any,
+            yearMonth: catData.yearMonth,
             amount: String(catData.amount),
             transactionCount: String(catData.count),
-            updatedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
+            set: {
+              amount: String(catData.amount),
+              transactionCount: String(catData.count),
+              updatedAt: new Date(),
+            },
+          });
+      }
     }
   }
 }
@@ -366,9 +376,12 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
-  const categoryByMonth: Record<
+  const categoryByMonthAndAccount: Record<
     string,
-    Record<string, { amount: number; count: number; categoryId: string; yearMonth: string }>
+    Record<
+      string,
+      Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>
+    >
   > = {};
 
   for (const tx of decryptedTxns) {
@@ -387,44 +400,52 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
+    const accountId = tx.accountId.toString();
 
-    if (!categoryByMonth[yearMonth]) {
-      categoryByMonth[yearMonth] = {};
+    if (!categoryByMonthAndAccount[yearMonth]) {
+      categoryByMonthAndAccount[yearMonth] = {};
     }
-    if (!categoryByMonth[yearMonth][catId]) {
-      categoryByMonth[yearMonth][catId] = {
+    if (!categoryByMonthAndAccount[yearMonth][catId]) {
+      categoryByMonthAndAccount[yearMonth][catId] = {};
+    }
+    if (!categoryByMonthAndAccount[yearMonth][catId][accountId]) {
+      categoryByMonthAndAccount[yearMonth][catId][accountId] = {
         amount: 0,
         count: 0,
         categoryId: catId,
+        accountId,
         yearMonth,
       };
     }
 
-    categoryByMonth[yearMonth][catId].amount += parseFloat(tx.amount);
-    categoryByMonth[yearMonth][catId].count++;
+    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += parseFloat(tx.amount);
+    categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
   await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
 
-  for (const monthData of Object.values(categoryByMonth)) {
-    for (const catData of Object.values(monthData)) {
-      await getDb()
-        .insert(categoryIncomeSummary)
-        .values({
-          userId,
-          categoryId: catData.categoryId as any,
-          yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
-          transactionCount: String(catData.count),
-        })
-        .onConflictDoUpdate({
-          target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.yearMonth],
-          set: {
+  for (const catMap of Object.values(categoryByMonthAndAccount)) {
+    for (const accountMap of Object.values(catMap)) {
+      for (const catData of Object.values(accountMap)) {
+        await getDb()
+          .insert(categoryIncomeSummary)
+          .values({
+            userId,
+            categoryId: catData.categoryId as any,
+            accountId: catData.accountId as any,
+            yearMonth: catData.yearMonth,
             amount: String(catData.amount),
             transactionCount: String(catData.count),
-            updatedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
+            set: {
+              amount: String(catData.amount),
+              transactionCount: String(catData.count),
+              updatedAt: new Date(),
+            },
+          });
+      }
     }
   }
 }

@@ -41,15 +41,23 @@ export function getServerKey(): Uint8Array {
 
 // ── Low-level encrypt/decrypt with explicit key ─────────────────────────
 
+const encryptKeyCache = new Map<string, CryptoKey>();
+const decryptKeyCache = new Map<string, CryptoKey>();
+
 export async function encrypt(plaintext: string, key: Uint8Array): Promise<EncryptedPayload> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    toBufferSource(key),
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt'],
-  );
+  const keyHex = bytesToHex(key);
+  let cryptoKey = encryptKeyCache.get(keyHex);
+  if (!cryptoKey) {
+    cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      toBufferSource(key),
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt'],
+    );
+    encryptKeyCache.set(keyHex, cryptoKey);
+  }
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     cryptoKey,
@@ -63,13 +71,18 @@ export async function encrypt(plaintext: string, key: Uint8Array): Promise<Encry
 }
 
 export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Array): Promise<string> {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    toBufferSource(key),
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt'],
-  );
+  const keyHex = bytesToHex(key);
+  let cryptoKey = decryptKeyCache.get(keyHex);
+  if (!cryptoKey) {
+    cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      toBufferSource(key),
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    );
+    decryptKeyCache.set(keyHex, cryptoKey);
+  }
   const ivBytes = hexToBytes(iv);
   const ciphertextBytes = bytesFromBase64(ciphertext);
   try {
