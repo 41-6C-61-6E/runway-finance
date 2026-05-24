@@ -8,6 +8,7 @@ import { formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
@@ -91,9 +92,7 @@ export function NetIncomeAnalysis() {
         <div className="p-5 pb-2">
           <h3 className="text-sm font-semibold text-foreground">Net Income Analysis</h3>
         </div>
-        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner category="chart" className="h-[300px]" />
       </div>
     );
   }

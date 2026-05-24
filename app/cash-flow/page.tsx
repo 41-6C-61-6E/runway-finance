@@ -8,6 +8,7 @@ import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { TrendingUp } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import { ChartErrorBoundary } from '@/components/chart-error-boundary';
 
@@ -23,7 +24,7 @@ function CashFlowContent() {
 
           {isVisible('cashFlowSankey') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading sankey...</div>}>
+              <Suspense fallback={<LoadingSpinner category="sankey" />}>
                 <ChartErrorBoundary name="Cash Flow Sankey">
                   <div>
                     <CashFlowSankey />
@@ -36,7 +37,7 @@ function CashFlowContent() {
 
           {isVisible('incomeExpenseChart') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <ChartErrorBoundary name="Income vs Expenses">
                   <div>
                     <IncomeExpenseChart />
@@ -49,7 +50,7 @@ function CashFlowContent() {
 
           {isVisible('cashFlowForecast') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading forecast...</div>}>
+              <Suspense fallback={<LoadingSpinner category="forecast" />}>
                 <ChartErrorBoundary name="Cash Flow Forecast">
                   <div>
                     <CashFlowForecast />
@@ -67,7 +68,7 @@ function CashFlowContent() {
 
 export default function CashFlowPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <CashFlowContent />
     </Suspense>
   );

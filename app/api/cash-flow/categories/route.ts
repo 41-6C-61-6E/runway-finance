@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       eq(transactions.ignored, false),
       eq(accounts.isHidden, false),
       eq(accounts.isExcludedFromNetWorth, false),
-      or(isNull(transactions.categoryId), eq(categories.excludeFromReports, false)),
+      or(isNull(transactions.categoryId), sql`coalesce(${categories.excludeFromReports}, false) = false`),
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
@@ -212,9 +212,10 @@ export async function GET(request: Request) {
           if (existing) {
             existing.amount += parseFloat(decryptedAmt);
           } else {
+            const decryptedName = await decryptField(r.categoryName || 'Uncategorized', dek);
             categoryMap.set(catId, {
               categoryId: catId,
-              categoryName: r.categoryName || 'Uncategorized',
+              categoryName: decryptedName,
               categoryColor: r.categoryColor || '#6366f1',
               isIncome: r.isIncome || r === incomeRows.find((ir) => ir.categoryId === catId) || false,
               amount: parseFloat(decryptedAmt),
@@ -364,9 +365,12 @@ export async function GET(request: Request) {
       const change = amount - prevAmount;
       const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
+      const categoryName = (accountIdList.length === 0 && isImportTransactionsEnabled)
+        ? await decryptField(row.categoryName || 'Uncategorized', dek)
+        : (row.categoryName || 'Uncategorized');
       data.push({
         categoryId: row.categoryId ?? '',
-        categoryName: row.categoryName || 'Uncategorized',
+        categoryName,
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: row.isIncome || false,
         amount,
@@ -386,9 +390,12 @@ export async function GET(request: Request) {
       const change = amount - prevAmount;
       const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
+      const incomeCategoryName = (accountIdList.length === 0 && isImportTransactionsEnabled)
+        ? await decryptField(row.categoryName || 'Uncategorized', dek)
+        : (row.categoryName || 'Uncategorized');
       data.push({
         categoryId: row.categoryId ?? '',
-        categoryName: row.categoryName || 'Uncategorized',
+        categoryName: incomeCategoryName,
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: true,
         amount,

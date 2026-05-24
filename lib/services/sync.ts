@@ -274,9 +274,10 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     if (!tx.categoryId || parseFloat(tx.amount) >= 0 || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
+    if (!category) continue;
 
-    let excluded = category?.excludeFromReports ?? false;
-    if (!excluded && category?.parentId) {
+    let excluded = category.excludeFromReports;
+    if (!excluded && category.parentId) {
       const parent = catById.get(category.parentId.toString());
       if (parent?.excludeFromReports) excluded = true;
     }

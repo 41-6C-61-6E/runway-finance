@@ -6,6 +6,7 @@ import { GoalsList } from '@/components/goals/goals-list';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Target } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 function GoalsContent() {
@@ -19,7 +20,7 @@ function GoalsContent() {
         <div className="mx-auto max-w-[1600px]">
 
           {isVisible('goalsSummary') && (
-            <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
+            <Suspense fallback={<LoadingSpinner category="summary" />}>
               <div>
                 <GoalsSummary />
                 <MathDescription chartId="goalsSummary" />
@@ -29,7 +30,7 @@ function GoalsContent() {
 
           {isVisible('goalsList') && (
             <div className="mt-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading goals...</div>}>
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <div>
                   <GoalsList />
                   <MathDescription chartId="goalsList" />
@@ -45,7 +46,7 @@ function GoalsContent() {
 
 export default function GoalsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <GoalsContent />
     </Suspense>
   );

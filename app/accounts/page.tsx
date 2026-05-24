@@ -17,9 +17,25 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { 
+  ChevronRight, 
+  ChevronDown, 
+  TrendingUp, 
+  TrendingDown, 
+  Activity, 
+  Banknote, 
+  Home, 
+  PiggyBank, 
+  CreditCard, 
+  Landmark, 
+  ArrowRight,
+  Filter,
+  Plus,
+} from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,17 +48,6 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
 import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
-import { 
-  ChevronRight, 
-  ChevronDown, 
-  TrendingUp, 
-  TrendingDown, 
-  Activity, 
-  Landmark, 
-  Loader2, 
-  Plus
-} from 'lucide-react';
-
 // ── Types ───────────────────────────────────────────────────────────────────
 type ChartType = 'line' | 'bar';
 type GroupingMode = 'account' | 'type' | 'group';
@@ -1073,10 +1078,7 @@ export default function AccountsPage() {
                 <div className="h-[380px] w-full relative">
                   {historyLoading ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-card/20 backdrop-blur-[1px]">
-                      <div className="text-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
-                        <p className="text-xs text-muted-foreground">Crunching historical snapshots...</p>
-                      </div>
+                      <LoadingSpinner category="analysis" />
                     </div>
                   ) : reportableAccounts.length === 0 ? (
                     <ChartEmptyState 
