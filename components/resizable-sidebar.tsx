@@ -121,7 +121,7 @@ export default function ResizableSidebar() {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed left-0 top-0 z-20 h-screen border-r flex flex-col justify-between transition-all duration-200 border-sidebar-border ${
+        className={`fixed left-0 top-0 z-20 h-screen border-r flex flex-col justify-between transition-all duration-200 border-sidebar-border hidden md:flex ${
           reduceTransparency
             ? 'bg-sidebar'
             : 'backdrop-blur-md bg-sidebar/40 dark:bg-sidebar/40'
@@ -237,7 +237,7 @@ export default function ResizableSidebar() {
       {/* Resize Handle */}
       {!isCollapsed && (
         <div
-          className="fixed top-0 z-30 cursor-col-resize"
+          className="fixed top-0 z-30 cursor-col-resize hidden md:block"
           style={{
             left: `${sidebarWidth}px`,
             width: '6px',

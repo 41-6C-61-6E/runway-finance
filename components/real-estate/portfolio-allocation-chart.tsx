@@ -111,7 +111,7 @@ export function PortfolioAllocationChart() {
       </div>
       <div className="h-[300px] px-2 pb-2">
         <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <PieChart>
               <defs>
                 <pattern id="diagonal-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">

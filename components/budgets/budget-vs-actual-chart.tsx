@@ -122,7 +122,7 @@ export function BudgetVsActualChart() {
       </div>
       <div className="h-[350px] px-2 pb-2">
         <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <BarChart
               layout="vertical"
               data={allChartData}

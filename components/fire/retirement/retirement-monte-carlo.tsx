@@ -110,7 +110,7 @@ export function RetirementMonteCarlo({
       <div className="pt-4 border-t border-border">
         <p className="text-xs font-semibold text-foreground mb-3">End Balance Distribution</p>
         <div className="h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <BarChart
               data={histData}
               margin={{ top: 5, right: 10, left: 0, bottom: 5 }}

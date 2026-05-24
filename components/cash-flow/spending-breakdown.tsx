@@ -320,7 +320,7 @@ export function SpendingBreakdown() {
                 const dynamicLeft = Math.max(80, maxLabelLen * 7 + 12);
                 
                 return (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                     <BarChart
                       layout="vertical"
                       data={pieData}
@@ -370,7 +370,7 @@ export function SpendingBreakdown() {
                 );
               })() : (
                 <>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                     <PieChart>
                       <Pie
                         data={pieData}

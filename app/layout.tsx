@@ -13,14 +13,19 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Runway",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#10b981",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
+
 
 export default function RootLayout({
   children,

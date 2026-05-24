@@ -102,7 +102,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
       </div>
       <div className="h-[400px]">
         {chartType === 'bar' ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <BarChart
               data={chartData}
               margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
@@ -140,7 +140,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
               data={chartData}
               margin={{ top: 10, right: 120, left: 10, bottom: 20 }}
