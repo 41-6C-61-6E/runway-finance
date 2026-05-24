@@ -8,6 +8,7 @@ import { sanitizeText } from '@/lib/utils/sanitize';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow } from '@/lib/crypto';
+import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -146,6 +147,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set(encrypted)
     .where(eq(transactions.id, id))
     .returning();
+
+  // Rebuild summaries since categories/transactions changed (non-blocking background task)
+  Promise.all([
+    updateCategorySpendingSummaries(userId, dek),
+    updateCategoryIncomeSummaries(userId, dek),
+    updateMonthlyCashFlowSummaries(userId, dek),
+  ]).catch((err) => {
+    logger.error('Background summaries rebuild failed', { userId, error: err });
+  });
 
   return NextResponse.json(updated);
 }

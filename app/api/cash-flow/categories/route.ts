@@ -112,14 +112,21 @@ export async function GET(request: Request) {
     });
   }
 
-  async function fetchUncategorizedTotal(start: string, end: string, accountIds: string[]): Promise<{ total: number; count: number; isIncome: boolean }> {
+  async function fetchUncategorizedTotals(start: string, end: string, accountIds: string[]): Promise<{
+    spendingTotal: number;
+    spendingCount: number;
+    incomeTotal: number;
+    incomeCount: number;
+  }> {
     const conditions = [
       eq(transactions.userId, session.user.id),
       gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
       lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
-      eq(transactions.categoryId, null),
+      isNull(transactions.categoryId),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false),
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
@@ -132,17 +139,25 @@ export async function GET(request: Request) {
     const rows = await db
       .select({ amount: transactions.amount })
       .from(transactions)
+      .innerJoin(accounts, eq(transactions.accountId, accounts.id))
       .where(whereClause);
 
-    let total = 0;
-    let count = 0;
+    let spendingTotal = 0;
+    let spendingCount = 0;
+    let incomeTotal = 0;
+    let incomeCount = 0;
+
     for (const row of rows) {
       const decrypted = parseFloat(await decryptField(row.amount, dek));
-      if (Math.abs(decrypted) <= 0) continue;
-      total += Math.abs(decrypted);
-      count++;
+      if (decrypted < 0) {
+        spendingTotal += Math.abs(decrypted);
+        spendingCount++;
+      } else if (decrypted > 0) {
+        incomeTotal += decrypted;
+        incomeCount++;
+      }
     }
-    return { total, count, isIncome: total > 0 };
+    return { spendingTotal, spendingCount, incomeTotal, incomeCount };
   }
 
   try {
@@ -205,7 +220,7 @@ export async function GET(request: Request) {
           .where(and(...incomeConditions));
       }
 
-      const { total: uncategorizedTotal } = await fetchUncategorizedTotal(startMonth!, endMonth!, accountIdList);
+      const { spendingTotal, spendingCount, incomeTotal, incomeCount } = await fetchUncategorizedTotals(startMonth!, endMonth!, accountIdList);
 
       // Decrypt and aggregate by categoryId
       const categoryMap = new Map<string, any>();
@@ -240,13 +255,24 @@ export async function GET(request: Request) {
       }
       const data = Array.from(categoryMap.values());
 
-      if (uncategorizedTotal !== 0) {
+      if (spendingTotal > 0) {
         data.push({
           categoryId: 'uncategorized',
           categoryName: 'Uncategorized',
           categoryColor: '#94a3b8',
-          isIncome: uncategorizedTotal > 0,
-          amount: uncategorizedTotal,
+          isIncome: false,
+          amount: spendingTotal,
+          transactionCount: spendingCount,
+        });
+      }
+      if (incomeTotal > 0) {
+        data.push({
+          categoryId: 'uncategorized_income',
+          categoryName: 'Uncategorized Income',
+          categoryColor: '#94a3b8',
+          isIncome: true,
+          amount: incomeTotal,
+          transactionCount: incomeCount,
         });
       }
 
@@ -314,20 +340,30 @@ export async function GET(request: Request) {
         .where(and(...incomeConditions));
     }
 
-    const { total: uncategorizedAmountStr, count: uncategorizedCount, isIncome: uncategorizedIsIncome } = await fetchUncategorizedTotal(resolvedMonth, resolvedMonth, accountIdList);
-    const uncategorizedAmount = uncategorizedAmountStr;
+    const { spendingTotal, spendingCount, incomeTotal, incomeCount } = await fetchUncategorizedTotals(resolvedMonth, resolvedMonth, accountIdList);
 
     // Fetch previous month uncategorized
-    const { total: prevUncategorizedAmount } = await fetchUncategorizedTotal(previousMonth, previousMonth, accountIdList);
+    const { spendingTotal: prevSpendingTotal, incomeTotal: prevIncomeTotal } = await fetchUncategorizedTotals(previousMonth, previousMonth, accountIdList);
 
-    if (uncategorizedAmount !== 0) {
+    if (spendingTotal > 0) {
       currentRows.push({
         categoryId: 'uncategorized',
-        amount: String(uncategorizedAmount),
-        transactionCount: uncategorizedCount,
+        amount: String(spendingTotal),
+        transactionCount: spendingCount,
         categoryName: 'Uncategorized',
         categoryColor: '#94a3b8',
-        isIncome: uncategorizedIsIncome,
+        isIncome: false,
+      });
+    }
+
+    if (incomeTotal > 0) {
+      currentIncomeRows.push({
+        categoryId: 'uncategorized_income',
+        amount: String(incomeTotal),
+        transactionCount: incomeCount,
+        categoryName: 'Uncategorized Income',
+        categoryColor: '#94a3b8',
+        isIncome: true,
       });
     }
 
@@ -357,8 +393,11 @@ export async function GET(request: Request) {
     const prevMap = new Map<string, number>();
     for (const [k, v] of prevExpenseMap) prevMap.set(k, v);
     for (const [k, v] of prevIncomeMap) prevMap.set(k, v);
-    if (prevUncategorizedAmount !== 0) {
-      prevMap.set('uncategorized', prevUncategorizedAmount);
+    if (prevSpendingTotal > 0) {
+      prevMap.set('uncategorized', prevSpendingTotal);
+    }
+    if (prevIncomeTotal > 0) {
+      prevMap.set('uncategorized_income', prevIncomeTotal);
     }
 
     const data: any[] = [];
@@ -366,7 +405,7 @@ export async function GET(request: Request) {
     // Process spending rows
     for (const row of currentRows) {
       const amount = row.categoryId === 'uncategorized'
-        ? uncategorizedAmount
+        ? spendingTotal
         : isImportTransactionsEnabled
         ? parseFloat(await decryptField(row.amount, dek))
         : row.amount;
@@ -392,14 +431,18 @@ export async function GET(request: Request) {
 
     // Process income rows (only for summary-table mode; in transaction mode income is already included)
     for (const row of currentIncomeRows) {
-      const amount = isImportTransactionsEnabled
+      const amount = row.categoryId === 'uncategorized_income'
+        ? incomeTotal
+        : isImportTransactionsEnabled
         ? parseFloat(await decryptField(row.amount, dek))
         : row.amount;
       const prevAmount = prevMap.get(row.categoryId) || 0;
       const change = amount - prevAmount;
       const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
-      const incomeCategoryName = isImportTransactionsEnabled
+      const incomeCategoryName = row.categoryId === 'uncategorized_income'
+        ? 'Uncategorized Income'
+        : isImportTransactionsEnabled
         ? await decryptField(row.categoryName || 'Uncategorized', dek)
         : (row.categoryName || 'Uncategorized');
       data.push({
