@@ -32,6 +32,7 @@ export default function CategoriesTab() {
   const [isAdding, setIsAdding] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetResult, setResetResult] = useState<{ kept: number; deleted: number; created: number } | null>(null);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,11 +197,13 @@ export default function CategoriesTab() {
   const handleResetToDefaults = async () => {
     setResetting(true);
     try {
-      await fetch('/api/categories/reset', {
+      const res = await fetch('/api/categories/reset', {
         method: 'POST',
         credentials: 'include',
       });
+      const data = await res.json();
       setShowResetConfirm(false);
+      setResetResult({ kept: data.kept ?? 0, deleted: data.deleted ?? 0, created: data.created ?? 0 });
       await fetchCategories();
     } catch {}
     setResetting(false);
@@ -229,7 +232,7 @@ export default function CategoriesTab() {
             disabled={resetting}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reset to Defaults
+            Clean Up Categories
           </button>
           <button
             onClick={openAdd}
@@ -526,9 +529,17 @@ export default function CategoriesTab() {
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset Categories to Defaults</AlertDialogTitle>
+            <AlertDialogTitle>Clean Up Categories</AlertDialogTitle>
             <AlertDialogDescription>
-              This will <strong className="text-destructive">permanently delete all your custom categories</strong> and restore the default system categories. Any transactions linked to deleted categories will become uncategorized. This action cannot be undone.
+              <p className="mb-2">
+                This will <strong>remove unused categories</strong> and add any missing default categories.
+              </p>
+              <p className="mb-2">
+                Categories that still have transactions, budgets, or rules assigned to them will be <strong>preserved</strong> to avoid uncategorizing your data.
+              </p>
+              <p>
+                If a default category matches the name of an existing one, it will be kept as-is rather than replaced. This action cannot be undone.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -538,11 +549,31 @@ export default function CategoriesTab() {
               disabled={resetting}
               className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {resetting ? 'Resetting...' : 'Reset to Defaults'}
+              {resetting ? 'Cleaning...' : 'Clean Up'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Result */}
+      {resetResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/15" onClick={() => setResetResult(null)}>
+          <div className="bg-card border border-border rounded-xl shadow-lg p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground mb-3">Categories Reset</h3>
+            <div className="space-y-2 text-sm text-foreground/80">
+              <p><strong className="text-foreground">{resetResult.kept}</strong> existing categories preserved</p>
+              <p><strong className="text-foreground">{resetResult.deleted}</strong> unused categories removed</p>
+              <p><strong className="text-foreground">{resetResult.created}</strong> new default categories created</p>
+            </div>
+            <button
+              onClick={() => setResetResult(null)}
+              className="mt-4 w-full px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
   Search,
   Sparkles,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type Transaction = {
   id: string;
@@ -658,7 +659,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     <>
     <div className="bg-card border border-border rounded-xl overflow-hidden" ref={containerRef}>
         {loading ? (
-          <div className="p-12 text-center text-muted-foreground">Loading transactions...</div>
+          <LoadingSpinner category="transactions" className="p-12" />
         ) : transactions.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-muted-foreground text-base mb-4">No transactions found.</p>

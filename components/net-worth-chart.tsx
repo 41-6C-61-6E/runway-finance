@@ -18,6 +18,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
@@ -556,12 +557,7 @@ export function NetWorthChart() {
   const renderChart = () => {
     if (loading) {
       return (
-        <div className="flex items-center justify-center text-muted-foreground h-72">
-          <div className="text-center">
-            <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin mx-auto mb-2" />
-            Loading chart...
-          </div>
-        </div>
+        <LoadingSpinner category="chart" className="h-72" />
       );
     }
 

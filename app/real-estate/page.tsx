@@ -7,6 +7,7 @@ import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-all
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Home } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 
 function RealEstateContent() {
@@ -21,7 +22,7 @@ function RealEstateContent() {
 
           {isVisible('propertyCards') && (
             <div className="mb-5">
-              <Suspense fallback={<div className="text-muted-foreground">Loading properties...</div>}>
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
                   <PropertyCards />
                   <MathDescription chartId="propertyCards" />
@@ -33,7 +34,7 @@ function RealEstateContent() {
           {(isVisible('equityOverTimeChart') || isVisible('portfolioAllocationChart')) && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {isVisible('equityOverTimeChart') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading chart...</div>}>
+                <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <div className="lg:col-span-2">
                     <EquityOverTimeChart />
                     <MathDescription chartId="equityOverTimeChart" />
@@ -41,7 +42,7 @@ function RealEstateContent() {
                 </Suspense>
               )}
               {isVisible('portfolioAllocationChart') && (
-                <Suspense fallback={<div className="text-muted-foreground">Loading allocation...</div>}>
+                <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <div>
                     <PortfolioAllocationChart />
                     <MathDescription chartId="portfolioAllocationChart" />
@@ -59,7 +60,7 @@ function RealEstateContent() {
 
 export default function RealEstatePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingSpinner category="default" className="min-h-screen" />}>
       <RealEstateContent />
     </Suspense>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Circle, Landmark, ListChecks, Target, Wallet } from 'lucide-react';
+import { CheckCircle2, Circle, Landmark, ListChecks, Target, Wallet, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ChecklistState = {
@@ -21,6 +21,12 @@ const initialState: ChecklistState = {
 export function OnboardingChecklist() {
   const [state, setState] = useState<ChecklistState>(initialState);
   const [loading, setLoading] = useState(true);
+  const [dismissed, setDismissed] = useState(() => typeof window !== 'undefined' && localStorage.getItem('onboarding-checklist-dismissed') === 'true');
+
+  function dismiss() {
+    localStorage.setItem('onboarding-checklist-dismissed', 'true');
+    setDismissed(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +98,7 @@ export function OnboardingChecklist() {
   ], [state]);
 
   const completed = items.filter((item) => item.done).length;
-  if (loading || completed === items.length) return null;
+  if (dismissed || loading || completed === items.length) return null;
 
   return (
     <div className="mb-5 bg-card border border-border rounded-xl p-4 shadow-sm">
@@ -103,8 +109,17 @@ export function OnboardingChecklist() {
             {completed} of {items.length} complete
           </p>
         </div>
-        <div className="h-1.5 w-28 rounded-full bg-muted overflow-hidden">
-          <div className="h-full bg-primary" style={{ width: `${(completed / items.length) * 100}%` }} />
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-28 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-primary" style={{ width: `${(completed / items.length) * 100}%` }} />
+          </div>
+          <button
+            onClick={dismiss}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Dismiss checklist"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">

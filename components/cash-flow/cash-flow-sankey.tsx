@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface CategoryData {
   categoryId: string;
@@ -344,7 +345,7 @@ function buildSankeyData(
   }
 
   // Hub node
-  if (incomeCategories.length > 0 || expenseCategories.length > 0) {
+  if (incomeCategories.length > 0 || expenseCategories.length > 0 || totalIncome > 0 || totalExpenses > 0) {
     nodes.push({ id: hubId, label: 'Available Funds', color: VIBRANT_COLORS[2], value: totalIncome, percentage: 100 });
   }
 
@@ -831,9 +832,7 @@ export function CashFlowSankey() {
         <div className="p-5 pb-2">
           <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
         </div>
-        <div className="h-[450px] flex items-center justify-center text-muted-foreground">
-          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner category="sankey" className="h-[450px]" />
       </div>
     );
   }

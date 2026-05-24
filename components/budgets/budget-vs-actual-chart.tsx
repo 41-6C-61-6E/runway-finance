@@ -7,6 +7,7 @@ import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface BudgetData {
   id: string;
@@ -82,9 +83,7 @@ export function BudgetVsActualChart() {
         <div className="p-5 pb-2">
           <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
         </div>
-        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-          <div className="w-7 h-7 border-2 border-border border-t-primary rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner category="chart" className="h-[300px]" />
       </div>
     );
   }
