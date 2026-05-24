@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
@@ -19,6 +19,7 @@ import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
 import AiTab from '@/components/features/settings/AiTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
+import ImportTab from '@/components/features/settings/ImportTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
@@ -67,7 +68,7 @@ type Account = {
   balanceDate: string | null;
 };
 
-export default function SettingsPage() {
+function SettingsPageBody() {
   const router = useRouter();
   const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
@@ -117,7 +118,17 @@ export default function SettingsPage() {
   const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'advanced' | 'ai'>('general');
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'analytics', 'ai', 'import', 'advanced'].includes(urlTab)
+    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'ai' | 'import' | 'advanced')
+    : 'general';
+
+  const goToTab = useCallback((tab: typeof activeTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    router.replace(`/settings?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
   const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -396,7 +407,7 @@ export default function SettingsPage() {
           {/* Tab Bar */}
           <div className="flex rounded-lg bg-card border border-border overflow-hidden">
             <button
-              onClick={() => setActiveTab('general')}
+              onClick={() => goToTab('general')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'general' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -404,7 +415,7 @@ export default function SettingsPage() {
               General
             </button>
             <button
-              onClick={() => setActiveTab('accounts')}
+              onClick={() => goToTab('accounts')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'accounts' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -412,7 +423,7 @@ export default function SettingsPage() {
               Accounts
             </button>
             <button
-              onClick={() => setActiveTab('categories')}
+              onClick={() => goToTab('categories')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'categories' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -420,7 +431,7 @@ export default function SettingsPage() {
               Categories
             </button>
             <button
-              onClick={() => setActiveTab('rules')}
+              onClick={() => goToTab('rules')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'rules' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -428,7 +439,7 @@ export default function SettingsPage() {
               Rules
             </button>
             <button
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => goToTab('analytics')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -436,7 +447,7 @@ export default function SettingsPage() {
               Analytics
             </button>
             <button
-              onClick={() => setActiveTab('ai')}
+              onClick={() => goToTab('ai')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -444,7 +455,15 @@ export default function SettingsPage() {
               AI
             </button>
             <button
-              onClick={() => setActiveTab('advanced')}
+              onClick={() => goToTab('import')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'import' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Import
+            </button>
+            <button
+              onClick={() => goToTab('advanced')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'advanced' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
@@ -1172,7 +1191,11 @@ export default function SettingsPage() {
         </div>
       )}
 
-          {/* Connection Details Dialog */}
+      {activeTab === 'import' && (
+        <ImportTab />
+      )}
+
+      {/* Connection Details Dialog */}
           <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
             <DialogContent className="max-w-md">
               <DialogHeader>
@@ -1323,5 +1346,13 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageBody />
+    </Suspense>
   );
 }

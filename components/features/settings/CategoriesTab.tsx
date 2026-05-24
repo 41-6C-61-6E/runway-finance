@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 
@@ -34,6 +34,12 @@ export default function CategoriesTab() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [filterSources, setFilterSources] = useState<Set<'system' | 'user' | 'ai'>>(
+    new Set(['system', 'user', 'ai'])
+  );
+
   const [formName, setFormName] = useState('');
   const [formParentId, setFormParentId] = useState<string | null>(null);
   const [formColor, setFormColor] = useState('#6366f1');
@@ -60,6 +66,66 @@ export default function CategoriesTab() {
   const parents = categories.filter((c) => !c.parentId);
   const children = categories.filter((c) => c.parentId);
   const getChildren = (parentId: string) => children.filter((c) => c.parentId === parentId);
+
+  const toggleSourceFilter = (source: 'system' | 'user' | 'ai') => {
+    setFilterSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  };
+
+  const categoryMatchesSource = (cat: Category): boolean => {
+    if (filterSources.size === 0) return true;
+    if (cat.isSystem && filterSources.has('system')) return true;
+    if (cat.createdByAi && filterSources.has('ai')) return true;
+    if (!cat.isSystem && !cat.createdByAi && filterSources.has('user')) return true;
+    return false;
+  };
+
+  const categoryMatchesType = (cat: Category): boolean => {
+    if (filterType === 'all') return true;
+    if (filterType === 'income' && cat.isIncome) return true;
+    if (filterType === 'expense' && !cat.isIncome) return true;
+    return false;
+  };
+
+  const categoryMatchesSearch = (cat: Category): boolean => {
+    if (!searchQuery.trim()) return true;
+    return cat.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+  };
+
+  const parentHasMatchingChildren = (parentId: string): boolean => {
+    return children.some(
+      (child) =>
+        child.parentId === parentId &&
+        categoryMatchesSearch(child) &&
+        categoryMatchesType(child) &&
+        categoryMatchesSource(child)
+    );
+  };
+
+  const filteredParents = useMemo(() => {
+    return parents.filter((parent) => {
+      const parentMatches =
+        categoryMatchesSearch(parent) &&
+        categoryMatchesType(parent) &&
+        categoryMatchesSource(parent);
+
+      if (parentMatches) return true;
+      if (parentHasMatchingChildren(parent.id)) return true;
+      return false;
+    });
+  }, [parents, searchQuery, filterType, filterSources]);
+
+  const expandAll = () => {
+    setExpandedParents(new Set(filteredParents.map((p) => p.id)));
+  };
+
+  const collapseAll = () => {
+    setExpandedParents(new Set());
+  };
 
   const openAdd = () => {
     setIsAdding(true);
@@ -175,8 +241,97 @@ export default function CategoriesTab() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+            placeholder="Search categories..."
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters and Expand/Collapse Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(['all', 'income', 'expense'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  filterType === type
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-1.5">
+            {([
+              { key: 'system' as const, label: 'System' },
+              { key: 'user' as const, label: 'My' },
+              { key: 'ai' as const, label: 'AI' },
+            ]).map((source) => (
+              <button
+                key={source.key}
+                onClick={() => toggleSourceFilter(source.key)}
+                className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  filterSources.has(source.key)
+                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    : 'border-border bg-background text-muted-foreground opacity-50 hover:opacity-70'
+                }`}
+              >
+                {source.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={expandAll}
+            className="px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md bg-background hover:bg-muted transition-colors"
+          >
+            Expand All
+          </button>
+          <button
+            onClick={collapseAll}
+            className="px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md bg-background hover:bg-muted transition-colors"
+          >
+            Collapse All
+          </button>
+        </div>
+      </div>
+
+      {/* Empty state for filters */}
+      {filteredParents.length === 0 && (
+        <div className="p-8 text-center">
+          <p className="text-muted-foreground text-sm">
+            {searchQuery || filterSources.size === 0
+              ? 'No categories match your filters.'
+              : 'No categories yet.'}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-1.5">
-        {parents.map((parent) => {
+        {filteredParents.map((parent) => {
           const childList = getChildren(parent.id);
           const isExpanded = expandedParents.has(parent.id);
           return (
@@ -214,9 +369,17 @@ export default function CategoriesTab() {
                   </button>
                 </div>
               </div>
-              {isExpanded && childList.length > 0 && (
-                <div className="ml-6 mt-1 space-y-1">
-                  {childList.map((child) => (
+               {(() => {
+                 const filteredChildren = childList.filter(
+                   (c) =>
+                     categoryMatchesSearch(c) &&
+                     categoryMatchesType(c) &&
+                     categoryMatchesSource(c)
+                 );
+                 if (!isExpanded || filteredChildren.length === 0) return null;
+                 return (
+                   <div className="ml-6 mt-1 space-y-1">
+                     {filteredChildren.map((child) => (
                     <div
                       key={child.id}
                       onClick={() => openEdit(child)}
@@ -241,9 +404,10 @@ export default function CategoriesTab() {
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                   ))}
+                   </div>
+                 );
+               })()}
             </div>
           );
         })}
