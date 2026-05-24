@@ -10,6 +10,10 @@ const nextConfig = {
   images: {
     remotePatterns: [],
   },
+  experimental: {
+    workerThreads: process.env.DISABLE_WORKER_THREADS === 'true' ? false : undefined,
+    cpus: process.env.DISABLE_WORKER_THREADS === 'true' ? 1 : undefined,
+  },
   async headers() {
     return [
       {
