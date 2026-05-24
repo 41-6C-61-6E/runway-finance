@@ -54,17 +54,17 @@ export function AssetAllocation() {
           style={{ width: `${liabilityPct}%` }}
         />
       </div>
-      <div className="flex justify-between mt-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-chart-1" />
-          <span className="text-xs text-muted-foreground">Assets</span>
-          <span className="text-xs font-medium text-foreground tabular-nums">{assetPct.toFixed(0)}%</span>
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:gap-2 mt-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-chart-1" />
+          <span className="text-xs text-muted-foreground">Assets:</span>
+          <span className="text-xs font-semibold text-foreground tabular-nums">{assetPct.toFixed(0)}%</span>
           <span className="text-xs text-muted-foreground tabular-nums">({formatCurrency(totals.totalAssets)})</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-destructive" />
-          <span className="text-xs text-muted-foreground">Liabilities</span>
-          <span className="text-xs font-medium text-foreground tabular-nums">{liabilityPct.toFixed(0)}%</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+          <span className="text-xs text-muted-foreground">Liabilities:</span>
+          <span className="text-xs font-semibold text-foreground tabular-nums">{liabilityPct.toFixed(0)}%</span>
           <span className="text-xs text-muted-foreground tabular-nums">({formatCurrency(totals.totalLiabilities)})</span>
         </div>
       </div>

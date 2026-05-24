@@ -398,17 +398,22 @@ function SettingsPageBody() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Settings" icon={Settings} />
-      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6" style={{ marginLeft: `${COLLAPSED_WIDTH}px` }}>
+      <div 
+        className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6 ml-0 md:ml-[var(--settings-margin-left)]" 
+        style={{ 
+          '--settings-margin-left': `${COLLAPSED_WIDTH}px` 
+        } as React.CSSProperties}
+      >
         <div className="max-w-2xl w-full space-y-6">
 
           {/* Setup Checklist */}
           <OnboardingChecklist />
 
           {/* Tab Bar */}
-          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
+          <div className="flex rounded-lg bg-card border border-border overflow-x-auto no-scrollbar whitespace-nowrap w-full">
             <button
               onClick={() => goToTab('general')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'general' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -416,7 +421,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('accounts')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'accounts' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -424,7 +429,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('categories')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'categories' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -432,7 +437,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('rules')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'rules' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -440,7 +445,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('analytics')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -448,7 +453,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('ai')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -456,7 +461,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('import')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'import' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -464,7 +469,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => goToTab('advanced')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'advanced' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
