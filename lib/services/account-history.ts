@@ -1,7 +1,8 @@
 import { getDb, getPool } from '@/lib/db';
-import { accountSnapshots, transactions } from '@/lib/db/schema';
+import { accountSnapshots, transactions, accounts, netWorthSnapshots } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
-import { decryptField, encryptField } from '@/lib/crypto';
+import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypto';
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
@@ -131,6 +132,20 @@ export async function generateHistoricalAccountSnapshots(
   dek?: Uint8Array
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
   const startedAt = Date.now();
+
+  // Fetch account to see if it is imported
+  const [account] = await getDb()
+    .select({ externalId: accounts.externalId })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        eq(accounts.userId, userId)
+      )
+    )
+    .limit(1);
+
+  const isAccountImported = account?.externalId?.startsWith('imported-') ?? false;
 
   // 1. Fetch all real snapshots for this account
   const realSnapshots = await getDb()
@@ -281,10 +296,10 @@ export async function generateHistoricalAccountSnapshots(
     }
   }
 
-  // 7. Prepare synthetic snapshots ONLY for the requested range [fromDate, toDate]
-  // and do not go further back than calculationStartDate (effectiveFromDate)
-  const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean }> = [];
-  const insertStartDate = fromDate > effectiveFromDate ? fromDate : effectiveFromDate;
+  // 7. Prepare synthetic snapshots starting from the earliest data date (effectiveFromDate)
+  // to ensure a full daily history is rebuilt after the slate was cleared.
+  const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean; isImported: boolean }> = [];
+  const insertStartDate = effectiveFromDate;
   const start = new Date(insertStartDate + 'T00:00:00Z');
   const end = new Date(toDate + 'T00:00:00Z');
   let current = new Date(start);
@@ -303,6 +318,7 @@ export async function generateHistoricalAccountSnapshots(
           snapshotDate: dateStr,
           balance: String(bal),
           isSynthetic: true,
+          isImported: isAccountImported,
         });
       }
     }
@@ -323,16 +339,16 @@ export async function generateHistoricalAccountSnapshots(
 
       for (const row of chunk) {
         const balanceEncrypted = dek ? await encryptField(row.balance, dek) : row.balance;
-        params.push(row.userId, row.accountId, row.snapshotDate, balanceEncrypted, row.isSynthetic);
-        valuePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4})`);
-        paramIdx += 5;
+        params.push(row.userId, row.accountId, row.snapshotDate, balanceEncrypted, row.isSynthetic, row.isImported);
+        valuePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5})`);
+        paramIdx += 6;
       }
 
       const sqlText = `
-        INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic")
+        INSERT INTO "account_snapshots" ("user_id", "account_id", "snapshot_date", "balance", "is_synthetic", "is_imported")
         VALUES ${valuePlaceholders.join(', ')}
         ON CONFLICT ("user_id", "account_id", "snapshot_date") 
-        DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic
+        DO UPDATE SET "balance" = EXCLUDED.balance, "is_synthetic" = EXCLUDED.is_synthetic, "is_imported" = EXCLUDED.is_imported
         RETURNING "id"
       `;
 
@@ -355,4 +371,127 @@ export async function generateHistoricalAccountSnapshots(
   });
 
   return { syntheticCount, skippedRealCount: skippedReal };
+}
+
+/**
+ * Regenerate the net_worth_snapshots table historically for a user.
+ */
+export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Array) {
+  const db = getDb();
+
+  // 1. Get all accounts
+  const userAccounts = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  if (userAccounts.length === 0) {
+    await db.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
+    return;
+  }
+
+  // 2. Get all snapshots for this user
+  const snaps = await db
+    .select({
+      accountId: accountSnapshots.accountId,
+      snapshotDate: accountSnapshots.snapshotDate,
+      balance: accountSnapshots.balance,
+      isSynthetic: accountSnapshots.isSynthetic,
+      isImported: accountSnapshots.isImported,
+    })
+    .from(accountSnapshots)
+    .where(eq(accountSnapshots.userId, userId))
+    .orderBy(asc(accountSnapshots.snapshotDate));
+
+  if (snaps.length === 0) {
+    await db.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
+    return;
+  }
+
+  // Decrypt snapshot balances
+  const decryptedSnaps = await Promise.all(
+    snaps.map(async (s) => {
+      let balance = 0;
+      if (dek) {
+        try {
+          const decrypted = await decryptField(s.balance, dek);
+          balance = parseFloat(decrypted);
+          if (isNaN(balance)) balance = 0;
+        } catch {
+          balance = 0;
+        }
+      } else {
+        balance = parseFloat(s.balance);
+        if (isNaN(balance)) balance = 0;
+      }
+      return { ...s, balance };
+    })
+  );
+
+  // Group snapshots by date
+  const snapsByDate = new Map<string, Array<{ accountId: string; balance: number }>>();
+  for (const s of decryptedSnaps) {
+    const d = s.snapshotDate;
+    if (!snapsByDate.has(d)) {
+      snapsByDate.set(d, []);
+    }
+    snapsByDate.get(d)!.push({ accountId: s.accountId, balance: s.balance });
+  }
+
+  // Get all unique dates in sorted order
+  const sortedDates = Array.from(snapsByDate.keys()).sort((a, b) => a.localeCompare(b));
+
+  // Decrypt account details to check types
+  const decryptedAccounts = dek ? await decryptRows('accounts', userAccounts, dek) : userAccounts;
+
+  const latestByAccount = new Map<string, number>();
+
+  // Clear existing net worth snapshots
+  await db.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
+
+  // Iterate dates and calculate net worth
+  for (const dateStr of sortedDates) {
+    // Update latest balances for the day
+    for (const snap of snapsByDate.get(dateStr)!) {
+      latestByAccount.set(snap.accountId, snap.balance);
+    }
+
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    const breakdown: Record<string, { count: number; value: number }> = {};
+
+    for (const acc of decryptedAccounts) {
+      if (acc.isExcludedFromNetWorth || acc.isHidden) continue;
+
+      const bal = latestByAccount.get(acc.id) ?? 0;
+      const accountType = acc.type.toLowerCase();
+
+      if (isAssetAccount(accountType)) {
+        totalAssets += bal;
+      } else if (isLiabilityAccount(accountType)) {
+        totalLiabilities += Math.abs(bal);
+      }
+
+      if (!breakdown[accountType]) {
+        breakdown[accountType] = { count: 0, value: 0 };
+      }
+      breakdown[accountType].count++;
+      breakdown[accountType].value += bal;
+    }
+
+    const netWorth = totalAssets - totalLiabilities;
+
+    const nwValues = {
+      userId,
+      snapshotDate: dateStr,
+      totalAssets: String(totalAssets),
+      totalLiabilities: String(totalLiabilities),
+      netWorth: String(netWorth),
+      breakdown,
+    };
+
+    const encryptedNw = dek ? await encryptRow('net_worth_snapshots', nwValues, dek) : nwValues;
+
+    await db.insert(netWorthSnapshots).values(encryptedNw);
+  }
 }

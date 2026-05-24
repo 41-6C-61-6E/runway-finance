@@ -1,5 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
-import { accountSnapshots, transactions } from '@/lib/db/schema';
+import { accountSnapshots, transactions, accounts } from '@/lib/db/schema';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { generateHistoricalAccountSnapshots } from '@/lib/services/account-history';
 
@@ -8,6 +8,7 @@ let mockRealSnapshotsResponse: any[] = [];
 let mockEarliestTxResponse: any[] = [];
 let mockPostedTxsResponse: any[] = [];
 let mockLatestRealSnapshotResponse: any[] = [];
+let mockAccountResponse: any[] = [{ externalId: 'imported-test-account-id' }];
 
 // Mock query builder to support Drizzle chained method calls without DB connection
 class MockDbQueryBuilder {
@@ -60,6 +61,8 @@ class MockDbQueryBuilder {
       } else {
         result = mockPostedTxsResponse;
       }
+    } else if (this._fromTable === accounts) {
+      result = mockAccountResponse;
     }
     return Promise.resolve(result).then(onfulfilled, onrejected);
   }
@@ -67,7 +70,7 @@ class MockDbQueryBuilder {
 
 // Mock pool query function
 const mockPoolQuery = vi.fn((sqlText: string, params: any[]) => {
-  const chunkLength = params ? params.length / 5 : 0;
+  const chunkLength = params ? params.length / 6 : 0;
   return Promise.resolve({
     rows: Array.from({ length: chunkLength }, (_, i) => ({ id: i })),
   });
@@ -110,13 +113,14 @@ describe('account-history', () => {
       const inserted: any[] = [];
       for (const call of mockPoolQuery.mock.calls) {
         const params = call[1];
-        for (let i = 0; i < params.length; i += 5) {
+        for (let i = 0; i < params.length; i += 6) {
           inserted.push({
             userId: params[i],
             accountId: params[i + 1],
             snapshotDate: params[i + 2],
             balance: params[i + 3],
             isSynthetic: params[i + 4],
+            isImported: params[i + 5],
           });
         }
       }
@@ -128,6 +132,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-02',
         balance: '10',
         isSynthetic: true,
+        isImported: true,
       });
       expect(inserted[1]).toEqual({
         userId: 'user_123',
@@ -135,6 +140,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-03',
         balance: '30',
         isSynthetic: true,
+        isImported: true,
       });
       expect(inserted[2]).toEqual({
         userId: 'user_123',
@@ -142,6 +148,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-04',
         balance: '30',
         isSynthetic: true,
+        isImported: true,
       });
       expect(inserted[3]).toEqual({
         userId: 'user_123',
@@ -149,6 +156,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-05',
         balance: '25',
         isSynthetic: true,
+        isImported: true,
       });
     });
 
@@ -181,13 +189,14 @@ describe('account-history', () => {
       const inserted: any[] = [];
       for (const call of mockPoolQuery.mock.calls) {
         const params = call[1];
-        for (let i = 0; i < params.length; i += 5) {
+        for (let i = 0; i < params.length; i += 6) {
           inserted.push({
             userId: params[i],
             accountId: params[i + 1],
             snapshotDate: params[i + 2],
             balance: params[i + 3],
             isSynthetic: params[i + 4],
+            isImported: params[i + 5],
           });
         }
       }
@@ -205,6 +214,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-02',
         balance: '85',
         isSynthetic: true,
+        isImported: true,
       });
       expect(inserted[1]).toEqual({
         userId: 'user_123',
@@ -212,6 +222,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-03',
         balance: '105',
         isSynthetic: true,
+        isImported: true,
       });
       expect(inserted[2]).toEqual({
         userId: 'user_123',
@@ -219,6 +230,7 @@ describe('account-history', () => {
         snapshotDate: '2026-05-05',
         balance: '115',
         isSynthetic: true,
+        isImported: true,
       });
     });
 
@@ -291,7 +303,7 @@ describe('account-history', () => {
       const inserted: any[] = [];
       for (const call of mockPoolQuery.mock.calls) {
         const params = call[1];
-        for (let i = 0; i < params.length; i += 5) {
+        for (let i = 0; i < params.length; i += 6) {
           inserted.push({
             snapshotDate: params[i + 2],
             balance: params[i + 3],
@@ -308,6 +320,37 @@ describe('account-history', () => {
       expect(inserted).toContainEqual({ snapshotDate: '2026-05-20', balance: '900' });
       expect(inserted).toContainEqual({ snapshotDate: '2026-05-19', balance: '870' });
       expect(inserted).toContainEqual({ snapshotDate: '2026-05-18', balance: '850' });
+    });
+
+    it('sets isImported to false if the account is not imported', async () => {
+      mockRealSnapshotsResponse = [];
+      mockEarliestTxResponse = [{ date: '2026-05-02' }];
+      mockPostedTxsResponse = [
+        { date: '2026-05-02', postedDate: null, amount: '10.00' },
+      ];
+      mockAccountResponse = [{ externalId: 'regular-account-id' }];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_123',
+        'user_123',
+        '2026-05-02',
+        '2026-05-02'
+      );
+
+      expect(result.syntheticCount).toBe(1);
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            isImported: params[i + 5],
+          });
+        }
+      }
+
+      expect(inserted[0].isImported).toBe(false);
     });
   });
 });

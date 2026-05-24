@@ -218,6 +218,34 @@
       "when": 1779479918461,
       "tag": "0030_add_sidebar_and_chart_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1779650400000,
+      "tag": "0031_add_import_feature",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1779730000000,
+      "tag": "0032_drop_import_log_user_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1779740000000,
+      "tag": "0033_add_date_range_to_import_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779750000000,
+      "tag": "0034_add_data_date_range_to_import_log",
+      "breakpoints": true
     }
   ]
 }

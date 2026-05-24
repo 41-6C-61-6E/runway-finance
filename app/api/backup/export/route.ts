@@ -21,6 +21,7 @@ import {
   simplifinConnections,
   aiProviders,
   aiProposals,
+  importLog,
   userSettings,
 } from '@/lib/db/schema';
 
@@ -41,6 +42,7 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: fireScenarios, dbName: 'fire_scenarios' },
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
+  { table: importLog, dbName: 'import_log' },
 ];
 
 export async function GET() {

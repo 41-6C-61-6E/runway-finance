@@ -53,6 +53,7 @@ export async function GET() {
       aiAutoApproveThreshold: created?.aiAutoApproveThreshold ?? DEFAULTS.aiAutoApproveThreshold,
       aiBatchSize: created?.aiBatchSize ?? DEFAULTS.aiBatchSize,
       aiAnalysisTimeoutSeconds: created?.aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
+      showImportedData: created?.showImportedData ?? DEFAULTS.showImportedData,
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       apiKeys: created?.apiKeys ?? {},
     });
@@ -76,6 +77,7 @@ export async function GET() {
     hiddenPages: settings[0].hiddenPages ?? DEFAULTS.hiddenPages,
     cardStyle: settings[0].cardStyle ?? DEFAULTS.cardStyle,
     showSyntheticData: settings[0].showSyntheticData ?? DEFAULTS.showSyntheticData,
+    showImportedData: settings[0].showImportedData ?? DEFAULTS.showImportedData,
     defaultChartTimeRange: settings[0].defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
     defaultChartType: settings[0].defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: settings[0].reduceTransparency ?? DEFAULTS.reduceTransparency,
@@ -125,6 +127,7 @@ export async function PATCH(request: Request) {
 	const aiAnalysisTimeoutSeconds = body.aiAnalysisTimeoutSeconds;
 	const aiActiveProviderId = body.aiActiveProviderId;
 	const apiKeys = body.apiKeys;
+	const showImportedData = body.showImportedData;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -168,6 +171,18 @@ export async function PATCH(request: Request) {
     for (const key of VALID_SYNTHETIC_KEYS) {
       if (key in showSyntheticData && typeof showSyntheticData[key] !== 'boolean') {
         return Response.json({ error: `Invalid showSyntheticData.${key} value` }, { status: 400 });
+      }
+    }
+  }
+
+  const VALID_IMPORTED_KEYS = ['global', 'netWorth', 'realEstate', 'cashFlowProjections'];
+  if (showImportedData !== undefined) {
+    if (typeof showImportedData !== 'object' || showImportedData === null || Array.isArray(showImportedData)) {
+      return Response.json({ error: 'Invalid showImportedData value' }, { status: 400 });
+    }
+    for (const key of VALID_IMPORTED_KEYS) {
+      if (key in showImportedData && typeof showImportedData[key] !== 'boolean') {
+        return Response.json({ error: `Invalid showImportedData.${key} value` }, { status: 400 });
       }
     }
   }
@@ -285,6 +300,7 @@ export async function PATCH(request: Request) {
   if (hiddenPages !== undefined) updates.hiddenPages = hiddenPages;
   if (cardStyle !== undefined) updates.cardStyle = cardStyle;
   if (showSyntheticData !== undefined) updates.showSyntheticData = showSyntheticData;
+  if (showImportedData !== undefined) updates.showImportedData = showImportedData;
   if (defaultChartTimeRange !== undefined) updates.defaultChartTimeRange = defaultChartTimeRange;
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
@@ -328,6 +344,7 @@ export async function PATCH(request: Request) {
     hiddenPages: updated.hiddenPages ?? DEFAULTS.hiddenPages,
     cardStyle: updated.cardStyle ?? DEFAULTS.cardStyle,
     showSyntheticData: updated.showSyntheticData ?? DEFAULTS.showSyntheticData,
+    showImportedData: updated.showImportedData ?? DEFAULTS.showImportedData,
     defaultChartTimeRange: updated.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
     defaultChartType: updated.defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: updated.reduceTransparency ?? DEFAULTS.reduceTransparency,

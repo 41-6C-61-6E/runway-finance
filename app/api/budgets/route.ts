@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions } from '@/lib/db/schema';
+import { budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, userSettings } from '@/lib/db/schema';
 import { eq, and, or, isNull, sql, inArray, gte, lt } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -147,6 +147,35 @@ export async function GET(request: Request) {
         });
       }
 
+      // Fetch user settings to respect imported data toggles
+      const userSettingsList = await db
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, session.user.id))
+        .limit(1);
+
+      const userSetting = userSettingsList[0];
+      const rawShowImported = userSetting?.showImportedData;
+      const importSettings = {
+        global: true,
+        netWorth: true,
+        realEstate: true,
+        cashFlowProjections: true,
+        ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+      } as Record<string, boolean>;
+
+      const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+
+      const txConditions = [
+        eq(transactions.userId, session.user.id),
+        inArray(transactions.categoryId, allSearchIds),
+        gte(transactions.date, bounds.startDate),
+        lt(transactions.date, bounds.endDate)
+      ];
+      if (!isImportTransactionsEnabled) {
+        txConditions.push(eq(transactions.isImported, false));
+      }
+
       // Use exclusive end date comparison to capture timestamps correctly
       // transactions.date < bounds.endDate captures up to 23:59:59.999 of the actual period end
       const txRows = await db
@@ -155,14 +184,7 @@ export async function GET(request: Request) {
           amount: transactions.amount,
         })
         .from(transactions)
-        .where(
-          and(
-            eq(transactions.userId, session.user.id),
-            inArray(transactions.categoryId, allSearchIds),
-            gte(transactions.date, bounds.startDate),
-            lt(transactions.date, bounds.endDate)
-          )
-        );
+        .where(and(...txConditions));
 
       // Decrypt and aggregate in memory
       const totals = new Map<string, number>();

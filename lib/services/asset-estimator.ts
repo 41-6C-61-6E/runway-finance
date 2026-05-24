@@ -423,6 +423,7 @@ export async function generateAssetHistorySnapshots(
       }).onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
         set: { balance: String(snap.value), isSynthetic: true },
+        where: eq(accountSnapshots.isSynthetic, true),
       });
       inserted++;
     } catch (err) {

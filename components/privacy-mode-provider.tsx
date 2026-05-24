@@ -3,6 +3,17 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { applyAccent } from '@/lib/utils/apply-accent';
 
+// Apply saved accent immediately at module scope, before React renders,
+// so there is no flash of the default violet on page navigation.
+if (typeof window !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('runway-accent');
+    if (saved) {
+      applyAccent(saved);
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
 type PrivacyModeContextType = {
   privacyMode: boolean;
   togglePrivacyMode: () => Promise<void>;

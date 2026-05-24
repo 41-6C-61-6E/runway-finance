@@ -76,9 +76,8 @@ export default function RulesTab() {
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSystemRules, setShowSystemRules] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'my' | 'system' | 'ai'>('my');
   const [systemToggling, setSystemToggling] = useState(false);
-  const [showAiGeneratedRules, setShowAiGeneratedRules] = useState(true);
   const [aiToggling, setAiToggling] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -93,57 +92,54 @@ export default function RulesTab() {
     [systemRules]
   );
 
-  // Get AI-generated rules
-  const aiRules = useMemo(() => rules.filter((r) => r.createdByAi), [rules]);
+  const aiRules = useMemo(() => rules.filter((r) => r.createdByAi && !r.isSystem), [rules]);
   const aiRulesAllActive = useMemo(
     () => aiRules.length > 0 && aiRules.every((r) => r.isActive),
     [aiRules]
   );
 
-  // Enhanced search filtering with error handling
+  const activeTabRules = useMemo(() => {
+    switch (activeSubTab) {
+      case 'my':
+        return rules.filter((r) => !r.isSystem && !r.createdByAi);
+      case 'system':
+        return systemRules;
+      case 'ai':
+        return aiRules;
+      default:
+        return rules;
+    }
+  }, [rules, activeSubTab, systemRules, aiRules]);
+
   const filteredRules = useMemo(() => {
     try {
-      let result = rules;
-      
-      // Filter out system rules if not shown
-      if (!showSystemRules) {
-        result = result.filter((r) => !r.isSystem);
-      }
-      
-      // Filter out AI-generated rules if not shown
-      if (!showAiGeneratedRules) {
-        result = result.filter((r) => !r.createdByAi);
-      }
-      
-      // Apply search filter if query exists
+      let result = activeTabRules;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         result = result.filter((r) => {
           try {
             const cat = r.setCategoryId ? getCategoryName(r.setCategoryId) : null;
             const catName = cat ? cat.name.toLowerCase() : '';
-            
-            // Safely check all fields for matches
+
             return (
               (r.name && r.name.toLowerCase().includes(q)) ||
               (r.conditionValue && r.conditionValue.toLowerCase().includes(q)) ||
-              (catName && catName.includes(q)) ||
-              (r.createdByAi && q.includes('ai'))
+              (catName && catName.includes(q))
             );
           } catch (e) {
-            // If there's an error in filtering, return false to exclude the item
             console.error('Error filtering rule:', e);
             return false;
           }
         });
       }
-      
+
       return result;
     } catch (error) {
       console.error('Error in filteredRules calculation:', error);
       return [];
     }
-  }, [rules, searchQuery, categories, showSystemRules, showAiGeneratedRules, getCategoryName]);
+  }, [activeTabRules, searchQuery, categories, getCategoryName]);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -444,9 +440,9 @@ export default function RulesTab() {
           >
             Reset to Defaults
           </button>
-          <button
+           <button
             onClick={handleRunAll}
-            disabled={runningAll || rules.length === 0}
+            disabled={runningAll || filteredRules.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-all disabled:opacity-50"
           >
             <Play className="h-3.5 w-3.5" />
@@ -462,7 +458,37 @@ export default function RulesTab() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Sub-Tabs */}
+      <div className="flex rounded-lg bg-card border border-border overflow-hidden mb-3">
+        {([
+          { key: 'my' as const, label: 'My Rules', count: rules.filter((r) => !r.isSystem && !r.createdByAi).length },
+          { key: 'system' as const, label: 'System Rules', count: systemRules.length },
+          { key: 'ai' as const, label: 'AI Rules', count: aiRules.length },
+        ]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSubTab(tab.key)}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              activeSubTab === tab.key
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            {tab.label}
+            <span
+              className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                activeSubTab === tab.key
+                  ? 'bg-primary-foreground/20 text-primary-foreground/80'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Tab-specific controls + Search */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -470,42 +496,39 @@ export default function RulesTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-            placeholder="Search rules by name, keyword, or category..."
+            placeholder={
+              activeSubTab === 'my'
+                ? 'Search your rules...'
+                : activeSubTab === 'system'
+                ? 'Search system rules...'
+                : 'Search AI rules...'
+            }
             aria-label="Search rules"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              ×
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">Show System</span>
+
+        {(activeSubTab === 'system' || activeSubTab === 'ai') && (
+          <div className="flex items-center gap-2 shrink-0 border-l border-border pl-3">
+            <span className="text-xs text-foreground/70 whitespace-nowrap">
+              {activeSubTab === 'system' ? 'Enable All' : 'Enable All'}
+            </span>
             <Switch
-              checked={showSystemRules}
-              onCheckedChange={setShowSystemRules}
+              checked={activeSubTab === 'system' ? systemRulesAllActive : aiRulesAllActive}
+              onCheckedChange={
+                activeSubTab === 'system' ? handleToggleSystemRules : handleToggleAiRules
+              }
+              disabled={activeSubTab === 'system' ? systemToggling : aiToggling}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">Enable System</span>
-            <Switch
-              checked={systemRulesAllActive}
-              onCheckedChange={handleToggleSystemRules}
-              disabled={systemToggling}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">Show AI Generated</span>
-            <Switch
-              checked={showAiGeneratedRules}
-              onCheckedChange={setShowAiGeneratedRules}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">Enable AI Generated</span>
-            <Switch
-              checked={aiRulesAllActive}
-              onCheckedChange={handleToggleAiRules}
-              disabled={aiToggling}
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {filteredRules.length === 0 && (
