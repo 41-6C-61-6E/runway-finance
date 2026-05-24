@@ -1095,7 +1095,7 @@ export default function AccountsPage() {
                     <div className="flex flex-col md:flex-row gap-4 h-full w-full">
                       {/* Chart Area */}
                       <div className="flex-1 min-w-0 h-full relative">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                           {chartType === 'bar' ? (
                             <BarChart
                               data={rechartsData}

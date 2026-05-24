@@ -328,7 +328,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
       {/* Chart */}
       {chartDataPoints.length > 0 ? (
         <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
               data={chartDataPoints}
               margin={{ top: 10, right: 10, left: 10, bottom: 10 }}

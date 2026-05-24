@@ -129,7 +129,7 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
         Baseline: {baseline === Infinity ? '∞' : `${baseline.toFixed(1)} yrs`} to FI
       </p>
       <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
           <BarChart
             layout="vertical"
             data={chartData}

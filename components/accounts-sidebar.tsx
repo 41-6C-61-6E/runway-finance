@@ -269,7 +269,7 @@ export default function AccountsSidebar() {
     return (
       <button
         onClick={toggleAccountsCollapsed}
-        className="fixed top-0 z-50 flex items-center justify-center w-6 h-10 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer"
+        className="fixed top-0 z-50 flex items-center justify-center w-6 h-10 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer hidden md:flex"
         style={{ left: `${sidebarWidth}px` }}
         title="Expand accounts sidebar"
       >
@@ -282,7 +282,7 @@ export default function AccountsSidebar() {
     return (
       <>
         <aside 
-          className="fixed top-0 h-screen bg-card border-r border-border flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10"
+          className="fixed top-0 h-screen bg-card border-r border-border flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
           style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
         >
           <div className="flex items-center justify-between">
@@ -297,7 +297,7 @@ export default function AccountsSidebar() {
           </div>
         </aside>
         <div
-          className="fixed top-0 z-30 cursor-col-resize"
+          className="fixed top-0 z-30 cursor-col-resize hidden md:block"
           style={{
             left: `${navCollapsedWidth + accountsWidth}px`,
             width: '6px',
@@ -316,7 +316,7 @@ export default function AccountsSidebar() {
   return (
     <>
       <aside 
-        className="fixed top-0 h-screen bg-card border-r border-border flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200 z-10"
+        className="fixed top-0 h-screen bg-card border-r border-border flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
         style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
       >
         {/* Net Worth Header */}
@@ -388,7 +388,7 @@ export default function AccountsSidebar() {
 
       {/* Resize Handle */}
       <div
-        className="fixed top-0 z-30 cursor-col-resize"
+        className="fixed top-0 z-30 cursor-col-resize hidden md:block"
         style={{
           left: `${navCollapsedWidth + accountsWidth}px`,
           width: '6px',
