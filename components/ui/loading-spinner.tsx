@@ -13,9 +13,12 @@ interface LoadingSpinnerProps {
 
 export function LoadingSpinner({ category = 'default', message, className = '' }: LoadingSpinnerProps) {
   const pool = message ? [message] : messages[category] || messages.default;
-  const [index, setIndex] = useState(() => Math.floor(Math.random() * pool.length));
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
+    // Select a random index on mount (client-side only)
+    setIndex(Math.floor(Math.random() * pool.length));
+
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % pool.length);
     }, 1000);
