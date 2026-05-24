@@ -19,6 +19,7 @@ interface MortgageAttributesFormProps {
   meta: Record<string, string>;
   onChange: (meta: Record<string, string>) => void;
   showStartDate?: boolean;
+  allMortgages?: { id: string; name: string }[];
 }
 
 /**
@@ -29,9 +30,79 @@ export function MortgageAttributesForm({
   meta,
   onChange,
   showStartDate = true,
+  allMortgages = [],
 }: MortgageAttributesFormProps) {
+  const status = meta.mortgageStatus || 'active';
+
   return (
     <>
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Mortgage Status</label>
+        <select
+          value={status}
+          onChange={(e) => onChange({ ...meta, mortgageStatus: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="active">Active</option>
+          <option value="paid_off">Paid Off</option>
+          <option value="refinanced">Refinanced</option>
+        </select>
+      </div>
+
+      {status === 'paid_off' && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Payoff Date</label>
+          <Input
+            type="date"
+            value={meta.payoffDate || ''}
+            onChange={(e) => onChange({ ...meta, payoffDate: e.target.value })}
+            required
+          />
+        </div>
+      )}
+
+      {status === 'refinanced' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Refinance Date</label>
+              <Input
+                type="date"
+                value={meta.refinanceDate || ''}
+                onChange={(e) => onChange({ ...meta, refinanceDate: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Payoff Balance</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={meta.payoffBalance || ''}
+                onChange={(e) => onChange({ ...meta, payoffBalance: e.target.value })}
+                placeholder="e.g., 240000"
+                required
+              />
+            </div>
+          </div>
+          {allMortgages.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Refinanced By Loan</label>
+              <select
+                value={meta.refinancedByLoanId || ''}
+                onChange={(e) => onChange({ ...meta, refinancedByLoanId: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select refinancing mortgage...</option>
+                {allMortgages.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </>
+      )}
+
       {showStartDate && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Start Date (origination)</label>

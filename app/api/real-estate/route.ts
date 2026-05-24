@@ -88,9 +88,13 @@ export async function GET(request: Request) {
       realEstateAccounts.map(async (property: any) => {
         const meta = parseMetadata(property.metadata);
         const linkedMortgageIds = getStringArray(meta.mortgageAccountIds);
-        const linkedMortgages = linkedMortgageIds
-          .map((id) => mortgageMap.get(id))
-          .filter(Boolean) as any[];
+        
+        // Find all mortgages that either have their ID in property's mortgageAccountIds,
+        // OR have linkedPropertyId in their metadata pointing to this property.id
+        const linkedMortgages = mortgageAccounts.filter((m: any) => {
+          const mMeta = parseMetadata(m.metadata);
+          return linkedMortgageIds.includes(m.id) || mMeta.linkedPropertyId === property.id;
+        });
 
         const propertyValue = parseFloat(property.balance);
         const totalMortgageBalance = linkedMortgages.reduce(
@@ -126,16 +130,21 @@ export async function GET(request: Request) {
           isSynthetic: s.isSynthetic,
         })));
 
+        const allLinkedIds = Array.from(new Set([
+          ...linkedMortgageIds,
+          ...linkedMortgages.map((m) => m.id),
+        ]));
+
         const mortgageSnapshotsConditions = [
           eq(accountSnapshots.userId, userId),
-          inArray(accountSnapshots.accountId, linkedMortgageIds),
+          inArray(accountSnapshots.accountId, allLinkedIds),
           sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
         ];
         if (!isImportRealEstateEnabled) {
           mortgageSnapshotsConditions.push(eq(accountSnapshots.isImported, false));
         }
 
-        const mortgageSnapshots = linkedMortgageIds.length > 0
+        const mortgageSnapshots = allLinkedIds.length > 0
           ? await db
               .select({ snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance, accountId: accountSnapshots.accountId, isSynthetic: accountSnapshots.isSynthetic })
               .from(accountSnapshots)

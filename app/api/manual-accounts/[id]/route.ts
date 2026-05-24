@@ -75,6 +75,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.isHidden !== undefined) updateData.isHidden = body.isHidden;
   if (body.isExcludedFromNetWorth !== undefined) updateData.isExcludedFromNetWorth = body.isExcludedFromNetWorth;
   if (body.displayOrder !== undefined) updateData.displayOrder = body.displayOrder;
+  if (body.balance !== undefined) updateData.balance = String(body.balance);
   if (body.metadata !== undefined) {
     updateData.metadata = body.metadata;
   }
@@ -102,14 +103,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (SNAPSHOT_TYPES.includes(decrypted.type)) {
       try {
         const apiConfig = await readApiConfig(userId);
-        await generateAssetHistorySnapshots(id, userId, decrypted.type, meta, apiConfig, dek);
+        const oldDecrypted = await decryptRow('accounts', account, dek);
+        const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
+        await generateAssetHistorySnapshots(
+          id,
+          userId,
+          decrypted.type,
+          meta,
+          apiConfig,
+          dek,
+          oldMeta.purchaseDate as string | undefined,
+          oldMeta.purchasePrice as number | undefined
+        );
       } catch (err) {
         logger.warn(`Failed to regenerate history snapshots on PATCH for account ${id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
-  if (body.isHidden !== undefined || body.isExcludedFromNetWorth !== undefined) {
+  if (
+    body.isHidden !== undefined ||
+    body.isExcludedFromNetWorth !== undefined ||
+    body.balance !== undefined
+  ) {
     const today = new Date().toISOString().split('T')[0];
     await Promise.all([
       createAccountSnapshots(userId, dek, today),

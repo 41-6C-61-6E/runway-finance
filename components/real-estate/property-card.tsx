@@ -27,6 +27,7 @@ interface MortgageInfo {
   extraPrincipal?: number;
   pmi?: number;
   escrow?: number;
+  metadata?: Record<string, unknown>;
 }
 
 interface Property {
@@ -59,7 +60,13 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
 
   const { isVisible } = useChartVisibility();
 
-  const activeMortgages = property.linkedMortgages;
+  const activeMortgages = property.linkedMortgages.filter(
+    (m) => !m.metadata || !['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
+  );
+  const closedMortgages = property.linkedMortgages.filter(
+    (m) => m.metadata && ['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
+  );
+
   const defaultMortgageId = activeMortgages[0]?.id || null;
   const currentMortgageId = selectedMortgageId || defaultMortgageId;
   const selectedMortgage = activeMortgages.find((m) => m.id === currentMortgageId) || activeMortgages[0];
@@ -279,6 +286,58 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {closedMortgages.length > 0 && (
+              <div className="space-y-2 mb-4 pt-2 border-t border-border/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Closed Mortgages</span>
+                </div>
+                <div className="space-y-1.5">
+                  {closedMortgages.map((m) => {
+                    const mMeta = m.metadata || {};
+                    const isRefi = mMeta.mortgageStatus === 'refinanced';
+                    const closedLabel = isRefi ? 'Refinanced' : 'Paid Off';
+                    const closedDate = isRefi ? String(mMeta.refinanceDate || '') : String(mMeta.payoffDate || '');
+                    return (
+                      <div key={m.id} className="p-3 bg-muted/20 border border-border/40 rounded-lg flex items-center justify-between relative group text-xs">
+                        <button
+                          onClick={() => onUnlinkMortgage(m.id)}
+                          className="absolute top-1 right-1 p-0.5 rounded hover:bg-muted text-muted-foreground/30 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          title="Unlink mortgage"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-muted-foreground truncate">{m.name}</span>
+                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
+                              {closedLabel}
+                            </span>
+                          </div>
+                          {closedDate && (
+                            <div className="text-[10px] text-muted-foreground/75 mt-0.5">
+                              Date: {closedDate}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-4 flex items-center gap-1.5">
+                          {onEditMortgage && (
+                            <button
+                              onClick={() => onEditMortgage(m)}
+                              className="p-1 rounded hover:bg-muted text-muted-foreground/40 hover:text-foreground transition-all cursor-pointer"
+                              title="Edit attributes"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                          <span className="font-mono text-muted-foreground blur-number">$0.00</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

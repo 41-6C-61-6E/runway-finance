@@ -147,13 +147,17 @@ export async function estimateRealEstateHistory(
     const lastHpi = parseFloat(hpiData[hpiData.length - 1].value);
     if (firstHpi > 0 && lastHpi > 0) {
       const hpiRatio = lastHpi / firstHpi;
-      const adjustedCurrentValue = currentValue;
-      const adjustedPurchaseValue = adjustedCurrentValue / hpiRatio;
+      const N = hpiData.length;
+      const H_last = purchasePrice * hpiRatio;
+      const D = currentValue - H_last;
 
-      for (const obs of hpiData) {
+      for (let i = 0; i < N; i++) {
+        const obs = hpiData[i];
         const obsHpi = parseFloat(obs.value);
         if (obsHpi <= 0) continue;
-        const estimatedValue = adjustedPurchaseValue * (obsHpi / firstHpi);
+        const H_i = purchasePrice * (obsHpi / firstHpi);
+        const adjustment = D * (i / (N - 1));
+        const estimatedValue = H_i + adjustment;
         snapshots.push({ date: obs.date, value: Math.round(estimatedValue * 100) / 100 });
       }
       return snapshots;
@@ -274,7 +278,10 @@ export async function estimateMetalsHistory(
 export function generateMortgagePaydownHistory(
   params: AmortizationParams,
   currentBalance: number,
-  currentDate: string
+  currentDate: string,
+  status?: string,
+  endDateStr?: string,
+  payoffBalance?: number
 ): Array<{ date: string; balance: number }> {
   const { originalBalance, annualRate, termMonths, monthlyPayment, startDate } = params;
   const monthlyRate = annualRate / 100 / 12;
@@ -285,35 +292,113 @@ export function generateMortgagePaydownHistory(
     effectivePayment = originalBalance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
   }
 
-  const end = new Date(currentDate + 'T00:00:00');
   const start = new Date(startDate + 'T00:00:00');
+  const today = new Date(currentDate + 'T00:00:00');
 
-  // Walk backward from current balance to origination date
-  // using reverse amortization: balance_prev = (balance_curr + payment) / (1 + rate)
-  let balance = currentBalance;
-  const cursor = new Date(end);
+  if (status === 'paid_off' || status === 'refinanced') {
+    const endEventDateStr = endDateStr || currentDate;
+    const endEventDate = new Date(endEventDateStr + 'T00:00:00');
 
-  while (cursor >= start) {
+    // 1. From endEventDate (inclusive) to today, balance is 0
     snapshots.push({
-      date: cursor.toISOString().split('T')[0],
-      balance: Math.round(balance * 100) / 100,
+      date: endEventDateStr,
+      balance: 0,
     });
 
-    cursor.setMonth(cursor.getMonth() - 1);
-    if (cursor < start) break;
-
-    if (monthlyRate > 0) {
-      balance = (balance + effectivePayment) / (1 + monthlyRate);
-    } else {
-      balance += effectivePayment;
+    let cursor = new Date(today);
+    while (cursor > endEventDate) {
+      snapshots.push({
+        date: cursor.toISOString().split('T')[0],
+        balance: 0,
+      });
+      cursor.setMonth(cursor.getMonth() - 1);
     }
 
-    if (balance > originalBalance) {
-      balance = originalBalance;
+    // 2. Walk before the end event date:
+    if (status === 'paid_off') {
+      // Walk forward from startDate to endEventDate - 1 month
+      let balance = originalBalance;
+      let forwardCursor = new Date(start);
+      const endEventDateMinus1Month = new Date(endEventDate);
+      endEventDateMinus1Month.setMonth(endEventDateMinus1Month.getMonth() - 1);
+
+      while (forwardCursor <= endEventDateMinus1Month) {
+        snapshots.push({
+          date: forwardCursor.toISOString().split('T')[0],
+          balance: Math.round(balance * 100) / 100,
+        });
+        forwardCursor.setMonth(forwardCursor.getMonth() + 1);
+
+        if (monthlyRate > 0) {
+          const interest = balance * monthlyRate;
+          const principal = effectivePayment - interest;
+          balance = balance - principal;
+        } else {
+          balance = balance - effectivePayment;
+        }
+        if (balance < 0) balance = 0;
+      }
+    } else {
+      // Walk backward from endEventDate - 1 month using payoffBalance
+      const startVal = payoffBalance ?? 0;
+      let balance = startVal;
+      let backwardCursor = new Date(endEventDate);
+      backwardCursor.setMonth(backwardCursor.getMonth() - 1);
+
+      while (backwardCursor >= start) {
+        snapshots.push({
+          date: backwardCursor.toISOString().split('T')[0],
+          balance: Math.round(balance * 100) / 100,
+        });
+        backwardCursor.setMonth(backwardCursor.getMonth() - 1);
+        if (backwardCursor < start) break;
+
+        if (monthlyRate > 0) {
+          balance = (balance + effectivePayment) / (1 + monthlyRate);
+        } else {
+          balance += effectivePayment;
+        }
+
+        if (balance > originalBalance) {
+          balance = originalBalance;
+        }
+      }
+    }
+  } else {
+    // Walk backward from current balance to origination date
+    // using reverse amortization: balance_prev = (balance_curr + payment) / (1 + rate)
+    let balance = currentBalance;
+    const cursor = new Date(today);
+
+    while (cursor >= start) {
+      snapshots.push({
+        date: cursor.toISOString().split('T')[0],
+        balance: Math.round(balance * 100) / 100,
+      });
+
+      cursor.setMonth(cursor.getMonth() - 1);
+      if (cursor < start) break;
+
+      if (monthlyRate > 0) {
+        balance = (balance + effectivePayment) / (1 + monthlyRate);
+      } else {
+        balance += effectivePayment;
+      }
+
+      if (balance > originalBalance) {
+        balance = originalBalance;
+      }
     }
   }
 
-  return snapshots.reverse();
+  // Deduplicate and sort chronologically
+  const dedupedMap = new Map<string, number>();
+  for (const snap of snapshots) {
+    dedupedMap.set(snap.date, snap.balance);
+  }
+  return Array.from(dedupedMap.entries())
+    .map(([date, balance]) => ({ date, balance }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // ─── Main Dispatcher ─────────────────────────────────────────────────────────
@@ -324,7 +409,9 @@ export async function generateAssetHistorySnapshots(
   accountType: string,
   metadata: Record<string, unknown>,
   apiConfig?: ApiConfig,
-  dek?: Uint8Array
+  dek?: Uint8Array,
+  oldPurchaseDate?: string,
+  oldPurchasePrice?: number
 ): Promise<number> {
   const { getDb } = await import(/* @vite-ignore */ '@/lib/db');
   const db = getDb();
@@ -340,8 +427,21 @@ export async function generateAssetHistorySnapshots(
         eq(accountSnapshots.isSynthetic, true)
       )
     );
+
+    // Clean up the old purchase date snapshot if it exists and matches the old purchase date/price
+    if (accountType === 'realestate' && oldPurchaseDate && oldPurchasePrice !== undefined) {
+      await db.delete(accountSnapshots).where(
+        and(
+          eq(accountSnapshots.accountId, accountId),
+          eq(accountSnapshots.userId, userId),
+          eq(accountSnapshots.snapshotDate, oldPurchaseDate),
+          eq(accountSnapshots.isSynthetic, false),
+          eq(accountSnapshots.balance, String(oldPurchasePrice))
+        )
+      );
+    }
   } catch (err) {
-    logger.error(`${LOG_TAG} Failed to clear existing synthetic snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+    logger.error(`${LOG_TAG} Failed to clear existing snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
     return 0;
   }
 
@@ -387,17 +487,24 @@ export async function generateAssetHistorySnapshots(
       const interestRate = metadata.interestRate as number ?? 0;
       const termMonths = metadata.termMonths as number ?? 360;
       const monthlyPayment = metadata.monthlyPayment as number ?? 0;
-      const pmi = (metadata.pmi as number) ?? 0;
-      const escrow = (metadata.escrow as number ?? metadata.escrowAmount as number) ?? 0;
-      const monthlyPI = Math.max(0, monthlyPayment - escrow - pmi);
+      const monthlyPI = monthlyPayment;
       const startDate = metadata.purchaseDate as string ?? metadata.startDate as string ?? today;
+      
+      const mortgageStatus = metadata.mortgageStatus as string | undefined;
+      const payoffDate = metadata.payoffDate as string | undefined;
+      const refinanceDate = metadata.refinanceDate as string | undefined;
+      const payoffBalance = metadata.payoffBalance ? parseFloat(String(metadata.payoffBalance)) : 0;
+      
       const currentBalance = await getAccountCurrentBalance(accountId, dek);
 
       if (originalLoanAmount > 0 && interestRate > 0) {
         const history = generateMortgagePaydownHistory(
           { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
           Math.abs(currentBalance),
-          today
+          today,
+          mortgageStatus,
+          mortgageStatus === 'paid_off' ? payoffDate : refinanceDate,
+          mortgageStatus === 'paid_off' ? 0 : payoffBalance
         );
         snapshots = history.map((h) => ({ date: h.date, value: -h.balance }));
       }
@@ -413,21 +520,26 @@ export async function generateAssetHistorySnapshots(
   let inserted = 0;
   for (const snap of snapshots) {
     if (snap.date >= today) continue;
+
+    // Treat the purchase date snapshot as real (isSynthetic = false)
+    const isPurchaseDate = (accountType === 'realestate' && snap.date === (metadata.purchaseDate as string));
+    const isSynth = isPurchaseDate ? false : true;
+
     try {
       await db.insert(accountSnapshots).values({
         userId,
         accountId,
         snapshotDate: snap.date,
         balance: String(snap.value),
-        isSynthetic: true,
+        isSynthetic: isSynth,
       }).onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-        set: { balance: String(snap.value), isSynthetic: true },
-        where: eq(accountSnapshots.isSynthetic, true),
+        set: { balance: String(snap.value), isSynthetic: isSynth },
+        where: isSynth ? eq(accountSnapshots.isSynthetic, true) : undefined,
       });
       inserted++;
     } catch (err) {
-      logger.warn(`${LOG_TAG} Failed to insert synthetic snapshot for ${accountId} on ${snap.date}: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(`${LOG_TAG} Failed to insert snapshot for ${accountId} on ${snap.date}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
