@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, netWorthSnapshots, accountSnapshots, userSettings } from '@/lib/db/schema';
+import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, gte, lte, lt, desc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';

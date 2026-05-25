@@ -14,6 +14,10 @@ const nextConfig = {
     workerThreads: process.env.DISABLE_WORKER_THREADS === 'true' ? false : undefined,
     cpus: process.env.DISABLE_WORKER_THREADS === 'true' ? 1 : undefined,
   },
+  env: {
+    NEXT_PUBLIC_BUILD_NUMBER: process.env.BUILD_NUMBER || 'dev',
+    NEXT_PUBLIC_BUILD_TIME: process.env.BUILD_TIME || new Date().toISOString(),
+  },
   async headers() {
     return [
       {

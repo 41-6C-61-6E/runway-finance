@@ -79,23 +79,26 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
 
   const netWorth = totalAssets - totalLiabilities;
 
+  const nwValues = {
+    userId,
+    snapshotDate,
+    totalAssets: String(totalAssets),
+    totalLiabilities: String(totalLiabilities),
+    netWorth: String(netWorth),
+    breakdown,
+  };
+  const encryptedNw = await encryptRow('net_worth_snapshots', nwValues, dek);
+
   await getDb()
     .insert(netWorthSnapshots)
-    .values({
-      userId,
-      snapshotDate,
-      totalAssets: String(totalAssets),
-      totalLiabilities: String(totalLiabilities),
-      netWorth: String(netWorth),
-      breakdown,
-    })
+    .values(encryptedNw)
     .onConflictDoUpdate({
       target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
       set: {
-        totalAssets: String(totalAssets),
-        totalLiabilities: String(totalLiabilities),
-        netWorth: String(netWorth),
-        breakdown,
+        totalAssets: sql`excluded.total_assets`,
+        totalLiabilities: sql`excluded.total_liabilities`,
+        netWorth: sql`excluded.net_worth`,
+        breakdown: sql`excluded.breakdown`,
       },
     });
 }
@@ -216,9 +219,12 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
   }
 
   if (insertValues.length > 0) {
+    const encryptedValues = await Promise.all(
+      insertValues.map((row) => encryptRow('monthly_cash_flow', row, dek))
+    );
     await getDb()
       .insert(monthlyCashFlow)
-      .values(insertValues)
+      .values(encryptedValues)
       .onConflictDoUpdate({
         target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
         set: {
@@ -334,9 +340,12 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
   }
 
   if (insertValues.length > 0) {
+    const encryptedValues = await Promise.all(
+      insertValues.map((row) => encryptRow('category_spending_summary', row, dek))
+    );
     await getDb()
       .insert(categorySpendingSummary)
-      .values(insertValues)
+      .values(encryptedValues)
       .onConflictDoUpdate({
         target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
         set: {
@@ -450,9 +459,12 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   }
 
   if (insertValues.length > 0) {
+    const encryptedValues = await Promise.all(
+      insertValues.map((row) => encryptRow('category_income_summary', row, dek))
+    );
     await getDb()
       .insert(categoryIncomeSummary)
-      .values(insertValues)
+      .values(encryptedValues)
       .onConflictDoUpdate({
         target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
         set: {

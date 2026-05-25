@@ -47,13 +47,6 @@ export default function ResizableSidebar() {
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
   const [devMode, setDevMode] = useState<boolean | null>(null)
-  const [appStatus, setAppStatus] = useState<{
-    connected: boolean
-    lastSyncAt: string | null
-    lastSyncStatus: string | null
-    accounts: number
-    transactions: number
-  } | null>(null)
   const [pendingAiCount, setPendingAiCount] = useState<number>(0)
 
   useEffect(() => {
@@ -61,32 +54,7 @@ export default function ResizableSidebar() {
   }, [])
 
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const [connRes, acctRes, txnRes] = await Promise.all([
-          fetch('/api/connections', { credentials: 'include' }),
-          fetch('/api/accounts', { credentials: 'include' }),
-          fetch('/api/transactions?limit=1', { credentials: 'include' }),
-        ])
-        const connections = connRes.ok ? await connRes.json() : []
-        const accounts = acctRes.ok ? await acctRes.json() : []
-        const transactions = txnRes.ok ? await txnRes.json() : []
-        const latestConn = Array.isArray(connections) && connections.length > 0
-          ? connections.reduce((a: any, b: any) => (!a.lastSyncAt || new Date(b.lastSyncAt) > new Date(a.lastSyncAt) ? b : a))
-          : null
-        setAppStatus({
-          connected: Array.isArray(connections) && connections.length > 0,
-          lastSyncAt: latestConn?.lastSyncAt ?? null,
-          lastSyncStatus: latestConn?.lastSyncStatus ?? null,
-          accounts: Array.isArray(accounts) ? accounts.length : 0,
-          transactions: txnRes.ok ? (transactions.total ?? 0) : 0,
-        })
-      } catch {
-        setAppStatus({ connected: false, lastSyncAt: null, lastSyncStatus: null, accounts: 0, transactions: 0 })
-      }
-    }
-    fetchStatus()
-    // Also check for pending AI proposals
+    // Check for pending AI proposals
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
       .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
@@ -97,18 +65,6 @@ export default function ResizableSidebar() {
       .then(data => setDevMode(data.devMode))
       .catch(() => setDevMode(false))
   }, [])
-
-  const formatRelativeTime = (dateStr: string | null) => {
-    if (!dateStr) return 'Never'
-    const diff = Date.now() - new Date(dateStr).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'Just now'
-    if (mins < 60) return `${mins}m ago`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    return `${days}d ago`
-  }
 
   const isActive = (href: string) => pathname === href
   const isCollapsed = sidebarWidth === COLLAPSED_WIDTH
@@ -187,40 +143,6 @@ export default function ResizableSidebar() {
         {/* Bottom section */}
         {session?.user && (
           <div className={isCollapsed ? 'space-y-2 pb-4 flex flex-col items-center' : 'space-y-3 p-3'}>
-            {!isCollapsed && (
-              <div className="px-3 py-2.5 rounded-lg border border-sidebar-border space-y-1.5">
-                <div className="text-xs text-sidebar-foreground/50 font-medium">Status</div>
-                <div className="text-xs text-sidebar-foreground/70">
-                  Signed in as: {session?.user?.name}
-                </div>
-                {appStatus && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        appStatus.lastSyncStatus === 'ok'
-                          ? 'bg-status-positive'
-                          : appStatus.lastSyncStatus === 'error'
-                          ? 'bg-destructive'
-                          : 'bg-status-warning'
-                      }`} />
-                      <span className="text-xs text-sidebar-foreground/70">
-                        {appStatus.connected ? 'Connected' : 'No bridge'}
-                      </span>
-                    </div>
-                    {appStatus.connected && (
-                      <div className="text-xs text-sidebar-foreground/50">
-                        {formatRelativeTime(appStatus.lastSyncAt)}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-sidebar-foreground/50">
-                      <span>{appStatus.accounts} accts</span>
-                      <span>{appStatus.transactions} txns</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {isCollapsed && session?.user?.name && (
               <SimpleTooltip label={session.user.name} show={isCollapsed}>
                 <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mb-1">

@@ -289,8 +289,6 @@ export default function ImportTab() {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     };
-    console.log(`[ImportTab] Sending execute request: type=${importType}, columnMapping=`, columnMapping, `accountMapping=`, accountMapping, `categoryMapping=`, categoryMapping);
-
     try {
       const res = await fetch('/api/import/execute', {
         method: 'POST',
@@ -299,20 +297,16 @@ export default function ImportTab() {
         body: JSON.stringify(payload),
       });
 
-      console.log(`[ImportTab] Execute response status: ${res.status}`);
       if (!res.ok) {
         const err = await res.json();
-        console.error(`[ImportTab] Execute failed:`, err);
         const detail = err.errorDetails || err.message || '';
         throw new Error(detail ? `Import failed: ${detail}` : 'Import failed');
       }
 
       const data = await res.json();
-      console.log(`[ImportTab] Execute result:`, data);
       setImportResult(data);
       fetchLogs();
     } catch (err: any) {
-      console.error(`[ImportTab] Execute error:`, err);
       setError(err.message || 'Import failed');
     } finally {
       setImporting(false);
