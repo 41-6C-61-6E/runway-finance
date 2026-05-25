@@ -52,8 +52,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly. Do NOT output any thinking, reasoning, explanation, or <think> tags.' },
+          { role: 'user', content: userPrompt }
+        ],
         max_tokens: 200,
+        chat_id: 'test-connection',
       }),
     });
     const elapsed = Date.now() - startTime;
@@ -66,7 +70,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const data = await res.json();
-    const responseContent = data.choices?.[0]?.message?.content || '(empty response)';
+    const msg = data.choices?.[0]?.message;
+    const responseContent = msg?.content || msg?.reasoning || msg?.reasoning_content || '(empty response)';
 
     return NextResponse.json({
       ok: true,

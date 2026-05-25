@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { Check } from 'lucide-react';
 
 interface BulkActionsToolbarProps {
   selectedIds: string[];
   onClear: () => void;
+  totalCount: number;
+  selectAllMatching: boolean;
+  onSelectAllMatching: () => void;
+  filters: Record<string, string | null>;
 }
 
 type Category = {
@@ -14,7 +19,7 @@ type Category = {
   color: string;
 };
 
-export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActionsToolbarProps) {
+export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, selectAllMatching, onSelectAllMatching, filters }: BulkActionsToolbarProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -46,11 +51,22 @@ export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActions
       const action = Object.keys(updates)[0] || 'patch';
       setActionLoading(action);
       try {
+        let body: Record<string, unknown>;
+        if (selectAllMatching) {
+          body = { selectAllMatching: true, patch: updates };
+          for (const [key, value] of Object.entries(filters)) {
+            if (value !== null) {
+              body[key] = value;
+            }
+          }
+        } else {
+          body = { ids: selectedIds, patch: updates };
+        }
         const res = await fetch('/api/transactions', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ ids: selectedIds, patch: updates }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -58,7 +74,7 @@ export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActions
           return;
         }
         if (data.updated === 0) {
-          console.warn('Bulk patch: 0 rows updated', { ids: selectedIds, patch: updates });
+          console.warn('Bulk patch: 0 rows updated', { body, patch: updates });
         }
         onClear();
       } catch (err) {
@@ -67,7 +83,7 @@ export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActions
         setActionLoading(null);
       }
     },
-    [selectedIds, onClear]
+    [selectedIds, selectAllMatching, filters, onClear]
   );
 
   const handleSetCategory = useCallback(
@@ -87,7 +103,25 @@ export default function BulkActionsToolbar({ selectedIds, onClear }: BulkActions
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-xl mb-4">
-      <span className="text-sm text-primary font-medium">{selectedIds.length} selected</span>
+      {selectAllMatching ? (
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+          <Check className="h-4 w-4" />
+          All {totalCount} transactions selected
+        </span>
+      ) : (
+        <span className="text-sm text-primary font-medium">{selectedIds.length} selected</span>
+      )}
+      {!selectAllMatching && selectedIds.length < totalCount && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <button
+            onClick={onSelectAllMatching}
+            className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+          >
+            Select all {totalCount} transactions
+          </button>
+        </>
+      )}
       <div className="h-4 w-px bg-border" />
       <button
         onClick={() => handleBulkPatch({ reviewed: true })}

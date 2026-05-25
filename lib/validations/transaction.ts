@@ -19,6 +19,7 @@ export const TransactionFilterSchema = z.object({
   sort: z.enum(['date', 'amount', 'description']).default('date'),
   order: z.enum(['asc', 'desc']).default('desc'),
   totalAmountOnly: z.coerce.boolean().optional(),
+  idsOnly: z.coerce.boolean().optional(),
 });
 
 export const PatchTransactionSchema = z.object({
@@ -31,10 +32,24 @@ export const PatchTransactionSchema = z.object({
 });
 
 export const BulkPatchTransactionSchema = z.object({
-  ids: z.array(z.string()).min(1).max(500),
+  ids: z.array(z.string()).min(1).optional(),
   patch: z.object({
     categoryId: z.string().nullable().optional(),
     reviewed: z.boolean().optional(),
     ignored: z.boolean().optional(),
   }),
+  selectAllMatching: z.boolean().optional(),
+  search: z.string().max(200).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  accountId: z.string().optional(),
+  accountIds: z.string().optional(),
+  accountTypes: z.string().optional(),
+  categoryId: z.string().optional(),
+  categoryIds: z.string().optional(),
+  pending: z.string().optional(),
+  reviewed: z.string().optional(),
+  categorizedByAi: z.string().optional(),
+  minAmount: z.string().optional(),
+  maxAmount: z.string().optional(),
 });
