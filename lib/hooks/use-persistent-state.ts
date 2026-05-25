@@ -42,15 +42,18 @@ export function usePersistentState<T>(
 
     const dbValue = context.settings.chartSelections?.[key];
 
-    if (dbValue !== undefined) {
+    if (dbValue !== undefined && dbValue !== null) {
       // DB has a value — use it and record it so we don't re-save it
-      let parsed = dbValue as T;
+      let parsed: T;
       if (optionsRef.current?.deserialize) {
         try {
           parsed = optionsRef.current.deserialize(JSON.stringify(dbValue));
         } catch (e) {
           console.warn(`Error deserializing DB value for key "${key}":`, e);
+          parsed = defaultValue;
         }
+      } else {
+        parsed = dbValue as T;
       }
       const valForDb = parsed instanceof Set ? Array.from(parsed) : parsed;
       lastDbSavedRef.current = JSON.stringify(valForDb);
@@ -66,8 +69,10 @@ export function usePersistentState<T>(
       if (stored !== null) {
         const deserialize = optionsRef.current?.deserialize ?? JSON.parse;
         const parsed = deserialize(stored);
-        setState(parsed);
-        stateRef.current = parsed;
+        if (parsed !== null) {
+          setState(parsed);
+          stateRef.current = parsed;
+        }
       }
     } catch (e) {
       console.warn(`Error reading localStorage key "${key}":`, e);
