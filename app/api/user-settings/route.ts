@@ -241,8 +241,8 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid aiBatchSize value (must be 1-200)' }, { status: 400 });
 	}
 
-	if (aiAnalysisTimeoutSeconds !== undefined && (typeof aiAnalysisTimeoutSeconds !== 'number' || aiAnalysisTimeoutSeconds < 30 || aiAnalysisTimeoutSeconds > 600)) {
-		return Response.json({ error: 'Invalid aiAnalysisTimeoutSeconds value (must be 30-600)' }, { status: 400 });
+	if (aiAnalysisTimeoutSeconds !== undefined && (typeof aiAnalysisTimeoutSeconds !== 'number' || aiAnalysisTimeoutSeconds < 60 || aiAnalysisTimeoutSeconds > 3600)) {
+		return Response.json({ error: 'Invalid aiAnalysisTimeoutSeconds value (must be 60-3600)' }, { status: 400 });
 	}
 
 	if (aiActiveProviderId !== undefined && aiActiveProviderId !== null && typeof aiActiveProviderId !== 'string') {

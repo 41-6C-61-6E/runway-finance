@@ -142,6 +142,60 @@ export async function GET(request: Request) {
     }
   }
 
+  if (filters.idsOnly) {
+    const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined);
+
+    if (!hasEncryptedFilters) {
+      const result = await getDb()
+        .select({ id: transactions.id })
+        .from(transactions)
+        .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+        .where(and(...whereConditions));
+      return NextResponse.json({ ids: result.map(r => r.id) });
+    }
+
+    let query = getDb()
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        description: transactions.description,
+        payee: transactions.payee,
+        notes: transactions.notes,
+        categoryName: categories.name,
+      })
+      .from(transactions)
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .leftJoin(categories, eq(transactions.categoryId, categories.id));
+
+    const result = await query.where(and(...whereConditions));
+
+    let filtered = await Promise.all(result.map(async (row: any) => {
+      const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+      let matchesSearch = true;
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const descDec = (await decryptField(row.description, dek)).toLowerCase();
+        const payeeDec = row.payee ? (await decryptField(row.payee, dek)).toLowerCase() : '';
+        const notesDec = row.notes ? (await decryptField(row.notes, dek)).toLowerCase() : '';
+        const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
+        matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
+      }
+      return { id: row.id, amount, matchesSearch };
+    }));
+
+    if (filters.search) {
+      filtered = filtered.filter((f) => f.matchesSearch);
+    }
+    if (filters.minAmount !== undefined) {
+      filtered = filtered.filter((f) => f.amount > filters.minAmount!);
+    }
+    if (filters.maxAmount !== undefined) {
+      filtered = filtered.filter((f) => f.amount <= filters.maxAmount!);
+    }
+
+    return NextResponse.json({ ids: filtered.map((f) => f.id) });
+  }
+
   // Optimized path for calculating total amount of matching transactions (Option A)
   if (filters.totalAmountOnly) {
     const selectFields: any = { amount: transactions.amount };
@@ -362,12 +416,12 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const { ids, patch } = parsed.data;
+  const { ids, patch, selectAllMatching, ...filterFields } = parsed.data;
   const patchedFields: string[] = [];
   if (patch.categoryId !== undefined) patchedFields.push('categoryId');
   if (patch.reviewed !== undefined) patchedFields.push('reviewed');
   if (patch.ignored !== undefined) patchedFields.push('ignored');
-  logger.info('Patching transactions', { idsCount: ids.length, patchedFields });
+  logger.info('Patching transactions', { selectAllMatching: !!selectAllMatching, idsCount: ids?.length, patchedFields });
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.categoryId !== undefined) {
@@ -377,13 +431,160 @@ export async function PATCH(request: Request) {
   if (patch.reviewed !== undefined) updateData.reviewed = patch.reviewed;
   if (patch.ignored !== undefined) updateData.ignored = patch.ignored;
 
-  const updated = await getDb()
-    .update(transactions)
-    .set(updateData)
-    .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)))
-    .returning();
+  let updated;
 
-  // Rebuild summaries since categories/transactions changed (non-blocking background task)
+  if (selectAllMatching) {
+    const userSettingsList = await getDb()
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    const userSetting = userSettingsList[0];
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
+
+    const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+
+    const whereConditions = [
+      eq(transactions.userId, userId),
+      eq(accounts.isHidden, false),
+      eq(accounts.isExcludedFromNetWorth, false),
+    ];
+
+    if (!isImportTransactionsEnabled) {
+      whereConditions.push(eq(transactions.isImported, false));
+    }
+
+    if (filterFields.accountIds) {
+      const splitIds = filterFields.accountIds.split(',').map(id => id.trim()).filter(Boolean);
+      if (splitIds.length > 0) {
+        whereConditions.push(inArray(transactions.accountId, splitIds));
+      }
+    } else if (filterFields.accountId) {
+      whereConditions.push(eq(transactions.accountId, filterFields.accountId));
+    }
+    if (filterFields.accountTypes) {
+      const types = filterFields.accountTypes.split(',').map(t => t.trim()).filter(Boolean);
+      if (types.length > 0) {
+        whereConditions.push(inArray(accounts.type, types));
+      }
+    }
+    if (filterFields.startDate) {
+      whereConditions.push(gte(transactions.date, filterFields.startDate));
+    }
+    if (filterFields.endDate) {
+      whereConditions.push(lte(transactions.date, filterFields.endDate));
+    }
+    if (filterFields.pending !== undefined) {
+      whereConditions.push(eq(transactions.pending, filterFields.pending === 'true'));
+    }
+    if (filterFields.reviewed !== undefined) {
+      whereConditions.push(eq(transactions.reviewed, filterFields.reviewed === 'true'));
+    }
+    if (filterFields.categorizedByAi !== undefined) {
+      whereConditions.push(eq(transactions.categorizedByAi, filterFields.categorizedByAi === 'true'));
+    }
+
+    if (filterFields.categoryIds) {
+      const splitIds = filterFields.categoryIds.split(',').map(id => id.trim()).filter(Boolean);
+      if (splitIds.length > 0) {
+        const uncategorizedIdx = splitIds.findIndex(id => id === 'uncategorized' || id === 'uncategorized_income');
+        if (uncategorizedIdx !== -1) {
+          const otherIds = splitIds.filter((_, i) => i !== uncategorizedIdx);
+          if (otherIds.length > 0) {
+            whereConditions.push(
+              or(isNull(transactions.categoryId), inArray(transactions.categoryId, otherIds))
+            );
+          } else {
+            whereConditions.push(isNull(transactions.categoryId));
+          }
+        } else {
+          whereConditions.push(inArray(transactions.categoryId, splitIds));
+        }
+      }
+    } else if (filterFields.categoryId) {
+      if (filterFields.categoryId === 'uncategorized' || filterFields.categoryId === 'uncategorized_income') {
+        whereConditions.push(isNull(transactions.categoryId));
+      } else {
+        whereConditions.push(eq(transactions.categoryId, filterFields.categoryId));
+      }
+    }
+
+    const hasEncryptedFilters = !!(filterFields.search || filterFields.minAmount || filterFields.maxAmount);
+
+    if (!hasEncryptedFilters) {
+      updated = await getDb()
+        .update(transactions)
+        .set(updateData)
+        .from(accounts)
+        .where(and(eq(transactions.accountId, accounts.id), ...whereConditions))
+        .returning();
+    } else {
+      const result = await getDb()
+        .select({
+          id: transactions.id,
+          amount: transactions.amount,
+          description: transactions.description,
+          payee: transactions.payee,
+          notes: transactions.notes,
+          categoryName: categories.name,
+        })
+        .from(transactions)
+        .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+        .leftJoin(categories, eq(transactions.categoryId, categories.id))
+        .where(and(...whereConditions));
+
+      let filtered = await Promise.all(result.map(async (row: any) => {
+        const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+        let matchesSearch = true;
+        if (filterFields.search) {
+          const q = filterFields.search.toLowerCase();
+          const descDec = (await decryptField(row.description, dek)).toLowerCase();
+          const payeeDec = row.payee ? (await decryptField(row.payee, dek)).toLowerCase() : '';
+          const notesDec = row.notes ? (await decryptField(row.notes, dek)).toLowerCase() : '';
+          const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
+          matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
+        }
+        return { id: row.id, amount, matchesSearch };
+      }));
+
+      if (filterFields.search) {
+        filtered = filtered.filter((f) => f.matchesSearch);
+      }
+      if (filterFields.minAmount) {
+        filtered = filtered.filter((f) => f.amount > parseFloat(filterFields.minAmount!));
+      }
+      if (filterFields.maxAmount) {
+        filtered = filtered.filter((f) => f.amount <= parseFloat(filterFields.maxAmount!));
+      }
+
+      const matchingIds = filtered.map((f) => f.id);
+
+      if (matchingIds.length > 0) {
+        updated = await getDb()
+          .update(transactions)
+          .set(updateData)
+          .where(and(eq(transactions.userId, userId), inArray(transactions.id, matchingIds)))
+          .returning();
+      } else {
+        updated = [];
+      }
+    }
+  } else {
+    updated = await getDb()
+      .update(transactions)
+      .set(updateData)
+      .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids!)))
+      .returning();
+  }
+
   Promise.all([
     updateCategorySpendingSummaries(userId, dek),
     updateCategoryIncomeSummaries(userId, dek),

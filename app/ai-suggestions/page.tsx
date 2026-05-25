@@ -16,6 +16,12 @@ type AiProposal = {
   payload: any;
   explanation: string | null;
   createdAt: string;
+  transactionDetails?: {
+    payee: string | null;
+    date: string;
+    amount: string;
+    accountName: string | null;
+  };
 };
 
 function confidenceColor(confidence: number): string {
@@ -220,22 +226,33 @@ function ProposalCard({
     );
   }
 
+  // Build category path lookup (e.g. "Electricity" → "Utilities > Electricity")
+  const catById = new Map(categories.map(c => [c.id, c]));
+  const catPath = (name: string | null): string => {
+    if (!name) return 'Uncategorized';
+    const cat = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (cat?.parentId) {
+      const parent = catById.get(cat.parentId);
+      if (parent) return `${parent.name} > ${cat.name}`;
+    }
+    return name;
+  };
+
   const detailLines: string[] = [];
   switch (proposal.type) {
     case 'categorize':
       detailLines.push(`Transaction: ${payload.transactionDescription ?? 'Unknown'}`);
-      if (payload.proposedCategoryName) {
-        detailLines.push(`→ Category: ${payload.proposedCategoryName}`);
-      }
+      detailLines.push(`→ Category: ${catPath(payload.proposedCategoryName)}`);
       break;
     case 'create_category':
-      detailLines.push(`New category: ${payload.name}`);
-      if (payload.parentName) detailLines.push(`Parent: ${payload.parentName}`);
+      detailLines.push(payload.parentName
+        ? `New category: ${payload.parentName} > ${payload.name}`
+        : `New category: ${payload.name}`);
       break;
     case 'create_rule':
       detailLines.push(`Rule: ${payload.ruleName ?? 'Unnamed'}`);
       detailLines.push(`If ${payload.conditionField} ${payload.conditionOperator} "${payload.conditionValue}"`);
-      if (payload.setCategoryName) detailLines.push(`→ ${payload.setCategoryName}`);
+      detailLines.push(`→ ${catPath(payload.setCategoryName)}`);
       break;
   }
 
@@ -294,6 +311,31 @@ function ProposalCard({
         ))}
       </div>
 
+      {proposal.type === 'categorize' && proposal.transactionDetails && (
+        <div className="mt-2.5 mb-3 grid grid-cols-2 gap-x-4 gap-y-2 p-3 rounded-lg bg-muted/30 text-[11px] font-mono text-muted-foreground border border-border/40">
+          <div>
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Payee</span>
+            <span className="text-foreground text-xs">{proposal.transactionDetails.payee || '—'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Account</span>
+            <span className="text-foreground text-xs">{proposal.transactionDetails.accountName || '—'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Date</span>
+            <span className="text-foreground text-xs">
+              {new Date(proposal.transactionDetails.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Amount</span>
+            <span className="text-foreground text-xs font-semibold">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(proposal.transactionDetails.amount))}
+            </span>
+          </div>
+        </div>
+      )}
+
       {proposal.explanation && (
         <p className="text-xs text-muted-foreground italic">{proposal.explanation}</p>
       )}
@@ -302,7 +344,7 @@ function ProposalCard({
 }
 
 const STATUS_KEY = 'ai_analysis_status';
-const ANALYSIS_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const ANALYSIS_TIMEOUT_MS = 70 * 60 * 1000; // 70 minutes (matches server overall timeout + buffer)
 
 type AnalysisStatus = { status: 'running' | 'completed' | 'error'; message: string; startedAt?: number; totalToAnalyze?: number | null } | null;
 
@@ -335,8 +377,18 @@ export default function AiSuggestionsPage() {
   const [editPayload, setEditPayload] = useState<any>(null);
   const [categories, setCategories] = useState<{ id: string; name: string; isIncome: boolean; parentId: string | null; color: string }[]>([]);
   const analyzingRef = useRef(false);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
 
   const [savedStatus, setSavedStatus] = useState<AnalysisStatus>(null);
+  const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string>('Initializing...');
+
+  useEffect(() => {
+    if (showLogs && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [analysisLogs, showLogs]);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -384,7 +436,7 @@ export default function AiSuggestionsPage() {
           const elapsed = Date.now() - parsed.startedAt;
           if (elapsed > ANALYSIS_TIMEOUT_MS) {
             // Analysis has been running too long, mark as failed
-            const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
+            const timeoutMsg = `Analysis timed out after 10 minutes. The server-side process may have stalled or taken too long. Please try running the analysis again.`;
             setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
             localStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
             return;
@@ -412,7 +464,7 @@ export default function AiSuggestionsPage() {
     const checkTimeout = setInterval(() => {
       const elapsed = Date.now() - (savedStatus.startedAt || 0);
       if (elapsed > ANALYSIS_TIMEOUT_MS) {
-        const timeoutMsg = 'Analysis appears to have timed out. Please try running the analysis again.';
+        const timeoutMsg = `Analysis timed out after 10 minutes. The server-side process may have stalled or taken too long. Please try running the analysis again.`;
         persistStatus({ status: 'error', message: timeoutMsg, startedAt: savedStatus.startedAt });
         setAnalyzing(false);
         showFeedback('error', timeoutMsg);
@@ -487,21 +539,33 @@ export default function AiSuggestionsPage() {
     return () => clearInterval(interval);
   }, [analyzing, startTime, filterStatus, filterType]);
 
-  // Poll backend status for live progress (processedCount/totalCount)
+  // Poll backend status for live progress (processedCount/totalCount, logs, steps)
   useEffect(() => {
     if (!analyzing) {
       setProcessedCount(0);
+      setAnalysisLogs([]);
+      setCurrentStep('Initializing...');
       return;
     }
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/ai/status', { credentials: 'include' });
-        const data = await res.json();
-        if (data.status === 'running' || data.status === 'completed') {
-          setProcessedCount(data.processedCount ?? 0);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'running' || data.status === 'completed') {
+            setProcessedCount(data.processedCount ?? 0);
+            if (data.totalCount) setTotalToAnalyze(data.totalCount);
+            if (data.log) {
+              setAnalysisLogs(data.log);
+              if (data.log.length > 0) {
+                const rawLastLog = data.log[data.log.length - 1];
+                setCurrentStep(rawLastLog);
+              }
+            }
+          }
         }
       } catch { /* ignore */ }
-    }, 2000);
+    }, 1500);
     return () => clearInterval(interval);
   }, [analyzing]);
 
@@ -522,6 +586,8 @@ export default function AiSuggestionsPage() {
     setAnalyzing(true);
     analyzingRef.current = true;
     const startedAt = Date.now();
+    setAnalysisLogs([]);
+    setCurrentStep('Initializing...');
     
     // Get initial count of items to analyze
     const txnRes = await fetch('/api/transactions?countOnly=true&uncategorized=true', { credentials: 'include' }).catch(() => null);
@@ -602,6 +668,8 @@ export default function AiSuggestionsPage() {
     setTotalToAnalyze(null);
     setLastBatchAt(null);
     setLastBatchDuration(null);
+    setAnalysisLogs([]);
+    setCurrentStep('Initializing...');
   };
 
   const confirmAction = (config: { title: string; description: string; actionLabel: string; onConfirm: () => void; isDestructive?: boolean }) => {
@@ -843,106 +911,145 @@ export default function AiSuggestionsPage() {
 
         {/* Persistent analysis status banner — survives navigation */}
         {(analyzing || savedStatus) && (
-          <div className={`p-3 rounded-lg flex items-center gap-3 border ${
+          <div className={`p-4 rounded-lg border flex flex-col gap-3 ${
             savedStatus?.status === 'completed' ? 'bg-chart-2/10 border-chart-2/30' :
             savedStatus?.status === 'error' ? 'bg-destructive/10 border-destructive/30' :
             'bg-primary/5 border-primary/20'
           }`}>
-            {(analyzing || savedStatus?.status === 'running') ? (
-              <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-            ) : (
-              <div className="h-4 w-4 shrink-0" />
-            )}
-            <div className="flex-1 text-sm text-foreground">
+            <div className="flex items-start gap-3">
               {(analyzing || savedStatus?.status === 'running') ? (
-                <div className="space-y-1.5">
-                  <p className="font-medium">AI analysis in progress</p>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1" title="Transactions prompted to the AI model so far">
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      Prompted: {processedCount}{totalToAnalyze !== null ? ` / ${totalToAnalyze}` : ''}
-                    </span>
-                    <span className="flex items-center gap-1" title="Categorization suggestions created">
-                      <Tag className="h-3.5 w-3.5" />
-                      Categorized: {newTxnsCount}
-                    </span>
-                    <span className="flex items-center gap-1" title="Category suggestions created">
-                      <FileText className="h-3.5 w-3.5" />
-                      Categories: {newCategoriesCount}
-                    </span>
-                    <span className="flex items-center gap-1" title="Rule suggestions created">
-                      <Brain className="h-3.5 w-3.5" />
-                      Rules: {newRulesCount}
-                    </span>
-                    <span className="flex items-center gap-1" title="Suggestions waiting for your review">
-                      <Layers className="h-3.5 w-3.5" />
-                      Pending: {pendingProposalsCount}
-                    </span>
-                    <span className="flex items-center gap-1" title="Number of transactions processed per AI call">
-                      <Layers className="h-3.5 w-3.5" />
-                      Batch: {batchSize || 25}
-                    </span>
-                    {lastBatchDuration !== null && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        Last batch: {lastBatchDuration}s
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1 font-mono">
-                      Elapsed: {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground space-y-0.5">
-                    <p>
-                      The AI is analyzing your uncategorized transactions in batches of {batchSize || 25},
-                      considering your existing categories and rules to suggest categorizations, new categories, and rules.
-                    </p>
-                    <p className="opacity-70">
-                      You can navigate away — analysis continues in the background. New proposals appear here automatically.
-                    </p>
-                  </div>
-                </div>
-              ) : savedStatus?.status === 'error' ? (
-                <>
-                  <p className="font-medium text-destructive">{savedStatus.message}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Check your AI provider settings and try again. If the issue persists, verify your AI provider endpoint and API key.
-                  </p>
-                </>
+                <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0 mt-0.5" />
               ) : (
-                <p className="text-sm">{savedStatus?.message}</p>
+                <div className="h-4 w-4 shrink-0" />
               )}
+              <div className="flex-1 text-sm text-foreground space-y-2">
+                {(analyzing || savedStatus?.status === 'running') ? (
+                  <div className="space-y-2.5">
+                    <p className="font-medium">AI analysis in progress</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1" title="Transactions prompted to the AI model so far">
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        Prompted: {processedCount}{totalToAnalyze !== null ? ` / ${totalToAnalyze}` : ''}
+                      </span>
+                      <span className="flex items-center gap-1" title="Categorization suggestions created">
+                        <Tag className="h-3.5 w-3.5" />
+                        Categorized: {newTxnsCount}
+                      </span>
+                      <span className="flex items-center gap-1" title="Category suggestions created">
+                        <FileText className="h-3.5 w-3.5" />
+                        Categories: {newCategoriesCount}
+                      </span>
+                      <span className="flex items-center gap-1" title="Rule suggestions created">
+                        <Brain className="h-3.5 w-3.5" />
+                        Rules: {newRulesCount}
+                      </span>
+                      <span className="flex items-center gap-1" title="Suggestions waiting for your review">
+                        <Layers className="h-3.5 w-3.5" />
+                        Pending: {pendingProposalsCount}
+                      </span>
+                      <span className="flex items-center gap-1" title="Number of transactions processed per AI call">
+                        <Layers className="h-3.5 w-3.5" />
+                        Batch: {batchSize || 25}
+                      </span>
+                      {lastBatchDuration !== null && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          Last batch: {lastBatchDuration}s
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 font-mono">
+                        Elapsed: {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                    {currentStep && (
+                      <p className="text-[11px] font-mono text-primary bg-primary/10 px-2.5 py-1.5 rounded border border-primary/20 select-none animate-pulse flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                        </span>
+                        Status: {currentStep}
+                      </p>
+                    )}
+                    <div className="text-[10px] text-muted-foreground space-y-0.5">
+                      <p>
+                        The AI is analyzing your uncategorized transactions in batches of {batchSize || 25},
+                        considering your existing categories and rules to suggest categorizations, new categories, and rules.
+                      </p>
+                      <p className="opacity-70">
+                        You can navigate away — analysis continues in the background. New proposals appear here automatically.
+                      </p>
+                    </div>
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowLogs(!showLogs)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded"
+                      >
+                        {showLogs ? 'Hide live progress log' : 'Show live progress log'}
+                        <span className="text-[10px] opacity-60">({analysisLogs.length} entries)</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : savedStatus?.status === 'error' ? (
+                  <>
+                    <p className="font-medium text-destructive">{savedStatus.message}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Check your AI provider settings and try again. If the issue persists, verify your AI provider endpoint and API key.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm">{savedStatus?.message}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {(analyzing || savedStatus?.status === 'running') && (
+                  <button
+                    onClick={handleCancel}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
+                  >
+                    <X className="h-3 w-3" />
+                    Cancel
+                  </button>
+                )}
+                {savedStatus?.status === 'error' && (
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={analyzing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Retry
+                  </button>
+                )}
+                {!(analyzing || savedStatus?.status === 'running') && (
+                  <button
+                    onClick={dismissStatus}
+                    className="text-muted-foreground hover:text-foreground"
+                    title="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {(analyzing || savedStatus?.status === 'running') && (
-                <button
-                  onClick={handleCancel}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
-                >
-                  <X className="h-3 w-3" />
-                  Cancel
-                </button>
-              )}
-              {savedStatus?.status === 'error' && (
-                <button
-                  onClick={handleAnalyze}
-                  disabled={analyzing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  Retry
-                </button>
-              )}
-              {!(analyzing || savedStatus?.status === 'running') && (
-                <button
-                  onClick={dismissStatus}
-                  className="text-muted-foreground hover:text-foreground"
-                  title="Dismiss"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+
+            {showLogs && (analyzing || savedStatus?.status === 'running') && (
+              <div 
+                ref={logsContainerRef}
+                className="border border-border/50 rounded-lg bg-zinc-950/80 p-3 font-mono text-[11px] text-zinc-300 overflow-y-auto max-h-48 space-y-1 shadow-inner select-text"
+              >
+                {analysisLogs.length === 0 ? (
+                  <p className="italic text-zinc-500 animate-pulse">Initializing log stream...</p>
+                ) : (
+                  analysisLogs.map((log, idx) => (
+                    <div key={idx} className="flex gap-2 py-0.5 px-1 hover:bg-white/5 rounded">
+                      <span className="text-zinc-600 select-none">[{idx + 1}]</span>
+                      <span className="whitespace-pre-wrap">{log}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1045,18 +1152,20 @@ export default function AiSuggestionsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-1">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === pendingCount && pendingCount > 0}
-                onChange={(e) => {
-                  if (e.target.checked) setSelectedIds(new Set(allPendingIds));
-                  else setSelectedIds(new Set());
-                }}
-                className="accent-primary"
-              />
-              <span className="text-xs text-muted-foreground">Select all pending</span>
-            </div>
+            {filterStatus === 'pending' && (
+              <div className="flex items-center gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === pendingCount && pendingCount > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(new Set(allPendingIds));
+                    else setSelectedIds(new Set());
+                  }}
+                  className="accent-primary"
+                />
+                <span className="text-xs text-muted-foreground">Select all pending</span>
+              </div>
+            )}
             {proposals.map((proposal) => (
               <div key={proposal.id} className="flex items-start gap-3">
                 {proposal.status === 'pending' && (

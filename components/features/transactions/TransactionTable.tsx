@@ -62,6 +62,7 @@ interface TransactionTableProps {
   filters: Record<string, string | null>;
   onSelectAll: (ids: string[]) => void;
   onTransactionClick?: (tx: Transaction) => void;
+  onTotalChange?: (total: number) => void;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -132,7 +133,7 @@ function SortableHeader({
   );
 }
 
-export default function TransactionTable({ filters, onSelectAll, onTransactionClick }: TransactionTableProps) {
+export default function TransactionTable({ filters, onSelectAll, onTransactionClick, onTotalChange }: TransactionTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState<number | null>(null);
@@ -310,6 +311,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         categoryColor: tx.category?.color ?? null,
       })));
       setTotal(data.total ?? 0);
+      onTotalChange?.(data.total ?? 0);
 
       // Lazy load total amount
       if (data.totalAmount !== null && data.totalAmount !== undefined) {

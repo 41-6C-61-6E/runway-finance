@@ -52,6 +52,10 @@ export default function AiTab() {
   const [formTestResult, setFormTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [showTestProgress, setShowTestProgress] = useState<string | null>(null);
   const [testProgressFn, setTestProgressFn] = useState<((signal: AbortSignal) => Promise<{ ok: boolean; message: string; response?: string }>) | null>(null);
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
+  const [isCustomModel, setIsCustomModel] = useState(false);
 
   const loadData = async () => {
     try {
@@ -85,6 +89,48 @@ export default function AiTab() {
     loadData();
   }, []);
 
+  // Debounced model fetching
+  useEffect(() => {
+    if (!showForm || !formEndpoint.trim() || !formEndpoint.startsWith('http')) {
+      setFetchedModels([]);
+      setModelsFetchError(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setFetchingModels(true);
+      setModelsFetchError(null);
+      try {
+        const res = await fetch('/api/ai/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            endpoint: formEndpoint.trim(),
+            apiKey: formApiKey.trim(),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.models || [];
+          setFetchedModels(list);
+          if (formModel && !list.includes(formModel)) {
+            setIsCustomModel(true);
+          }
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setModelsFetchError(data.error || 'Failed to fetch models');
+        }
+      } catch (err) {
+        setModelsFetchError('Failed to connect to model endpoint');
+      } finally {
+        setFetchingModels(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [formEndpoint, formApiKey, showForm]);
+
   const openAddForm = () => {
     setEditingId(null);
     setFormName('');
@@ -93,6 +139,9 @@ export default function AiTab() {
     setFormApiKey('');
     setFormSetActive(false);
     setShowForm(true);
+    setFetchedModels([]);
+    setIsCustomModel(false);
+    setModelsFetchError(null);
   };
 
   const openEditForm = (p: Provider) => {
@@ -103,6 +152,9 @@ export default function AiTab() {
     setFormApiKey(p.apiKey);
     setFormSetActive(false);
     setShowForm(true);
+    setFetchedModels([]);
+    setIsCustomModel(false);
+    setModelsFetchError(null);
   };
 
   const handleSaveProvider = async () => {
@@ -161,8 +213,12 @@ export default function AiTab() {
           headers,
           body: JSON.stringify({
             model,
-            messages: [{ role: 'user', content: customPrompt || 'Reply with only "ok". Do not think step by step. Do not use tools. Respond immediately.' }],
+            messages: [
+              { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly. Do NOT output any thinking, reasoning, explanation, or <think> tags.' },
+              { role: 'user', content: customPrompt || DEFAULT_TEST_PROMPT }
+            ],
             max_tokens: 200,
+            chat_id: 'test-connection',
           }),
           signal,
         });
@@ -178,7 +234,8 @@ export default function AiTab() {
         }
 
         const data = await res.json();
-        const responseContent = data.choices?.[0]?.message?.content || '(empty response)';
+        const msg = data.choices?.[0]?.message;
+        const responseContent = msg?.content || msg?.reasoning || msg?.reasoning_content || '(empty response)';
         const result = { ok: true, message: `Connected to ${model} (${elapsed}ms)`, response: responseContent };
         setFormTestResult(result);
         return result;
@@ -350,6 +407,16 @@ export default function AiTab() {
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-foreground mb-1">API Key</label>
+              <input
+                type="password"
+                value={formApiKey}
+                onChange={(e) => setFormApiKey(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="sk-... (leave blank if not required)"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-foreground mb-1">Endpoint URL</label>
               <input
                 value={formEndpoint}
@@ -359,23 +426,61 @@ export default function AiTab() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Model Name</label>
-              <input
-                value={formModel}
-                onChange={(e) => setFormModel(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="llama3, gpt-4o, etc."
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">API Key</label>
-              <input
-                type="password"
-                value={formApiKey}
-                onChange={(e) => setFormApiKey(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="sk-... (leave blank if not required)"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-foreground">Model Name</label>
+                {fetchingModels && (
+                  <span className="text-[10px] text-primary animate-pulse flex items-center gap-1">
+                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Fetching models...
+                  </span>
+                )}
+                {!fetchingModels && fetchedModels.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomModel(!isCustomModel)}
+                    className="text-[10px] text-primary hover:underline font-medium"
+                  >
+                    {isCustomModel ? 'Select from list' : '✏️ Enter custom name'}
+                  </button>
+                )}
+              </div>
+
+              {(!isCustomModel && fetchedModels.length > 0) ? (
+                <select
+                  value={formModel}
+                  onChange={(e) => setFormModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="" disabled>Select a model...</option>
+                  {fetchedModels.map((modelName) => (
+                    <option key={modelName} value={modelName}>
+                      {modelName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-1">
+                  <input
+                    value={formModel}
+                    onChange={(e) => setFormModel(e.target.value)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="e.g. gpt-4o, llama3"
+                  />
+                  {modelsFetchError && (
+                    <p className="text-[10px] text-destructive font-medium">
+                      Could not fetch models: {modelsFetchError} (entering manually)
+                    </p>
+                  )}
+                  {fetchedModels.length === 0 && !fetchingModels && !modelsFetchError && formEndpoint.trim() && (
+                    <p className="text-[10px] text-muted-foreground">
+                      No models found or endpoint not queried. Enter model manually.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input

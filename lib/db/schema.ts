@@ -116,7 +116,7 @@ export const userSettings = pgTable('user_settings', {
   aiAutoApprove: boolean('ai_auto_approve').notNull().default(false),
   aiAutoApproveThreshold: integer('ai_auto_approve_threshold').notNull().default(95),
   aiBatchSize: integer('ai_batch_size').notNull().default(25),
-  aiAnalysisTimeoutSeconds: integer('ai_analysis_timeout_seconds').notNull().default(600),
+  aiAnalysisTimeoutSeconds: integer('ai_analysis_timeout_seconds').notNull().default(3600),
   aiActiveProviderId: uuid('ai_active_provider_id'),
   apiKeys: text('api_keys'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

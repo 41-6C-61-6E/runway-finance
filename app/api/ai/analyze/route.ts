@@ -2,10 +2,6 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { activeAnalysisSessions } from '../state';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
-import { getDb } from '@/lib/db';
-import { userSettings } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-
 export async function POST() {
   const session = await auth();
   const userId = session?.user?.id;
@@ -28,27 +24,6 @@ export async function POST() {
       status: 'running',
       log: [],
     });
-
-    // Get timeout from user settings (default 600s)
-    const db = getDb();
-    const settingsRow = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-    const timeoutSeconds = settingsRow[0]?.aiAnalysisTimeoutSeconds ?? 600;
-
-    // Set a server-side timeout
-    const timeoutId = setTimeout(() => {
-      abortController.abort();
-      const existing = activeAnalysisSessions.get(userId);
-      if (existing) {
-        existing.status = 'error';
-        existing.error = 'Analysis timed out';
-        existing.log.push(`Timed out after ${timeoutSeconds}s`);
-      }
-    }, timeoutSeconds * 1000);
-
-    if (activeAnalysisSessions.get(userId)?.timeoutId) {
-      clearTimeout(activeAnalysisSessions.get(userId)!.timeoutId!);
-    }
-    activeAnalysisSessions.get(userId)!.timeoutId = timeoutId;
 
     try {
       const result = await analyzeUncategorized(
@@ -85,7 +60,6 @@ export async function POST() {
         errors: result.errors,
       });
     } finally {
-      clearTimeout(timeoutId);
       setTimeout(() => {
         activeAnalysisSessions.delete(userId);
       }, 5000);
@@ -102,4 +76,4 @@ export async function POST() {
   }
 }
 
-export const maxDuration = 600;
+export const maxDuration = 3600;
