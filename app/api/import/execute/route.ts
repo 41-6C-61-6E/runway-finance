@@ -419,9 +419,9 @@ export async function POST(request: Request) {
       await updateCategoryIncomeSummaries(userId, dek);
       logger.info(`[import/execute] Successfully updated summaries, regenerated snapshots, and updated account balances.`);
     } catch (postImportError) {
-      logger.error(`[import/execute] Error in post-import snapshot/summary updates (non-fatal)`, {
-        error: postImportError instanceof Error ? postImportError.message : String(postImportError),
-      });
+      const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
+      logger.error(`[import/execute] Error in post-import snapshot/summary updates`, { error: msg });
+      warnings.push(`Post-import processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
     }
 
     return NextResponse.json({
