@@ -9,6 +9,7 @@ import { decryptRows } from '@/lib/crypto';
 import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { readApiConfig } from '@/lib/services/manual-accounts';
+import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
 const MODEL_SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
 
@@ -41,6 +42,12 @@ export async function POST(request: Request) {
 
     let syntheticCount = 0;
     let skippedCount = 0;
+    let summaryMonths = 0;
+    let summaryTransactions = 0;
+    let summarySpendingRows = 0;
+    let summarySpendingCategories = 0;
+    let summaryIncomeRows = 0;
+    let summaryIncomeCategories = 0;
     const errors: Array<{ accountId: string; error: string }> = [];
 
     if (type === 'netWorth') {
@@ -117,6 +124,16 @@ export async function POST(request: Request) {
     } else if (type === 'cashFlow') {
       // Cash flow projections are computed on-the-fly from budgets and
       // spending patterns; no stored snapshots to regenerate.
+    } else if (type === 'summaries') {
+      const monthlyResult = await updateMonthlyCashFlowSummaries(userId, dek);
+      const spendingResult = await updateCategorySpendingSummaries(userId, dek);
+      const incomeResult = await updateCategoryIncomeSummaries(userId, dek);
+      summaryMonths = monthlyResult.monthsUpdated;
+      summaryTransactions = monthlyResult.transactionsProcessed;
+      summarySpendingRows = spendingResult.categoryRows;
+      summarySpendingCategories = spendingResult.categoriesCount;
+      summaryIncomeRows = incomeResult.categoryRows;
+      summaryIncomeCategories = incomeResult.categoriesCount;
     }
 
     logger.info('Snapshot recalculation complete', {
@@ -135,7 +152,9 @@ export async function POST(request: Request) {
           ? `Regenerated account snapshots and rebuilt net worth chart (${syntheticCount} synthetic snapshots across ${decrypted.length} accounts)`
           : type === 'realEstate'
             ? `Regenerated estimated snapshots for model-based accounts (${syntheticCount} synthetic snapshots created)`
-            : `Cash flow projections are computed in real-time \u2014 no stored data to recalculate`,
+            : type === 'summaries'
+              ? `Recalculated cash flow (${summaryMonths} months, ${summaryTransactions} transactions), spending (${summarySpendingRows} rows, ${summarySpendingCategories} categories), and income summaries (${summaryIncomeRows} rows, ${summaryIncomeCategories} categories)`
+              : `Cash flow projections are computed in real-time \u2014 no stored data to recalculate`,
       stats: {
         accountsProcessed: type === 'netWorth'
           ? decrypted.length
@@ -146,6 +165,14 @@ export async function POST(request: Request) {
         skippedRealSnapshots: skippedCount,
         errorsEncountered: errors.length,
         errors: errors.length > 0 ? errors : undefined,
+        ...(type === 'summaries' ? {
+          summaryMonths,
+          summaryTransactions,
+          summarySpendingRows,
+          summarySpendingCategories,
+          summaryIncomeRows,
+          summaryIncomeCategories,
+        } : {}),
       },
     });
   } catch (error) {

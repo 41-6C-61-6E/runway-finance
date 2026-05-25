@@ -79,6 +79,7 @@ export default function AnalyticsTab() {
   const [netWorthState, setNetWorthState] = useState<ModuleRecalcState>(INIT_RECALC);
   const [realEstateState, setRealEstateState] = useState<ModuleRecalcState>(INIT_RECALC);
   const [cashFlowState, setCashFlowState] = useState<ModuleRecalcState>(INIT_RECALC);
+  const [summariesState, setSummariesState] = useState<ModuleRecalcState>(INIT_RECALC);
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'data' | 'charts'>('general');
 
   const toggleModuleExpanded = (key: string) => {
@@ -479,19 +480,44 @@ export default function AnalyticsTab() {
         </div>
       </div>
 
-      {/* ── Summary Tables ────────────────────────────────────────────── */}
+      {/* ── Summary Tables (Spending & Cash Flow) ─────────────────────── */}
       <div className="p-4 bg-muted/20 border border-border rounded-lg">
-        <h2 className="text-sm font-semibold text-foreground mb-1">Summary Tables</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-1">Summary Tables &mdash; Spending &amp; Cash Flow</h2>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Cash flow summaries (monthly income/expenses) and category breakdowns (spending &amp; income
-          by category) are pre-computed for fast chart rendering. These are <strong className="text-foreground/80">automatically
-          recalculated</strong> whenever you sync accounts or create/edit transactions &mdash; no manual
-          action is needed.
+          Your <strong className="text-foreground/80">Spending</strong> and <strong className="text-foreground/80">Cash Flow</strong>
+          pages are powered by pre-computed summary tables: monthly income/expense totals and category breakdowns.
+          These are <strong className="text-foreground/80">automatically recalculated</strong> whenever you sync
+          accounts or create/edit transactions. If you&rsquo;re seeing missing or stale data, you can trigger a
+          manual recalculation below.
         </p>
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-          <span>Auto-maintained &mdash; nothing to configure here.</span>
+        <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+          <button
+            type="button"
+            disabled={summariesState.recalculating}
+            onClick={() => handleRecalculate('summaries', summariesState, setSummariesState)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${summariesState.recalculating ? 'animate-spin' : ''}`} />
+            {summariesState.recalculating ? 'Recalculating...' : 'Recalculate Spending & Cash Flow Summaries'}
+          </button>
         </div>
+        {summariesState.result && (
+          <div className={`mt-2 p-2.5 rounded-lg border text-[11px] ${
+            summariesState.result.success
+              ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
+              : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
+          }`}>
+            <p className="font-medium">{summariesState.result.message}</p>
+            {summariesState.result.stats && (
+              <ul className="mt-1 space-y-0.5">
+                <li>Cash flow months: {summariesState.result.stats.summaryMonths}</li>
+                <li>Transactions processed: {summariesState.result.stats.summaryTransactions}</li>
+                <li>Spending summary rows: {summariesState.result.stats.summarySpendingRows} ({summariesState.result.stats.summarySpendingCategories} categories)</li>
+                <li>Income summary rows: {summariesState.result.stats.summaryIncomeRows} ({summariesState.result.stats.summaryIncomeCategories} categories)</li>
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Imported Data ─────────────────────────────────────────────── */}
