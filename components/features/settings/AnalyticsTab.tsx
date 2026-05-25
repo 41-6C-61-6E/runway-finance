@@ -29,17 +29,17 @@ const MODULES = [
   {
     key: 'netWorth' as const,
     label: 'Net Worth & Accounts',
-    description: 'Estimated balance snapshots are generated from your transaction history to fill in days where no automatic snapshot was taken by your financial institution. Disabling this shows only dates with confirmed snapshots.',
+    description: 'Estimated daily balance snapshots are generated from your transaction history to fill gaps between confirmed snapshots from your financial institution. Synthetic snapshots are automatically backfilled during each sync. Manual recalibration is useful after importing historical data, correcting past transactions, or changing account settings.',
   },
   {
     key: 'realEstate' as const,
     label: 'Real Estate',
-    description: 'When adding a property manually, historical values are estimated using the FHFA Housing Price Index. Mortgage paydown is estimated using amortization schedules. Disabling this shows only balance snapshots you have manually entered or synced.',
+    description: 'Historical property values are estimated using the FHFA Housing Price Index, and mortgage paydown is simulated via amortization schedules. Snapshots are automatically regenerated when you add or edit a property, vehicle, or mortgage. Manual recalculation is useful after updating property details, loan terms, or purchase dates.',
   },
   {
     key: 'cashFlowProjections' as const,
     label: 'Cash Flow Projections',
-    description: 'Future income and expense projections are calculated from your budgets and historical spending patterns. Disabling this removes projected future data from charts.',
+    description: 'Future income and expense projections are calculated in real-time from your budgets and historical spending patterns. No data is stored — projections are computed on-the-fly whenever charts are viewed. No recalculation is needed.',
   },
 ];
 
@@ -116,10 +116,10 @@ export default function AnalyticsTab() {
 
   const recalcConfirmText = (key: string) => {
     if (key === 'netWorth') {
-      return 'This will permanently delete all previously calculated synthetic snapshots for your accounts and regenerate them from scratch. Your actual synced or manually entered historical snapshots will not be deleted.';
+      return 'This will permanently delete all previously calculated synthetic account snapshots and regenerate them from your transaction history. The net worth chart will also be rebuilt from the updated snapshots. Your actual synced or manually entered snapshots will not be deleted.';
     }
     if (key === 'realEstate') {
-      return 'This will permanently delete all estimated property value and mortgage paydown snapshots and regenerate them from your current property and mortgage details. This is useful if you have updated loan terms, corrected a purchase date, or added a new mortgage.';
+      return 'This will permanently delete all estimated property value and mortgage paydown snapshots and regenerate them from your current property and mortgage details. Useful after updating loan terms, correcting a purchase date, adding a new mortgage, or changing property details.';
     }
     return 'Cash flow projections are computed in real-time from your budgets and spending patterns. No stored snapshots need to be recalculated.';
   };
@@ -239,6 +239,35 @@ export default function AnalyticsTab() {
       {/* Tab: Data Sources */}
       {activeSubTab === 'data' && (
         <div className="space-y-8">
+          {/* ── Automatic Data Refresh ────────────────────────────────────── */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <h2 className="text-sm font-semibold text-foreground mb-2">
+              Automatic Data Refresh
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Most data is refreshed automatically &mdash; no manual action is needed for day-to-day operation:
+            </p>
+            <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+              <li>
+                <strong className="text-foreground/80">Syncing your accounts</strong> &mdash; each sync
+                creates current-day balance snapshots, backfills synthetic historical snapshots from
+                your transaction history, and rebuilds cash flow &amp; category spending summaries.
+              </li>
+              <li>
+                <strong className="text-foreground/80">Adding or editing accounts</strong> &mdash;
+                model-based estimates (real estate, vehicles, mortgages) are regenerated automatically.
+              </li>
+              <li>
+                <strong className="text-foreground/80">Creating or editing transactions</strong> &mdash;
+                cash flow summaries and category breakdowns are recalculated immediately.
+              </li>
+              <li>
+                <strong className="text-foreground/80">Importing data via CSV</strong> &mdash; synthetic
+                snapshots are regenerated, the net worth table is rebuilt, and all summaries are updated.
+              </li>
+            </ul>
+          </div>
+
           {/* ── Synthetic & Estimated Data ─────────────────────────────────── */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Synthetic &amp; Estimated Data</h2>
@@ -246,7 +275,13 @@ export default function AnalyticsTab() {
               Synthetic or estimated data fills in gaps where no live snapshot from your financial institution
               is available. When enabled, estimated values appear with dashed lines and &ldquo;estimated&rdquo;
               labels in charts. Disabling a module hides those data points entirely, showing only confirmed
-              data from your accounts.
+              data from your accounts. Click &ldquo;How this works&rdquo; on each module for details on
+              inputs and calculations.
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+              <strong className="text-foreground/80">Recalculating</strong> permanently deletes and
+              regenerates only <em>synthetic</em> snapshots from scratch. Your actual synced or manually
+              entered snapshots are never touched.
             </p>
 
         {/* Module Toggles */}
@@ -284,25 +319,18 @@ export default function AnalyticsTab() {
 
                 {/* Recalculate button + result */}
                 <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                  <button
-                    type="button"
-                    disabled={state.recalculating}
-                    onClick={() => {
-                      if (mod.key === 'cashFlowProjections') {
-                        handleRecalculate('cashFlow', state, setState);
-                      } else {
-                        setState({ ...state, showConfirm: true });
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${state.recalculating ? 'animate-spin' : ''}`} />
-                    {state.recalculating
-                      ? 'Recalculating...'
-                      : `Recalculate ${mod.label.split(' ')[0]} Snapshots`}
-                  </button>
-                  {mod.key === 'cashFlowProjections' && state.result?.success && (
+                  {mod.key === 'cashFlowProjections' ? (
                     <span className="text-[11px] text-muted-foreground">Computed in real-time &mdash; no stored data</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={state.recalculating}
+                      onClick={() => setState({ ...state, showConfirm: true })}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${state.recalculating ? 'animate-spin' : ''}`} />
+                      {state.recalculating ? 'Recalculating...' : 'Recalculate'}
+                    </button>
                   )}
                 </div>
 
@@ -448,6 +476,21 @@ export default function AnalyticsTab() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* ── Summary Tables ────────────────────────────────────────────── */}
+      <div className="p-4 bg-muted/20 border border-border rounded-lg">
+        <h2 className="text-sm font-semibold text-foreground mb-1">Summary Tables</h2>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Cash flow summaries (monthly income/expenses) and category breakdowns (spending &amp; income
+          by category) are pre-computed for fast chart rendering. These are <strong className="text-foreground/80">automatically
+          recalculated</strong> whenever you sync accounts or create/edit transactions &mdash; no manual
+          action is needed.
+        </p>
+        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+          <span>Auto-maintained &mdash; nothing to configure here.</span>
         </div>
       </div>
 
