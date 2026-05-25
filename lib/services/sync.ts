@@ -136,7 +136,7 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   }
 }
 
-export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8Array) {
+export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8Array): Promise<{ monthsUpdated: number; transactionsProcessed: number }> {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -148,7 +148,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
 
   if (userAccounts.length === 0) {
     await getDb().delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
-    return;
+    return { monthsUpdated: 0, transactionsProcessed: 0 };
   }
 
   const allCategories = await getDb()
@@ -174,6 +174,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
   const monthlyData: Record<string, { income: number; expenses: number; count: number }> = {};
+  let transactionsProcessed = 0;
 
   for (const tx of decryptedTxns) {
     if (tx.ignored) continue;
@@ -196,6 +197,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     }
 
     monthlyData[yearMonth].count++;
+    transactionsProcessed++;
     if (amount > 0 && (!category || category.isIncome)) {
       monthlyData[yearMonth].income += amount;
     } else if (amount < 0 && (!category || !category.isIncome)) {
@@ -236,9 +238,11 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
         },
       });
   }
+
+  return { monthsUpdated: insertValues.length, transactionsProcessed };
 }
 
-export async function updateCategorySpendingSummaries(userId: string, dek: Uint8Array) {
+export async function updateCategorySpendingSummaries(userId: string, dek: Uint8Array): Promise<{ categoryRows: number; categoriesCount: number }> {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -250,7 +254,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
 
   if (userAccounts.length === 0) {
     await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
-    return;
+    return { categoryRows: 0, categoriesCount: 0 };
   }
 
   const allCategories = await getDb()
@@ -282,6 +286,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
       Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>
     >
   > = {};
+  const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
     if (!tx.categoryId || parseFloat(tx.amount) >= 0 || tx.ignored) continue;
@@ -300,6 +305,8 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
     const accountId = tx.accountId.toString();
+
+    uniqueCategories.add(catId);
 
     if (!categoryByMonthAndAccount[yearMonth]) {
       categoryByMonthAndAccount[yearMonth] = {};
@@ -355,9 +362,11 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
         },
       });
   }
+
+  return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
 }
 
-export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Array) {
+export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Array): Promise<{ categoryRows: number; categoriesCount: number }> {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -369,7 +378,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
   if (userAccounts.length === 0) {
     await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
-    return;
+    return { categoryRows: 0, categoriesCount: 0 };
   }
 
   const allCategories = await getDb()
@@ -401,6 +410,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
       Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>
     >
   > = {};
+  const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
     if (!tx.categoryId || parseFloat(tx.amount) <= 0 || tx.ignored) continue;
@@ -419,6 +429,8 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
     const accountId = tx.accountId.toString();
+
+    uniqueCategories.add(catId);
 
     if (!categoryByMonthAndAccount[yearMonth]) {
       categoryByMonthAndAccount[yearMonth] = {};
@@ -474,6 +486,8 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
         },
       });
   }
+
+  return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
 }
 
 export async function syncConnection(connectionId: string, userId: string, dekOverride?: Uint8Array): Promise<SyncResult> {

@@ -179,9 +179,11 @@ export function SpendingBreakdown() {
     return allCategories.filter((c) => !c.isIncome && c.amount > 0);
   }, [allCategories]);
 
+  const safeExcludedIds = excludedCategoryIds instanceof Set ? excludedCategoryIds : new Set<string>();
+
   const visibleCategories = useMemo(() => {
-    return expenseCategories.filter((c) => !excludedCategoryIds.has(c.categoryId));
-  }, [expenseCategories, excludedCategoryIds]);
+    return expenseCategories.filter((c) => !safeExcludedIds.has(c.categoryId));
+  }, [expenseCategories, safeExcludedIds]);
 
   const totalSpending = useMemo(() => {
     return visibleCategories.reduce((sum, c) => sum + c.amount, 0);
@@ -293,9 +295,9 @@ export function SpendingBreakdown() {
         <div className="lg:col-span-3 h-[380px] relative flex flex-col justify-center">
           {pieData.length === 0 ? (
             <ChartEmptyState
-              variant={excludedCategoryIds.size > 0 ? 'empty' : 'nodata'}
+              variant={safeExcludedIds.size > 0 ? 'empty' : 'nodata'}
               description={
-                excludedCategoryIds.size > 0
+                safeExcludedIds.size > 0
                   ? 'All categories are excluded. Adjust your filters.'
                   : 'No spending data for this period'
               }
@@ -438,7 +440,7 @@ export function SpendingBreakdown() {
           {/* Controls Panel */}
           <div className="flex items-center justify-between text-xs mb-3 pb-2 border-b border-border/60">
             <span className="text-muted-foreground font-medium">
-              Showing {expenseCategories.length - excludedCategoryIds.size} of {expenseCategories.length}
+              Showing {expenseCategories.length - safeExcludedIds.size} of {expenseCategories.length}
             </span>
             <div className="flex gap-2.5">
               <button
@@ -465,7 +467,7 @@ export function SpendingBreakdown() {
               </div>
             ) : (
               filteredCategories.map((c) => {
-                const isExcluded = excludedCategoryIds.has(c.categoryId);
+                const isExcluded = safeExcludedIds.has(c.categoryId);
                 const adaptedColor = getThemeAdaptedColor(c.categoryColor, theme);
                 const pct = totalSpending > 0 && !isExcluded
                   ? ((c.amount / totalSpending) * 100).toFixed(1)

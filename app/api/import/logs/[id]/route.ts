@@ -5,6 +5,7 @@ import { importLog, transactions, accountSnapshots, accounts } from '@/lib/db/sc
 import { eq, and, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
+import { logger } from '@/lib/logger';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
@@ -72,65 +73,72 @@ export async function DELETE(
     });
 
     // Step 5: Post-delete processing (recalculating snapshots & balances)
-    if (affectedAccountIds.size > 0) {
-      const todayStr = new Date().toISOString().split('T')[0];
-      for (const acctId of affectedAccountIds) {
-        const earliestTx = await getEarliestTransactionDate(acctId);
-        const fromDateStr = earliestTx || todayStr;
-        await generateHistoricalAccountSnapshots(
-          acctId,
-          userId,
-          fromDateStr,
-          todayStr,
-          dek
-        );
+    const postWarnings: string[] = [];
+    try {
+      if (affectedAccountIds.size > 0) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        for (const acctId of affectedAccountIds) {
+          const earliestTx = await getEarliestTransactionDate(acctId);
+          const fromDateStr = earliestTx || todayStr;
+          await generateHistoricalAccountSnapshots(
+            acctId,
+            userId,
+            fromDateStr,
+            todayStr,
+            dek
+          );
 
-        // Sync the main accounts table balance with the latest snapshot balance
-        const [latestSnapshot] = await db
-          .select({ balance: accountSnapshots.balance })
-          .from(accountSnapshots)
-          .where(
-            and(
-              eq(accountSnapshots.accountId, acctId),
-              eq(accountSnapshots.userId, userId)
+          // Sync the main accounts table balance with the latest snapshot balance
+          const [latestSnapshot] = await db
+            .select({ balance: accountSnapshots.balance })
+            .from(accountSnapshots)
+            .where(
+              and(
+                eq(accountSnapshots.accountId, acctId),
+                eq(accountSnapshots.userId, userId)
+              )
             )
-          )
-          .orderBy(desc(accountSnapshots.snapshotDate))
-          .limit(1);
+            .orderBy(desc(accountSnapshots.snapshotDate))
+            .limit(1);
 
-        if (latestSnapshot) {
-          await db
-            .update(accounts)
-            .set({
-              balance: latestSnapshot.balance,
-              balanceDate: new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(accounts.id, acctId));
-        } else {
-          // Reset balance to encrypted '0' if no snapshots remain
-          const encryptedZero = await encryptField('0', dek);
-          await db
-            .update(accounts)
-            .set({
-              balance: encryptedZero,
-              balanceDate: new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(accounts.id, acctId));
+          if (latestSnapshot) {
+            await db
+              .update(accounts)
+              .set({
+                balance: latestSnapshot.balance,
+                balanceDate: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(accounts.id, acctId));
+          } else {
+            // Reset balance to encrypted '0' if no snapshots remain
+            const encryptedZero = await encryptField('0', dek);
+            await db
+              .update(accounts)
+              .set({
+                balance: encryptedZero,
+                balanceDate: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(accounts.id, acctId));
+          }
         }
       }
+
+      // Historically recalculate the daily net worth snapshots table
+      await recalculateNetWorthSnapshots(userId, dek);
+
+      // Update cash flow, category spending, and category income summaries for charts
+      await updateMonthlyCashFlowSummaries(userId, dek);
+      await updateCategorySpendingSummaries(userId, dek);
+      await updateCategoryIncomeSummaries(userId, dek);
+    } catch (postError) {
+      const msg = postError instanceof Error ? postError.message : String(postError);
+      logger.error(`[import/logs] Error in post-delete snapshot/summary updates`, { error: msg });
+      postWarnings.push(`Post-delete processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
     }
 
-    // Historically recalculate the daily net worth snapshots table
-    await recalculateNetWorthSnapshots(userId, dek);
-
-    // Update cash flow, category spending, and category income summaries for charts
-    await updateMonthlyCashFlowSummaries(userId, dek);
-    await updateCategorySpendingSummaries(userId, dek);
-    await updateCategoryIncomeSummaries(userId, dek);
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, warnings: postWarnings.length > 0 ? postWarnings : undefined });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to delete import', message: error instanceof Error ? error.message : 'Unknown error' },
