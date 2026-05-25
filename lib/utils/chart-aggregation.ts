@@ -107,3 +107,44 @@ export function aggregateChartData<T extends AggregatablePoint>(
       return result;
     });
 }
+
+/**
+ * Find the first index in an array where the given key is truthy.
+ * Returns 0 if not found. Useful for trimming leading empty data in charts.
+ */
+export function findFirstDataIndex(data: Record<string, unknown>[], hasDataKey: string): number {
+  const idx = data.findIndex((d) => d[hasDataKey]);
+  return idx !== -1 ? idx : 0;
+}
+
+/**
+ * Downsample an array to at most `maxPoints` elements via uniform sampling.
+ * Useful for large chart datasets where rendering all points is expensive.
+ */
+export function sampleData<T>(data: T[], maxPoints: number): T[] {
+  if (data.length <= maxPoints) return data;
+  const sampled: T[] = [];
+  const len = data.length;
+  for (let i = 0; i < maxPoints; i++) {
+    const index = Math.min(Math.floor((i * (len - 1)) / (maxPoints - 1)), len - 1);
+    sampled.push(data[index]);
+  }
+  return sampled;
+}
+
+/**
+ * Calculate Y-axis chart bounds from an array of numeric values,
+ * applying a padding factor (default 15%). Ensures a minimum range.
+ */
+export function calculateChartBounds(
+  values: number[],
+  defaultMax = 1000,
+  paddingFactor = 0.15,
+): { maxValue: number; minValue: number } {
+  const rawMax = Math.max(...values, defaultMax);
+  const rawMin = Math.min(...values, 0);
+  return {
+    maxValue: rawMax * (1 + paddingFactor),
+    minValue: rawMin < 0 ? rawMin * (1 + paddingFactor) : 0,
+  };
+}

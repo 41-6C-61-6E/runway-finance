@@ -52,7 +52,16 @@ export async function GET(request: Request) {
       eq(transactions.ignored, false),
       eq(accounts.isHidden, false),
       eq(accounts.isExcludedFromNetWorth, false),
-      or(isNull(transactions.categoryId), sql`coalesce(${categories.excludeFromReports}, false) = false`),
+      or(
+        isNull(transactions.categoryId),
+        and(
+          sql`coalesce(${categories.excludeFromReports}, false) = false`,
+          or(
+            isNull(categories.parentId),
+            sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+          )
+        )
+      ),
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
@@ -228,17 +237,20 @@ export async function GET(request: Request) {
         for (const r of [...rows, ...incomeRows]) {
           const decryptedAmt = await decryptField(r.amount, dek);
           const catId = r.categoryId ?? '';
+          const decryptedCount = r.transactionCount ? parseInt(await decryptField(String(r.transactionCount), dek)) || 0 : 0;
           const existing = categoryMap.get(catId);
           if (existing) {
             existing.amount += parseFloat(decryptedAmt);
+            existing.transactionCount += decryptedCount;
           } else {
             const decryptedName = await decryptField(r.categoryName || 'Uncategorized', dek);
             categoryMap.set(catId, {
               categoryId: catId,
               categoryName: decryptedName,
               categoryColor: r.categoryColor || '#6366f1',
-              isIncome: r.isIncome || r === incomeRows.find((ir) => ir.categoryId === catId) || false,
+              isIncome: r.isIncome || false,
               amount: parseFloat(decryptedAmt),
+              transactionCount: decryptedCount,
             });
           }
         }
@@ -415,13 +427,16 @@ export async function GET(request: Request) {
       const categoryName = isImportTransactionsEnabled
         ? await decryptField(row.categoryName || 'Uncategorized', dek)
         : (row.categoryName || 'Uncategorized');
+      const transactionCount = isImportTransactionsEnabled
+        ? (row.transactionCount ? parseInt(await decryptField(String(row.transactionCount), dek)) || 0 : 0)
+        : (row.transactionCount || 0);
       data.push({
         categoryId: row.categoryId ?? '',
         categoryName,
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: row.isIncome || false,
         amount,
-        transactionCount: row.transactionCount ? parseInt(String(row.transactionCount)) || 0 : 0,
+        transactionCount,
         previousAmount: prevAmount,
         change,
         percentChange,
@@ -444,13 +459,16 @@ export async function GET(request: Request) {
         : isImportTransactionsEnabled
         ? await decryptField(row.categoryName || 'Uncategorized', dek)
         : (row.categoryName || 'Uncategorized');
+      const incomeTxCount = isImportTransactionsEnabled
+        ? (row.transactionCount ? parseInt(await decryptField(String(row.transactionCount), dek)) || 0 : 0)
+        : (row.transactionCount || 0);
       data.push({
         categoryId: row.categoryId ?? '',
         categoryName: incomeCategoryName,
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: true,
         amount,
-        transactionCount: row.transactionCount ? parseInt(String(row.transactionCount)) || 0 : 0,
+        transactionCount: incomeTxCount,
         previousAmount: prevAmount,
         change,
         percentChange,

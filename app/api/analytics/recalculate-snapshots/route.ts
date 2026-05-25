@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { readApiConfig } from '@/lib/services/manual-accounts';
 
@@ -86,6 +86,8 @@ export async function POST(request: Request) {
           });
         }
       }
+      // Rebuild the aggregated net worth table from the regenerated account snapshots
+      await recalculateNetWorthSnapshots(userId, dek);
     } else if (type === 'realEstate') {
       const apiConfig = await readApiConfig(userId).catch(() => undefined);
       const relevant = decrypted.filter((a: any) => MODEL_SNAPSHOT_TYPES.includes(a.type));
@@ -129,7 +131,11 @@ export async function POST(request: Request) {
       success: true,
       message: errors.length > 0
         ? `Completed with ${errors.length} error${errors.length === 1 ? '' : 's'}`
-        : `Recalculated ${type === 'netWorth' ? 'net worth' : type === 'realEstate' ? 'real estate' : 'cash flow'} snapshots successfully`,
+        : type === 'netWorth'
+          ? `Regenerated account snapshots and rebuilt net worth chart (${syntheticCount} synthetic snapshots across ${decrypted.length} accounts)`
+          : type === 'realEstate'
+            ? `Regenerated estimated snapshots for model-based accounts (${syntheticCount} synthetic snapshots created)`
+            : `Cash flow projections are computed in real-time \u2014 no stored data to recalculate`,
       stats: {
         accountsProcessed: type === 'netWorth'
           ? decrypted.length

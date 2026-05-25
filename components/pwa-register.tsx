@@ -22,7 +22,6 @@ export function PWARegister() {
           if (installing) {
             installing.addEventListener("statechange", () => {
               if (installing.state === "installed" && navigator.serviceWorker.controller) {
-                console.log("PWA update available");
               }
             });
           }
