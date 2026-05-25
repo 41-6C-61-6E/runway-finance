@@ -55,8 +55,12 @@ export async function getLatestRealSnapshot(
       if (decrypted) balanceStr = decrypted;
       // If decryption returned empty and raw value looks like JSON, default to 0
       else if (balanceStr.startsWith('{')) balanceStr = '0';
-    } catch {
+    } catch (err) {
       // Fallback: keep raw value if decryption fails
+      logger.warn(`${LOG_TAG} Failed to decrypt real snapshot balance`, {
+        accountId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -172,8 +176,12 @@ export async function generateHistoricalAccountSnapshots(
           const decrypted = await decryptField(s.balance, dek);
           if (decrypted) balanceStr = decrypted;
           else if (balanceStr.startsWith('{')) balanceStr = '0';
-        } catch {
+        } catch (err) {
           // Keep raw value
+          logger.warn(`${LOG_TAG} Failed to decrypt historical real snapshot balance`, {
+            accountId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
       return { date: String(s.date), balance: balanceStr };
@@ -231,8 +239,12 @@ export async function generateHistoricalAccountSnapshots(
       try {
         const decrypted = await decryptField(tx.amount, dek);
         if (decrypted) amountStr = decrypted;
-      } catch {
+      } catch (err) {
         // Fallback: keep raw value
+        logger.warn(`${LOG_TAG} Failed to decrypt transaction amount for snapshot calculations`, {
+          accountId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     const amount = parseFloat(amountStr);
@@ -417,8 +429,13 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
           const decrypted = await decryptField(s.balance, dek);
           balance = parseFloat(decrypted);
           if (isNaN(balance)) balance = 0;
-        } catch {
+        } catch (err) {
           balance = 0;
+          logger.warn(`${LOG_TAG} Failed to decrypt snapshot balance for net worth recalculation`, {
+            accountId: s.accountId,
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       } else {
         balance = parseFloat(s.balance);

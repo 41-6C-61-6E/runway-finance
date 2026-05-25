@@ -791,7 +791,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               logger.error(`${LOG_TAG} AI analysis failed (non-fatal)`, { connectionId, userId, error: String(err) });
             });
           }
-        } catch { /* non-fatal: AI analysis is optional */ }
+        } catch (err) {
+          logger.debug(`${LOG_TAG} AI auto-categorization check failed (non-fatal)`, {
+            connectionId,
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
 

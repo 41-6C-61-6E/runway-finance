@@ -145,18 +145,37 @@ export function CategorySummaries() {
     fetchData();
   }, [queryParams]);
 
+  const processedCategories = useMemo(() => {
+    const map = new Map<string, CategoryData>();
+    for (const cat of allCategories) {
+      const existing = map.get(cat.categoryId);
+      if (existing) {
+        existing.amount += cat.amount;
+        existing.transactionCount += cat.transactionCount;
+        existing.change += cat.change;
+        existing.previousAmount += cat.previousAmount;
+        existing.percentChange = existing.previousAmount > 0 
+          ? (existing.change / existing.previousAmount) * 100 
+          : 0;
+      } else {
+        map.set(cat.categoryId, { ...cat });
+      }
+    }
+    return Array.from(map.values());
+  }, [allCategories]);
+
   const income = useMemo(() =>
-    allCategories
+    processedCategories
       .filter((c) => c.isIncome && c.amount > 0)
       .sort((a, b) => b.amount - a.amount),
-    [allCategories]
+    [processedCategories]
   );
 
   const expenses = useMemo(() =>
-    allCategories
+    processedCategories
       .filter((c) => !c.isIncome && c.amount > 0)
       .sort((a, b) => b.amount - a.amount),
-    [allCategories]
+    [processedCategories]
   );
 
   const handleCategoryClick = (categoryId: string) => {
