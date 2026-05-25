@@ -44,8 +44,17 @@ services:
       - NODE_ENV=production
       - NEXTAUTH_TRUST_HOST=true
 
+      # File logging and rotation settings
+      - LOG_FILE_PATH=/app/logs/runway.log
+      - LOG_FILE_MAX_SIZE_MB=100
+      - LOG_FILE_MAX_FILES=20
+
+    volumes:
+      - app-logs:/app/logs
+
     depends_on:
       - postgres
 
 volumes:
   pgdata:
+  app-logs:
