@@ -54,6 +54,8 @@ function TransactionsContent() {
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -90,6 +92,11 @@ function TransactionsContent() {
       router.replace(newUrl, { scroll: false });
     }
   }, [filters, router]);
+
+  useEffect(() => {
+    setSelectAllMatching(false);
+    setSelectedIds(new Set());
+  }, [filters]);
 
   const spAccountId = searchParams.get('accountId');
   const spAccountIds = searchParams.get('accountIds');
@@ -179,8 +186,17 @@ function TransactionsContent() {
     }
   }, []);
 
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectAllMatching(true);
+  }, []);
+
+  const handleTotalChange = useCallback((total: number) => {
+    setTotalCount(total);
+  }, []);
+
   const handleBulkActionComplete = useCallback(() => {
     setSelectedIds(new Set());
+    setSelectAllMatching(false);
     setRefreshKey((k) => k + 1);
   }, []);
 
@@ -222,10 +238,14 @@ function TransactionsContent() {
             <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
 
             <div className="min-w-0">
-              {selectedIds.size > 0 && (
+              {(selectedIds.size > 0 || selectAllMatching) && (
                 <BulkActionsToolbar
                   selectedIds={Array.from(selectedIds)}
                   onClear={handleBulkActionComplete}
+                  totalCount={totalCount}
+                  selectAllMatching={selectAllMatching}
+                  onSelectAllMatching={handleSelectAllMatching}
+                  filters={filters}
                 />
               )}
               <TransactionTable
@@ -233,6 +253,7 @@ function TransactionsContent() {
                 filters={filters}
                 onSelectAll={handleSelectAll}
                 onTransactionClick={handleTransactionClick}
+                onTotalChange={handleTotalChange}
               />
               {selectedTransaction && (
                 <TransactionDetailDrawer

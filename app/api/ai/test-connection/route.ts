@@ -41,8 +41,12 @@ export async function POST(request: Request) {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly. Do NOT output any thinking, reasoning, explanation, or <think> tags.' },
+          { role: 'user', content: userPrompt }
+        ],
         max_tokens: 200,
+        chat_id: 'test-connection',
       }),
     });
     const elapsed = Date.now() - startTime;
@@ -60,7 +64,15 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true, message: `Connected to ${model} at ${endpoint} (${elapsed}ms)` });
+    const data = await res.json();
+    const msg = data.choices?.[0]?.message;
+    const responseContent = msg?.content || msg?.reasoning || msg?.reasoning_content || '(empty response)';
+
+    return NextResponse.json({
+      ok: true,
+      message: `Connected to ${model} at ${endpoint} (${elapsed}ms)`,
+      response: responseContent,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Connection failed';
     logger.error('AI connection test failed', { endpoint, error: message });

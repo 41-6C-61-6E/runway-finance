@@ -7,6 +7,7 @@ import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypt
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 
 const LOG_TAG = '[ai-categorizer]';
+const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
 
 type TransactionInfo = {
   index: number;
@@ -55,6 +56,7 @@ export async function analyzeUncategorized(
   const errors: string[] = [];
 
   try {
+    onLog?.('Loading encryption key and user settings...');
     const userSettingsRow = await db
       .select()
       .from(userSettings)
@@ -62,7 +64,9 @@ export async function analyzeUncategorized(
       .limit(1);
 
     if (!userSettingsRow.length) {
-      return { proposalsCreated: 0, autoApproved: 0, errors: ['User settings not found'] };
+      const msg = 'User settings not found';
+      onLog?.(`Error: ${msg}`);
+      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
 
     const settings = userSettingsRow[0];
@@ -87,12 +91,17 @@ export async function analyzeUncategorized(
           } catch { /* no api key */ }
         }
       } else {
-        return { proposalsCreated: 0, autoApproved: 0, errors: ['Active AI provider not found or misconfigured'] };
+        const msg = 'Active AI provider not found or misconfigured';
+        onLog?.(`Error: ${msg}`);
+        return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
       }
     } else {
-      return { proposalsCreated: 0, autoApproved: 0, errors: ['No active AI provider configured'] };
+      const msg = 'No active AI provider configured';
+      onLog?.(`Error: ${msg}`);
+      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
 
+    onLog?.('Fetching financial categories from database...');
     const categoryRows = await db
       .select()
       .from(categoriesTable)
@@ -117,6 +126,7 @@ export async function analyzeUncategorized(
       isIncome: c.isIncome,
     }));
 
+    onLog?.('Loading active auto-categorization rules...');
     const ruleRows = await db
       .select()
       .from(categoryRules)
@@ -135,6 +145,7 @@ export async function analyzeUncategorized(
       };
     });
 
+    onLog?.('Counting uncategorized transactions...');
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(transactions)
@@ -199,52 +210,91 @@ export async function analyzeUncategorized(
       const prompt = buildPrompt(categories, rules, decryptedTxns);
 
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
-      onLog?.(`Batch ${batchNum}: Sending ${decryptedTxns.length} transaction(s) to AI (${model})`);
-      const batchStart = Date.now();
-      logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
-      const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, abortController?.signal);
+      onLog?.(`Batch ${batchNum}: Prepared prompt with ${decryptedTxns.length} transaction(s).`);
 
-      const { suggestions } = aiResponse;
-      onLog?.(`Batch ${batchNum}: AI returned ${suggestions.length} suggestion(s) in ${((Date.now() - batchStart) / 1000).toFixed(1)}s`);
-      logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
+      // Per-batch AbortController with its own timeout
+      const batchAbortController = new AbortController();
+      const batchTimeoutId = setTimeout(() => {
+        batchAbortController.abort();
+      }, BATCH_TIMEOUT_MS);
 
-      let batchProposals = 0;
-      let batchAutoApproved = 0;
+      // Propagate main cancel signal to per-batch controller
+      const onMainAbort = () => {
+        if (!batchAbortController.signal.aborted) {
+          batchAbortController.abort();
+        }
+      };
+      abortController?.signal.addEventListener('abort', onMainAbort);
 
-      for (const suggestion of suggestions) {
-        const payload = buildPayload(suggestion, decryptedTxns, categories);
-        if (!payload) {
-          errors.push(`Invalid suggestion: ${JSON.stringify(suggestion).slice(0, 200)}`);
-          continue;
+      try {
+        const batchStart = Date.now();
+        logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
+        onLog?.(`Batch ${batchNum}: Calling model (${model}). Waiting for response...`);
+        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, batchAbortController.signal);
+
+        const { suggestions } = aiResponse;
+        const elapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
+        onLog?.(`Batch ${batchNum}: Received response from ${model} in ${elapsed}s. Found ${suggestions.length} suggestion(s).`);
+        logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
+
+        let batchProposals = 0;
+        let batchAutoApproved = 0;
+
+        for (const suggestion of suggestions) {
+          const payload = buildPayload(suggestion, decryptedTxns, categories);
+          if (!payload) {
+            errors.push(`Invalid suggestion: ${JSON.stringify(suggestion).slice(0, 200)}`);
+            continue;
+          }
+
+          const shouldAutoApprove = settings.aiAutoApprove && (suggestion.confidence * 100) >= autoApproveThreshold;
+          const status = shouldAutoApprove ? 'approved' : 'pending';
+          const confidenceStr = String(Math.round(suggestion.confidence * 100));
+
+          await db.insert(aiProposals).values({
+            userId,
+            type: suggestion.type,
+            status,
+            confidence: confidenceStr,
+            payload: payload as any,
+            explanation: suggestion.explanation,
+          });
+
+          batchProposals++;
+          if (shouldAutoApprove) batchAutoApproved++;
         }
 
-        const shouldAutoApprove = settings.aiAutoApprove && (suggestion.confidence * 100) >= autoApproveThreshold;
-        const status = shouldAutoApprove ? 'approved' : 'pending';
-        const confidenceStr = String(Math.round(suggestion.confidence * 100));
+        proposalsCreated += batchProposals;
+        autoApproved += batchAutoApproved;
 
-        await db.insert(aiProposals).values({
-          userId,
-          type: suggestion.type,
-          status,
-          confidence: confidenceStr,
-          payload: payload as any,
-          explanation: suggestion.explanation,
-        });
+        if (batchAutoApproved > 0) {
+          onLog?.(`Batch ${batchNum}: Applying ${batchAutoApproved} auto-approved suggestion(s) to database...`);
+          await applyApprovedProposals(userId, dek);
+        }
 
-        batchProposals++;
-        if (shouldAutoApprove) batchAutoApproved++;
+        onProgress?.(offset + txnRows.length, totalUncategorized);
+        onLog?.(`Batch ${batchNum}: Saved ${batchProposals} proposal(s) ${batchAutoApproved > 0 ? `(${batchAutoApproved} auto-approved)` : ''}.`);
+        logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
+      } catch (err) {
+        if (abortController?.signal.aborted) {
+          onLog?.('Analysis cancelled by user');
+          break;
+        }
+        if (err instanceof Error && err.name === 'AbortError') {
+          const msg = `Batch ${batchNum} timed out after ${BATCH_TIMEOUT_MS / 1000}s, skipping.`;
+          onLog?.(msg);
+          errors.push(msg);
+        } else {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const msg = `Batch ${batchNum} failed: ${errMsg}`;
+          onLog?.(msg);
+          errors.push(msg);
+          logger.error(`${LOG_TAG} Batch ${batchNum} failed`, { userId, error: errMsg });
+        }
+      } finally {
+        clearTimeout(batchTimeoutId);
+        abortController?.signal.removeEventListener('abort', onMainAbort);
       }
-
-      proposalsCreated += batchProposals;
-      autoApproved += batchAutoApproved;
-
-      if (batchAutoApproved > 0) {
-        await applyApprovedProposals(userId, dek);
-      }
-
-      onProgress?.(offset + txnRows.length, totalUncategorized);
-      onLog?.(`Batch ${batchNum}: ${batchProposals} proposal(s) saved${batchAutoApproved > 0 ? `, ${batchAutoApproved} auto-approved` : ''}`);
-      logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
 
       offset += txnRows.length;
       hasMore = txnRows.length >= batchSize;
@@ -256,6 +306,7 @@ export async function analyzeUncategorized(
 
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    onLog?.(`Critical Error: ${message}`);
     logger.error(`${LOG_TAG} Analysis failed`, { userId, error: message });
     return { proposalsCreated: 0, autoApproved: 0, errors: [message] };
   }
@@ -297,6 +348,34 @@ function buildPrompt(
   return prompt;
 }
 
+function cleanJsonString(content: string): string {
+  let clean = content;
+  
+  const stringKeys = [
+    'explanation',
+    'reasoning',
+    'ruleName',
+    'conditionValue',
+    'name',
+    'parentName',
+    'categoryName',
+    'color',
+    'categoryId'
+  ];
+  
+  for (const key of stringKeys) {
+    const regex = new RegExp(`("${key}"\\s*:\\s*")([\\s\\S]*?)("\\s*(?=,|\\n|\\}))`, 'g');
+    clean = clean.replace(regex, (match, prefix, value, suffix) => {
+      const escapedValue = value.replace(/(?<!\\)"/g, '\\"');
+      return prefix + escapedValue + suffix;
+    });
+  }
+  
+  clean = clean.replace(/,\s*([\]}])/g, '$1');
+  
+  return clean;
+}
+
 async function callAiApi(
   endpoint: string,
   model: string,
@@ -315,6 +394,8 @@ async function callAiApi(
     ],
     temperature: 0.1,
     response_format: { type: 'json_object' },
+    chat_id: 'runway-categorize',
+    stream: true,
   };
 
   const headers: Record<string, string> = {
@@ -327,6 +408,9 @@ async function callAiApi(
   const MAX_RETRIES = 2;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -346,21 +430,73 @@ async function callAiApi(
         throw new Error(`AI API error: ${response.status} ${text.slice(0, 500)}`);
       }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('AI API returned response body that is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let content = '';
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine) continue;
+            if (cleanLine === 'data: [DONE]') continue;
+            if (cleanLine.startsWith('data: ')) {
+              try {
+                const parsedChunk = JSON.parse(cleanLine.slice(6));
+                const text = parsedChunk.choices?.[0]?.delta?.content ?? '';
+                content += text;
+              } catch {
+                // Ignore parsing errors for incomplete SSE lines
+              }
+            }
+          }
+        }
+
+        const cleanBuffer = buffer.trim();
+        if (cleanBuffer.startsWith('data: ') && cleanBuffer !== 'data: [DONE]') {
+          try {
+            const parsedChunk = JSON.parse(cleanBuffer.slice(6));
+            const text = parsedChunk.choices?.[0]?.delta?.content ?? '';
+            content += text;
+          } catch {}
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
       if (!content) {
         throw new Error('AI API returned empty response');
       }
 
       let parsed: AiResponse;
+      let jsonText = content;
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1];
+      }
+
       try {
-        parsed = JSON.parse(content);
-      } catch {
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[1]);
-        } else {
-          throw new Error('Failed to parse AI response as JSON');
+        parsed = JSON.parse(jsonText);
+      } catch (firstErr) {
+        try {
+          const cleanedText = cleanJsonString(jsonText);
+          parsed = JSON.parse(cleanedText);
+          logger.info(`${LOG_TAG} AI response JSON successfully repaired and parsed after initial failure`, { contentLength: content.length });
+        } catch (secondErr) {
+          const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+          throw new Error(`Failed to parse AI response as JSON: ${errMsg}`);
         }
       }
 
@@ -382,6 +518,7 @@ async function callAiApi(
 
       return parsed;
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err;
       const isNonRetryableHttp = err instanceof Error && /^AI API error: [4][0-9]{2}/.test(err.message);
       if (attempt < MAX_RETRIES && !isNonRetryableHttp) {
         const delay = Math.pow(2, attempt) * 1000;

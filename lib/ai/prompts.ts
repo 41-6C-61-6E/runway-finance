@@ -54,5 +54,5 @@ For "create_rule" suggestions:
 - Only suggest rules for clear, repetitive patterns.
 - Condition operators: "contains" (substring match), "equals" (exact), "starts_with" (prefix), "ends_with" (suffix), "regex" (regular expression).`;
 
-export const DEFAULT_TEST_PROMPT = 'Write a haiku about money, finance, retirement, investing, or financial freedom.';
+export const DEFAULT_TEST_PROMPT = 'Write a haiku about money, finance, retirement, investing, or financial freedom. Output ONLY the 3 line poem. Do not include any thinking, reasoning, explanation, or <think> tags.';
 export const TEST_PROMPT_STORAGE_KEY = 'ai_test_prompt';

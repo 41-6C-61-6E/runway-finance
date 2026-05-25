@@ -138,7 +138,12 @@ function MultiSelectDropdown({
 }
 
 export default function FilterBar({ filters, onChange, onClearAll }: FilterBarProps) {
-  const [datePreset, setDatePreset] = useState('all');
+  const [datePreset, setDatePreset] = useState(() => {
+    if (filters.startDate || filters.endDate) return 'custom';
+    return 'all';
+  });
+  const [customStartDate, setCustomStartDate] = useState(filters.startDate ?? '');
+  const [customEndDate, setCustomEndDate] = useState(filters.endDate ?? '');
   const [search, setSearch] = useState(filters.search ?? '');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -166,12 +171,11 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
   }, []);
 
   useEffect(() => {
-    if (filters.startDate || filters.endDate) {
-      setDatePreset('custom');
-    } else {
-      setDatePreset('all');
+    if (datePreset === 'custom') {
+      setCustomStartDate(filters.startDate ?? '');
+      setCustomEndDate(filters.endDate ?? '');
     }
-  }, [filters.startDate, filters.endDate]);
+  }, [datePreset]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -334,17 +338,26 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
             <span className="text-xs font-medium text-muted-foreground mt-1">Date range:</span>
             <input
               type="date"
-              value={filters.startDate ?? ''}
-              onChange={(e) => onChange('startDate', e.target.value || null)}
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
               className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
             />
             <span className="hidden sm:inline text-xs text-muted-foreground">to</span>
             <input
               type="date"
-              value={filters.endDate ?? ''}
-              onChange={(e) => onChange('endDate', e.target.value || null)}
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
               className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
             />
+            <button
+              onClick={() => {
+                onChange('startDate', customStartDate || null);
+                onChange('endDate', customEndDate || null);
+              }}
+              className="px-4 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Apply
+            </button>
           </div>
         )}
       </div>
@@ -729,7 +742,11 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
           {hasActiveFilters && (
             <div className="ml-auto flex justify-end w-full sm:w-auto relative z-10">
               <button
-                onClick={onClearAll}
+                onClick={() => {
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                  onClearAll();
+                }}
                 className="px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all flex items-center gap-1 min-w-[80px] justify-center bg-background/90 backdrop-blur-sm shadow-lg"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

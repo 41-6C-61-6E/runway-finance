@@ -49,7 +49,7 @@ export const AI_DEFAULTS = {
   aiAutoApprove: false,
   aiAutoApproveThreshold: 95,
   aiBatchSize: 25,
-  aiAnalysisTimeoutSeconds: 600,
+  aiAnalysisTimeoutSeconds: 3600,
   aiActiveProviderId: null,
 } as const;
 
@@ -182,7 +182,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'aiAutoApprove', label: 'Auto-approve suggestions', description: 'Automatically approve AI suggestions above confidence threshold', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApprove },
   { key: 'aiAutoApproveThreshold', label: 'Auto-approve threshold', description: 'Confidence threshold % for auto-approval (0-100)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApproveThreshold },
   { key: 'aiBatchSize', label: 'AI Batch Size', description: 'Number of transactions to analyze per API call (1-200)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiBatchSize },
-  { key: 'aiAnalysisTimeoutSeconds', label: 'AI Analysis Timeout', description: 'Seconds before analysis auto-cancels (30-600)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAnalysisTimeoutSeconds },
+  { key: 'aiAnalysisTimeoutSeconds', label: 'AI Analysis Timeout', description: 'Maximum seconds for entire analysis to complete (60-3600)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAnalysisTimeoutSeconds },
   { key: 'aiSystemPrompt', label: 'AI System Prompt', description: 'Custom system prompt for the AI model (null = use default)', type: 'string', group: 'AI', defaultValue: AI_DEFAULTS.aiSystemPrompt },
   { key: 'aiActiveProviderId', label: 'Active AI Provider ID', description: 'UUID of the active AI provider', type: 'string', group: 'AI', defaultValue: AI_DEFAULTS.aiActiveProviderId },
 
