@@ -39,7 +39,11 @@ async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<s
     }
     const meta = JSON.parse(raw) as Record<string, unknown>;
     return (meta.syncFrequency as string) || 'manual';
-  } catch {
+  } catch (err) {
+    logger.warn(`${LOG_TAG} Failed to extract sync frequency from account metadata`, {
+      accountId: accountRow.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return 'manual';
   }
 }

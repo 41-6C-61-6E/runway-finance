@@ -9,6 +9,7 @@ import { eq, and, sql, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
+import { logger } from '@/lib/logger';
 
 type ImportType = 'transactions' | 'account_snapshots';
 
@@ -62,7 +63,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not parse CSV' }, { status: 400 });
     }
 
-    console.log(`[import/execute] Starting import: type=${importType}, totalRows=${parsed.totalRows}, accountMapping=${Object.keys(accountMapping || {}).length}, categoryMapping=${Object.keys(categoryMapping || {}).length}, newAccounts=${Object.keys(newAccounts || {}).length}, newCategories=${Object.keys(newCategories || {}).length}`);
+    logger.info(`[import/execute] Starting import: type=${importType}, totalRows=${parsed.totalRows}`, {
+      accountMappingCount: Object.keys(accountMapping || {}).length,
+      categoryMappingCount: Object.keys(categoryMapping || {}).length,
+      newAccountsCount: Object.keys(newAccounts || {}).length,
+      newCategoriesCount: Object.keys(newCategories || {}).length,
+    });
 
     const EXCLUDED = '__excluded__';
     const warnings: string[] = [];
@@ -89,7 +95,7 @@ export async function POST(request: Request) {
 
     // Step 2: Pre-generate IDs for new categories and populate categoryIdByName
     // Skip unmapped entries (empty string) so they become uncategorized
-    console.log(`[import/execute] categoryMapping received:`, JSON.stringify(categoryMapping));
+    logger.info(`[import/execute] categoryMapping received`, { categoryMapping });
     const categoryIdByName = new Map<string, string>();
     const unmappedCategories: string[] = [];
     if (categoryMapping) {
@@ -98,7 +104,7 @@ export async function POST(request: Request) {
           categoryIdByName.set(csvName, categoryId);
         } else {
           unmappedCategories.push(csvName);
-          console.log(`[import/execute] Skipping unmapped category "${csvName}" (will be uncategorized)`);
+          logger.info(`[import/execute] Skipping unmapped category (will be uncategorized)`, { csvName });
         }
       }
     }
@@ -251,7 +257,12 @@ export async function POST(request: Request) {
       dataEndDate = allDates[allDates.length - 1];
     }
 
-    console.log(`[import/execute] Processing: ${transactionsToInsert.length} transactions, ${snapshotsToInsert.length} snapshots to insert, ${recordsSkipped} skipped, ${recordsErrored} errored`);
+    logger.info(`[import/execute] Processing import chunks`, {
+      transactionsToInsert: transactionsToInsert.length,
+      snapshotsToInsert: snapshotsToInsert.length,
+      recordsSkipped,
+      recordsErrored,
+    });
 
     await db.transaction(async (tx) => {
       // Step 1: Create import log entry FIRST so FK constraints on import_id are satisfied
@@ -315,7 +326,7 @@ export async function POST(request: Request) {
       // Step 4: Batch insert transactions or snapshots (chunked to avoid huge queries)
       const CHUNK_SIZE = 500;
       if (transactionsToInsert.length > 0) {
-        console.log(`[import/execute] Inserting ${transactionsToInsert.length} transactions (chunk size ${CHUNK_SIZE})`);
+        logger.info(`[import/execute] Inserting transactions chunk`, { count: transactionsToInsert.length, chunkSize: CHUNK_SIZE });
         for (let i = 0; i < transactionsToInsert.length; i += CHUNK_SIZE) {
           const chunk = transactionsToInsert.slice(i, i + CHUNK_SIZE);
           await tx.insert(transactions).values(chunk);
@@ -323,7 +334,7 @@ export async function POST(request: Request) {
       }
 
       if (snapshotsToInsert.length > 0) {
-        console.log(`[import/execute] Inserting ${snapshotsToInsert.length} account snapshots (chunk size ${CHUNK_SIZE})`);
+        logger.info(`[import/execute] Inserting account snapshots chunk`, { count: snapshotsToInsert.length, chunkSize: CHUNK_SIZE });
         for (let i = 0; i < snapshotsToInsert.length; i += CHUNK_SIZE) {
           const chunk = snapshotsToInsert.slice(i, i + CHUNK_SIZE);
           await tx.insert(accountSnapshots)
@@ -361,7 +372,7 @@ export async function POST(request: Request) {
 
       if (affectedAccountIds.size > 0) {
         const todayStr = new Date().toISOString().split('T')[0];
-        console.log(`[import/execute] Regenerating snapshots for ${affectedAccountIds.size} accounts...`);
+        logger.info(`[import/execute] Regenerating snapshots for affected accounts`, { count: affectedAccountIds.size });
         for (const acctId of affectedAccountIds) {
           const earliestTx = await getEarliestTransactionDate(acctId);
           const fromDateStr = earliestTx || todayStr;
@@ -406,9 +417,11 @@ export async function POST(request: Request) {
       await updateMonthlyCashFlowSummaries(userId, dek);
       await updateCategorySpendingSummaries(userId, dek);
       await updateCategoryIncomeSummaries(userId, dek);
-      console.log(`[import/execute] Successfully updated summaries, regenerated snapshots, and updated account balances.`);
+      logger.info(`[import/execute] Successfully updated summaries, regenerated snapshots, and updated account balances.`);
     } catch (postImportError) {
-      console.error(`[import/execute] Error in post-import snapshot/summary updates (non-fatal):`, postImportError);
+      logger.error(`[import/execute] Error in post-import snapshot/summary updates (non-fatal)`, {
+        error: postImportError instanceof Error ? postImportError.message : String(postImportError),
+      });
     }
 
     return NextResponse.json({
@@ -422,7 +435,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[import/execute] Error:`, rawMessage, error);
+    logger.error(`[import/execute] Import failed`, {
+      message: rawMessage,
+      error: error instanceof Error ? error.stack : String(error),
+    });
 
     // Classify common Postgres errors into user-friendly messages
     let cleanMessage: string;
