@@ -156,7 +156,7 @@ export async function POST(request: Request) {
           }
 
           if (mapped.date) {
-            const parsedRowDate = parseDateField(mapped.date);
+            const parsedRowDate = parseDateField(mapped.date, importType === 'account_snapshots');
             if (startDate && parsedRowDate < startDate) {
               return { skipped: true };
             }
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
                 userId,
                 accountId: resolvedAccountId,
                 externalId,
-                date: parseDateField(mapped.date),
+                date: parseDateField(mapped.date, false),
                 amount: encryptedAmount,
                 description: encryptedDescription,
                 payee: encryptedPayee ?? undefined,
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
               data: {
                 userId,
                 accountId: resolvedAccountId,
-                snapshotDate: parseDateField(mapped.date),
+                snapshotDate: parseDateField(mapped.date, true),
                 balance: encryptedBalance,
                 isImported: true,
                 importId,

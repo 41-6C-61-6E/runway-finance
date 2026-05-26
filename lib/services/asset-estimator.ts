@@ -1,5 +1,5 @@
 import { accountSnapshots } from '@/lib/db/schema';
-import { eq, and, desc, gt } from 'drizzle-orm';
+import { eq, and, desc, gt, lt } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
@@ -454,6 +454,11 @@ export async function generateAssetHistorySnapshots(
   // Delete existing synthetic snapshots first. If this fails, abort —
   // otherwise old data (potentially from a different amortization
   // range or property) lingers alongside new data.
+  const REAL_ESTATE_ASSET_TYPES = [
+    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+    'single-family', 'condo', 'townhouse', 'multi-family', 'other'
+  ];
+
   try {
     await db.delete(accountSnapshots).where(
       and(
@@ -476,10 +481,21 @@ export async function generateAssetHistorySnapshots(
           )
         );
       }
+
+      const startDate = metadata.purchaseDate as string ?? metadata.startDate as string ?? undefined;
+      if (startDate) {
+        await db.delete(accountSnapshots).where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            lt(accountSnapshots.snapshotDate, startDate)
+          )
+        );
+      }
     }
 
     // Clean up the old purchase date snapshot if it exists and matches the old purchase date/price
-    if (accountType === 'realestate' && oldPurchaseDate && oldPurchasePrice !== undefined) {
+    if (REAL_ESTATE_ASSET_TYPES.includes(accountType) && oldPurchaseDate && oldPurchasePrice !== undefined) {
       await db.delete(accountSnapshots).where(
         and(
           eq(accountSnapshots.accountId, accountId),
@@ -490,6 +506,20 @@ export async function generateAssetHistorySnapshots(
         )
       );
     }
+
+    // Clean up any historical snapshots (both synthetic and real) before the purchase date
+    if (REAL_ESTATE_ASSET_TYPES.includes(accountType) || accountType === 'vehicle' || accountType === 'metals') {
+      const purchaseDate = metadata.purchaseDate as string | undefined;
+      if (purchaseDate) {
+        await db.delete(accountSnapshots).where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            lt(accountSnapshots.snapshotDate, purchaseDate)
+          )
+        );
+      }
+    }
   } catch (err) {
     logger.error(`${LOG_TAG} Failed to clear existing snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
     return 0;
@@ -499,7 +529,18 @@ export async function generateAssetHistorySnapshots(
   const today = new Date().toISOString().split('T')[0];
 
   switch (accountType) {
-    case 'realestate': {
+    case 'realestate':
+    case 'primaryhome':
+    case 'secondaryhome':
+    case 'rentalproperty':
+    case 'commercial':
+    case 'land':
+    case 'otherrealestate':
+    case 'single-family':
+    case 'condo':
+    case 'townhouse':
+    case 'multi-family':
+    case 'other': {
       const purchasePrice = metadata.purchasePrice as number ?? 0;
       const purchaseDate = metadata.purchaseDate as string ?? today;
       const zipCode = metadata.zipCode as string | undefined;
@@ -507,6 +548,7 @@ export async function generateAssetHistorySnapshots(
 
       if (purchasePrice > 0 && purchaseDate < today) {
         snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode, apiConfig);
+        snapshots = snapshots.filter(s => s.date >= purchaseDate);
       }
       break;
     }
@@ -517,6 +559,7 @@ export async function generateAssetHistorySnapshots(
 
       if (purchasePrice > 0 && purchaseDate < today) {
         snapshots = estimateVehicleHistory(purchasePrice, purchaseDate);
+        snapshots = snapshots.filter(s => s.date >= purchaseDate);
       }
       break;
     }
@@ -528,6 +571,7 @@ export async function generateAssetHistorySnapshots(
 
       if (amountOz > 0 && purchaseDate < today) {
         snapshots = await estimateMetalsHistory(amountOz, subType, purchaseDate, apiConfig);
+        snapshots = snapshots.filter(s => s.date >= purchaseDate);
       }
       break;
     }
@@ -557,6 +601,7 @@ export async function generateAssetHistorySnapshots(
           mortgageStatus === 'paid_off' ? 0 : payoffBalance
         );
         snapshots = history.map((h) => ({ date: h.date, value: -h.balance }));
+        snapshots = snapshots.filter(s => s.date >= startDate);
       }
       break;
     }
@@ -572,7 +617,7 @@ export async function generateAssetHistorySnapshots(
     if (snap.date >= today) continue;
 
     // Treat the purchase date snapshot as real (isSynthetic = false)
-    const isPurchaseDate = (accountType === 'realestate' && snap.date === (metadata.purchaseDate as string));
+    const isPurchaseDate = (REAL_ESTATE_ASSET_TYPES.includes(accountType) && snap.date === (metadata.purchaseDate as string));
     const isSynth = isPurchaseDate ? false : true;
 
     try {

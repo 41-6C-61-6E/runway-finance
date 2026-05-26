@@ -530,3 +530,54 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'query_failed', message: errMsg }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const { searchParams } = new URL(request.url);
+  const tableKey = searchParams.get('table');
+  const id = searchParams.get('id');
+
+  if (!tableKey || !id) {
+    return NextResponse.json({ error: 'missing_parameters', message: 'Table name and ID are required' }, { status: 400 });
+  }
+
+  const config = TABLE_REGISTRY[tableKey];
+  if (!config) {
+    return NextResponse.json({ error: 'invalid_table', message: `Unknown table: ${tableKey}` }, { status: 400 });
+  }
+
+  const { table } = config;
+  const allCols = getTableColumns(table);
+  const idCol = allCols['id'];
+  const userIdCol = allCols['userId'] || (table as any).userId;
+
+  if (!idCol) {
+    return NextResponse.json({ error: 'unsupported_table', message: 'Table does not have an ID column' }, { status: 400 });
+  }
+
+  try {
+    const db = getDb();
+    const conditions = [eq(idCol, id)];
+    if (userIdCol) {
+      conditions.push(eq(userIdCol, userId));
+    }
+
+    // Perform delete query
+    const result = (await db.delete(table).where(and(...conditions)).returning()) as any[];
+
+    if (!result || result.length === 0) {
+      return NextResponse.json({ error: 'not_found', message: 'Record not found or not owned by user' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, deleted: result[0] });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Data Explorer delete failed', { table: tableKey, id, error: errMsg });
+    return NextResponse.json({ error: 'delete_failed', message: errMsg }, { status: 500 });
+  }
+}

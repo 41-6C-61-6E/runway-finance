@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const TransactionFilterSchema = z.object({
   accountId: z.string().uuid().optional(),
@@ -6,28 +6,50 @@ export const TransactionFilterSchema = z.object({
   accountTypes: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  categoryId: z.union([z.string().uuid(), z.literal('uncategorized')]).optional(),
+  categoryId: z
+    .union([z.string().uuid(), z.literal("uncategorized")])
+    .optional(),
   categoryIds: z.string().optional(),
   search: z.string().max(200).optional(),
-  type: z.enum(['income', 'expense']).optional(),
+  type: z.enum(["income", "expense"]).optional(),
   pending: z.preprocess(
-    (val) => (val === 'true' ? true : val === 'false' ? false : undefined),
-    z.boolean().optional()
+    (val) => (val === "true" ? true : val === "false" ? false : undefined),
+    z.boolean().optional(),
   ),
   reviewed: z.preprocess(
-    (val) => (val === 'true' || val === true ? true : val === 'false' || val === false ? false : undefined),
-    z.boolean().optional()
+    (val) =>
+      val === "true" || val === true
+        ? true
+        : val === "false" || val === false
+          ? false
+          : undefined,
+    z.boolean().optional(),
   ),
   categorizedByAi: z.preprocess(
-    (val) => (val === 'true' || val === true ? true : val === 'false' || val === false ? false : undefined),
-    z.boolean().optional()
+    (val) =>
+      val === "true" || val === true
+        ? true
+        : val === "false" || val === false
+          ? false
+          : undefined,
+    z.boolean().optional(),
   ),
   minAmount: z.coerce.number().optional(),
   maxAmount: z.coerce.number().optional(),
   limit: z.coerce.number().min(1).max(200).default(50),
   offset: z.coerce.number().min(0).default(0),
-  sort: z.enum(['date', 'amount', 'description']).default('date'),
-  order: z.enum(['asc', 'desc']).default('desc'),
+  sort: z
+    .enum([
+      "date",
+      "amount",
+      "description",
+      "account",
+      "category",
+      "postedDate",
+      "ai",
+    ])
+    .default("date"),
+  order: z.enum(["asc", "desc"]).default("desc"),
   totalAmountOnly: z.coerce.boolean().optional(),
   idsOnly: z.coerce.boolean().optional(),
 });
@@ -83,4 +105,3 @@ export const BulkDeleteTransactionSchema = z.object({
   minAmount: z.string().optional(),
   maxAmount: z.string().optional(),
 });
-

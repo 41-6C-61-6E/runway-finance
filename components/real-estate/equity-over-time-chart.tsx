@@ -144,16 +144,20 @@ export function EquityOverTimeChart() {
         }
 
         // Deconstruct individual mortgage balances by key (zero-out prior to loan origination)
-        const mortgageBalances: Record<string, number> = {};
+        const mortgageBalances: Record<string, number | undefined> = {};
         let totalMortgageBalance = 0;
         for (const m of prop.linkedMortgages) {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
           if (date < origDate) {
-            mortgageBalances[`mortgage_${m.id}`] = 0;
+            mortgageBalances[`mortgage_${m.id}`] = undefined;
           } else {
             const bal = lastMortgageBalances[m.id] ?? 0;
-            mortgageBalances[`mortgage_${m.id}`] = Math.round(bal * 100) / 100;
-            totalMortgageBalance += bal;
+            if (bal <= 0) {
+              mortgageBalances[`mortgage_${m.id}`] = undefined;
+            } else {
+              mortgageBalances[`mortgage_${m.id}`] = Math.round(bal * 100) / 100;
+              totalMortgageBalance += bal;
+            }
           }
         }
 
@@ -187,10 +191,11 @@ export function EquityOverTimeChart() {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
           return sum + (date >= origDate ? Math.abs(m.balance) : 0);
         }, 0);
-        const mortgageBalances: Record<string, number> = {};
+        const mortgageBalances: Record<string, number | undefined> = {};
         for (const m of prop.linkedMortgages) {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
-          mortgageBalances[`mortgage_${m.id}`] = date >= origDate ? Math.abs(m.balance) : 0;
+          const bal = date >= origDate ? Math.abs(m.balance) : 0;
+          mortgageBalances[`mortgage_${m.id}`] = bal <= 0 ? undefined : bal;
         }
         filteredTimeline.push({
           date,
@@ -224,7 +229,7 @@ export function EquityOverTimeChart() {
       let totalEquity = 0;
       let totalMortgage = 0;
       let isSynthetic = false;
-      const combinedMortgageBalances: Record<string, number> = {};
+      const combinedMortgageBalances: Record<string, number | undefined> = {};
 
       for (const pt of parsedTimelines) {
         // Find latest point <= date
@@ -240,9 +245,19 @@ export function EquityOverTimeChart() {
           // Sum up individual mortgages by key
           for (const key of Object.keys(latestPoint)) {
             if (key.startsWith('mortgage_')) {
-              combinedMortgageBalances[key] = (combinedMortgageBalances[key] || 0) + (latestPoint[key] as number);
+              const val = latestPoint[key];
+              if (val !== undefined && val !== null) {
+                combinedMortgageBalances[key] = ((combinedMortgageBalances[key] as number) || 0) + (val as number);
+              }
             }
           }
+        }
+      }
+
+      // Convert zero balances to undefined to avoid drawing lines along the x-axis
+      for (const key of Object.keys(combinedMortgageBalances)) {
+        if (combinedMortgageBalances[key] === 0) {
+          combinedMortgageBalances[key] = undefined;
         }
       }
 

@@ -11,7 +11,11 @@ import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { readApiConfig } from '@/lib/services/manual-accounts';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
-const MODEL_SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
+const MODEL_SNAPSHOT_TYPES = [
+  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+  'single-family', 'condo', 'townhouse', 'multi-family', 'other',
+  'vehicle', 'metals', 'mortgage'
+];
 
 export async function POST(request: Request) {
   try {

@@ -356,7 +356,7 @@ export default function ImportTab() {
       let count = 0;
       for (const row of parsed.allRows) {
         if (dateCol && row[dateCol]) {
-          const parsedRowDate = parseDateField(row[dateCol]);
+          const parsedRowDate = parseDateField(row[dateCol], importType === 'account_snapshots');
           if (startDate && parsedRowDate < startDate) continue;
           if (endDate && parsedRowDate > endDate) continue;
         }
