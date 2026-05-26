@@ -142,7 +142,7 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
       { name: 'ATM & Bank Fees', color: '#475569' },
       { name: 'Late Fees', color: '#334155' },
       { name: 'Loan Interest', color: '#94a3b8' },
-      { name: 'Investments & Contributions', color: '#cbd5e1' },
+      { name: 'Investments & Brokerage Fees', color: '#cbd5e1' },
     ],
   },
   {
@@ -198,7 +198,13 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
     isIncome: false,
     excludeFromReports: true,
     children: [
-      { name: 'Balance Adjustments', color: '#6b7280', excludeFromReports: true },
+      { name: 'Transfer to Savings',     color: '#6b7280', excludeFromReports: true },
+      { name: 'Transfer to Checking',    color: '#9ca3af', excludeFromReports: true },
+      { name: 'Credit Card Payment',     color: '#4b5563', excludeFromReports: true },
+      { name: 'Investment Contribution', color: '#374151', excludeFromReports: true },
+      { name: 'Loan Principal Payment',  color: '#9ca3af', excludeFromReports: true },
+      { name: 'Internal Transfer',       color: '#d1d5db', excludeFromReports: true },
+      { name: 'Balance Adjustments',     color: '#6b7280', excludeFromReports: true },
     ],
   },
 ];
@@ -253,16 +259,26 @@ export async function seedUserCategories(userId: string) {
   }
 }
 
+/** All default subcategories for Transfers & Adjustments, in display order. */
+const TRANSFER_SUBCATEGORIES: ChildCategoryDef[] = [
+  { name: 'Transfer to Savings',     color: '#6b7280', excludeFromReports: true },
+  { name: 'Transfer to Checking',    color: '#9ca3af', excludeFromReports: true },
+  { name: 'Credit Card Payment',     color: '#4b5563', excludeFromReports: true },
+  { name: 'Investment Contribution', color: '#374151', excludeFromReports: true },
+  { name: 'Loan Principal Payment',  color: '#9ca3af', excludeFromReports: true },
+  { name: 'Internal Transfer',       color: '#d1d5db', excludeFromReports: true },
+  { name: 'Balance Adjustments',     color: '#6b7280', excludeFromReports: true },
+];
+
 export async function ensureSystemCategories(userId: string) {
   const db = getDb();
 
-  const existing = await db
+  // Find or create the Transfers & Adjustments parent
+  const existingParents = await db
     .select()
     .from(categories)
     .where(and(eq(categories.userId, userId), eq(categories.name, 'Transfers & Adjustments')))
     .limit(1);
-
-  if (existing.length > 0) return existing[0].id;
 
   const [last] = await db
     .select({ maxOrder: sql<number>`max(${categories.displayOrder})` })
@@ -270,44 +286,80 @@ export async function ensureSystemCategories(userId: string) {
     .where(eq(categories.userId, userId));
   let order = (last?.maxOrder ?? 0) + 1;
 
-  const [parent] = await db
-    .insert(categories)
-    .values({
-      userId,
-      name: 'Transfers & Adjustments',
-      color: '#6b7280',
-      isIncome: false,
-      isSystem: true,
-      excludeFromReports: true,
-      displayOrder: order++,
-    })
-    .returning();
+  let parentId: string;
 
-  const [child] = await db
-    .insert(categories)
-    .values({
-      userId,
-      parentId: parent.id,
-      name: 'Balance Adjustments',
-      color: '#6b7280',
-      isIncome: false,
-      isSystem: true,
-      excludeFromReports: true,
-      displayOrder: order++,
-    })
-    .returning();
+  if (existingParents.length === 0) {
+    // Create parent for the first time
+    const [parent] = await db
+      .insert(categories)
+      .values({
+        userId,
+        name: 'Transfers & Adjustments',
+        color: '#6b7280',
+        isIncome: false,
+        isSystem: true,
+        excludeFromReports: true,
+        displayOrder: order++,
+      })
+      .returning();
+    parentId = parent.id;
+  } else {
+    parentId = existingParents[0].id;
+  }
 
-  // Migrate existing adj-* transactions to Balance Adjustments
-  await db
-    .update(transactions)
-    .set({ categoryId: child.id })
-    .where(
-      and(
-        eq(transactions.userId, userId),
-        sql`${transactions.externalId} LIKE 'adj-%'`,
-        isNull(transactions.categoryId)
-      )
-    );
+  // Fetch all existing children of this parent
+  const existingChildren = await db
+    .select({ name: categories.name })
+    .from(categories)
+    .where(and(eq(categories.userId, userId), eq(categories.parentId, parentId)));
 
-  return child.id;
+  const existingChildNames = new Set(existingChildren.map((c) => c.name));
+
+  // Upsert any missing subcategories
+  let balanceAdjId: string | undefined;
+  for (const sub of TRANSFER_SUBCATEGORIES) {
+    if (existingChildNames.has(sub.name)) {
+      // Already exists — fetch its id only if it's Balance Adjustments (needed for migration below)
+      if (sub.name === 'Balance Adjustments') {
+        const [found] = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(and(eq(categories.userId, userId), eq(categories.parentId, parentId), eq(categories.name, 'Balance Adjustments')))
+          .limit(1);
+        balanceAdjId = found?.id;
+      }
+      continue;
+    }
+    const [inserted] = await db
+      .insert(categories)
+      .values({
+        userId,
+        parentId,
+        name: sub.name,
+        color: sub.color,
+        isIncome: false,
+        isSystem: true,
+        excludeFromReports: true,
+        displayOrder: order++,
+      })
+      .returning();
+    if (sub.name === 'Balance Adjustments') balanceAdjId = inserted.id;
+  }
+
+  // Migrate existing adj-* transactions to Balance Adjustments (only uncategorized ones)
+  if (balanceAdjId) {
+    await db
+      .update(transactions)
+      .set({ categoryId: balanceAdjId })
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          sql`${transactions.externalId} LIKE 'adj-%'`,
+          isNull(transactions.categoryId)
+        )
+      );
+  }
+
+  // Return the Balance Adjustments subcategory ID (callers use this as categoryId for adj- transactions)
+  return balanceAdjId ?? parentId;
 }
