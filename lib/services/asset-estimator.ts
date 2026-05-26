@@ -1,5 +1,5 @@
-import { accountSnapshots } from '@/lib/db/schema';
-import { eq, and, desc, gt, lt } from 'drizzle-orm';
+import { accountSnapshots, accounts } from '@/lib/db/schema';
+import { eq, and, desc, gt, lt, asc, sql } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
@@ -591,7 +591,68 @@ export async function generateAssetHistorySnapshots(
       
       const currentBalance = await getAccountCurrentBalance(accountId, dek);
 
-      if (originalLoanAmount > 0 && interestRate > 0) {
+      // Query real snapshots to see if we should anchor to them
+      const realSnaps = await db
+        .select({
+          snapshotDate: accountSnapshots.snapshotDate,
+          balance: accountSnapshots.balance,
+        })
+        .from(accountSnapshots)
+        .where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            eq(accountSnapshots.isSynthetic, false)
+          )
+        )
+        .orderBy(asc(accountSnapshots.snapshotDate));
+
+      const decryptedRealSnaps = await Promise.all(
+        realSnaps.map(async (s) => {
+          let balanceStr = String(s.balance);
+          if (dek) {
+            try {
+              const decrypted = await decryptField(s.balance, dek);
+              if (decrypted) balanceStr = decrypted;
+            } catch (err) {
+              // ignore
+            }
+          }
+          return { date: String(s.snapshotDate), balance: parseFloat(balanceStr) };
+        })
+      );
+
+      const validRealSnaps = decryptedRealSnaps.filter(s => !isNaN(s.balance));
+      const firstReal = validRealSnaps[0];
+
+      if (firstReal && originalLoanAmount > 0 && interestRate > 0) {
+        // Hybrid Approach:
+        // 1. Generate amortization paydown history BEFORE the first real snapshot date,
+        // anchoring it to the first real snapshot's balance.
+        const firstRealBalanceAbs = Math.abs(firstReal.balance);
+        const historyBefore = generateMortgagePaydownHistory(
+          { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
+          firstRealBalanceAbs,
+          firstReal.date,
+          mortgageStatus,
+          mortgageStatus === 'paid_off' ? payoffDate : refinanceDate,
+          mortgageStatus === 'paid_off' ? 0 : payoffBalance
+        );
+        
+        // Map and filter to only keep snapshots BEFORE the first real snapshot date
+        const estBefore = historyBefore
+          .map((h) => ({ date: h.date, value: -h.balance }))
+          .filter((s) => s.date >= startDate && s.date < firstReal.date);
+
+        // 2. Generate daily history for the period starting at the first real snapshot date
+        // using the transaction-based/real-snapshot-based history generator.
+        const { generateHistoricalAccountSnapshots } = await import('./account-history');
+        await generateHistoricalAccountSnapshots(accountId, userId, firstReal.date, today, dek);
+
+        // 3. Keep the estimated snapshots before the first real snapshot for insertion
+        snapshots = estBefore;
+      } else if (originalLoanAmount > 0 && interestRate > 0) {
+        // Fallback: No real snapshots - generate full history using standard amortization from currentBalance to startDate
         const history = generateMortgagePaydownHistory(
           { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
           Math.abs(currentBalance),
