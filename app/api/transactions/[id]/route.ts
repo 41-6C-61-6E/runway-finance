@@ -38,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (result.length === 0) {
@@ -89,7 +89,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (!existing) {
@@ -159,3 +159,51 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return NextResponse.json(updated);
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'unauthenticated', message: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
+  const userId = session.user.id;
+  const dek = await getSessionDEK();
+  const { id } = await params;
+
+  logger.info('Soft deleting transaction', { transactionId: id });
+
+  const [existing] = await getDb()
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
+    .limit(1);
+
+  if (!existing) {
+    logger.warn('Transaction not found for DELETE', { transactionId: id });
+    return NextResponse.json(
+      { error: 'not_found', message: 'Transaction not found' },
+      { status: 404 }
+    );
+  }
+
+  const [updated] = await getDb()
+    .update(transactions)
+    .set({ deleted: true, updatedAt: new Date() })
+    .where(eq(transactions.id, id))
+    .returning();
+
+  // Rebuild summaries since categories/transactions changed (non-blocking background task)
+  Promise.all([
+    updateCategorySpendingSummaries(userId, dek),
+    updateCategoryIncomeSummaries(userId, dek),
+    updateMonthlyCashFlowSummaries(userId, dek),
+  ]).catch((err) => {
+    logger.error('Background summaries rebuild failed after DELETE', { userId, error: err });
+  });
+
+  return NextResponse.json(updated);
+}
+

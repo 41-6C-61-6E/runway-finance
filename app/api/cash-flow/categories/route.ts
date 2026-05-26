@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
+      eq(transactions.deleted, false),
       eq(accounts.isHidden, false),
       eq(accounts.isExcludedFromNetWorth, false),
       or(
@@ -134,6 +135,7 @@ export async function GET(request: Request) {
       isNull(transactions.categoryId),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
+      eq(transactions.deleted, false),
       eq(accounts.isHidden, false),
       eq(accounts.isExcludedFromNetWorth, false),
     ];

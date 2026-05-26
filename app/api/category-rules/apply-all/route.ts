@@ -24,7 +24,7 @@ export async function POST() {
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(eq(transactions.userId, userId));
+    .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
 
   if (allTxns.length === 0) {
     return NextResponse.json({ updated: 0, total: 0 });

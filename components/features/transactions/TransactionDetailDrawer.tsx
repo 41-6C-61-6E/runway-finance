@@ -48,6 +48,8 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -63,6 +65,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     setReviewed(!!transaction.reviewed);
     setCategoryId(transaction.categoryId);
     setIsCreatingCategory(false);
+    setConfirmDelete(false);
   }, [transaction]);
 
   const fetchCategories = useCallback(async () => {
@@ -142,6 +145,28 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     }
   }, [transaction.id, payee, notes, categoryId, onSuccess, onClose]);
 
+  const handleDelete = useCallback(async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        onSuccess();
+        onClose();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeleting(false);
+    }
+  }, [transaction.id, confirmDelete, onSuccess, onClose]);
+
   const toggleReviewed = async () => {
     setReviewed(!reviewed);
   };
@@ -168,7 +193,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px]">
+      <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle>Transaction Details</SheetTitle>
         </SheetHeader>
@@ -451,14 +476,28 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
             )}
           </div>
 
-          {/* Save */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || deleting}
+              className="w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+
+            <button
+              onClick={handleDelete}
+              disabled={saving || deleting}
+              className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
+                confirmDelete
+                  ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+                  : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
+              } disabled:opacity-50`}
+            >
+              {deleting ? 'Deleting...' : confirmDelete ? 'Are you sure? Click to confirm delete' : 'Delete Transaction'}
+            </button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

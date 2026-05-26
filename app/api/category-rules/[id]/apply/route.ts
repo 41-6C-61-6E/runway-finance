@@ -35,7 +35,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(eq(transactions.userId, userId));
+    .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
 
   const matchedIds: string[] = [];
   for (const tx of allTxns) {

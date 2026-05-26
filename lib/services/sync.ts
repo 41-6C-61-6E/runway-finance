@@ -4,12 +4,14 @@ import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { userSettings } from '@/lib/db/schema';
-import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+
+import { isSimilarDescription } from '@/lib/utils/description-matching';
 
 const LOG_TAG = '[sync]';
 
@@ -165,9 +167,12 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     .select()
     .from(transactions)
     .where(
-      inArray(
-        transactions.accountId,
-        userAccounts.map((a) => a.id)
+      and(
+        inArray(
+          transactions.accountId,
+          userAccounts.map((a) => a.id)
+        ),
+        eq(transactions.deleted, false)
       )
     );
 
@@ -271,9 +276,12 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     .select()
     .from(transactions)
     .where(
-      inArray(
-        transactions.accountId,
-        userAccounts.map((a) => a.id)
+      and(
+        inArray(
+          transactions.accountId,
+          userAccounts.map((a) => a.id)
+        ),
+        eq(transactions.deleted, false)
       )
     );
 
@@ -395,9 +403,12 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     .select()
     .from(transactions)
     .where(
-      inArray(
-        transactions.accountId,
-        userAccounts.map((a) => a.id)
+      and(
+        inArray(
+          transactions.accountId,
+          userAccounts.map((a) => a.id)
+        ),
+        eq(transactions.deleted, false)
       )
     );
 
@@ -660,6 +671,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       };
 
       if (sfAccount.transactions) {
+        const incomingIds = new Set(sfAccount.transactions.map((t) => t.id));
         for (const sfTx of sfAccount.transactions) {
           const amountNum = parseFloat(sfTx.amount);
           const accountId = upserted.id;

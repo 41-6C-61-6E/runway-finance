@@ -252,6 +252,7 @@ export const transactions = pgTable(
     reviewed: boolean('reviewed').notNull().default(false),
     categorizedByAi: boolean('categorized_by_ai').notNull().default(false),
     ignored: boolean('ignored').notNull().default(false),
+    deleted: boolean('deleted').notNull().default(false),
     isImported: boolean('is_imported').notNull().default(false),
     importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
