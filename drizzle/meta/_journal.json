@@ -253,6 +253,13 @@
       "when": 1779760000000,
       "tag": "0035_add_account_id_to_summaries",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779770000000,
+      "tag": "0036_add_deleted_to_transactions",
+      "breakpoints": true
     }
   ]
 }

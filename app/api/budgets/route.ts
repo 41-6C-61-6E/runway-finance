@@ -170,7 +170,8 @@ export async function GET(request: Request) {
         eq(transactions.userId, session.user.id),
         inArray(transactions.categoryId, allSearchIds),
         gte(transactions.date, bounds.startDate),
-        lt(transactions.date, bounds.endDate)
+        lt(transactions.date, bounds.endDate),
+        eq(transactions.deleted, false)
       ];
       if (!isImportTransactionsEnabled) {
         txConditions.push(eq(transactions.isImported, false));

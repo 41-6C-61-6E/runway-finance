@@ -125,6 +125,7 @@ export async function GET(request: Request) {
       inArray(transactions.accountId, fundingAccountIds),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
+      eq(transactions.deleted, false),
     ];
     if (!isImportTransactionsEnabled) {
       txConditions.push(eq(transactions.isImported, false));

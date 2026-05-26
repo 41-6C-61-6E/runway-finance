@@ -65,7 +65,7 @@ export default function ChangePasswordDrawer({ open, onClose }: ChangePasswordDr
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px]">
+      <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
         <SheetHeader className="pb-4">
           <SheetTitle className="flex items-center gap-2">
             <KeyRound className="h-5 w-5" />

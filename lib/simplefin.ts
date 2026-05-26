@@ -81,6 +81,7 @@ export async function fetchAccounts(
   const url = new URL(`${parsed.origin}${accountsPath}`);
   url.searchParams.set('start-date', String(Math.floor(startDate.getTime() / 1000)));
   url.searchParams.set('end-date', String(Math.floor(endDate.getTime() / 1000)));
+  url.searchParams.set('pending', '1');
 
   const headers: Record<string, string> = {};
   if (credentials) {

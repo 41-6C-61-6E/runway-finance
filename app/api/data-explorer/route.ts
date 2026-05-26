@@ -308,7 +308,7 @@ function buildWhereClause(
 
   if (search && searchColumns && searchColumns.length > 0) {
     const searchConditions = searchColumns.map((colName) => {
-      const col = table._.columns[colName];
+      const col = tableCols[colName];
       return col ? like(col, `%${search}%`) : null;
     }).filter(Boolean);
     if (searchConditions.length > 0) {
@@ -368,36 +368,151 @@ export async function GET(request: Request) {
 
   try {
     const db = getDb();
+    const tableCols = getTableColumns(table);
 
-    const whereClause = buildWhereClause(table, userId, parsedFilters, search, config.searchColumns);
-
-    const [totalRow] = await db
-      .select({ count: sql<number>`count(*)` })
+    // 1. Fetch all rows for the user from the database
+    const userIdCol = tableCols['userId'] || (table as any).userId;
+    const baseConditions = userIdCol ? [eq(userIdCol, userId)] : [];
+    
+    const rawData = await db
+      .select()
       .from(table)
-      .where(whereClause)
-      .limit(1);
+      .where(and(...baseConditions));
 
-    const total = totalRow?.count ?? 0;
-
-    const tableColsForSort = getTableColumns(table);
-    const effectiveSort = sort || config.defaultSort;
-    const sortCol = tableColsForSort[effectiveSort] ?? null;
-    const orderFn = order === 'asc' ? asc : desc;
-
-    let dataQuery = db.select().from(table).where(whereClause).limit(limit).offset(offset);
-    if (sortCol) {
-      dataQuery = dataQuery.orderBy(orderFn(sortCol)) as typeof dataQuery;
-    }
-    const data = await dataQuery;
-
-    // Decrypt encrypted fields for this table
+    // 2. Decrypt all rows
     const encryptedFields = ENCRYPTED_FIELDS[tableKey];
-    const decrypted = encryptedFields ? await decryptRows(tableKey, data, dek) : data;
+    const decrypted = encryptedFields ? await decryptRows(tableKey, rawData, dek) : rawData;
 
+    // 3. Filter in memory
     const columns = extractColumns(table, config.columnOverrides);
+    const colTypes = new Map<string, ColumnMeta['type']>();
+    for (const c of columns) {
+      colTypes.set(c.field, c.type);
+    }
+
+    let filtered = decrypted;
+
+    // Apply filter rules in memory
+    for (const f of parsedFilters) {
+      const type = colTypes.get(f.field) || 'string';
+      filtered = filtered.filter((row) => {
+        const val = row[f.field];
+        const filterVal = f.value;
+
+        if (f.op === 'isNull') return val === null || val === undefined;
+        if (f.op === 'isNotNull') return val !== null && val !== undefined;
+        if (val === null || val === undefined) return false;
+
+        // Normalize value comparison based on column type
+        if (type === 'number') {
+          const numVal = parseFloat(String(val)) || 0;
+          const numFilter = parseFloat(String(filterVal)) || 0;
+          if (f.op === 'eq') return numVal === numFilter;
+          if (f.op === 'neq') return numVal !== numFilter;
+          if (f.op === 'gt') return numVal > numFilter;
+          if (f.op === 'gte') return numVal >= numFilter;
+          if (f.op === 'lt') return numVal < numFilter;
+          if (f.op === 'lte') return numVal <= numFilter;
+        }
+
+        if (type === 'date') {
+          const tVal = new Date(String(val)).getTime();
+          const tFilter = new Date(String(filterVal)).getTime();
+          if (isNaN(tVal) || isNaN(tFilter)) return false;
+          if (f.op === 'eq') return tVal === tFilter;
+          if (f.op === 'neq') return tVal !== tFilter;
+          if (f.op === 'gt') return tVal > tFilter;
+          if (f.op === 'gte') return tVal >= tFilter;
+          if (f.op === 'lt') return tVal < tFilter;
+          if (f.op === 'lte') return tVal <= tFilter;
+        }
+
+        if (type === 'boolean') {
+          const bVal = String(val) === 'true' || val === true;
+          const bFilter = String(filterVal) === 'true' || filterVal === true;
+          if (f.op === 'eq') return bVal === bFilter;
+          if (f.op === 'neq') return bVal !== bFilter;
+        }
+
+        // Default: string matching
+        const sVal = String(val).toLowerCase();
+        const sFilter = String(filterVal).toLowerCase();
+
+        if (f.op === 'eq') return sVal === sFilter;
+        if (f.op === 'neq') return sVal !== sFilter;
+        if (f.op === 'contains') return sVal.includes(sFilter);
+        if (f.op === 'in') {
+          if (Array.isArray(filterVal)) {
+            return filterVal.map(v => String(v).toLowerCase()).includes(sVal);
+          }
+          return sVal.includes(sFilter);
+        }
+
+        return false;
+      });
+    }
+
+    // Apply search query in memory
+    if (search && config.searchColumns && config.searchColumns.length > 0) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter((row) => {
+        return config.searchColumns.some((colName) => {
+          const val = row[colName];
+          if (val === null || val === undefined) return false;
+          return String(val).toLowerCase().includes(searchLower);
+        });
+      });
+    }
+
+    const total = filtered.length;
+
+    // 4. Sort in memory
+    const effectiveSort = sort || config.defaultSort;
+    if (effectiveSort) {
+      const type = colTypes.get(effectiveSort) || 'string';
+      filtered.sort((a, b) => {
+        const valA = a[effectiveSort];
+        const valB = b[effectiveSort];
+
+        if (valA === null || valA === undefined) return valB === null || valB === undefined ? 0 : 1;
+        if (valB === null || valB === undefined) return -1;
+
+        if (type === 'number') {
+          const numA = parseFloat(String(valA)) || 0;
+          const numB = parseFloat(String(valB)) || 0;
+          return order === 'asc' ? numA - numB : numB - numA;
+        }
+
+        if (type === 'date') {
+          const tA = new Date(String(valA)).getTime();
+          const tB = new Date(String(valB)).getTime();
+          const validA = !isNaN(tA);
+          const validB = !isNaN(tB);
+          if (!validA) return !validB ? 0 : 1;
+          if (!validB) return -1;
+          return order === 'asc' ? tA - tB : tB - tA;
+        }
+
+        if (type === 'boolean') {
+          const bA = (String(valA) === 'true' || valA === true) ? 1 : 0;
+          const bB = (String(valB) === 'true' || valB === true) ? 1 : 0;
+          return order === 'asc' ? bA - bB : bB - bA;
+        }
+
+        // Case-insensitive string sorting
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        return order === 'asc'
+          ? strA.localeCompare(strB)
+          : strB.localeCompare(strA);
+      });
+    }
+
+    // 5. Paginate in memory
+    const paginated = filtered.slice(offset, offset + limit);
 
     return NextResponse.json({
-      data: decrypted,
+      data: paginated,
       total,
       limit,
       offset,
