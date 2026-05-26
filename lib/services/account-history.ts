@@ -76,7 +76,7 @@ export async function getEarliestTransactionDate(
   const [tx] = await getDb()
     .select({ date: transactions.date })
     .from(transactions)
-    .where(eq(transactions.accountId, accountId))
+    .where(and(eq(transactions.accountId, accountId), eq(transactions.deleted, false)))
     .orderBy(asc(transactions.date))
     .limit(1);
 
@@ -109,7 +109,8 @@ export async function getPostedTransactions(
         eq(transactions.accountId, accountId),
         gte(transactions.date, fromDate),
         lte(transactions.date, toDate),
-        eq(transactions.pending, false)
+        eq(transactions.pending, false),
+        eq(transactions.deleted, false)
       )
     )
     .orderBy(asc(transactions.date));

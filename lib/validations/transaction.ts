@@ -9,7 +9,10 @@ export const TransactionFilterSchema = z.object({
   categoryId: z.union([z.string().uuid(), z.literal('uncategorized')]).optional(),
   categoryIds: z.string().optional(),
   search: z.string().max(200).optional(),
-  pending: z.coerce.boolean().optional(),
+  pending: z.preprocess(
+    (val) => (val === 'true' ? true : val === 'false' ? false : undefined),
+    z.boolean().optional()
+  ),
   reviewed: z.coerce.boolean().optional(),
   categorizedByAi: z.coerce.boolean().optional(),
   minAmount: z.coerce.number().optional(),
@@ -53,3 +56,22 @@ export const BulkPatchTransactionSchema = z.object({
   minAmount: z.string().optional(),
   maxAmount: z.string().optional(),
 });
+
+export const BulkDeleteTransactionSchema = z.object({
+  ids: z.array(z.string()).min(1).optional(),
+  selectAllMatching: z.boolean().optional(),
+  search: z.string().max(200).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  accountId: z.string().optional(),
+  accountIds: z.string().optional(),
+  accountTypes: z.string().optional(),
+  categoryId: z.string().optional(),
+  categoryIds: z.string().optional(),
+  pending: z.string().optional(),
+  reviewed: z.string().optional(),
+  categorizedByAi: z.string().optional(),
+  minAmount: z.string().optional(),
+  maxAmount: z.string().optional(),
+});
+
