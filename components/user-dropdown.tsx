@@ -145,11 +145,30 @@ export default function UserDropdown() {
           <div className="h-px bg-border mx-2" />
 
           <div className="px-3 py-2 text-[10px] text-muted-foreground space-y-1 bg-muted/20">
-            <div className="flex justify-between gap-2 font-mono">
+            <div className="flex justify-between items-center gap-2 font-mono">
               <span className="opacity-55">Build:</span>
-              <span className="text-right truncate max-w-[70%]" title={process.env.NEXT_PUBLIC_BUILD_NUMBER}>
-                {process.env.NEXT_PUBLIC_BUILD_NUMBER}
-              </span>
+              <div className="flex items-center gap-1.5 truncate max-w-[70%]">
+                {(() => {
+                  const buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || 'dev';
+                  let dotClass = 'bg-emerald-500 shadow-[0_0_4px_#10b981]';
+                  let buildLabel = 'Production Release';
+                  if (buildNumber.endsWith('.dev')) {
+                    dotClass = 'bg-amber-500 shadow-[0_0_4px_#f59e0b]';
+                    buildLabel = 'Development';
+                  } else if (buildNumber.endsWith('.local')) {
+                    dotClass = 'bg-blue-500 shadow-[0_0_4px_#3b82f6]';
+                    buildLabel = 'Local Production';
+                  }
+                  return (
+                    <>
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} title={buildLabel} />
+                      <span className="text-right truncate" title={`${buildNumber} (${buildLabel})`}>
+                        {buildNumber}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
             <div className="flex justify-between gap-2 font-mono">
               <span className="opacity-55">Built:</span>

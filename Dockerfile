@@ -12,6 +12,10 @@ RUN corepack enable pnpm && corepack prepare pnpm@10.23.0 --activate && pnpm i -
 
 # Rebuild the source code only when needed
 FROM deps AS builder
+ARG BUILD_NUMBER
+ARG BUILD_TIME
+ENV BUILD_NUMBER=$BUILD_NUMBER
+ENV BUILD_TIME=$BUILD_TIME
 WORKDIR /app
 COPY . .
 
