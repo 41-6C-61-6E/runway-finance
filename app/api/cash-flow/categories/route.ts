@@ -188,6 +188,11 @@ export async function GET(request: Request) {
           gte(categorySpendingSummary.yearMonth, startMonth!),
           lte(categorySpendingSummary.yearMonth, endMonth!),
           eq(categories.excludeFromReports, false),
+          // Also exclude children whose parent has excludeFromReports=true
+          or(
+            isNull(categories.parentId),
+            sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+          ),
         ];
 
         const incomeConditions = [
@@ -195,6 +200,11 @@ export async function GET(request: Request) {
           gte(categoryIncomeSummary.yearMonth, startMonth!),
           lte(categoryIncomeSummary.yearMonth, endMonth!),
           eq(categories.excludeFromReports, false),
+          // Also exclude children whose parent has excludeFromReports=true
+          or(
+            isNull(categories.parentId),
+            sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+          ),
         ];
 
         if (accountIdList.length > 0) {
@@ -312,12 +322,22 @@ export async function GET(request: Request) {
       const spendingConditions = [
         eq(categorySpendingSummary.userId, session.user.id),
         eq(categorySpendingSummary.yearMonth, resolvedMonth),
-        eq(categories.excludeFromReports, false)
+        eq(categories.excludeFromReports, false),
+        // Also exclude children whose parent has excludeFromReports=true
+        or(
+          isNull(categories.parentId),
+          sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+        ),
       ];
       const incomeConditions = [
         eq(categoryIncomeSummary.userId, session.user.id),
         eq(categoryIncomeSummary.yearMonth, resolvedMonth),
-        eq(categories.excludeFromReports, false)
+        eq(categories.excludeFromReports, false),
+        // Also exclude children whose parent has excludeFromReports=true
+        or(
+          isNull(categories.parentId),
+          sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+        ),
       ];
 
       if (accountIdList.length > 0) {
