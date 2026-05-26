@@ -1,8 +1,17 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, ExternalLink, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import JsonViewer from './JsonViewer';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type ColumnMeta = {
   field: string;
@@ -15,11 +24,45 @@ interface RowExpansionProps {
   row: Record<string, unknown>;
   columns: ColumnMeta[];
   onNavigate: (table: string, filterField: string, filterValue: string) => void;
+  tableKey?: string;
+  onRowDeleted?: () => void;
 }
 
 const NAVIGABLE_FIELDS = ['account_id', 'category_id', 'connection_id', 'fire_scenario_id', 'funding_account_id', 'linked_account_id'];
 
-export default function RowExpansion({ row, columns, onNavigate }: RowExpansionProps) {
+export default function RowExpansion({ row, columns, onNavigate, tableKey, onRowDeleted }: RowExpansionProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = useCallback(async () => {
+    if (!tableKey || !row.id) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/data-explorer?table=${tableKey}&id=${row.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        let errMsg = `Failed to delete record (${res.status})`;
+        try {
+          const err = await res.json();
+          errMsg = err.message || err.error || errMsg;
+        } catch {}
+        throw new Error(errMsg);
+      }
+      setShowDeleteConfirm(false);
+      if (onRowDeleted) {
+        onRowDeleted();
+      }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [tableKey, row.id, onRowDeleted]);
+
   return (
     <div className="border-t border-b border-border/50 bg-muted/10">
       <div className="grid grid-cols-[200px_1fr] gap-x-4 gap-y-2 p-4 text-xs">
@@ -43,6 +86,74 @@ export default function RowExpansion({ row, columns, onNavigate }: RowExpansionP
           );
         })}
       </div>
+
+      {tableKey && row.id && (
+        <>
+          <div className="border-t border-border/30 px-4 py-3 flex items-center justify-between bg-muted/5">
+            <span className="text-xs text-muted-foreground">
+              Record ID: <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px] select-all">{String(row.id || '')}</code>
+            </span>
+            <button
+              onClick={() => {
+                setDeleteError(null);
+                setShowDeleteConfirm(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 border border-destructive/20 hover:border-destructive/30 rounded-lg transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Entry
+            </button>
+          </div>
+
+          <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                  Delete Database Entry
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3 pt-2">
+                  <p className="font-medium text-foreground">
+                    Warning: This is a direct database delete operation and is highly dangerous.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Deleting this entry from the <strong className="text-foreground">{tableKey}</strong> table can cause database integrity issues, broken foreign key references, or missing balance history.
+                  </p>
+                  <div className="text-xs text-muted-foreground bg-muted p-3 rounded border border-border space-y-1 font-mono">
+                    <div><strong>ID:</strong> {String(row.id)}</div>
+                    <div><strong>Table:</strong> {tableKey}</div>
+                  </div>
+                  <p className="font-medium text-foreground text-sm">
+                    Are you sure you want to permanently delete this entry?
+                  </p>
+                  {deleteError && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive font-medium break-words">
+                      Error: {deleteError}
+                    </div>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-4">
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50 gap-1.5 cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Confirm Delete'
+                  )}
+                </button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   );
 }

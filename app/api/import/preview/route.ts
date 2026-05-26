@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
       // Normalize date field
       if (mapped.date) {
-        mapped.parsedDate = parseDateField(mapped.date);
+        mapped.parsedDate = parseDateField(mapped.date, importType === 'account_snapshots');
       }
 
       // Resolve account reference
