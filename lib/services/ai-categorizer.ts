@@ -615,56 +615,58 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
 
   logger.info(`${LOG_TAG} Applying ${pending.length} approved proposals`, { userId });
 
+  // Load all existing categories and decrypt them
+  const categoryRows = await db
+    .select()
+    .from(categoriesTable)
+    .where(eq(categoriesTable.userId, userId));
+  const decryptedCategories = await decryptRows('categories', categoryRows, dek);
+
+  // Set of valid category IDs to check existence later
+  const existingIds = new Set<string>();
+  // Map of lowercase category name to ID
+  const nameToId = new Map<string, string>();
+  for (const cat of decryptedCategories) {
+    existingIds.add(cat.id);
+    nameToId.set(cat.name.trim().toLowerCase(), cat.id);
+  }
+
   const categoryIdMap = new Map<string, string>();
 
   // First pass: Process all create_category proposals and check for duplicates
-  const categoryCreationQueue: { payload: any; proposal: typeof pending[0] }[] = [];
-  
   for (const proposal of pending) {
     if (proposal.type !== 'create_category') continue;
     const payload = proposal.payload as any;
-    
-    // Check if category already exists (case insensitive)
-    const existingCategory = await db
-      .select()
-      .from(categoriesTable)
-      .where(and(
-        eq(categoriesTable.userId, userId),
-        eq(categoriesTable.name, payload.name)
-      ))
-      .limit(1);
-    
-    if (existingCategory.length > 0) {
+    const normName = payload.name.trim().toLowerCase();
+
+    // Check if category already exists in memory (case insensitive)
+    const existingId = nameToId.get(normName);
+
+    if (existingId) {
       // Category already exists, map it to the existing ID
-      categoryIdMap.set(payload.name, existingCategory[0].id);
-      logger.info(`${LOG_TAG} Category "${payload.name}" already exists`, { userId, categoryId: existingCategory[0].id });
+      categoryIdMap.set(payload.name, existingId);
+      logger.info(`${LOG_TAG} Category "${payload.name}" already exists`, { userId, categoryId: existingId });
     } else {
-      // Queue for creation
-      categoryCreationQueue.push({ payload, proposal });
+      const encrypted = await encryptField(payload.name, dek);
+      const [created] = await db
+        .insert(categoriesTable)
+        .values({
+          userId,
+          parentId: payload.parentId,
+          name: encrypted,
+          color: payload.color ?? '#6366f1',
+          isIncome: payload.isIncome ?? false,
+          isSystem: false,
+          createdByAi: true,
+          displayOrder: 999,
+        })
+        .returning();
+
+      categoryIdMap.set(payload.name, created.id);
+      nameToId.set(normName, created.id);
+      existingIds.add(created.id);
+      logger.info(`${LOG_TAG} Created category "${payload.name}"`, { userId, categoryId: created.id });
     }
-  }
-
-  // Create new categories that don't already exist
-  for (const { payload, proposal } of categoryCreationQueue) {
-    const encrypted = await encryptField(payload.name, dek);
-    const encryptedParentId = payload.parentId ? await encryptField(payload.parentId, dek) : null;
-
-    const [created] = await db
-      .insert(categoriesTable)
-      .values({
-        userId,
-        parentId: payload.parentId,
-        name: encrypted,
-        color: payload.color ?? '#6366f1',
-        isIncome: payload.isIncome ?? false,
-        isSystem: false,
-        createdByAi: true,
-        displayOrder: 999,
-      })
-      .returning();
-
-    categoryIdMap.set(payload.name, created.id);
-    logger.info(`${LOG_TAG} Created category "${payload.name}"`, { userId, categoryId: created.id });
   }
 
   // Second pass: Process remaining proposals (categorize and create_rule)
@@ -674,11 +676,18 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     switch (proposal.type) {
       case 'categorize': {
         let categoryId = payload.proposedCategoryId;
-        if (categoryId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId)) {
-          categoryId = null;
+        // Verify proposedCategoryId exists in the database
+        if (categoryId) {
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId);
+          if (!isValidUuid || !existingIds.has(categoryId)) {
+            categoryId = null;
+          }
         }
+        // Fallback to lookup by name
         if (!categoryId && payload.proposedCategoryName) {
-          categoryId = categoryIdMap.get(payload.proposedCategoryName) ?? null;
+          categoryId = categoryIdMap.get(payload.proposedCategoryName) ?? 
+                       nameToId.get(payload.proposedCategoryName.trim().toLowerCase()) ?? 
+                       null;
         }
         if (categoryId) {
           await db
@@ -691,18 +700,18 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
       }
       case 'create_rule': {
         let setCategoryId = payload.setCategoryId;
-        if (!setCategoryId && payload.setCategoryName) {
-          setCategoryId = categoryIdMap.get(payload.setCategoryName) ?? null;
-          if (!setCategoryId) {
-            const existing = await db
-              .select()
-              .from(categoriesTable)
-              .where(and(eq(categoriesTable.userId, userId), eq(categoriesTable.name, payload.setCategoryName)))
-              .limit(1);
-            if (existing.length > 0) {
-              setCategoryId = existing[0].id;
-            }
+        // Verify setCategoryId exists in the database
+        if (setCategoryId) {
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(setCategoryId);
+          if (!isValidUuid || !existingIds.has(setCategoryId)) {
+            setCategoryId = null;
           }
+        }
+        // Fallback to lookup by name
+        if (!setCategoryId && payload.setCategoryName) {
+          setCategoryId = categoryIdMap.get(payload.setCategoryName) ?? 
+                          nameToId.get(payload.setCategoryName.trim().toLowerCase()) ?? 
+                          null;
         }
 
         const encryptedRule = await encryptField(payload.ruleName, dek);

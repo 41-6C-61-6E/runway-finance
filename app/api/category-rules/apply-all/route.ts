@@ -5,6 +5,8 @@ import { transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows, encryptField } from '@/lib/crypto';
 
 export async function POST() {
   const session = await auth();
@@ -13,6 +15,7 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   const allTxns = await getDb()
     .select({
@@ -30,13 +33,16 @@ export async function POST() {
     return NextResponse.json({ updated: 0, total: 0 });
   }
 
-  const ruleResults = await applyRulesToTransactions(allTxns, userId);
+  const decryptedTxns = await decryptRows('transactions', allTxns, dek);
+  const ruleResults = await applyRulesToTransactions(decryptedTxns, userId, dek);
 
   if (ruleResults.size > 0) {
     for (const [txId, action] of ruleResults) {
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (action.categoryId) updateData.categoryId = action.categoryId;
-      if (action.payee) updateData.payee = action.payee;
+      if (action.payee) {
+        updateData.payee = await encryptField(action.payee, dek);
+      }
       if (action.reviewed !== null) updateData.reviewed = action.reviewed;
       if (Object.keys(updateData).length > 1) {
         await getDb()
