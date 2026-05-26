@@ -49,6 +49,15 @@ describe('CSV Parser', () => {
     expect(parseDateField('10/05/2025')).toBe('2025-10-05');
     expect(parseDateField('October 2025')).toBe('2025-10-01');
     expect(parseDateField('Oct 2025')).toBe('2025-10-01');
+
+    // Test endOfMonth = true for various formats
+    expect(parseDateField('October 2025', true)).toBe('2025-10-31');
+    expect(parseDateField('Oct 2025', true)).toBe('2025-10-31');
+    expect(parseDateField('2025-10', true)).toBe('2025-10-31');
+    expect(parseDateField('10/2025', true)).toBe('2025-10-31');
+    expect(parseDateField('February 2024', true)).toBe('2024-02-29'); // Leap year
+    expect(parseDateField('Feb 2025', true)).toBe('2025-02-28'); // Non-leap year
+    expect(parseDateField('Oct-25', true)).toBe('2025-10-31'); // 2-digit year
   });
 
   it('should determine transaction sign based on type indicator', () => {

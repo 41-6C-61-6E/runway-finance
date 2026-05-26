@@ -55,6 +55,7 @@ interface DataTableProps {
   onPageChange: (offset: number) => void;
   onPageSizeChange: (size: number) => void;
   onNavigate: (table: string, filterField: string, filterValue: string) => void;
+  onRowDeleted?: () => void;
 }
 
 const ALL_COLUMNS_MARKER = '__all__';
@@ -75,6 +76,7 @@ export default function DataTable({
   onPageChange,
   onPageSizeChange,
   onNavigate,
+  onRowDeleted,
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>(
     sort ? [{ id: sort, desc: order === 'desc' }] : []
@@ -360,6 +362,8 @@ export default function DataTable({
                               row={row.original}
                               columns={columns}
                               onNavigate={onNavigate}
+                              tableKey={tableKey}
+                              onRowDeleted={onRowDeleted}
                             />
                           </td>
                         </tr>

@@ -21,3 +21,4 @@ pgdata/
 .vscode/
 .idea/
 chat.json
+.DS_Store
