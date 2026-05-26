@@ -217,7 +217,6 @@ export default function AiTab() {
               { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly. Do NOT output any thinking, reasoning, explanation, or <think> tags.' },
               { role: 'user', content: customPrompt || DEFAULT_TEST_PROMPT }
             ],
-            max_tokens: 200,
             chat_id: 'test-connection',
           }),
           signal,

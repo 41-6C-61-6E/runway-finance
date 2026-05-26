@@ -236,6 +236,43 @@ const setOptions = {
   deserialize: (raw: string) => new Set<string>(JSON.parse(raw)),
 };
 
+const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] => {
+  if (data.length === 0) return [0, 0];
+  const lastIdx = data.length - 1;
+  const lastDateStr = data[lastIdx].date;
+  const lastDate = new Date(lastDateStr + 'T00:00:00Z');
+
+  let startDate = new Date(lastDate);
+  switch (range) {
+    case '1m':
+      startDate.setUTCMonth(startDate.getUTCMonth() - 1);
+      break;
+    case '3m':
+      startDate.setUTCMonth(startDate.getUTCMonth() - 3);
+      break;
+    case '6m':
+      startDate.setUTCMonth(startDate.getUTCMonth() - 6);
+      break;
+    case '1y':
+      startDate.setUTCFullYear(startDate.getUTCFullYear() - 1);
+      break;
+    case '5y':
+      startDate.setUTCFullYear(startDate.getUTCFullYear() - 5);
+      break;
+    case 'ytd':
+      startDate = new Date(Date.UTC(lastDate.getUTCFullYear(), 0, 1));
+      break;
+    case 'all':
+    default:
+      return [0, lastIdx];
+  }
+
+  const startStr = startDate.toISOString().split('T')[0];
+  let startIdx = data.findIndex(d => d.date >= startStr);
+  if (startIdx === -1) startIdx = 0;
+  return [startIdx, lastIdx];
+};
+
 // ── Main Accounts Dashboard Page ─────────────────────────────────────────────
 export default function AccountsPage() {
   const { data: session } = useSession();
@@ -247,6 +284,23 @@ export default function AccountsPage() {
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('runway:accounts:groupMode', 'type');
   const [showHidden, setShowHidden] = usePersistentState<boolean>('runway:accounts:showHidden', false);
+
+  // ── Chart pan/zoom viewport state ────────────────────────────────────────────
+  const [viewStart, setViewStart] = useState<number | null>(null);
+  const [viewEnd, setViewEnd] = useState<number | null>(null);
+
+  // Drag tracking refs (don't need re-renders during drag)
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartViewStart = useRef(0);
+  const dragStartViewEnd = useRef(0);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  // Flag to prevent timeframe useEffect from resetting custom viewport on double click zoom
+  const isZooming = useRef(false);
+
+  // Cursor state (separate from isDragging ref since refs don't trigger re-renders)
+  const [isDraggingCursor, setIsDraggingCursor] = useState(false);
 
   // Tree expanded states
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -352,9 +406,9 @@ export default function AccountsPage() {
 
   // 2. Fetch Accounts History Chart Data (only reportable accounts)
   const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[]; accounts: any[] }>({
-    queryKey: ['accounts-history', timeframe],
+    queryKey: ['accounts-history'],
     queryFn: async () => {
-      const res = await fetch(`/api/accounts/history?timeframe=${timeframe}`, { credentials: 'include' });
+      const res = await fetch(`/api/accounts/history?timeframe=all`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch history');
       return res.json();
     },
@@ -451,9 +505,9 @@ export default function AccountsPage() {
   }, [uniqueSeriesKeys, groupMode, reportableAccounts, isAssetSeries]);
 
   // ── Calculate dynamic stacking and data structures ──
-  const { rechartsData, activeAssets, activeLiabilities, processedChartData, maxVal, minVal } = useMemo(() => {
+  const { rechartsData, activeAssets, activeLiabilities, processedChartData } = useMemo(() => {
     if (historyData.length === 0) {
-      return { rechartsData: [], activeAssets: [], activeLiabilities: [], processedChartData: [], maxVal: 1000, minVal: 0 };
+      return { rechartsData: [], activeAssets: [], activeLiabilities: [], processedChartData: [] };
     }
 
     // Compile accounts list matching each checked series
@@ -535,53 +589,177 @@ export default function AccountsPage() {
       return row;
     });
 
+    // Always trim leading days with no data points
     let startIdx = 0;
-    if (timeframe === 'all') {
-      const firstDataIdx = rechartsDataRaw.findIndex(d => d._hasData);
-      if (firstDataIdx !== -1) {
-        startIdx = firstDataIdx;
-      }
+    const firstDataIdx = rechartsDataRaw.findIndex(d => d._hasData);
+    if (firstDataIdx !== -1) {
+      startIdx = firstDataIdx;
     }
-    let rechartsData = rechartsDataRaw.slice(startIdx);
-
-    if (timeframe === 'all' && rechartsData.length > 100) {
-      const sampled: typeof rechartsData = [];
-      const len = rechartsData.length;
-      for (let i = 0; i < 100; i++) {
-        const index = Math.min(
-          Math.floor((i * (len - 1)) / 99),
-          len - 1
-        );
-        sampled.push(rechartsData[index]);
-      }
-      rechartsData = sampled;
-    }
-
-    // Find bounds
-    const allValues = rechartsData.flatMap((d) => [
-      d.netWorth,
-      d.totalAssets,
-      -d.totalLiabilities
-    ]);
-
-    const rawMax = Math.max(...allValues, 1000);
-    const rawMin = Math.min(...allValues, 0);
-    const maxValue = rawMax * 1.15;
-    const minValue = rawMin < 0 ? rawMin * 1.15 : 0;
+    const rechartsData = rechartsDataRaw.slice(startIdx);
 
     return {
       rechartsData,
       activeAssets,
       activeLiabilities,
       processedChartData: processedPoints.slice(startIdx),
-      maxVal: maxValue,
-      minVal: minValue,
     };
-  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries, timeframe]);
+  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries]);
+
+  // ── Viewport-sliced data (what the chart actually renders) ──────────────────
+  const [defaultStart, defaultEnd] = useMemo(() => {
+    return getTimeframeIndices(rechartsData, timeframe);
+  }, [rechartsData, timeframe]);
+
+  const currentViewStart = viewStart ?? defaultStart;
+  const currentViewEnd = viewEnd ?? defaultEnd;
+
+  const visibleData = useMemo(() => {
+    if (rechartsData.length === 0) return [];
+    const rawVisible = rechartsData.slice(currentViewStart, currentViewEnd + 1);
+    
+    // If the visible range is very large (e.g. 'all' timeframe), we downsample the rendered points to 100 points
+    if (rawVisible.length > 150) {
+      const sampled: typeof rawVisible = [];
+      const len = rawVisible.length;
+      for (let i = 0; i < 100; i++) {
+        const index = Math.min(
+          Math.floor((i * (len - 1)) / 99),
+          len - 1
+        );
+        sampled.push(rawVisible[index]);
+      }
+      return sampled;
+    }
+    return rawVisible;
+  }, [rechartsData, currentViewStart, currentViewEnd]);
+
+  // Reset viewport whenever timeframe changes
+  useEffect(() => {
+    if (isZooming.current) {
+      isZooming.current = false;
+      return;
+    }
+    setViewStart(null);
+    setViewEnd(null);
+  }, [timeframe]);
+
+  // ── Calculate dynamic Y-axis bounds based on visible data ──────────────────
+  const { minVal, maxVal } = useMemo(() => {
+    if (visibleData.length === 0) {
+      return { minVal: 0, maxVal: 1000 };
+    }
+    const allValues = visibleData.flatMap((d) => {
+      const vals: number[] = [d.netWorth, d.totalAssets, d.totalLiabilities];
+      selectedSeriesKeys.forEach((k) => {
+        if (d[k] !== undefined) {
+          vals.push(d[k]);
+        }
+      });
+      return vals;
+    });
+
+    const rawMax = Math.max(...allValues, 1000);
+    const rawMin = Math.min(...allValues, 0);
+    const maxValue = rawMax * 1.15;
+    const minValue = rawMin < 0 ? rawMin * 1.15 : 0;
+    return { minVal: minValue, maxVal: maxValue };
+  }, [visibleData, selectedSeriesKeys]);
 
   const xAxisTicks = useMemo(() => {
-    return getChartXTicks(rechartsData, timeframe, 'date');
-  }, [rechartsData, timeframe]);
+    return getChartXTicks(visibleData, timeframe, 'date');
+  }, [visibleData, timeframe]);
+
+  // ── Pan handlers ─────────────────────────────────────────────────────────────
+  const handleChartMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    // Ignore right-clicks or if we have no data
+    if (rechartsData.length === 0) return;
+    isDragging.current = true;
+    setIsDraggingCursor(true);
+    dragStartX.current = e.clientX;
+    dragStartViewStart.current = currentViewStart;
+    dragStartViewEnd.current = currentViewEnd;
+  }, [rechartsData.length, currentViewStart, currentViewEnd]);
+
+  const handleChartMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - dragStartX.current;
+    const containerWidth = chartContainerRef.current?.clientWidth ?? 1;
+    const windowSize = dragStartViewEnd.current - dragStartViewStart.current;
+    if (windowSize <= 0) return;
+
+    // Convert pixel delta to data-point delta (negative dx = panning right in time)
+    const pointsPerPixel = windowSize / containerWidth;
+    const delta = Math.round(-dx * pointsPerPixel);
+    const totalPoints = rechartsData.length;
+
+    const maxStart = Math.max(0, totalPoints - windowSize - 1);
+    const newStart = Math.max(0, Math.min(maxStart, dragStartViewStart.current + delta));
+    const newEnd = Math.min(totalPoints - 1, newStart + windowSize);
+    setViewStart(newStart);
+    setViewEnd(newEnd);
+  }, [rechartsData.length]);
+
+  const handleChartMouseUp = useCallback(() => {
+    isDragging.current = false;
+    setIsDraggingCursor(false);
+  }, []);
+
+  // ── Double-click zoom handler ─────────────────────────────────────────────────
+  const handleChartDoubleClick = useCallback((e: React.MouseEvent) => {
+    const container = chartContainerRef.current;
+    if (!container || visibleData.length === 0) return;
+
+    // Map click x to a date in the visible window
+    const rect = container.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    const fraction = Math.max(0, Math.min(1, relX / rect.width));
+    const idx = Math.round(fraction * (visibleData.length - 1));
+    const clickedDate = String(visibleData[idx]?.date ?? '');
+
+    // Determine the next drill-down timeframe
+    const zoomMap: Record<TimeRange, TimeRange> = {
+      all: '5y',
+      '5y': '1y',
+      '1y': '6m',
+      '6m': '3m',
+      '3m': '1m',
+      '1m': '1m',
+      ytd: '3m',
+    };
+    const nextTimeframe = zoomMap[timeframe];
+    if (nextTimeframe === timeframe) return; // already at minimum zoom level
+
+    // Find the index of clickedDate in full rechartsData
+    const fullIdx = rechartsData.findIndex(d => d.date === clickedDate);
+    if (fullIdx === -1) return;
+
+    // Calculate default window size for nextTimeframe
+    const [nextStart, nextEnd] = getTimeframeIndices(rechartsData, nextTimeframe);
+    const windowSize = nextEnd - nextStart;
+
+    // Center around fullIdx
+    const half = Math.floor(windowSize / 2);
+    const newStart = Math.max(0, Math.min(rechartsData.length - windowSize - 1, fullIdx - half));
+    const newEnd = Math.min(rechartsData.length - 1, newStart + windowSize);
+
+    isZooming.current = true;
+    setViewStart(newStart);
+    setViewEnd(newEnd);
+    setTimeframe(nextTimeframe);
+  }, [visibleData, timeframe, rechartsData, setTimeframe]);
+
+  // ── Visible date range label for the pill ─────────────────────────────────────
+  const visibleDateRange = useMemo(() => {
+    if (visibleData.length === 0) return null;
+    const first = String(visibleData[0].date);
+    const last = String(visibleData[visibleData.length - 1].date);
+    if (first === last) return null;
+    const fmt = (d: string) => formatSafeUTCDate(d, { month: 'short', year: 'numeric' });
+    return `${fmt(first)} – ${fmt(last)}`;
+  }, [visibleData]);
+
+  const isPanned = viewStart !== null || viewEnd !== null;
 
 
   // Hierarchy statistics calculations
@@ -1094,11 +1272,20 @@ export default function AccountsPage() {
                   ) : (
                     <div className="flex flex-col md:flex-row gap-4 h-full w-full">
                       {/* Chart Area */}
-                      <div className="flex-1 min-w-0 h-full relative">
+                      <div
+                        ref={chartContainerRef}
+                        className="flex-1 min-w-0 h-full relative select-none"
+                        style={{ cursor: isDraggingCursor ? 'grabbing' : 'grab' }}
+                        onMouseDown={handleChartMouseDown}
+                        onMouseMove={handleChartMouseMove}
+                        onMouseUp={handleChartMouseUp}
+                        onMouseLeave={handleChartMouseUp}
+                        onDoubleClick={handleChartDoubleClick}
+                      >
                         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                           {chartType === 'bar' ? (
                             <BarChart
-                              data={rechartsData}
+                              data={visibleData}
                               stackOffset="sign"
                               margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
                             >
@@ -1173,7 +1360,7 @@ export default function AccountsPage() {
                             </BarChart>
                           ) : (
                             <ComposedChart
-                              data={rechartsData}
+                              data={visibleData}
                               stackOffset="sign"
                               margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
                             >
@@ -1267,6 +1454,24 @@ export default function AccountsPage() {
                             </ComposedChart>
                           )}
                         </ResponsiveContainer>
+
+                        {/* Date range pill + Reset View */}
+                        {visibleDateRange && (
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                              {visibleDateRange}
+                            </span>
+                            {isPanned && (
+                              <button
+                                className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 border border-primary/40 text-primary hover:bg-primary/25 transition-colors pointer-events-auto"
+                                onClick={() => { setViewStart(null); setViewEnd(null); }}
+                                title="Reset to full view"
+                              >
+                                Reset View
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Legend Column */}
