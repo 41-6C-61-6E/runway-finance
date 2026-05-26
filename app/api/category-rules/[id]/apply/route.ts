@@ -5,6 +5,8 @@ import { categoryRules, transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { evaluateCondition } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptRows, encryptField } from '@/lib/crypto';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -13,6 +15,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dek = await getSessionDEK();
   const { id } = await params;
 
   const [rule] = await getDb()
@@ -24,6 +27,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!rule) {
     return NextResponse.json({ error: 'not_found', message: 'Rule not found' }, { status: 404 });
   }
+
+  const [decryptedRule] = await decryptRows('category_rules', [rule], dek);
 
   const allTxns = await getDb()
     .select({
@@ -37,18 +42,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .from(transactions)
     .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
 
+  const decryptedTxns = await decryptRows('transactions', allTxns, dek);
+
   const matchedIds: string[] = [];
-  for (const tx of allTxns) {
-    if (evaluateCondition(rule, tx)) {
+  for (const tx of decryptedTxns) {
+    if (evaluateCondition(decryptedRule, tx)) {
       matchedIds.push(tx.id);
     }
   }
 
   if (matchedIds.length > 0) {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (rule.setCategoryId) updateData.categoryId = rule.setCategoryId;
-    if (rule.setPayee) updateData.payee = rule.setPayee;
-    if (rule.setReviewed !== null) updateData.reviewed = rule.setReviewed;
+    if (decryptedRule.setCategoryId) updateData.categoryId = decryptedRule.setCategoryId;
+    if (decryptedRule.setPayee) {
+      updateData.payee = await encryptField(decryptedRule.setPayee, dek);
+    }
+    if (decryptedRule.setReviewed !== null) updateData.reviewed = decryptedRule.setReviewed;
 
     for (const txId of matchedIds) {
       await getDb()

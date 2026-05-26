@@ -91,11 +91,11 @@ const COLUMN_MIN_WIDTHS: Record<string, number> = {
   select: 40,
   date: 90,
   postedDate: 90,
-  description: 120,
+  description: 80,
   ai: 40,
-  account: 80,
-  category: 100,
-  amount: 100,
+  account: 60,
+  category: 90,
+  amount: 80,
 };
 
 function SortableHeader({
@@ -214,13 +214,72 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     if (clientWidth <= 0) return;
 
     const isMobileSize = clientWidth < 768;
-    const containerWidth = isMobileSize ? Math.max(clientWidth, 650) : clientWidth;
+    const containerWidth = isMobileSize ? Math.max(clientWidth, 480) : clientWidth;
     setTableWidth(containerWidth);
 
+    // Calculate dynamic column sizes based on actual content
+    const hasPending = transactions.some(tx => tx.pending);
+    const dateWidth = hasPending ? 110 : 95;
+
+    let maxCategoryWidth = 90;
+    for (const tx of transactions) {
+      const name = tx.categoryName || 'Uncategorized';
+      const charWidth = 6.5;
+      const paddingAndIcons = 55 + (tx.categorizedByAi ? 15 : 0);
+      const estimatedWidth = Math.ceil(name.length * charWidth + paddingAndIcons);
+      if (estimatedWidth > maxCategoryWidth) {
+        maxCategoryWidth = estimatedWidth;
+      }
+    }
+    const categoryWidth = Math.min(180, maxCategoryWidth);
+
+    let maxAmountWidth = 80;
+    for (const tx of transactions) {
+      const num = parseFloat(tx.amount);
+      const formatted = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        signDisplay: 'exceptZero',
+      }).format(num);
+      const estimatedWidth = Math.ceil(formatted.length * 8.5 + 24);
+      if (estimatedWidth > maxAmountWidth) {
+        maxAmountWidth = estimatedWidth;
+      }
+    }
+    const amountWidth = Math.min(150, maxAmountWidth);
+
     const visibleCols = columnOrder.filter((id) => columnVisibility[id] !== false);
-    const fixedSizes: Record<string, number> = { select: 40 };
+    const fixedSizes: Record<string, number> = {
+      select: 40,
+      date: dateWidth,
+      postedDate: 90,
+      ai: 40,
+      category: categoryWidth,
+      amount: amountWidth,
+    };
     if (isMobileSize) {
-      fixedSizes.description = 200; // About 25 chars wide on mobile
+      const hasDesc = visibleCols.includes('description');
+      const hasAccount = visibleCols.includes('account');
+      
+      // Calculate total fixed width of all other columns
+      const otherFixedTotal = 40 + dateWidth + 
+        (visibleCols.includes('postedDate') ? 90 : 0) + 
+        (visibleCols.includes('ai') ? 40 : 0) + 
+        categoryWidth + 
+        amountWidth;
+      const availableForFlex = containerWidth - otherFixedTotal;
+      
+      if (hasDesc && hasAccount) {
+        // Both description and account are visible on mobile, share the space
+        const flexSpace = Math.max(140, availableForFlex); // 80 (desc min) + 60 (account min) = 140
+        fixedSizes.account = Math.max(60, Math.floor(flexSpace * (0.6 / 1.8)));
+        fixedSizes.description = Math.max(80, Math.floor(flexSpace * (1.2 / 1.8)));
+      } else if (hasDesc) {
+        fixedSizes.description = Math.max(80, Math.min(200, availableForFlex));
+      } else if (hasAccount) {
+        fixedSizes.account = Math.max(60, Math.min(150, availableForFlex));
+      }
     }
     const flexibleCols = visibleCols.filter((id) => !(id in fixedSizes));
 
@@ -233,24 +292,48 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     const flexRatios: Record<string, number> = {
       date: 1,
       postedDate: 1,
-      description: 2.5,
-      account: 1.2,
+      description: clientWidth < 1024 ? (clientWidth < 900 ? 1.2 : 1.6) : 2.5,
+      account: clientWidth < 1024 ? (clientWidth < 900 ? 0.6 : 0.8) : 1.2,
       category: 1.5,
       amount: 1,
     };
 
-    const totalRatio = flexibleCols.reduce((s, id) => s + (flexRatios[id] || 1), 0);
-
     const sizes: Record<string, number> = { ...fixedSizes };
-    for (const id of flexibleCols) {
-      sizes[id] = Math.floor((remaining * (flexRatios[id] || 1)) / totalRatio);
+    if (flexibleCols.length > 0) {
+      // Initialize with min widths to ensure no alignment mismatch
+      const flexSizes: Record<string, number> = {};
+      let allocated = 0;
+      for (const id of flexibleCols) {
+        const minW = COLUMN_MIN_WIDTHS[id] || 60;
+        flexSizes[id] = minW;
+        allocated += minW;
+      }
+      
+      const extraSpace = remaining - allocated;
+      if (extraSpace > 0) {
+        const totalRatio = flexibleCols.reduce((s, id) => s + (flexRatios[id] || 1), 0);
+        let distributedExtra = 0;
+        flexibleCols.forEach((id, index) => {
+          const ratio = flexRatios[id] || 1;
+          if (index === flexibleCols.length - 1) {
+            flexSizes[id] += (extraSpace - distributedExtra);
+          } else {
+            const extra = Math.floor((extraSpace * ratio) / totalRatio);
+            flexSizes[id] += extra;
+            distributedExtra += extra;
+          }
+        });
+      }
+      for (const id of flexibleCols) {
+        sizes[id] = flexSizes[id];
+      }
     }
 
     setColumnSizing((prev) => {
       if (JSON.stringify(prev) === JSON.stringify(sizes)) return prev;
       return sizes;
     });
-  }, [columnOrder, columnVisibility]);
+  }, [columnOrder, columnVisibility, transactions]);
 
   useEffect(() => {
     calculateSizes();
@@ -544,7 +627,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
 
           return (
             <div className="flex items-center justify-between w-full min-w-0 pr-1 group-hover:pr-0">
-              <span className={`text-sm truncate min-w-0 flex-1 max-w-[25ch] sm:max-w-none ${isPending ? 'text-muted-foreground' : 'text-foreground'}`}>
+              <span className={`text-sm truncate min-w-0 flex-1 max-w-[10ch] sm:max-w-[15ch] md:max-w-[20ch] lg:max-w-[28ch] xl:max-w-[36ch] 2xl:max-w-none ${isPending ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {tx.payee || tx.description}
               </span>
               <button
@@ -585,7 +668,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           <SortableHeader column={column} title="Account" />
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground truncate block">{row.original.accountName || '—'}</span>
+          <span className="text-sm text-muted-foreground truncate block max-w-[10ch] sm:max-w-[15ch] md:max-w-[20ch] lg:max-w-[25ch] xl:max-w-[30ch] 2xl:max-w-none">{row.original.accountName || '—'}</span>
         ),
         enableSorting: false,
       },
@@ -834,7 +917,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         cell: ({ row }) => {
           const { text } = formatAmount(row.getValue('amount'));
           return (
-            <span className="text-right text-sm font-mono font-medium text-foreground block pr-3 financial-value">
+            <span className="text-right text-sm font-mono font-medium text-foreground block financial-value">
               {text}
             </span>
           );
@@ -962,12 +1045,14 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                         return (
                           <th
                             key={header.id}
-                            className={`px-3 py-2 text-left text-muted-foreground font-medium text-xs uppercase tracking-wider relative select-none ${
+                            className={`px-3 py-2 text-muted-foreground font-medium text-xs uppercase tracking-wider relative select-none ${
                               colId !== 'select' ? 'cursor-pointer' : ''
-                            } ${isDropTarget ? 'border-l-2 border-l-primary' : ''}`}
+                            } ${isDropTarget ? 'border-l-2 border-l-primary' : ''} ${
+                              header.column.columnDef.meta?.className || 'text-left'
+                            }`}
                             style={{ width: size, minWidth: COLUMN_MIN_WIDTHS[colId] || 60, maxWidth: 500 }}
                           >
-                            <div className="flex items-center">
+                            <div className={`flex items-center ${header.column.columnDef.meta?.className?.includes('text-right') ? 'justify-end' : ''}`}>
                               {colId !== 'select' && (
                                 <span
                                   draggable
@@ -1014,7 +1099,10 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                         <td
                           key={cell.id}
                           className={`px-3 py-1.5 overflow-hidden truncate ${cell.column.columnDef.meta?.className || ''}`}
-                          style={{ width: columnSizing[cell.column.id] || cell.column.getSize() }}
+                          style={{
+                            width: columnSizing[cell.column.id] || cell.column.getSize(),
+                            minWidth: COLUMN_MIN_WIDTHS[cell.column.id] || 60
+                          }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
