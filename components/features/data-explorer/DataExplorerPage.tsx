@@ -238,6 +238,10 @@ export default function DataExplorerPage() {
     [router]
   );
 
+  const handleRowDeleted = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
   const filterKey = JSON.stringify(filters);
   const searchKey = search;
 
@@ -320,6 +324,7 @@ export default function DataExplorerPage() {
                   onPageChange={handlePageChange}
                   onPageSizeChange={handlePageSizeChange}
                   onNavigate={handleNavigate}
+                  onRowDeleted={handleRowDeleted}
                 />
               </div>
             ) : (

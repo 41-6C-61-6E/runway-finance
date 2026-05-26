@@ -589,6 +589,35 @@ export default function AccountsPage() {
       return row;
     });
 
+    // Trim trailing zero balance values for each series key
+    selectedSeriesKeys.forEach((k) => {
+      // Find the index of the last non-zero value for series key k
+      let lastNonZeroIdx = -1;
+      for (let i = rechartsDataRaw.length - 1; i >= 0; i--) {
+        const val = rechartsDataRaw[i][k];
+        if (val !== undefined && val !== 0) {
+          lastNonZeroIdx = i;
+          break;
+        }
+      }
+
+      // If we found a last non-zero index, set all subsequent values to undefined
+      if (lastNonZeroIdx !== -1) {
+        for (let i = lastNonZeroIdx + 1; i < rechartsDataRaw.length; i++) {
+          if (rechartsDataRaw[i][k] !== undefined) {
+            rechartsDataRaw[i][k] = undefined;
+          }
+        }
+      } else {
+        // If the account has only 0 or undefined values, set all to undefined
+        for (let i = 0; i < rechartsDataRaw.length; i++) {
+          if (rechartsDataRaw[i][k] !== undefined) {
+            rechartsDataRaw[i][k] = undefined;
+          }
+        }
+      }
+    });
+
     // Always trim leading days with no data points
     let startIdx = 0;
     const firstDataIdx = rechartsDataRaw.findIndex(d => d._hasData);

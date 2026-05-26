@@ -115,9 +115,60 @@ const MONTH_NAMES = [
   'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
 ];
 
-export function parseDateField(value: string): string {
+export function parseDateField(value: string, endOfMonth: boolean = false): string {
   if (!value) return '';
   const trimmed = value.trim();
+
+  // Try "Month YYYY" or "Mon YYYY" or "Mon-YY" or "Month-YYYY" (e.g. "October 2025", "Oct 2025", "Oct-25", "Oct, 2025")
+  const monthMatch = trimmed.match(/^([a-zA-Z]+)[-,\s]+(\d{2,4})$/);
+  if (monthMatch) {
+    const monthName = monthMatch[1].toLowerCase();
+    let year = parseInt(monthMatch[2], 10);
+    if (monthMatch[2].length === 2) {
+      year = year < 50 ? 2000 + year : 1900 + year;
+    }
+    const monthIndex = MONTH_NAMES.indexOf(monthName);
+    if (monthIndex !== -1) {
+      const month = (monthIndex % 12) + 1;
+      const paddedMonth = month.toString().padStart(2, '0');
+      const day = endOfMonth
+        ? new Date(Date.UTC(year, month, 0)).getUTCDate()
+        : 1;
+      const paddedDay = day.toString().padStart(2, '0');
+      return `${year}-${paddedMonth}-${paddedDay}`;
+    }
+  }
+
+  // Try "YYYY-MM" or "YYYY-M"
+  const yearMonthMatch = trimmed.match(/^(\d{4})-(\d{1,2})$/);
+  if (yearMonthMatch) {
+    const year = parseInt(yearMonthMatch[1], 10);
+    const month = parseInt(yearMonthMatch[2], 10);
+    const paddedMonth = month.toString().padStart(2, '0');
+    const day = endOfMonth
+      ? new Date(Date.UTC(year, month, 0)).getUTCDate()
+      : 1;
+    const paddedDay = day.toString().padStart(2, '0');
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  // Try "MM/YYYY" or "M/YYYY" or "MM-YYYY" or "MM/YY" or "M/YY" (must be exactly 2 parts)
+  const monthYearMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{2,4})$/);
+  if (monthYearMatch) {
+    const month = parseInt(monthYearMatch[1], 10);
+    let year = parseInt(monthYearMatch[2], 10);
+    if (monthYearMatch[2].length === 2) {
+      year = year < 50 ? 2000 + year : 1900 + year;
+    }
+    if (month >= 1 && month <= 12) {
+      const paddedMonth = month.toString().padStart(2, '0');
+      const day = endOfMonth
+        ? new Date(Date.UTC(year, month, 0)).getUTCDate()
+        : 1;
+      const paddedDay = day.toString().padStart(2, '0');
+      return `${year}-${paddedMonth}-${paddedDay}`;
+    }
+  }
 
   // Try ISO / common date formats first (YYYY-MM-DD, MM/DD/YYYY, etc.)
   const d = new Date(trimmed);
@@ -136,19 +187,6 @@ export function parseDateField(value: string): string {
       const month = (monthIndex % 12) + 1;
       const padded = month.toString().padStart(2, '0');
       return `${year}-${padded}-${day}`;
-    }
-  }
-
-  // Try "Month YYYY" or "Mon YYYY" (e.g. "October 2025", "Oct 2025")
-  const monthMatch = trimmed.match(/^([a-zA-Z]+)\s+(\d{4})$/);
-  if (monthMatch) {
-    const monthName = monthMatch[1].toLowerCase();
-    const year = monthMatch[2];
-    const monthIndex = MONTH_NAMES.indexOf(monthName);
-    if (monthIndex !== -1) {
-      const month = (monthIndex % 12) + 1;
-      const padded = month.toString().padStart(2, '0');
-      return `${year}-${padded}-01`;
     }
   }
 
