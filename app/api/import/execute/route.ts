@@ -100,8 +100,18 @@ export async function POST(request: Request) {
     const unmappedCategories: string[] = [];
     if (categoryMapping) {
       for (const [csvName, categoryId] of Object.entries(categoryMapping)) {
-        if (categoryId && typeof categoryId === 'string') {
+        if (categoryId && typeof categoryId === 'string' && categoryId !== 'new') {
+          // Valid existing category ID — map it directly
           categoryIdByName.set(csvName, categoryId);
+        } else if (categoryId === 'new') {
+          // 'new' means the user intended to create a category; the actual ID comes
+          // from newCategories below. If newCategories has no entry for this name
+          // (e.g. the user never filled out the form), treat it as unmapped.
+          if (!newCategories || !(csvName in newCategories)) {
+            unmappedCategories.push(csvName);
+            logger.info(`[import/execute] Category mapped as 'new' but no creation data provided — treating as uncategorized`, { csvName });
+          }
+          // else: newCategories loop below will set the real UUID
         } else {
           unmappedCategories.push(csvName);
           logger.info(`[import/execute] Skipping unmapped category (will be uncategorized)`, { csvName });
@@ -310,7 +320,7 @@ export async function POST(request: Request) {
       // Step 3: Create any new categories (properly encrypted)
       if (newCategories && typeof newCategories === 'object') {
         for (const [csvName, catData] of Object.entries(newCategories)) {
-          const data = catData as { name: string; color?: string; isIncome?: boolean };
+          const data = catData as { name: string; color?: string; isIncome?: boolean; parentId?: string | null };
           const newCategoryId = categoryIdByName.get(csvName) as string;
 
           await tx.insert(categories).values({
@@ -319,6 +329,7 @@ export async function POST(request: Request) {
             name: await encryptField(data.name, dek),
             color: data.color || '#6366f1',
             isIncome: data.isIncome ?? false,
+            parentId: data.parentId || null,
           });
         }
       }

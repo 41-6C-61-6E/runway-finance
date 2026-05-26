@@ -166,6 +166,13 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const [tableWidth, setTableWidth] = useState<number | string>('100%');
   const limit = 50;
 
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+  const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
+  const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setColumnVisibility((prev) => ({
@@ -179,12 +186,22 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const [dragColId, setDragColId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/categories', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => setCategories(Array.isArray(data) ? data : []))
-      .catch(() => setCategories([]));
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch('/api/categories', { credentials: 'include' });
+      const data = await res.json();
+      const catList = Array.isArray(data) ? data : [];
+      setCategories(catList);
+      return catList;
+    } catch {
+      setCategories([]);
+      return [];
+    }
   }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const calculateSizes = useCallback(() => {
     const el = containerRef.current;
@@ -267,6 +284,43 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
     setDropdownPos(null);
     setCategoryFilter('');
   }, [transactions]);
+
+  const handleCreateCategory = useCallback(async (txId: string) => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          parentId: newCategoryParentId || null,
+          color: newCategoryColor,
+          isIncome: newCategoryIsIncome,
+        }),
+      });
+
+      if (res.ok) {
+        const createdData = await res.json();
+        const updatedCats = await fetchCategories();
+        const matchingCat = updatedCats.find(
+          (c) => c.name.toLowerCase() === newCategoryName.trim().toLowerCase()
+        ) || updatedCats.find((c) => c.id === createdData.id);
+
+        if (matchingCat) {
+          await handleSetCategory(txId, matchingCat.id, matchingCat.name, matchingCat.color);
+        } else {
+          await handleSetCategory(txId, createdData.id, newCategoryName.trim(), newCategoryColor);
+        }
+        setIsCreatingCategory(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingCategoryLoading(false);
+    }
+  }, [newCategoryName, newCategoryParentId, newCategoryColor, newCategoryIsIncome, fetchCategories, handleSetCategory]);
 
   const handleCreateRule = useCallback(async () => {
     if (!proposedRule) return;
@@ -541,7 +595,13 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                       left = window.innerWidth - dropdownWidth - 8;
                     }
                     if (left < 8) left = 8;
-                    setDropdownPos({ top: rect.bottom + 4, left });
+
+                    const dropdownHeight = 320; // max-h-80 is 320px
+                    let top = rect.bottom + 4;
+                    if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
+                      top = rect.top - dropdownHeight - 4;
+                    }
+                    setDropdownPos({ top, left });
                     setOpenCategoryTx(isOpen ? null : tx.id);
                   }}
                 className="flex items-center gap-1 max-w-full group/cat"
@@ -556,101 +616,189 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
                   >
                     {tx.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60" />}
                     {tx.categoryName}
-                    <ChevronDown className="h-3 w-3 opacity-0 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
+                    <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 text-xs rounded-full inline-flex items-center gap-1 whitespace-nowrap bg-muted text-muted-foreground group-hover/cat:text-foreground transition-colors">
                     Uncategorized
-                    <ChevronDown className="h-3 w-3 opacity-0 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
+                    <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
                   </span>
                 )}
               </button>
               {isOpen && dropdownPos && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenCategoryTx(null); setDropdownPos(null); setCategoryFilter(''); }} />
+                  <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenCategoryTx(null); setDropdownPos(null); setCategoryFilter(''); setIsCreatingCategory(false); }} />
                   <div
                     className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
                     style={{ top: dropdownPos.top, left: dropdownPos.left }}
                   >
-                    <div className="relative p-2 border-b border-border">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                      <input
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        placeholder="Search categories..."
-                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    <div className="flex-1 overflow-y-auto max-h-56">
-                      {(() => {
-                        const filter = categoryFilter.toLowerCase();
-                        const filteredParents = filter
-                          ? parents.filter((p) =>
-                              p.name.toLowerCase().includes(filter) ||
-                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
-                            )
-                          : parents;
+                    {isCreatingCategory ? (
+                      <div className="p-3 space-y-2 flex flex-col text-xs">
+                        <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-0.5">New Category</div>
+                        <div>
+                          <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">Name</label>
+                          <input
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            placeholder="Category name"
+                            className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
 
-                        const noResults = filteredParents.length === 0;
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, null, null, null); }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
-                            >
-                              None
-                            </button>
-                            {filteredParents.map((parent) => {
-                              const childList = filter
-                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
-                                : getChildren(parent.id);
-                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
-                              return (
-                                <div key={parent.id}>
-                                  <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
-                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
-                                    {parent.name}
+                        <div>
+                          <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">Parent Category</label>
+                          <select
+                            value={newCategoryParentId || ''}
+                            onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                            className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="">None (top-level)</option>
+                            {categories.filter((c) => !c.parentId).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="color"
+                              value={newCategoryColor}
+                              onChange={(e) => setNewCategoryColor(e.target.value)}
+                              className="w-5 h-5 rounded cursor-pointer border border-input"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="text-[9px] font-mono text-muted-foreground">{newCategoryColor}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              id={`table-new-category-income-${tx.id}`}
+                              checked={newCategoryIsIncome}
+                              onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
+                              className="rounded border-border text-primary focus:ring-ring"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <label htmlFor={`table-new-category-income-${tx.id}`} className="text-[9px] font-medium text-muted-foreground">Income</label>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2 border-t border-border/50">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setIsCreatingCategory(false); }}
+                            className="flex-1 py-1 text-[10px] text-foreground bg-muted hover:bg-accent rounded transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCreateCategory(tx.id); }}
+                            disabled={creatingCategoryLoading || !newCategoryName.trim()}
+                            className="flex-1 py-1 text-[10px] font-semibold text-primary-foreground bg-primary rounded hover:opacity-90 disabled:opacity-50 transition-all"
+                          >
+                            {creatingCategoryLoading ? 'Saving...' : 'Create'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative p-2 border-b border-border">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                          <input
+                            value={categoryFilter}
+                            onChange={(e) => setCategoryFilter(e.target.value)}
+                            placeholder="Search categories..."
+                            className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="flex-1 overflow-y-auto max-h-56">
+                          {(() => {
+                            const filter = categoryFilter.toLowerCase();
+                            const filteredParents = filter
+                              ? parents.filter((p) =>
+                                  p.name.toLowerCase().includes(filter) ||
+                                  getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                                )
+                              : parents;
+
+                            const noResults = filteredParents.length === 0;
+                            return (
+                              <>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, null, null, null); }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors text-left"
+                                >
+                                  None
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsCreatingCategory(true);
+                                    setNewCategoryName('');
+                                    setNewCategoryParentId(null);
+                                    setNewCategoryColor('#6366f1');
+                                    setNewCategoryIsIncome(false);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium border-b border-border/50 transition-colors text-left"
+                                >
+                                  + Create new category
+                                </button>
+                                {filteredParents.map((parent) => {
+                                  const childList = filter
+                                    ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                    : getChildren(parent.id);
+                                  if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                                  return (
+                                    <div key={parent.id}>
+                                      <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
+                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
+                                        {parent.name}
+                                      </div>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, parent.id, parent.name, parent.color); }}
+                                        className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
+                                          tx.categoryId === parent.id
+                                            ? 'text-primary bg-primary/10'
+                                            : 'text-foreground/80 hover:bg-muted'
+                                        }`}
+                                      >
+                                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                        {parent.name}
+                                      </button>
+                                      {childList.map((child) => (
+                                        <button
+                                          key={child.id}
+                                          onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, child.id, child.name, child.color); }}
+                                          className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
+                                            tx.categoryId === child.id
+                                              ? 'text-primary bg-primary/10'
+                                              : 'text-foreground/80 hover:bg-muted'
+                                          }`}
+                                        >
+                                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                          {child.name}
+                                          {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                                {noResults && (
+                                  <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                                    No categories found
                                   </div>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, parent.id, parent.name, parent.color); }}
-                                    className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors ${
-                                      tx.categoryId === parent.id
-                                        ? 'text-primary bg-primary/10'
-                                        : 'text-foreground/80 hover:bg-muted'
-                                    }`}
-                                  >
-                                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                                    {parent.name}
-                                  </button>
-                                  {childList.map((child) => (
-                                    <button
-                                      key={child.id}
-                                      onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, child.id, child.name, child.color); }}
-                                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors ${
-                                        tx.categoryId === child.id
-                                          ? 'text-primary bg-primary/10'
-                                          : 'text-foreground/80 hover:bg-muted'
-                                      }`}
-                                    >
-                                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                                      {child.name}
-                                      {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
-                                    </button>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                            {noResults && (
-                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                                No categories found
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -674,7 +822,20 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         meta: { className: 'text-right' },
       },
     ],
-    [categories, openCategoryTx, handleSetCategory, categoryFilter, dropdownPos]
+    [
+      categories,
+      openCategoryTx,
+      handleSetCategory,
+      categoryFilter,
+      dropdownPos,
+      isCreatingCategory,
+      newCategoryName,
+      newCategoryParentId,
+      newCategoryColor,
+      newCategoryIsIncome,
+      creatingCategoryLoading,
+      handleCreateCategory
+    ]
   );
 
   const table = useReactTable({

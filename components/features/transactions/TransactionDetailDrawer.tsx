@@ -49,24 +49,80 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+  const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
+  const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
+
   useEffect(() => {
     setPayee(transaction.payee ?? '');
     setMemo(transaction.memo ?? '');
     setNotes(transaction.notes ?? '');
     setReviewed(!!transaction.reviewed);
     setCategoryId(transaction.categoryId);
+    setIsCreatingCategory(false);
   }, [transaction]);
+
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    try {
+      const res = await fetch('/api/categories', { credentials: 'include' });
+      const data = await res.json();
+      const catList = Array.isArray(data) ? data : [];
+      setCategories(catList);
+      return catList;
+    } catch {
+      setCategories([]);
+      return [];
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (open && categories.length === 0 && !categoriesLoading) {
-      setCategoriesLoading(true);
-      fetch('/api/categories', { credentials: 'include' })
-        .then((res) => res.json())
-        .then((data) => setCategories(Array.isArray(data) ? data : []))
-        .catch(() => setCategories([]))
-        .finally(() => setCategoriesLoading(false));
+      fetchCategories();
     }
-  }, [open, categories.length, categoriesLoading]);
+  }, [open, categories.length, categoriesLoading, fetchCategories]);
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          parentId: newCategoryParentId || null,
+          color: newCategoryColor,
+          isIncome: newCategoryIsIncome,
+        }),
+      });
+
+      if (res.ok) {
+        const createdData = await res.json();
+        const updatedCats = await fetchCategories();
+        const matchingCat = updatedCats.find(
+          (c) => c.name.toLowerCase() === newCategoryName.trim().toLowerCase()
+        ) || updatedCats.find((c) => c.id === createdData.id);
+
+        if (matchingCat) {
+          setCategoryId(matchingCat.id);
+        } else {
+          setCategoryId(createdData.id);
+        }
+        setIsCreatingCategory(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingCategoryLoading(false);
+    }
+  };
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -149,108 +205,197 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           {/* Category Selector */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Category</label>
-            <div className="relative">
-              <button
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className="w-full flex items-center gap-2 px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground hover:bg-muted transition-colors text-left"
-              >
-                {selectedCat ? (
-                  <>
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
-                    <span>{selectedCat.name}</span>
-                    {transaction.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">Uncategorized</span>
-                )}
-                <span className="ml-auto text-muted-foreground">▼</span>
-              </button>
+            {isCreatingCategory ? (
+              <div className="space-y-3 p-3 bg-muted/20 border border-border rounded-lg">
+                <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-1">New Category</div>
 
-              {showCategoryDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col">
-                    <div className="relative p-2 border-b border-border">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <div>
+                  <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">Name</label>
+                  <input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Category name"
+                    className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">Parent Category</label>
+                  <select
+                    value={newCategoryParentId || ''}
+                    onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                    className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">None (top-level)</option>
+                    {categories.filter((c) => !c.parentId).map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">Color</label>
+                    <div className="flex items-center gap-1.5">
                       <input
-                        value={categorySearch}
-                        onChange={(e) => setCategorySearch(e.target.value)}
-                        placeholder="Search categories..."
-                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
+                        type="color"
+                        value={newCategoryColor}
+                        onChange={(e) => setNewCategoryColor(e.target.value)}
+                        className="w-6 h-6 rounded cursor-pointer border border-input"
                       />
+                      <span className="text-[10px] font-mono text-muted-foreground">{newCategoryColor}</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto max-h-56">
-                      {(() => {
-                        const filter = categorySearch.toLowerCase();
-                        const filteredParents = filter
-                          ? parents.filter((p) =>
-                              p.name.toLowerCase().includes(filter) ||
-                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
-                            )
-                          : parents;
-                        const noResults = filteredParents.length === 0;
-                        return (
-                          <>
-                            <button
-                              onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); setCategorySearch(''); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
-                            >
-                              None (uncategorized)
-                            </button>
-                            {filteredParents.map((parent) => {
-                              const childList = filter
-                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
-                                : getChildren(parent.id);
-                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
-                              return (
-                                <div key={parent.id}>
-                                  <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
-                                    {parent.name}
-                                  </div>
-                                  <button
-                                    onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
-                                    className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
-                                      categoryId === parent.id
-                                        ? 'text-primary bg-primary/10'
-                                        : 'text-foreground/80 hover:bg-muted'
-                                    }`}
-                                  >
-                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                                    {parent.name}
-                                  </button>
-                                  {childList.map((child) => (
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <div className="flex items-center gap-1.5 h-6">
+                      <input
+                        type="checkbox"
+                        id="new-category-income"
+                        checked={newCategoryIsIncome}
+                        onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-ring"
+                      />
+                      <label htmlFor="new-category-income" className="text-[10px] font-medium text-muted-foreground">Income category</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1 border-t border-border/50">
+                  <button
+                    onClick={() => setIsCreatingCategory(false)}
+                    className="flex-1 py-1 text-xs text-foreground bg-muted hover:bg-accent rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateCategory}
+                    disabled={creatingCategoryLoading || !newCategoryName.trim()}
+                    className="flex-1 py-1 text-xs font-semibold text-primary-foreground bg-primary rounded hover:opacity-90 disabled:opacity-50 transition-all"
+                  >
+                    {creatingCategoryLoading ? 'Saving...' : 'Create'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground hover:bg-muted transition-colors text-left"
+                >
+                  {selectedCat ? (
+                    <>
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
+                      <span>{selectedCat.name}</span>
+                      {transaction.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Uncategorized</span>
+                  )}
+                  <span className="ml-auto text-muted-foreground">▼</span>
+                </button>
+
+                {showCategoryDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col">
+                      <div className="relative p-2 border-b border-border">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                        <input
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Search categories..."
+                          className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto max-h-56">
+                        {(() => {
+                          const filter = categorySearch.toLowerCase();
+                          const filteredParents = filter
+                            ? parents.filter((p) =>
+                                p.name.toLowerCase().includes(filter) ||
+                                getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                              )
+                            : parents;
+                          const noResults = filteredParents.length === 0;
+                          return (
+                            <>
+                              <button
+                                onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
+                              >
+                                None (uncategorized)
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsCreatingCategory(true);
+                                  setShowCategoryDropdown(false);
+                                  setCategorySearch('');
+                                  setNewCategoryName('');
+                                  setNewCategoryParentId(null);
+                                  setNewCategoryColor('#6366f1');
+                                  setNewCategoryIsIncome(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-muted font-medium border-b border-border/50 transition-colors text-left"
+                              >
+                                + Create new category
+                              </button>
+                              {filteredParents.map((parent) => {
+                                const childList = filter
+                                  ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                  : getChildren(parent.id);
+                                if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                                return (
+                                  <div key={parent.id}>
+                                    <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
+                                      {parent.name}
+                                    </div>
                                     <button
-                                      key={child.id}
-                                      onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
-                                      className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors ${
-                                        categoryId === child.id
+                                      onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                      className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
+                                        categoryId === parent.id
                                           ? 'text-primary bg-primary/10'
                                           : 'text-foreground/80 hover:bg-muted'
                                       }`}
                                     >
-                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                                      {child.name}
+                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                      {parent.name}
                                     </button>
-                                  ))}
+                                    {childList.map((child) => (
+                                      <button
+                                        key={child.id}
+                                        onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                        className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
+                                          categoryId === child.id
+                                            ? 'text-primary bg-primary/10'
+                                            : 'text-foreground/80 hover:bg-muted'
+                                        }`}
+                                      >
+                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                        {child.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                              {noResults && (
+                                <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                                  No categories found
                                 </div>
-                              );
-                            })}
-                            {noResults && (
-                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                                No categories found
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Editable */}
