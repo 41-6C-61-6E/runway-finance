@@ -9,6 +9,7 @@ export const TransactionFilterSchema = z.object({
   categoryId: z.union([z.string().uuid(), z.literal('uncategorized')]).optional(),
   categoryIds: z.string().optional(),
   search: z.string().max(200).optional(),
+  type: z.enum(['income', 'expense']).optional(),
   pending: z.preprocess(
     (val) => (val === 'true' ? true : val === 'false' ? false : undefined),
     z.boolean().optional()
@@ -49,6 +50,7 @@ export const BulkPatchTransactionSchema = z.object({
   }),
   selectAllMatching: z.boolean().optional(),
   search: z.string().max(200).optional(),
+  type: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   accountId: z.string().optional(),
@@ -67,6 +69,7 @@ export const BulkDeleteTransactionSchema = z.object({
   ids: z.array(z.string()).min(1).optional(),
   selectAllMatching: z.boolean().optional(),
   search: z.string().max(200).optional(),
+  type: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   accountId: z.string().optional(),

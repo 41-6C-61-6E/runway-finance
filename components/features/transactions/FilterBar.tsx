@@ -10,6 +10,7 @@ type FilterState = {
   categoryId: string | null;
   categoryIds: string | null;
   search: string | null;
+  type: string | null;
   startDate: string | null;
   endDate: string | null;
   pending: string | null;
@@ -682,24 +683,24 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               Pending
             </button>
             <button
-              onClick={() => onChange('reviewed', filters.reviewed === 'true' ? null : 'true')}
+              onClick={() => onChange('type', filters.type === 'income' ? null : 'income')}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                filters.reviewed === 'true'
-                  ? 'border border-primary bg-primary/20 text-primary shadow-sm'
+                filters.type === 'income'
+                  ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-500 shadow-sm dark:border-emerald-400 dark:bg-emerald-400/20 dark:text-emerald-400'
                   : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              Reviewed
+              Income
             </button>
             <button
-              onClick={() => onChange('reviewed', filters.reviewed === 'false' ? null : 'false')}
+              onClick={() => onChange('type', filters.type === 'expense' ? null : 'expense')}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                filters.reviewed === 'false'
-                  ? 'border border-muted-foreground/50 bg-muted text-foreground shadow-sm'
+                filters.type === 'expense'
+                  ? 'border border-rose-500 bg-rose-500/20 text-rose-500 shadow-sm dark:border-rose-400 dark:bg-rose-400/20 dark:text-rose-400'
                   : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              Unreviewed
+              Expense
             </button>
             <button
               onClick={() => onChange('categorizedByAi', filters.categorizedByAi === 'true' ? null : 'true')}

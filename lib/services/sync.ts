@@ -118,6 +118,18 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
   for (const acc of decrypted) {
+    if (acc.type === 'mortgage') {
+      try {
+        const meta = acc.metadata ? (typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata) : {};
+        const status = meta.mortgageStatus;
+        const endEventDateStr = status === 'paid_off' ? meta.payoffDate : (status === 'refinanced' ? meta.refinanceDate : undefined);
+        if (endEventDateStr && snapshotDate > endEventDateStr) {
+          continue;
+        }
+      } catch (e) {
+        // Ignore json parse error
+      }
+    }
     const encryptedBalance = await encryptField(acc.balance, dek);
     await getDb()
       .insert(accountSnapshots)
