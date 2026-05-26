@@ -13,8 +13,14 @@ export const TransactionFilterSchema = z.object({
     (val) => (val === 'true' ? true : val === 'false' ? false : undefined),
     z.boolean().optional()
   ),
-  reviewed: z.coerce.boolean().optional(),
-  categorizedByAi: z.coerce.boolean().optional(),
+  reviewed: z.preprocess(
+    (val) => (val === 'true' || val === true ? true : val === 'false' || val === false ? false : undefined),
+    z.boolean().optional()
+  ),
+  categorizedByAi: z.preprocess(
+    (val) => (val === 'true' || val === true ? true : val === 'false' || val === false ? false : undefined),
+    z.boolean().optional()
+  ),
   minAmount: z.coerce.number().optional(),
   maxAmount: z.coerce.number().optional(),
   limit: z.coerce.number().min(1).max(200).default(50),

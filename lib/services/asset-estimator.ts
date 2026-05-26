@@ -275,6 +275,24 @@ export async function estimateMetalsHistory(
 
 // ─── Mortgage Synthetic Snapshots ────────────────────────────────────────────
 
+function formatDate(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getAnniversaryDate(startDateStr: string, year: number, monthIndex: number): Date {
+  const startParts = startDateStr.split('-').map(Number);
+  const targetDay = startParts[2];
+  
+  // Find maximum days in target year/month (monthIndex is 0-indexed)
+  const maxDays = new Date(year, monthIndex + 1, 0).getDate();
+  const day = Math.min(targetDay, maxDays);
+  
+  return new Date(year, monthIndex, day);
+}
+
 export function generateMortgagePaydownHistory(
   params: AmortizationParams,
   currentBalance: number,
@@ -305,13 +323,28 @@ export function generateMortgagePaydownHistory(
       balance: 0,
     });
 
-    let cursor = new Date(today);
+    snapshots.push({
+      date: currentDate,
+      balance: 0,
+    });
+
+    // Walk backward from the latest anniversary date on or before today to endEventDate
+    let year = today.getFullYear();
+    let month = today.getMonth();
+    let anniversary = getAnniversaryDate(startDate, year, month);
+    if (anniversary > today) {
+      month -= 1;
+      anniversary = getAnniversaryDate(startDate, year, month);
+    }
+
+    let cursor = new Date(anniversary);
     while (cursor > endEventDate) {
       snapshots.push({
-        date: cursor.toISOString().split('T')[0],
+        date: formatDate(cursor),
         balance: 0,
       });
-      cursor.setMonth(cursor.getMonth() - 1);
+      month -= 1;
+      cursor = getAnniversaryDate(startDate, year, month);
     }
 
     // 2. Walk before the end event date:
@@ -324,7 +357,7 @@ export function generateMortgagePaydownHistory(
 
       while (forwardCursor <= endEventDateMinus1Month) {
         snapshots.push({
-          date: forwardCursor.toISOString().split('T')[0],
+          date: formatDate(forwardCursor),
           balance: Math.round(balance * 100) / 100,
         });
         forwardCursor.setMonth(forwardCursor.getMonth() + 1);
@@ -347,7 +380,7 @@ export function generateMortgagePaydownHistory(
 
       while (backwardCursor >= start) {
         snapshots.push({
-          date: backwardCursor.toISOString().split('T')[0],
+          date: formatDate(backwardCursor),
           balance: Math.round(balance * 100) / 100,
         });
         backwardCursor.setMonth(backwardCursor.getMonth() - 1);
@@ -365,19 +398,43 @@ export function generateMortgagePaydownHistory(
       }
     }
   } else {
-    // Walk backward from current balance to origination date
-    // using reverse amortization: balance_prev = (balance_curr + payment) / (1 + rate)
+    // Pushes today/currentDate with currentBalance
+    snapshots.push({
+      date: currentDate,
+      balance: Math.round(currentBalance * 100) / 100,
+    });
+
+    // Find the latest anniversary date on or before today
+    let year = today.getFullYear();
+    let month = today.getMonth();
+    let anniversary = getAnniversaryDate(startDate, year, month);
+    if (anniversary > today) {
+      month -= 1;
+      anniversary = getAnniversaryDate(startDate, year, month);
+    }
+
+    let cursor = new Date(anniversary);
     let balance = currentBalance;
-    const cursor = new Date(today);
 
     while (cursor >= start) {
       snapshots.push({
-        date: cursor.toISOString().split('T')[0],
+        date: formatDate(cursor),
         balance: Math.round(balance * 100) / 100,
       });
 
-      cursor.setMonth(cursor.getMonth() - 1);
-      if (cursor < start) break;
+      month -= 1;
+      const prevCursor = getAnniversaryDate(startDate, year, month);
+      if (prevCursor < start) {
+        // If the previous anniversary would be before start, but the cursor is not start,
+        // we make sure we have a snapshot on start itself.
+        if (cursor.getTime() !== start.getTime()) {
+          snapshots.push({
+            date: startDate,
+            balance: Math.round(originalBalance * 100) / 100,
+          });
+        }
+        break;
+      }
 
       if (monthlyRate > 0) {
         balance = (balance + effectivePayment) / (1 + monthlyRate);
@@ -388,6 +445,8 @@ export function generateMortgagePaydownHistory(
       if (balance > originalBalance) {
         balance = originalBalance;
       }
+
+      cursor = prevCursor;
     }
   }
 

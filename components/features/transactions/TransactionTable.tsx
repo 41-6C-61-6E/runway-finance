@@ -141,6 +141,11 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
   const lastTotalParamsRef = useRef<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [prevFilters, setPrevFilters] = useState(filters);
+  if (JSON.stringify(prevFilters) !== JSON.stringify(filters)) {
+    setPrevFilters(filters);
+    setPage(0);
+  }
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     select: true,
@@ -533,11 +538,25 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
         cell: ({ row }) => {
           const tx = row.original;
           const isPending = tx.pending;
+          const searchQuery = tx.payee && tx.description && tx.payee !== tx.description
+            ? `${tx.payee} ${tx.description}`
+            : (tx.payee || tx.description);
+
           return (
-            <div className="truncate max-w-[25ch] sm:max-w-none">
-              <span className={`text-sm ${isPending ? 'text-muted-foreground' : 'text-foreground'}`}>
+            <div className="flex items-center justify-between w-full min-w-0 pr-1 group-hover:pr-0">
+              <span className={`text-sm truncate min-w-0 flex-1 max-w-[25ch] sm:max-w-none ${isPending ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {tx.payee || tx.description}
               </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank', 'noopener,noreferrer');
+                }}
+                className="opacity-0 group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
+                title="Search on Google"
+              >
+                <Search className="h-3.5 w-3.5" />
+              </button>
             </div>
           );
         },
