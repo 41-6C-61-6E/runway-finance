@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import TableSelector from './TableSelector';
 import DataToolbar from './DataToolbar';
 import DataTable from './DataTable';
+import DataCleanup from './DataCleanup';
 import ContentWrapper from '@/components/content-wrapper';
 import { PageHeader } from '@/components/page-header';
 import { Database } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function DataExplorerPage() {
   const [tablesLoading, setTablesLoading] = useState(true);
 
   const [table, setTable] = useState(searchParams.get('table') ?? 'account_snapshots');
+  const [activeTab, setActiveTab] = useState<'explore' | 'cleanup'>('explore');
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [sort, setSort] = useState(searchParams.get('sort') ?? '');
   const [order, setOrder] = useState(searchParams.get('order') ?? 'desc');
@@ -242,7 +244,7 @@ export default function DataExplorerPage() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Data Explorer" icon={Database}>
-        {tables.length > 0 && (
+        {activeTab === 'explore' && tables.length > 0 && (
           <div className="w-72">
             <TableSelector
               tables={tables}
@@ -255,47 +257,74 @@ export default function DataExplorerPage() {
       <div className="relative z-10">
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
+            {/* Tabs */}
+            <div className="flex border-b border-border mb-6">
+              <button
+                onClick={() => setActiveTab('explore')}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === 'explore'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Explore Data
+              </button>
+              <button
+                onClick={() => setActiveTab('cleanup')}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === 'cleanup'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Data Cleanup
+              </button>
+            </div>
 
-            {error && (
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            {error && activeTab === 'explore' && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg mb-4">
                 <p className="text-xs text-destructive font-medium">{error}</p>
               </div>
             )}
 
-            <div className="space-y-3">
-              <DataToolbar
-                key={`${table}-${filterKey}-${searchKey}`}
-                columns={columns}
-                filters={filters}
-                search={search}
-                table={table}
-                total={total}
-                tableKey={table}
-                visibleColumns={visibleColumns}
-                onFiltersChange={handleFiltersChange}
-                onSearchChange={handleSearchChange}
-                onClearAll={handleClearAll}
-                onColumnVisibilityChange={handleColumnVisibilityChange}
-              />
+            {activeTab === 'explore' ? (
+              <div className="space-y-3">
+                <DataToolbar
+                  key={`${table}-${filterKey}-${searchKey}`}
+                  columns={columns}
+                  filters={filters}
+                  search={search}
+                  table={table}
+                  total={total}
+                  tableKey={table}
+                  visibleColumns={visibleColumns}
+                  onFiltersChange={handleFiltersChange}
+                  onSearchChange={handleSearchChange}
+                  onClearAll={handleClearAll}
+                  onColumnVisibilityChange={handleColumnVisibilityChange}
+                />
 
-              <DataTable
-                tableKey={table}
-                columns={columns}
-                data={data}
-                total={total}
-                limit={limit}
-                offset={offset}
-                sort={sort}
-                order={order}
-                filters={filters}
-                search={search}
-                loading={loading}
-                onSortChange={handleSortChange}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-                onNavigate={handleNavigate}
-              />
-            </div>
+                <DataTable
+                  tableKey={table}
+                  columns={columns}
+                  data={data}
+                  total={total}
+                  limit={limit}
+                  offset={offset}
+                  sort={sort}
+                  order={order}
+                  filters={filters}
+                  search={search}
+                  loading={loading}
+                  onSortChange={handleSortChange}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  onNavigate={handleNavigate}
+                />
+              </div>
+            ) : (
+              <DataCleanup />
+            )}
           </div>
         </ContentWrapper>
       </div>

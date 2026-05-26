@@ -178,7 +178,6 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
       setColumnVisibility((prev) => ({
         ...prev,
         account: false,
-        category: false,
       }));
     }
   }, []);
@@ -215,6 +214,9 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
 
     const visibleCols = columnOrder.filter((id) => columnVisibility[id] !== false);
     const fixedSizes: Record<string, number> = { select: 40 };
+    if (isMobileSize) {
+      fixedSizes.description = 200; // About 25 chars wide on mobile
+    }
     const flexibleCols = visibleCols.filter((id) => !(id in fixedSizes));
 
     const fixedTotal = visibleCols
@@ -492,16 +494,15 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           const tx = row.original;
           const isPending = tx.pending;
           return (
-            <div className="whitespace-nowrap truncate">
+            <div className="whitespace-nowrap truncate flex items-center">
               <span className="text-foreground text-sm">
                 {new Date(row.getValue('date')).toLocaleDateString()}
               </span>
               {isPending && (
-                <span className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-chart-3 bg-chart-3/10 rounded-full">
+                <span className="ml-1.5 inline-flex items-center text-chart-3" title="Pending">
                   <svg className="h-2 w-2 animate-pulse" fill="currentColor" viewBox="0 0 8 8">
                     <circle cx="4" cy="4" r="3" />
                   </svg>
-                  Pending
                 </span>
               )}
             </div>
@@ -533,7 +534,7 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           const tx = row.original;
           const isPending = tx.pending;
           return (
-            <div className="truncate">
+            <div className="truncate max-w-[25ch] sm:max-w-none">
               <span className={`text-sm ${isPending ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {tx.payee || tx.description}
               </span>

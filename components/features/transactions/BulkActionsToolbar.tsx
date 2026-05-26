@@ -25,6 +25,11 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   const [categories, setCategories] = useState<Category[]>([]);
   const [categorySearch, setCategorySearch] = useState('');
   const categoryRef = useRef<HTMLDivElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [selectedIds]);
 
   useEffect(() => {
     if (categoryDropdownOpen) {
@@ -95,6 +100,44 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
     [handleBulkPatch]
   );
 
+  const handleBulkDelete = useCallback(async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setActionLoading('delete');
+    try {
+      let body: Record<string, unknown>;
+      if (selectAllMatching) {
+        body = { selectAllMatching: true };
+        for (const [key, value] of Object.entries(filters)) {
+          if (value !== null) {
+            body[key] = value;
+          }
+        }
+      } else {
+        body = { ids: selectedIds };
+      }
+      const res = await fetch('/api/transactions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Bulk delete failed', data);
+        return;
+      }
+      onClear();
+    } catch (err) {
+      console.error('Bulk delete error', err);
+    } finally {
+      setActionLoading(null);
+      setConfirmDelete(false);
+    }
+  }, [selectedIds, selectAllMatching, filters, onClear, confirmDelete]);
+
   const parents = categories.filter((c) => !c.parentId);
   const getChildren = (parentId: string) =>
     categories.filter((c) => c.parentId === parentId);
@@ -136,6 +179,17 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
         className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
       >
         Mark Ignored
+      </button>
+      <button
+        onClick={handleBulkDelete}
+        disabled={actionLoading !== null}
+        className={`px-3 py-1.5 text-xs font-medium transition-colors border rounded-lg disabled:opacity-50 ${
+          confirmDelete
+            ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+            : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
+        }`}
+      >
+        {actionLoading === 'delete' ? 'Deleting...' : confirmDelete ? 'Are you sure? Confirm' : 'Delete'}
       </button>
       <div className="relative" ref={categoryRef}>
         <button

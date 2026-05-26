@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQuery } from '@tanstack/react-query';
@@ -1579,43 +1579,45 @@ export default function AccountsPage() {
                           {/* ── Group Header Row ── */}
                           <div 
                             onClick={() => setExpandedGroups(prev => ({ ...prev, [group]: !isGroupExpanded }))}
-                            className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors rounded-xl cursor-pointer select-none"
+                            className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              {isGroupExpanded ? (
-                                <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                              )}
+                            <div className="flex items-center min-w-0 flex-1">
+                              <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                {isGroupExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
                               <span className="text-sm font-bold text-foreground truncate">{group}</span>
                             </div>
 
                             {/* Group Sparkline */}
-                            <div className="hidden sm:block mx-4">
+                            <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                               <Sparkline 
                                 data={groupStats.historyPoints} 
                                 isPositive={groupStats.isPositive} 
+                                width={90}
+                                height={20}
                               />
                             </div>
 
-                            <div className="flex items-center gap-4 flex-shrink-0">
-                              <div className="text-right">
-                                <p className="font-mono text-sm font-bold text-foreground blur-number">
-                                  {formatCurrency(groupStats.current)}
-                                </p>
-                                <span className={`text-[10px] font-semibold flex items-center gap-0.5 justify-end ${
-                                  groupChange.isPositive ? 'text-emerald-500' : 'text-destructive'
-                                }`}>
-                                  {groupChange.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                                  {groupChange.text}
-                                </span>
-                              </div>
+                            <div className="flex-shrink-0 w-36 text-right">
+                              <p className="font-mono text-sm font-bold text-foreground blur-number">
+                                {formatCurrency(groupStats.current)}
+                              </p>
+                              <span className={`text-[10px] font-semibold flex items-center gap-0.5 justify-end ${
+                                groupChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                              }`}>
+                                {groupChange.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                                {groupChange.text}
+                              </span>
                             </div>
                           </div>
 
-                          {/* ── Subgroups / Nested Accounts ── */}
+                          {/* ── Subgroups / Nested Accounts (Flat divide-y container) ── */}
                           {isGroupExpanded && (
-                            <div className="px-3 pb-3 pt-1.5 space-y-2 border-t border-border/10 bg-card/10">
+                            <div className="border-t border-border/10 divide-y divide-border/10 bg-card/5">
                               {Array.from(subMap.entries()).map(([subgroup, accs]) => {
                                 const isLiabSub = accs[0] ? isLiabilityAccount(accs[0].type) : false;
                                 const subStats = getTrendStats(accs);
@@ -1627,32 +1629,34 @@ export default function AccountsPage() {
                                   const subChange = formatChange(subStats.change, subStats.percentChange, isLiabSub);
 
                                   return (
-                                    <div key={subgroup} className="ml-2 border-l border-border/40 pl-2 space-y-1.5">
+                                    <Fragment key={subgroup}>
                                       {/* Subgroup Header */}
                                       <div
                                         onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
-                                        className="flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-muted/30 cursor-pointer select-none"
+                                        className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
                                       >
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                          {isSubExpanded ? (
-                                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
-                                          ) : (
-                                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
-                                          )}
+                                        <div className="flex items-center min-w-0 flex-1 pl-1.5 sm:pl-4">
+                                          <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                            {isSubExpanded ? (
+                                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
+                                            ) : (
+                                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
+                                            )}
+                                          </div>
                                           <span className="text-xs font-semibold text-muted-foreground truncate">{subgroup}</span>
-                                          <span className="text-[10px] text-muted-foreground/50">({accs.length})</span>
+                                          <span className="text-[10px] text-muted-foreground/50 ml-1">({accs.length})</span>
                                         </div>
 
-                                        <div className="hidden sm:block mx-4">
+                                        <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                           <Sparkline 
                                             data={subStats.historyPoints} 
                                             isPositive={subStats.isPositive} 
-                                            width={100}
-                                            height={24}
+                                            width={90}
+                                            height={20}
                                           />
                                         </div>
 
-                                        <div className="text-right">
+                                        <div className="flex-shrink-0 w-36 text-right">
                                           <p className="font-mono text-xs font-bold text-muted-foreground blur-number">
                                             {formatCurrency(subStats.current)}
                                           </p>
@@ -1665,72 +1669,68 @@ export default function AccountsPage() {
                                       </div>
 
                                       {/* Nested Accounts inside Subgroup */}
-                                      {isSubExpanded && (
-                                        <div className="space-y-1.5 pl-4">
-                                          {accs.map((acc) => {
-                                            const accStats = getTrendStats([acc]);
-                                            const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
-                                            const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                      {isSubExpanded && accs.map((acc) => {
+                                        const accStats = getTrendStats([acc]);
+                                        const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
+                                        const isAccExpanded = expandedAccounts[acc.id] ?? false;
 
-                                            return (
-                                              <div key={acc.id} className="border border-border/10 rounded-lg overflow-hidden bg-card/10">
-                                                <div 
-                                                  onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                                  className={`flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/40 transition-all cursor-pointer group/row ${
-                                                    acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
-                                                    <div className="min-w-0">
-                                                      <div className="flex items-center gap-1.5">
-                                                        <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
-                                                        {acc.isHidden && (
-                                                          <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
-                                                        )}
-                                                        {acc.isExcludedFromNetWorth && (
-                                                          <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
-                                                        )}
-                                                      </div>
-                                                      <span className="text-[10px] text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="hidden sm:block mx-4">
-                                                    <Sparkline 
-                                                      data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                                      isPositive={accStats.isPositive} 
-                                                      width={80}
-                                                      height={20}
-                                                    />
-                                                  </div>
-
-                                                  <div className="flex items-center gap-3.5 flex-shrink-0">
-                                                    <div className="text-right pr-2">
-                                                      <p className="font-mono text-xs font-bold text-foreground blur-number">
-                                                        {formatCurrency(acc.balance)}
-                                                      </p>
-                                                      {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                                        <span className={`text-[9px] ${
-                                                          accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
-                                                        }`}>
-                                                          {accChange.text}
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                  </div>
+                                        return (
+                                          <Fragment key={acc.id}>
+                                            <div 
+                                              onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
+                                              className={`w-full flex items-center justify-between px-4 py-2 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                                acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                              }`}
+                                            >
+                                              <div className="flex items-center min-w-0 flex-1 pl-3 sm:pl-8">
+                                                <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                                 </div>
+                                                <div className="min-w-0 flex-1">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
+                                                    {acc.isHidden && (
+                                                      <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                                    )}
+                                                    {acc.isExcludedFromNetWorth && (
+                                                      <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                                    )}
+                                                  </div>
+                                                  <span className="text-[10px] text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
+                                                </div>
+                                              </div>
 
-                                                {/* Inline Transactions Drawer */}
-                                                {isAccExpanded && (
-                                                  <AccountTransactions accountId={acc.id} />
+                                              <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                                <Sparkline 
+                                                  data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
+                                                  isPositive={accStats.isPositive} 
+                                                  width={90}
+                                                  height={20}
+                                                />
+                                              </div>
+
+                                              <div className="flex-shrink-0 w-36 text-right pr-2">
+                                                <p className="font-mono text-xs font-bold text-foreground blur-number">
+                                                  {formatCurrency(acc.balance)}
+                                                </p>
+                                                {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
+                                                  <span className={`text-[9px] ${
+                                                    accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                                  }`}>
+                                                    {accChange.text}
+                                                  </span>
                                                 )}
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
+                                            </div>
+
+                                            {/* Inline Transactions Drawer */}
+                                            {isAccExpanded && (
+                                              <AccountTransactions accountId={acc.id} />
+                                            )}
+                                          </Fragment>
+                                        );
+                                      })}
+                                    </Fragment>
                                   );
                                 }
 
@@ -1741,64 +1741,62 @@ export default function AccountsPage() {
                                 const isAccExpanded = expandedAccounts[acc.id] ?? false;
 
                                 return (
-                                  <div key={acc.id} className="ml-2 border-l border-border/40 pl-2">
-                                    <div className="border border-border/10 rounded-lg overflow-hidden bg-card/10">
-                                      <div 
-                                        onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                        className={`flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/40 transition-all cursor-pointer group/row ${
-                                          acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
-                                          <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
-                                              {acc.isHidden && (
-                                                <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
-                                              )}
-                                              {acc.isExcludedFromNetWorth && (
-                                                <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
-                                              )}
-                                            </div>
-                                            <span className="text-[10px] text-muted-foreground truncate block">
-                                              {acc.institution || 'Unknown Institution'} · {subgroup}
-                                            </span>
-                                          </div>
+                                  <Fragment key={acc.id}>
+                                    <div 
+                                      onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
+                                      className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                        acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                      }`}
+                                    >
+                                      <div className="flex items-center min-w-0 flex-1 pl-1.5 sm:pl-4">
+                                        <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                         </div>
-
-                                        {/* Sparkline for single account */}
-                                        <div className="hidden sm:block mx-4">
-                                          <Sparkline 
-                                            data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                            isPositive={accStats.isPositive} 
-                                            width={100}
-                                            height={24}
-                                          />
-                                        </div>
-
-                                        <div className="flex items-center gap-3.5 flex-shrink-0">
-                                          <div className="text-right pr-2">
-                                            <p className="font-mono text-xs font-bold text-foreground blur-number">
-                                              {formatCurrency(acc.balance)}
-                                            </p>
-                                            {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                              <span className={`text-[9px] ${
-                                                accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
-                                              }`}>
-                                                {accChange.text}
-                                              </span>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
+                                            {acc.isHidden && (
+                                              <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                            )}
+                                            {acc.isExcludedFromNetWorth && (
+                                              <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
                                             )}
                                           </div>
+                                          <span className="text-[10px] text-muted-foreground truncate block">
+                                            {acc.institution || 'Unknown Institution'} · {subgroup}
+                                          </span>
                                         </div>
                                       </div>
 
-                                      {/* Inline Transactions Drawer */}
-                                      {isAccExpanded && (
-                                        <AccountTransactions accountId={acc.id} />
-                                      )}
+                                      {/* Sparkline for single account */}
+                                      <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                        <Sparkline 
+                                          data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
+                                          isPositive={accStats.isPositive} 
+                                          width={90}
+                                          height={20}
+                                        />
+                                      </div>
+
+                                      <div className="flex-shrink-0 w-36 text-right pr-2">
+                                        <p className="font-mono text-xs font-bold text-foreground blur-number">
+                                          {formatCurrency(acc.balance)}
+                                        </p>
+                                        {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
+                                          <span className={`text-[9px] ${
+                                            accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                          }`}>
+                                            {accChange.text}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
+
+                                    {/* Inline Transactions Drawer */}
+                                    {isAccExpanded && (
+                                      <AccountTransactions accountId={acc.id} />
+                                    )}
+                                  </Fragment>
                                 );
                               })}
                             </div>

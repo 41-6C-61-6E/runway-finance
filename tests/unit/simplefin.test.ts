@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { SimpleFINError, claimAccessUrl, fetchAccounts } from '@/lib/simplefin';
+import { isSimilarDescription } from '@/lib/utils/description-matching';
 
 describe('SimpleFIN', () => {
   let originalFetch: typeof fetch;
@@ -109,6 +110,40 @@ describe('SimpleFIN', () => {
       await expect(
         fetchAccounts('https://simplefin.example.com/access/abc123', new Date(), new Date())
       ).rejects.toThrow(SimpleFINError);
+    });
+  });
+
+  describe('isSimilarDescription', () => {
+    it('matches exact case-insensitive descriptions', () => {
+      expect(isSimilarDescription('STARBUCKS', 'starbucks')).toBe(true);
+      expect(isSimilarDescription('  Starbucks  ', 'starbucks')).toBe(true);
+    });
+
+    it('ignores common noise prefix/suffix words', () => {
+      expect(isSimilarDescription('PENDING: STARBUCKS', 'STARBUCKS')).toBe(true);
+      expect(isSimilarDescription('POS Withdrawal Starbucks', 'Starbucks')).toBe(true);
+      expect(isSimilarDescription('Starbucks Purchase', 'Starbucks')).toBe(true);
+    });
+
+    it('ignores random codes, numeric IDs and dates', () => {
+      expect(isSimilarDescription('STARBUCKS #1234', 'STARBUCKS #5678')).toBe(true);
+      expect(isSimilarDescription('STARBUCKS 12/25', 'STARBUCKS 12-25')).toBe(true);
+      expect(isSimilarDescription('STARBUCKS x9999', 'STARBUCKS')).toBe(true);
+    });
+
+    it('matches sub-strings', () => {
+      expect(isSimilarDescription('SQ *BAKERY SHOP SAN FRAN', 'SQ *BAKERY SHOP')).toBe(true);
+      expect(isSimilarDescription('WHOLEFDS STR', 'WHOLEFDS STR CO')).toBe(true);
+    });
+
+    it('does not match completely different descriptions', () => {
+      expect(isSimilarDescription('STARBUCKS', 'TARGET')).toBe(false);
+      expect(isSimilarDescription('SAFEWAY', 'WHOLE FOODS')).toBe(false);
+      expect(isSimilarDescription('Large Cap Equity Index Fund', 'Small & Mid Cap Equity Index Fund')).toBe(false);
+    });
+
+    it('handles noise-only identical descriptions safely', () => {
+      expect(isSimilarDescription('PAYMENT TO CREDIT CARD', 'PAYMENT TO CREDIT CARD')).toBe(true);
     });
   });
 });

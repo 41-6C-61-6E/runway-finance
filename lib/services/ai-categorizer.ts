@@ -149,7 +149,7 @@ export async function analyzeUncategorized(
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), isNull(transactions.categoryId)));
+      .where(and(eq(transactions.userId, userId), isNull(transactions.categoryId), eq(transactions.deleted, false)));
     const totalUncategorized = Number(countResult[0]?.count ?? 0);
     onProgress?.(0, totalUncategorized);
     onLog?.(`Found ${totalUncategorized} uncategorized transaction(s)`);
@@ -177,6 +177,7 @@ export async function analyzeUncategorized(
         .where(and(
           eq(transactions.userId, userId),
           isNull(transactions.categoryId),
+          eq(transactions.deleted, false),
         ))
         .orderBy(asc(transactions.date))
         .limit(batchSize)
