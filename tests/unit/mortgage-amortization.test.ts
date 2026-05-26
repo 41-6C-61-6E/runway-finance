@@ -27,6 +27,28 @@ describe('mortgage-amortization', () => {
     expect(history[5].balance).toBe(290000);
   });
 
+  it('generates correct active mortgage paydown history when start date day-of-month does not align with currentDate day-of-month', () => {
+    // Start date is Jan 5, currentDate is Jun 1.
+    // Standard paydown history should contain a snapshot on the start date (Jan 5)
+    // and subsequent anniversary dates (Feb 5, Mar 5, Apr 5, May 5) and currentDate (Jun 1).
+    const nonAlignedParams = {
+      ...params,
+      startDate: '2025-01-05',
+    };
+    const history = generateMortgagePaydownHistory(nonAlignedParams, 290000, '2025-06-01', 'active');
+    
+    // Anniversary dates: Jan 5, Feb 5, Mar 5, Apr 5, May 5
+    // Plus currentDate: Jun 1
+    // Total should be 6 snapshots, and the earliest should be Jan 5.
+    expect(history).toHaveLength(6);
+    expect(history.map(h => h.date)).toContain('2025-01-05');
+    expect(history.map(h => h.date)).toContain('2025-02-05');
+    expect(history.map(h => h.date)).toContain('2025-03-05');
+    expect(history.map(h => h.date)).toContain('2025-04-05');
+    expect(history.map(h => h.date)).toContain('2025-05-05');
+    expect(history.map(h => h.date)).toContain('2025-06-01');
+  });
+
   it('generates correct paid off mortgage paydown history', () => {
     // Paid off date: 2025-03-01, current date: 2025-06-01
     // Amortization ends at 2025-03-01 with 0 balance.
