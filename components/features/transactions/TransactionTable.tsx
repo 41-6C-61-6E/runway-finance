@@ -1162,14 +1162,18 @@ export default function TransactionTable({ filters, onSelectAll, onTransactionCl
           </AlertDialogHeader>
           {proposedRule && (
             <div className="space-y-3 py-2">
-              <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">When payee contains</span>
-                  <span className="text-foreground font-mono font-medium max-w-[200px] truncate ml-2">
-                    &ldquo;{proposedRule.payee}&rdquo;
-                  </span>
+              <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    When payee contains
+                  </label>
+                  <input
+                    value={proposedRule.payee}
+                    onChange={(e) => setProposedRule(prev => prev ? { ...prev, payee: e.target.value } : null)}
+                    className="w-full px-2.5 py-1.5 bg-background border border-input rounded-md text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                  />
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-xs pt-2.5 border-t border-border/50">
                   <span className="text-muted-foreground">Set category to</span>
                   <span className="text-foreground font-medium">{proposedRule.categoryName}</span>
                 </div>

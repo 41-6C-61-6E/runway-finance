@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     categoryId: searchParams.get('categoryId') ?? undefined,
     categoryIds: searchParams.get('categoryIds') ?? undefined,
     search: searchParams.get('search') ?? undefined,
+    type: searchParams.get('type') ?? undefined,
     pending: searchParams.get('pending') ?? undefined,
     reviewed: searchParams.get('reviewed') ?? undefined,
     categorizedByAi: searchParams.get('categorizedByAi') ?? undefined,
@@ -144,7 +145,7 @@ export async function GET(request: Request) {
   }
 
   if (filters.idsOnly) {
-    const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined);
+    const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined || filters.type !== undefined);
 
     if (!hasEncryptedFilters) {
       const result = await getDb()
@@ -171,7 +172,8 @@ export async function GET(request: Request) {
     const result = await query.where(and(...whereConditions));
 
     let filtered = await Promise.all(result.map(async (row: any) => {
-      const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+      const decryptedAmt = parseFloat(await decryptField(row.amount, dek)) || 0;
+      const amount = Math.abs(decryptedAmt);
       let matchesSearch = true;
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -181,11 +183,20 @@ export async function GET(request: Request) {
         const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
         matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
       }
-      return { id: row.id, amount, matchesSearch };
+      let matchesType = true;
+      if (filters.type === 'income') {
+        matchesType = decryptedAmt > 0;
+      } else if (filters.type === 'expense') {
+        matchesType = decryptedAmt < 0;
+      }
+      return { id: row.id, amount, matchesSearch, matchesType };
     }));
 
     if (filters.search) {
       filtered = filtered.filter((f) => f.matchesSearch);
+    }
+    if (filters.type) {
+      filtered = filtered.filter((f) => f.matchesType);
     }
     if (filters.minAmount !== undefined) {
       filtered = filtered.filter((f) => f.amount > filters.minAmount!);
@@ -219,7 +230,8 @@ export async function GET(request: Request) {
     const result = await query.where(and(...whereConditions));
 
     let filtered = await Promise.all(result.map(async (row: any) => {
-      const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+      const decryptedAmt = parseFloat(await decryptField(row.amount, dek)) || 0;
+      const amount = Math.abs(decryptedAmt);
       let matchesSearch = true;
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -229,11 +241,20 @@ export async function GET(request: Request) {
         const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
         matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
       }
-      return { amount, matchesSearch };
+      let matchesType = true;
+      if (filters.type === 'income') {
+        matchesType = decryptedAmt > 0;
+      } else if (filters.type === 'expense') {
+        matchesType = decryptedAmt < 0;
+      }
+      return { amount, matchesSearch, matchesType };
     }));
 
     if (filters.search) {
       filtered = filtered.filter((f) => f.matchesSearch);
+    }
+    if (filters.type) {
+      filtered = filtered.filter((f) => f.matchesType);
     }
     if (filters.minAmount !== undefined) {
       filtered = filtered.filter((f) => f.amount > filters.minAmount!);
@@ -256,7 +277,7 @@ export async function GET(request: Request) {
 
   const totalBeforeFilters = totalRow?.count ?? 0;
 
-  const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined);
+  const hasEncryptedFilters = !!(filters.search || filters.minAmount !== undefined || filters.maxAmount !== undefined || filters.type !== undefined);
   const isEncryptedSort = filters.sort === 'amount' || filters.sort === 'description';
 
   // If we can paginate in the database, do so! (Massive speedup for page loads/nav)
@@ -352,6 +373,13 @@ export async function GET(request: Request) {
       (t.notes?.toLowerCase().includes(q) ?? false) ||
       (t.category?.name?.toLowerCase().includes(q) ?? false)
     );
+  }
+
+  // Apply type filter in memory
+  if (filters.type === 'income') {
+    filtered = filtered.filter((t: any) => parseFloat(t.amount) > 0);
+  } else if (filters.type === 'expense') {
+    filtered = filtered.filter((t: any) => parseFloat(t.amount) < 0);
   }
 
   // Apply amount filters in memory
@@ -519,7 +547,7 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const hasEncryptedFilters = !!(filterFields.search || filterFields.minAmount || filterFields.maxAmount);
+    const hasEncryptedFilters = !!(filterFields.search || filterFields.minAmount || filterFields.maxAmount || filterFields.type);
 
     if (!hasEncryptedFilters) {
       updated = await getDb()
@@ -544,7 +572,8 @@ export async function PATCH(request: Request) {
         .where(and(...whereConditions));
 
       let filtered = await Promise.all(result.map(async (row: any) => {
-        const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+        const decryptedAmt = parseFloat(await decryptField(row.amount, dek)) || 0;
+        const amount = Math.abs(decryptedAmt);
         let matchesSearch = true;
         if (filterFields.search) {
           const q = filterFields.search.toLowerCase();
@@ -554,11 +583,20 @@ export async function PATCH(request: Request) {
           const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
           matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
         }
-        return { id: row.id, amount, matchesSearch };
+        let matchesType = true;
+        if (filterFields.type === 'income') {
+          matchesType = decryptedAmt > 0;
+        } else if (filterFields.type === 'expense') {
+          matchesType = decryptedAmt < 0;
+        }
+        return { id: row.id, amount, matchesSearch, matchesType };
       }));
 
       if (filterFields.search) {
         filtered = filtered.filter((f) => f.matchesSearch);
+      }
+      if (filterFields.type) {
+        filtered = filtered.filter((f) => f.matchesType);
       }
       if (filterFields.minAmount) {
         filtered = filtered.filter((f) => f.amount > parseFloat(filterFields.minAmount!));
@@ -721,7 +759,7 @@ export async function DELETE(request: Request) {
       }
     }
 
-    const hasEncryptedFilters = !!(filterFields.search || filterFields.minAmount || filterFields.maxAmount);
+    const hasEncryptedFilters = !!(filterFields.search || filterFields.minAmount || filterFields.maxAmount || filterFields.type);
 
     if (!hasEncryptedFilters) {
       updated = await getDb()
@@ -746,7 +784,8 @@ export async function DELETE(request: Request) {
         .where(and(...whereConditions));
 
       let filtered = await Promise.all(result.map(async (row: any) => {
-        const amount = Math.abs(parseFloat(await decryptField(row.amount, dek)) || 0);
+        const decryptedAmt = parseFloat(await decryptField(row.amount, dek)) || 0;
+        const amount = Math.abs(decryptedAmt);
         let matchesSearch = true;
         if (filterFields.search) {
           const q = filterFields.search.toLowerCase();
@@ -756,11 +795,20 @@ export async function DELETE(request: Request) {
           const catDec = row.categoryName ? (await decryptField(row.categoryName, dek)).toLowerCase() : '';
           matchesSearch = descDec.includes(q) || payeeDec.includes(q) || notesDec.includes(q) || catDec.includes(q);
         }
-        return { id: row.id, amount, matchesSearch };
+        let matchesType = true;
+        if (filterFields.type === 'income') {
+          matchesType = decryptedAmt > 0;
+        } else if (filterFields.type === 'expense') {
+          matchesType = decryptedAmt < 0;
+        }
+        return { id: row.id, amount, matchesSearch, matchesType };
       }));
 
       if (filterFields.search) {
         filtered = filtered.filter((f) => f.matchesSearch);
+      }
+      if (filterFields.type) {
+        filtered = filtered.filter((f) => f.matchesType);
       }
       if (filterFields.minAmount) {
         filtered = filtered.filter((f) => f.amount > parseFloat(filterFields.minAmount!));
