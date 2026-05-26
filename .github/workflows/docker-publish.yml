@@ -24,6 +24,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Calculate Build Info
+        id: build_info
+        run: |
+          DATE_PREFIX=$(date +'%y.%m')
+          RUN_NUMBER_PADDED=$(printf "%03d" "${{ github.run_number }}")
+          BUILD_NUMBER="${DATE_PREFIX}.${RUN_NUMBER_PADDED}"
+          BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
+          echo "BUILD_TIME=${BUILD_TIME}" >> $GITHUB_ENV
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -32,6 +42,9 @@ jobs:
           target: runner
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            BUILD_NUMBER=${{ env.BUILD_NUMBER }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
