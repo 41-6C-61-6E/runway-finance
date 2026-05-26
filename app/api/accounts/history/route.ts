@@ -307,9 +307,8 @@ export async function GET(request: Request) {
       formattedData.push(point);
     }
 
-    // 6. Downsample if timeframe warrants it
-    const numericFields = ['netWorth', ...accountIds];
-    const aggregated = aggregateChartData(formattedData, numericFields as any);
+    // Return daily data directly (client-side handles downsampling to 100 points for larger views)
+    const aggregated = formattedData;
 
     return NextResponse.json({
       data: aggregated,
