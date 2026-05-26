@@ -18,6 +18,7 @@ type FilterState = {
   categoryId: string | null;
   categoryIds: string | null;
   search: string | null;
+  type: string | null;
   startDate: string | null;
   endDate: string | null;
   pending: string | null;
@@ -42,6 +43,7 @@ function TransactionsContent() {
     categoryId: searchParams.get('categoryId') ?? null,
     categoryIds: searchParams.get('categoryIds') ?? null,
     search: searchParams.get('search') ?? null,
+    type: searchParams.get('type') ?? null,
     startDate: searchParams.get('startDate') ?? null,
     endDate: searchParams.get('endDate') ?? null,
     pending: searchParams.get('pending') ?? null,
@@ -76,6 +78,7 @@ function TransactionsContent() {
     if (filters.categoryId) params.set('categoryId', filters.categoryId);
     if (filters.categoryIds) params.set('categoryIds', filters.categoryIds);
     if (filters.search) params.set('search', filters.search);
+    if (filters.type) params.set('type', filters.type);
     if (filters.startDate) params.set('startDate', filters.startDate);
     if (filters.endDate) params.set('endDate', filters.endDate);
     if (filters.pending) params.set('pending', filters.pending);
@@ -104,6 +107,7 @@ function TransactionsContent() {
   const spCategoryId = searchParams.get('categoryId');
   const spCategoryIds = searchParams.get('categoryIds');
   const spSearch = searchParams.get('search');
+  const spType = searchParams.get('type');
   const spStartDate = searchParams.get('startDate');
   const spEndDate = searchParams.get('endDate');
   const spPending = searchParams.get('pending');
@@ -122,6 +126,7 @@ function TransactionsContent() {
       const categoryId = spCategoryId ?? null;
       const categoryIds = spCategoryIds ?? null;
       const search = spSearch ?? null;
+      const type = spType ?? null;
       const startDate = spStartDate ?? null;
       const endDate = spEndDate ?? null;
       const pending = spPending ?? null;
@@ -138,6 +143,7 @@ function TransactionsContent() {
         prev.categoryId === categoryId &&
         prev.categoryIds === categoryIds &&
         prev.search === search &&
+        prev.type === type &&
         prev.startDate === startDate &&
         prev.endDate === endDate &&
         prev.pending === pending &&
@@ -150,9 +156,9 @@ function TransactionsContent() {
       ) {
         return prev;
       }
-      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, search, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
+      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
     });
-    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spSearch, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
+    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
 
   const updateFilter = useCallback((key: keyof FilterState, value: string | null) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -166,6 +172,7 @@ function TransactionsContent() {
       categoryId: null,
       categoryIds: null,
       search: null,
+      type: null,
       startDate: null,
       endDate: null,
       pending: null,

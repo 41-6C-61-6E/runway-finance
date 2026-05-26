@@ -1,5 +1,5 @@
 import { accountSnapshots } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gt } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
@@ -317,35 +317,11 @@ export function generateMortgagePaydownHistory(
     const endEventDateStr = endDateStr || currentDate;
     const endEventDate = new Date(endEventDateStr + 'T00:00:00');
 
-    // 1. From endEventDate (inclusive) to today, balance is 0
+    // 1. On endEventDate, balance is 0
     snapshots.push({
       date: endEventDateStr,
       balance: 0,
     });
-
-    snapshots.push({
-      date: currentDate,
-      balance: 0,
-    });
-
-    // Walk backward from the latest anniversary date on or before today to endEventDate
-    let year = today.getFullYear();
-    let month = today.getMonth();
-    let anniversary = getAnniversaryDate(startDate, year, month);
-    if (anniversary > today) {
-      month -= 1;
-      anniversary = getAnniversaryDate(startDate, year, month);
-    }
-
-    let cursor = new Date(anniversary);
-    while (cursor > endEventDate) {
-      snapshots.push({
-        date: formatDate(cursor),
-        balance: 0,
-      });
-      month -= 1;
-      cursor = getAnniversaryDate(startDate, year, month);
-    }
 
     // 2. Walk before the end event date:
     if (status === 'paid_off') {
@@ -486,6 +462,21 @@ export async function generateAssetHistorySnapshots(
         eq(accountSnapshots.isSynthetic, true)
       )
     );
+
+    // Clean up all snapshots after payoff/refinance date if applicable
+    if (accountType === 'mortgage') {
+      const status = metadata.mortgageStatus as string | undefined;
+      const endEventDateStr = status === 'paid_off' ? (metadata.payoffDate as string | undefined) : (status === 'refinanced' ? (metadata.refinanceDate as string | undefined) : undefined);
+      if (endEventDateStr) {
+        await db.delete(accountSnapshots).where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            gt(accountSnapshots.snapshotDate, endEventDateStr)
+          )
+        );
+      }
+    }
 
     // Clean up the old purchase date snapshot if it exists and matches the old purchase date/price
     if (accountType === 'realestate' && oldPurchaseDate && oldPurchasePrice !== undefined) {

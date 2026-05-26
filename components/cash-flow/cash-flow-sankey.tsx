@@ -225,26 +225,38 @@ function buildSankeyData(
   // ── Income side ──────────────────────────────────────────────────────────
   if (showParents) {
     const incomeByParent = new Map<string, CategoryData[]>();
-    const incomeNoParent: CategoryData[] = [];
 
     incomeCategories.forEach((cat) => {
-      if (cat.parentId) {
-        const arr = incomeByParent.get(cat.parentId);
-        if (arr) arr.push(cat);
-        else incomeByParent.set(cat.parentId, [cat]);
+      const pId = cat.parentId || cat.categoryId;
+      const pName = cat.parentName || cat.categoryName;
+      const pColor = cat.parentColor || cat.categoryColor;
+
+      const arr = incomeByParent.get(pId);
+      if (arr) {
+        arr.push({ ...cat, parentId: pId, parentName: pName, parentColor: pColor });
       } else {
-        incomeNoParent.push(cat);
+        incomeByParent.set(pId, [{ ...cat, parentId: pId, parentName: pName, parentColor: pColor }]);
       }
     });
 
+    // Sort parent groups by total amount descending to maintain a predictable vertical layout
+    const incomeParentTotals = new Map<string, number>();
     incomeByParent.forEach((children, parentId) => {
+      incomeParentTotals.set(parentId, children.reduce((sum, c) => sum + c.amount, 0));
+    });
+    const sortedIncomeParentIds = Array.from(incomeByParent.keys()).sort((a, b) => {
+      return (incomeParentTotals.get(b) || 0) - (incomeParentTotals.get(a) || 0);
+    });
+
+    sortedIncomeParentIds.forEach((parentId) => {
+      const children = incomeByParent.get(parentId)!;
       const parentNodeId = `inc_parent_${parentId}`;
       if (!createdParentNodes.has(parentNodeId)) {
         createdParentNodes.add(parentNodeId);
         const first = children[0];
         const childIds = children.map((c) => c.categoryId).join(',');
         const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[0];
-        const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
+        const totalForParent = incomeParentTotals.get(parentId) || 0;
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Income',
@@ -268,21 +280,8 @@ function buildSankeyData(
         links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
       });
 
-      const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
+      const totalForParent = incomeParentTotals.get(parentId) || 0;
       links.push({ source: parentNodeId, target: hubId, value: totalForParent });
-    });
-
-    incomeNoParent.forEach((cat) => {
-      const childNodeId = `inc_${cat.categoryId}`;
-      nodes.push({
-        id: childNodeId,
-        label: cat.categoryName,
-        color: vibrantColor(cat.categoryColor, true),
-        categoryId: cat.categoryId,
-        value: cat.amount,
-        percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
-      });
-      links.push({ source: childNodeId, target: hubId, value: cat.amount });
     });
   } else {
     // Flat: all income categories connect directly to hub
@@ -315,26 +314,38 @@ function buildSankeyData(
   // ── Expense side ─────────────────────────────────────────────────────────
   if (showParents) {
     const expenseByParent = new Map<string, CategoryData[]>();
-    const expenseNoParent: CategoryData[] = [];
 
     expenseCategories.forEach((cat) => {
-      if (cat.parentId) {
-        const arr = expenseByParent.get(cat.parentId);
-        if (arr) arr.push(cat);
-        else expenseByParent.set(cat.parentId, [cat]);
+      const pId = cat.parentId || cat.categoryId;
+      const pName = cat.parentName || cat.categoryName;
+      const pColor = cat.parentColor || cat.categoryColor;
+
+      const arr = expenseByParent.get(pId);
+      if (arr) {
+        arr.push({ ...cat, parentId: pId, parentName: pName, parentColor: pColor });
       } else {
-        expenseNoParent.push(cat);
+        expenseByParent.set(pId, [{ ...cat, parentId: pId, parentName: pName, parentColor: pColor }]);
       }
     });
 
+    // Sort parent groups by total amount descending to maintain a predictable vertical layout
+    const expenseParentTotals = new Map<string, number>();
     expenseByParent.forEach((children, parentId) => {
+      expenseParentTotals.set(parentId, children.reduce((sum, c) => sum + c.amount, 0));
+    });
+    const sortedExpenseParentIds = Array.from(expenseByParent.keys()).sort((a, b) => {
+      return (expenseParentTotals.get(b) || 0) - (expenseParentTotals.get(a) || 0);
+    });
+
+    sortedExpenseParentIds.forEach((parentId) => {
+      const children = expenseByParent.get(parentId)!;
       const parentNodeId = `exp_parent_${parentId}`;
       if (!createdParentNodes.has(parentNodeId)) {
         createdParentNodes.add(parentNodeId);
         const first = children[0];
         const childIds = children.map((c) => c.categoryId).join(',');
         const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[1];
-        const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
+        const totalForParent = expenseParentTotals.get(parentId) || 0;
         nodes.push({
           id: parentNodeId,
           label: first.parentName || 'Expenses',
@@ -358,21 +369,8 @@ function buildSankeyData(
         links.push({ source: parentNodeId, target: childNodeId, value: cat.amount });
       });
 
-      const totalForParent = children.reduce((sum, c) => sum + c.amount, 0);
+      const totalForParent = expenseParentTotals.get(parentId) || 0;
       links.push({ source: hubId, target: parentNodeId, value: totalForParent });
-    });
-
-    expenseNoParent.forEach((cat) => {
-      const childNodeId = `exp_${cat.categoryId}`;
-      nodes.push({
-        id: childNodeId,
-        label: cat.categoryName,
-        color: vibrantColor(cat.categoryColor, false),
-        categoryId: cat.categoryId,
-        value: cat.amount,
-        percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
-      });
-      links.push({ source: hubId, target: childNodeId, value: cat.amount });
     });
   } else {
     // Flat: hub connects directly to all expense categories
@@ -411,20 +409,53 @@ function buildSankeyData(
 // ── Custom node ────────────────────────────────────────────────────────────────
 // showPercentages is passed in so the label updates when the toggle changes.
 // The node data already has `percentage` baked in from buildSankeyData.
-const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, setHoveredNode, showPercentages, isMobile }: any) => {
+const SankeyCustomNode = ({
+  x,
+  y,
+  width,
+  height,
+  payload,
+  onClick,
+  hoveredNode,
+  setHoveredNode,
+  showPercentages,
+  isMobile,
+  nodes,
+  columnMetrics,
+  columnOffsets,
+}: any) => {
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
   const rawLabel = payload.label ?? payload.name ?? '';
   const isMobileSize = isMobile || (typeof window !== 'undefined' && window.innerWidth < 768);
   const maxLabelLen = isMobileSize ? 8 : 22;
-  const label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
+  let label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
 
   const valueLabel = showPercentages && payload.percentage !== undefined
     ? `${payload.percentage.toFixed(1)}%`
     : payload.value !== undefined
       ? formatCurrency(payload.value)
       : '';
+
+  // Get vertical offset to center this node's column
+  const nodeIdx = nodes.findIndex((n: any) => n.id === payload.id);
+  const colIndex = columnMetrics?.columns[nodeIdx] ?? -1;
+  const offset = colIndex >= 0 ? (columnOffsets[colIndex] ?? 0) : 0;
+  const shiftedY = y + offset;
+
+  // Suppress redundant leaf labels if the leaf has the same name as its parent
+  const isLeaf = colIndex === 0 || colIndex === 4;
+  if (isLeaf) {
+    const parentCol = colIndex === 0 ? 1 : 3;
+    const hasSameNamedParent = nodes.some((n: any, idx: number) => {
+      const col = columnMetrics?.columns[idx];
+      return col === parentCol && (n.label === rawLabel || n.name === rawLabel);
+    });
+    if (hasSameNamedParent) {
+      label = '';
+    }
+  }
 
   return (
     <g
@@ -435,7 +466,7 @@ const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, 
     >
       <rect
         x={x}
-        y={y}
+        y={shiftedY}
         width={width}
         height={height}
         fill={payload.color || 'var(--color-primary)'}
@@ -446,7 +477,7 @@ const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, 
       {/* Name label */}
       <text
         x={isRightSide ? x - 8 : x + width + 8}
-        y={y + height / 2 - (valueLabel ? 6 : 0)}
+        y={shiftedY + height / 2 - (valueLabel ? 6 : 0)}
         textAnchor={isRightSide ? 'end' : 'start'}
         dominantBaseline="central"
         fontSize={isMobileSize ? 8 : 10}
@@ -461,7 +492,7 @@ const SankeyCustomNode = ({ x, y, width, height, payload, onClick, hoveredNode, 
       {valueLabel && (
         <text
           x={isRightSide ? x - 8 : x + width + 8}
-          y={y + height / 2 + 7}
+          y={shiftedY + height / 2 + 7}
           textAnchor={isRightSide ? 'end' : 'start'}
           dominantBaseline="central"
           fontSize={isMobileSize ? 7 : 9}
@@ -491,18 +522,34 @@ const SankeyCustomLink = ({
   payload,
   onClick,
   hoveredNode,
+  nodes,
+  columnMetrics,
+  columnOffsets,
 }: any) => {
   const gradId = `link-grad-${index}`;
+
+  // Get column indices for source and target
+  const sourceIdx = nodes.findIndex((n: any) => n.id === payload.source.id);
+  const targetIdx = nodes.findIndex((n: any) => n.id === payload.target.id);
+
+  const sourceCol = columnMetrics?.columns[sourceIdx] ?? -1;
+  const targetCol = columnMetrics?.columns[targetIdx] ?? -1;
+
+  const sourceOffset = sourceCol >= 0 ? (columnOffsets[sourceCol] ?? 0) : 0;
+  const targetOffset = targetCol >= 0 ? (columnOffsets[targetCol] ?? 0) : 0;
+
+  const shiftedSourceY = sourceY + sourceOffset;
+  const shiftedTargetY = targetY + targetOffset;
 
   // Cubic bezier: control points at 1/2 x distance for smooth S-curve
   const midX = (sourceX + targetX) / 2;
   const halfW = linkWidth / 2;
 
   const path = [
-    `M ${sourceX},${sourceY - halfW}`,
-    `C ${midX},${sourceY - halfW} ${midX},${targetY - halfW} ${targetX},${targetY - halfW}`,
-    `L ${targetX},${targetY + halfW}`,
-    `C ${midX},${targetY + halfW} ${midX},${sourceY + halfW} ${sourceX},${sourceY + halfW}`,
+    `M ${sourceX},${shiftedSourceY - halfW}`,
+    `C ${midX},${shiftedSourceY - halfW} ${midX},${shiftedTargetY - halfW} ${targetX},${shiftedTargetY - halfW}`,
+    `L ${targetX},${shiftedTargetY + halfW}`,
+    `C ${midX},${shiftedTargetY + halfW} ${midX},${shiftedSourceY + halfW} ${sourceX},${shiftedSourceY + halfW}`,
     'Z',
   ].join(' ');
 
@@ -737,6 +784,96 @@ export function CashFlowSankey() {
     return { nodes, links };
   }, [sankeyData, themeVersion]);
 
+  // Compute column index and totals for each column to support centering layout
+  const columnMetrics = useMemo(() => {
+    if (!processedData || processedData.nodes.length === 0) return null;
+
+    const nodes = processedData.nodes;
+    const links = processedData.links;
+
+    // Topological sorting via BFS to assign columns (0-indexed rank)
+    const columns = new Array(nodes.length).fill(-1);
+    const incomingCount = new Array(nodes.length).fill(0);
+    links.forEach((l) => {
+      incomingCount[l.target]++;
+    });
+
+    const queue: number[] = [];
+    nodes.forEach((n, idx) => {
+      if (incomingCount[idx] === 0) {
+        columns[idx] = 0;
+        queue.push(idx);
+      }
+    });
+
+    while (queue.length > 0) {
+      const u = queue.shift()!;
+      links.forEach((l) => {
+        if (l.source === u) {
+          if (columns[l.target] < columns[u] + 1) {
+            columns[l.target] = columns[u] + 1;
+            queue.push(l.target);
+          }
+        }
+      });
+    }
+
+    const maxCol = Math.max(...columns);
+    const metrics = Array.from({ length: maxCol + 1 }, () => ({
+      count: 0,
+      totalValue: 0,
+    }));
+
+    nodes.forEach((node, idx) => {
+      const col = columns[idx];
+      if (col >= 0) {
+        metrics[col].count++;
+        metrics[col].totalValue += node.value || 0;
+      }
+    });
+
+    return { columns, metrics };
+  }, [processedData]);
+
+  const margin = useMemo(() => (
+    isMobile
+      ? { top: 15, right: 65, bottom: 15, left: 65 }
+      : { top: 20, right: 160, bottom: 20, left: 160 }
+  ), [isMobile]);
+
+  const chartHeight = showParents ? 620 : 460;
+  const usableHeight = chartHeight - margin.top - margin.bottom;
+
+  const nodePadding = isMobile
+    ? (showParents ? 12 : 16)
+    : (showParents ? 20 : 28);
+
+  const scale = useMemo(() => {
+    if (!columnMetrics || columnMetrics.metrics.length === 0) return 0;
+
+    let minScale = Infinity;
+    columnMetrics.metrics.forEach((metric) => {
+      if (metric.totalValue > 0) {
+        const padding = (metric.count - 1) * nodePadding;
+        const colScale = Math.max(0, usableHeight - padding) / metric.totalValue;
+        if (colScale < minScale) {
+          minScale = colScale;
+        }
+      }
+    });
+
+    return minScale === Infinity ? 0 : minScale;
+  }, [columnMetrics, usableHeight, nodePadding]);
+
+  const columnOffsets = useMemo(() => {
+    if (!columnMetrics || scale === 0) return [];
+
+    return columnMetrics.metrics.map((metric) => {
+      const columnHeight = metric.totalValue * scale + (metric.count - 1) * nodePadding;
+      return (usableHeight - columnHeight) / 2;
+    });
+  }, [columnMetrics, scale, usableHeight, nodePadding]);
+
   // Stabilize Sankey child elements to avoid recomputing layout on every render
   // NOTE: must be before early returns to maintain consistent hook order
   const sankeyNode = useMemo(() => (
@@ -746,15 +883,21 @@ export function CashFlowSankey() {
       setHoveredNode={setHoveredNode}
       showPercentages={showPercentages}
       isMobile={isMobile}
+      nodes={processedData.nodes}
+      columnMetrics={columnMetrics}
+      columnOffsets={columnOffsets}
     />
-  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile]);
+  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, processedData.nodes, columnMetrics, columnOffsets]);
 
   const sankeyLink = useMemo(() => (
     <SankeyCustomLink
       onClick={handleLinkClick}
       hoveredNode={hoveredNode}
+      nodes={processedData.nodes}
+      columnMetrics={columnMetrics}
+      columnOffsets={columnOffsets}
     />
-  ), [handleLinkClick, hoveredNode, themeVersion]);
+  ), [handleLinkClick, hoveredNode, themeVersion, processedData.nodes, columnMetrics, columnOffsets]);
 
   const sankeyTooltip = useMemo(() => (
     <Tooltip
@@ -974,9 +1117,10 @@ export function CashFlowSankey() {
                 data={processedData}
                 node={sankeyNode}
                 link={sankeyLink}
-                nodePadding={isMobile ? (showParents ? 12 : 16) : (showParents ? 20 : 28)}
+                iterations={0}
+                nodePadding={nodePadding}
                 nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
-                margin={isMobile ? { top: 15, right: 65, bottom: 15, left: 65 } : { top: 20, right: 160, bottom: 20, left: 160 }}
+                margin={margin}
               >
                 {sankeyTooltip}
               </Sankey>

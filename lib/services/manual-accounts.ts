@@ -632,6 +632,22 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
 
   const today = nowISO();
   for (const acc of userAccounts) {
+    if (acc.type === 'mortgage') {
+      try {
+        let rawMeta = acc.metadata;
+        if (dek && rawMeta) {
+          rawMeta = await decryptField(rawMeta, dek);
+        }
+        const meta = rawMeta ? JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) : {};
+        const status = meta.mortgageStatus;
+        const endEventDateStr = status === 'paid_off' ? meta.payoffDate : (status === 'refinanced' ? meta.refinanceDate : undefined);
+        if (endEventDateStr && today > endEventDateStr) {
+          continue;
+        }
+      } catch (e) {
+        // Ignore json parse error
+      }
+    }
     const decryptedBalance = dek ? await decryptField(acc.balance, dek) : acc.balance;
     const encryptedBalance = dek ? await encryptField(decryptedBalance, dek) : decryptedBalance;
     
