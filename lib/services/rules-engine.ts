@@ -2,6 +2,7 @@ import { getDb } from '@/lib/db';
 import { categoryRules } from '@/lib/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { decryptRows } from '@/lib/crypto';
 
 const LOG_TAG = '[rules-engine]';
 
@@ -22,7 +23,8 @@ type RuleAction = {
 
 export async function applyRulesToTransactions(
   txns: TransactionData[],
-  userId: string
+  userId: string,
+  dek: Uint8Array
 ): Promise<Map<string, RuleAction>> {
   const rules = await getDb()
     .select()
@@ -35,10 +37,12 @@ export async function applyRulesToTransactions(
     return new Map();
   }
 
+  const decryptedRules = await decryptRows('category_rules', rules, dek);
+
   const results = new Map<string, RuleAction>();
 
   for (const tx of txns) {
-    for (const rule of rules) {
+    for (const rule of decryptedRules) {
       const match = evaluateCondition(rule, tx);
       if (match) {
         results.set(tx.id, {
@@ -53,7 +57,7 @@ export async function applyRulesToTransactions(
 
   logger.info(`${LOG_TAG} Rules evaluated`, {
     userId,
-    activeRules: rules.length,
+    activeRules: decryptedRules.length,
     transactionsToCategorize: txns.length,
     transactionsMatched: results.size,
   });
