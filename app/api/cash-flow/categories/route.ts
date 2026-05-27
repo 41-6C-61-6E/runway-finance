@@ -402,25 +402,36 @@ export async function GET(request: Request) {
     }
 
     // Decrypt summary data for previous month
-    async function fetchPreviousSummary(table: typeof categorySpendingSummary | typeof categoryIncomeSummary): Promise<Map<string, number>> {
+    async function fetchPreviousSummary(
+      table: typeof categorySpendingSummary | typeof categoryIncomeSummary,
+      accountIds: string[]
+    ): Promise<Map<string, number>> {
       const map = new Map<string, number>();
       const idCol = table.categoryId;
+      const conditions = [
+        eq(table.userId, session.user.id),
+        eq(table.yearMonth, previousMonth),
+      ];
+      if (accountIds.length > 0) {
+        conditions.push(inArray(table.accountId, accountIds));
+      }
       const rows = await db
         .select({ categoryId: idCol, amount: table.amount })
         .from(table)
-        .where(and(eq(table.userId, session.user.id), eq(table.yearMonth, previousMonth)));
+        .where(and(...conditions));
       for (const row of rows) {
         try {
           const decrypted = await decryptField(row.amount, dek);
-          map.set(row.categoryId, parseFloat(decrypted));
+          const val = parseFloat(decrypted);
+          map.set(row.categoryId, (map.get(row.categoryId) || 0) + val);
         } catch { /* skip */ }
       }
       return map;
     }
 
     const [prevExpenseMap, prevIncomeMap] = await Promise.all([
-      fetchPreviousSummary(categorySpendingSummary),
-      fetchPreviousSummary(categoryIncomeSummary),
+      fetchPreviousSummary(categorySpendingSummary, accountIdList),
+      fetchPreviousSummary(categoryIncomeSummary, accountIdList),
     ]);
 
     const prevMap = new Map<string, number>();
@@ -433,64 +444,58 @@ export async function GET(request: Request) {
       prevMap.set('uncategorized_income', prevIncomeTotal);
     }
 
-    const data: any[] = [];
+    // Decrypt and aggregate current month rows by categoryId
+    const currentCategoryMap = new Map<string, any>();
 
-    // Process spending rows
-    for (const row of currentRows) {
+    const allCurrentRows = [
+      ...currentRows.map(r => ({ ...r, isIncome: false })),
+      ...currentIncomeRows.map(r => ({ ...r, isIncome: true })),
+    ];
+
+    for (const row of allCurrentRows) {
+      const catId = row.categoryId ?? '';
       const amount = row.categoryId === 'uncategorized'
         ? spendingTotal
-        : isImportTransactionsEnabled
-        ? parseFloat(await decryptField(row.amount, dek))
-        : row.amount;
-      const prevAmount = prevMap.get(row.categoryId) || 0;
-      const change = amount - prevAmount;
-      const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
-
-      const categoryName = isImportTransactionsEnabled
-        ? await decryptField(row.categoryName || 'Uncategorized', dek)
-        : (row.categoryName || 'Uncategorized');
-      const transactionCount = isImportTransactionsEnabled
-        ? (row.transactionCount ? parseInt(await decryptField(String(row.transactionCount), dek)) || 0 : 0)
-        : (row.transactionCount || 0);
-      data.push({
-        categoryId: row.categoryId ?? '',
-        categoryName,
-        categoryColor: row.categoryColor || '#6366f1',
-        isIncome: row.isIncome || false,
-        amount,
-        transactionCount,
-        previousAmount: prevAmount,
-        change,
-        percentChange,
-      });
-    }
-
-    // Process income rows (only for summary-table mode; in transaction mode income is already included)
-    for (const row of currentIncomeRows) {
-      const amount = row.categoryId === 'uncategorized_income'
+        : row.categoryId === 'uncategorized_income'
         ? incomeTotal
         : isImportTransactionsEnabled
         ? parseFloat(await decryptField(row.amount, dek))
         : row.amount;
-      const prevAmount = prevMap.get(row.categoryId) || 0;
-      const change = amount - prevAmount;
-      const percentChange = prevAmount > 0 ? ((amount - prevAmount) / prevAmount) * 100 : 0;
 
-      const incomeCategoryName = row.categoryId === 'uncategorized_income'
-        ? 'Uncategorized Income'
-        : isImportTransactionsEnabled
-        ? await decryptField(row.categoryName || 'Uncategorized', dek)
-        : (row.categoryName || 'Uncategorized');
-      const incomeTxCount = isImportTransactionsEnabled
+      const transactionCount = isImportTransactionsEnabled
         ? (row.transactionCount ? parseInt(await decryptField(String(row.transactionCount), dek)) || 0 : 0)
         : (row.transactionCount || 0);
+
+      const existing = currentCategoryMap.get(catId);
+      if (existing) {
+        existing.amount += amount;
+        existing.transactionCount += transactionCount;
+      } else {
+        const categoryName = (row.categoryId === 'uncategorized' || row.categoryId === 'uncategorized_income')
+          ? row.categoryName
+          : isImportTransactionsEnabled
+          ? await decryptField(row.categoryName || 'Uncategorized', dek)
+          : (row.categoryName || 'Uncategorized');
+
+        currentCategoryMap.set(catId, {
+          categoryId: catId,
+          categoryName,
+          categoryColor: row.categoryColor || '#6366f1',
+          isIncome: row.isIncome,
+          amount,
+          transactionCount,
+        });
+      }
+    }
+
+    const data: any[] = [];
+    for (const aggregated of currentCategoryMap.values()) {
+      const prevAmount = prevMap.get(aggregated.categoryId) || 0;
+      const change = aggregated.amount - prevAmount;
+      const percentChange = prevAmount > 0 ? ((aggregated.amount - prevAmount) / prevAmount) * 100 : 0;
+
       data.push({
-        categoryId: row.categoryId ?? '',
-        categoryName: incomeCategoryName,
-        categoryColor: row.categoryColor || '#6366f1',
-        isIncome: true,
-        amount,
-        transactionCount: incomeTxCount,
+        ...aggregated,
         previousAmount: prevAmount,
         change,
         percentChange,
