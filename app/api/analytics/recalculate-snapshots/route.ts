@@ -125,6 +125,8 @@ export async function POST(request: Request) {
           });
         }
       }
+      // Rebuild the aggregated net worth table from the regenerated real estate snapshots
+      await recalculateNetWorthSnapshots(userId, dek);
     } else if (type === 'cashFlow') {
       // Cash flow projections are computed on-the-fly from budgets and
       // spending patterns; no stored snapshots to regenerate.

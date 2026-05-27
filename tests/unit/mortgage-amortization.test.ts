@@ -102,4 +102,44 @@ describe('mortgage-amortization', () => {
     const febSnap = history.find(h => h.date === '2025-02-01');
     expect(febSnap?.balance).toBeGreaterThan(280000);
   });
+
+  it('generates mortgage paydown history with extraPrincipal using proportional adjustment', () => {
+    // 6 months term. Extra principal = 1000. Start balance = 300000.
+    // Standard P&I = 1798.65.
+    const history = generateMortgagePaydownHistory(
+      params,
+      280000, // current balance
+      '2025-06-01', // current date
+      'active',
+      undefined,
+      undefined,
+      1000 // extraPrincipal
+    );
+
+    // Should go from Jan to Jun (6 snapshots)
+    expect(history).toHaveLength(6);
+    // Start balance must be exactly originalBalance (300000)
+    expect(history[0].date).toBe('2025-01-01');
+    expect(history[0].balance).toBe(300000);
+    // End balance must be exactly currentBalance (280000)
+    expect(history[5].date).toBe('2025-06-01');
+    expect(history[5].balance).toBe(280000);
+  });
+
+  it('correctly pushes starting date with originalBalance in refinanced path', () => {
+    const history = generateMortgagePaydownHistory(
+      params,
+      0,
+      '2025-06-01',
+      'refinanced',
+      '2025-04-01',
+      280000,
+      0
+    );
+
+    // It should contain the start date snapshot '2025-01-01' with originalBalance (300000)
+    const janSnap = history.find(h => h.date === '2025-01-01');
+    expect(janSnap).toBeDefined();
+    expect(janSnap?.balance).toBe(300000);
+  });
 });

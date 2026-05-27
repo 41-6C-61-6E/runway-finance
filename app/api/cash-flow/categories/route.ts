@@ -77,6 +77,7 @@ export async function GET(request: Request) {
       .select({
         amount: transactions.amount,
         categoryId: transactions.categoryId,
+        isIncome: categories.isIncome,
       })
       .from(transactions)
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -88,12 +89,12 @@ export async function GET(request: Request) {
     let catCounts = new Map<string, number>();
     for (const row of txRows) {
       if (!row.categoryId) continue;
-      const decrypted = parseFloat(await decryptField(row.amount, dek));
-      if (isIncome === true && decrypted <= 0) continue;
-      if (isIncome === false && decrypted >= 0) continue;
-      const absVal = Math.abs(decrypted);
-      if (absVal <= 0) continue;
-      catTotals.set(row.categoryId, (catTotals.get(row.categoryId) || 0) + absVal);
+      if (row.isIncome !== isIncome) continue; // Category type must match requested type (income vs expense)
+
+      const decrypted = parseFloat(await decryptField(row.amount, dek)) || 0;
+      const val = isIncome ? decrypted : -decrypted;
+      if (val === 0) continue;
+      catTotals.set(row.categoryId, (catTotals.get(row.categoryId) || 0) + val);
       catCounts.set(row.categoryId, (catCounts.get(row.categoryId) || 0) + 1);
     }
 
@@ -429,10 +430,24 @@ export async function GET(request: Request) {
       return map;
     }
 
-    const [prevExpenseMap, prevIncomeMap] = await Promise.all([
-      fetchPreviousSummary(categorySpendingSummary, accountIdList),
-      fetchPreviousSummary(categoryIncomeSummary, accountIdList),
-    ]);
+    let prevExpenseMap = new Map<string, number>();
+    let prevIncomeMap = new Map<string, number>();
+
+    if (isImportTransactionsEnabled) {
+      const [expMap, incMap] = await Promise.all([
+        fetchPreviousSummary(categorySpendingSummary, accountIdList),
+        fetchPreviousSummary(categoryIncomeSummary, accountIdList),
+      ]);
+      prevExpenseMap = expMap;
+      prevIncomeMap = incMap;
+    } else {
+      const [prevSpending, prevIncome] = await Promise.all([
+        fetchTransactionsAggregated(previousMonth, previousMonth, accountIdList, false),
+        fetchTransactionsAggregated(previousMonth, previousMonth, accountIdList, true),
+      ]);
+      prevExpenseMap = new Map(prevSpending.map(r => [r.categoryId, r.amount]));
+      prevIncomeMap = new Map(prevIncome.map(r => [r.categoryId, r.amount]));
+    }
 
     const prevMap = new Map<string, number>();
     for (const [k, v] of prevExpenseMap) prevMap.set(k, v);
