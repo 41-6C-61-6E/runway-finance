@@ -70,6 +70,14 @@ export function CashFlowForecast() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
 
+  const showCashFlowProjections = isEnabled('cashFlowProjections');
+
+  useEffect(() => {
+    if (!showCashFlowProjections) {
+      setViewMode('chart');
+    }
+  }, [showCashFlowProjections]);
+
   // Config state
   const [forecastMode, setForecastMode] = useState<ForecastMode>('hybrid');
   const [lookbackMonths, setLookbackMonths] = useState(3);
@@ -163,9 +171,6 @@ export function CashFlowForecast() {
 
   const chartData = data.historical || [];
   
-  // Check if cash flow projections are enabled
-  const showCashFlowProjections = isEnabled('cashFlowProjections');
-
   // Return null if projections are disabled and there's no historical data
   if (!showCashFlowProjections && (!data || data.historical.length === 0)) {
     return null;
@@ -233,30 +238,32 @@ export function CashFlowForecast() {
         <div className="w-px h-5 bg-border" />
 
         {/* View toggle */}
-        <div className="flex gap-1">
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-              viewMode === 'table'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            <Table2 className="w-3 h-3" />
-            Table
-          </button>
-          <button
-            onClick={() => setViewMode('chart')}
-            className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-              viewMode === 'chart'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            <BarChart3 className="w-3 h-3" />
-            Chart
-          </button>
-        </div>
+        {showCashFlowProjections && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
+                viewMode === 'table'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              <Table2 className="w-3 h-3" />
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode('chart')}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
+                viewMode === 'chart'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              <BarChart3 className="w-3 h-3" />
+              Chart
+            </button>
+          </div>
+        )}
 
         {/* Account filter */}
         <div className="w-px h-5 bg-border" />

@@ -299,7 +299,8 @@ export function generateMortgagePaydownHistory(
   currentDate: string,
   status?: string,
   endDateStr?: string,
-  payoffBalance?: number
+  payoffBalance?: number,
+  extraPrincipal?: number
 ): Array<{ date: string; balance: number }> {
   const { originalBalance, annualRate, termMonths, monthlyPayment, startDate } = params;
   const monthlyRate = annualRate / 100 / 12;
@@ -313,116 +314,118 @@ export function generateMortgagePaydownHistory(
   const start = new Date(startDate + 'T00:00:00');
   const today = new Date(currentDate + 'T00:00:00');
 
-  if (status === 'paid_off' || status === 'refinanced') {
+  if (status === 'paid_off') {
     const endEventDateStr = endDateStr || currentDate;
     const endEventDate = new Date(endEventDateStr + 'T00:00:00');
 
-    // 1. On endEventDate, balance is 0
+    // 1. Walk forward from startDate to endEventDate - 1 month
+    let balance = originalBalance;
+    let forwardCursor = new Date(start);
+    const endEventDateMinus1Month = new Date(endEventDate);
+    endEventDateMinus1Month.setMonth(endEventDateMinus1Month.getMonth() - 1);
+
+    while (forwardCursor <= endEventDateMinus1Month) {
+      snapshots.push({
+        date: formatDate(forwardCursor),
+        balance: Math.round(balance * 100) / 100,
+      });
+      forwardCursor.setMonth(forwardCursor.getMonth() + 1);
+
+      if (monthlyRate > 0) {
+        const interest = balance * monthlyRate;
+        const principal = (effectivePayment + (extraPrincipal ?? 0)) - interest;
+        balance = balance - principal;
+      } else {
+        balance = balance - (effectivePayment + (extraPrincipal ?? 0));
+      }
+      if (balance < 0) balance = 0;
+    }
+
+    // 2. On endEventDate, balance is 0
     snapshots.push({
       date: endEventDateStr,
       balance: 0,
     });
-
-    // 2. Walk before the end event date:
-    if (status === 'paid_off') {
-      // Walk forward from startDate to endEventDate - 1 month
-      let balance = originalBalance;
-      let forwardCursor = new Date(start);
-      const endEventDateMinus1Month = new Date(endEventDate);
-      endEventDateMinus1Month.setMonth(endEventDateMinus1Month.getMonth() - 1);
-
-      while (forwardCursor <= endEventDateMinus1Month) {
-        snapshots.push({
-          date: formatDate(forwardCursor),
-          balance: Math.round(balance * 100) / 100,
-        });
-        forwardCursor.setMonth(forwardCursor.getMonth() + 1);
-
-        if (monthlyRate > 0) {
-          const interest = balance * monthlyRate;
-          const principal = effectivePayment - interest;
-          balance = balance - principal;
-        } else {
-          balance = balance - effectivePayment;
-        }
-        if (balance < 0) balance = 0;
-      }
-    } else {
-      // Walk backward from endEventDate - 1 month using payoffBalance
-      const startVal = payoffBalance ?? 0;
-      let balance = startVal;
-      let backwardCursor = new Date(endEventDate);
-      backwardCursor.setMonth(backwardCursor.getMonth() - 1);
-
-      while (backwardCursor >= start) {
-        snapshots.push({
-          date: formatDate(backwardCursor),
-          balance: Math.round(balance * 100) / 100,
-        });
-        backwardCursor.setMonth(backwardCursor.getMonth() - 1);
-        if (backwardCursor < start) break;
-
-        if (monthlyRate > 0) {
-          balance = (balance + effectivePayment) / (1 + monthlyRate);
-        } else {
-          balance += effectivePayment;
-        }
-
-        if (balance > originalBalance) {
-          balance = originalBalance;
-        }
-      }
-    }
   } else {
-    // Pushes today/currentDate with currentBalance
-    snapshots.push({
-      date: currentDate,
-      balance: Math.round(currentBalance * 100) / 100,
-    });
-
-    // Find the latest anniversary date on or before today
-    let year = today.getFullYear();
-    let month = today.getMonth();
-    let anniversary = getAnniversaryDate(startDate, year, month);
-    if (anniversary > today) {
-      month -= 1;
-      anniversary = getAnniversaryDate(startDate, year, month);
+    // For active or refinanced mortgages:
+    // We walk forward from startDate to targetEndDate using standard amortization,
+    // then adjust proportionally to hit targetEndBalance.
+    const isRefinanced = status === 'refinanced';
+    const targetEndDateStr = isRefinanced ? (endDateStr || currentDate) : currentDate;
+    const targetEndDate = new Date(targetEndDateStr + 'T00:00:00');
+    
+    // For refinanced, the amortization history ends 1 month before refinanceDate,
+    // with balance equal to payoffBalance. On refinanceDate, it is 0.
+    const amortEndLimitDate = new Date(targetEndDate);
+    if (isRefinanced) {
+      amortEndLimitDate.setMonth(amortEndLimitDate.getMonth() - 1);
     }
 
-    let cursor = new Date(anniversary);
-    let balance = currentBalance;
+    const targetEndBalance = isRefinanced ? (payoffBalance ?? 0) : currentBalance;
 
-    while (cursor >= start) {
-      snapshots.push({
+    let balance = originalBalance;
+    let cursor = new Date(start);
+    const tempSnaps: Array<{ date: string; balance: number }> = [];
+
+    // Find the latest anniversary on or before amortEndLimitDate
+    let year = amortEndLimitDate.getFullYear();
+    let month = amortEndLimitDate.getMonth();
+    let latestAnniversary = getAnniversaryDate(startDate, year, month);
+    if (latestAnniversary > amortEndLimitDate) {
+      month -= 1;
+      latestAnniversary = getAnniversaryDate(startDate, year, month);
+    }
+
+    while (cursor <= latestAnniversary) {
+      tempSnaps.push({
         date: formatDate(cursor),
-        balance: Math.round(balance * 100) / 100,
+        balance,
       });
 
-      month -= 1;
-      const prevCursor = getAnniversaryDate(startDate, year, month);
-      if (prevCursor < start) {
-        // If the previous anniversary would be before start, but the cursor is not start,
-        // we make sure we have a snapshot on start itself.
-        if (cursor.getTime() !== start.getTime()) {
-          snapshots.push({
-            date: startDate,
-            balance: Math.round(originalBalance * 100) / 100,
-          });
-        }
-        break;
-      }
-
       if (monthlyRate > 0) {
-        balance = (balance + effectivePayment) / (1 + monthlyRate);
+        const interest = balance * monthlyRate;
+        const principal = (effectivePayment + (extraPrincipal ?? 0)) - interest;
+        balance = balance - principal;
       } else {
-        balance += effectivePayment;
+        balance = balance - (effectivePayment + (extraPrincipal ?? 0));
       }
+      if (balance < 0) balance = 0;
 
-      if (balance > originalBalance) {
-        balance = originalBalance;
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    // Push the end limit date itself if it wasn't pushed (meaning it's not aligned with the anniversary)
+    const lastPushedStr = tempSnaps.length > 0 ? tempSnaps[tempSnaps.length - 1].date : '';
+    const targetEndLimitStr = formatDate(amortEndLimitDate);
+    if (lastPushedStr !== targetEndLimitStr) {
+      tempSnaps.push({
+        date: targetEndLimitStr,
+        balance,
+      });
+    }
+
+    // Proportional adjustment
+    const N = tempSnaps.length;
+    if (N > 0) {
+      const amortizedEnd = tempSnaps[N - 1].balance;
+      const diff = targetEndBalance - amortizedEnd;
+
+      for (let i = 0; i < N; i++) {
+        const fraction = N > 1 ? i / (N - 1) : 1;
+        const adjustedBal = tempSnaps[i].balance + diff * fraction;
+        snapshots.push({
+          date: tempSnaps[i].date,
+          balance: Math.round(adjustedBal * 100) / 100,
+        });
       }
+    }
 
-      cursor = prevCursor;
+    // If refinanced, on refinanceDate balance is 0
+    if (isRefinanced) {
+      snapshots.push({
+        date: targetEndDateStr,
+        balance: 0,
+      });
     }
   }
 
@@ -549,6 +552,23 @@ export async function generateAssetHistorySnapshots(
       if (purchasePrice > 0 && purchaseDate < today) {
         snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode, apiConfig);
         snapshots = snapshots.filter(s => s.date >= purchaseDate);
+
+        // Filter out synthetic snapshots for months that are already covered by real/imported snapshots
+        const realSnaps = await db
+          .select({
+            snapshotDate: accountSnapshots.snapshotDate,
+          })
+          .from(accountSnapshots)
+          .where(
+            and(
+              eq(accountSnapshots.accountId, accountId),
+              eq(accountSnapshots.userId, userId),
+              eq(accountSnapshots.isSynthetic, false)
+            )
+          );
+
+        const coveredMonths = new Set(realSnaps.map(s => String(s.snapshotDate).substring(0, 7)));
+        snapshots = snapshots.filter(s => !coveredMonths.has(s.date.substring(0, 7)));
       }
       break;
     }
@@ -583,6 +603,7 @@ export async function generateAssetHistorySnapshots(
       const monthlyPayment = metadata.monthlyPayment as number ?? 0;
       const monthlyPI = monthlyPayment;
       const startDate = metadata.purchaseDate as string ?? metadata.startDate as string ?? today;
+      const extraPrincipal = metadata.extraPrincipal ? parseFloat(String(metadata.extraPrincipal)) : 0;
       
       const mortgageStatus = metadata.mortgageStatus as string | undefined;
       const payoffDate = metadata.payoffDate as string | undefined;
@@ -634,9 +655,10 @@ export async function generateAssetHistorySnapshots(
           { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
           firstRealBalanceAbs,
           firstReal.date,
-          mortgageStatus,
-          mortgageStatus === 'paid_off' ? payoffDate : refinanceDate,
-          mortgageStatus === 'paid_off' ? 0 : payoffBalance
+          undefined,
+          undefined,
+          undefined,
+          extraPrincipal
         );
         
         // Map and filter to only keep snapshots BEFORE the first real snapshot date
@@ -659,7 +681,8 @@ export async function generateAssetHistorySnapshots(
           today,
           mortgageStatus,
           mortgageStatus === 'paid_off' ? payoffDate : refinanceDate,
-          mortgageStatus === 'paid_off' ? 0 : payoffBalance
+          mortgageStatus === 'paid_off' ? 0 : payoffBalance,
+          extraPrincipal
         );
         snapshots = history.map((h) => ({ date: h.date, value: -h.balance }));
         snapshots = snapshots.filter(s => s.date >= startDate);

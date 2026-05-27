@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from 'vitest';
 import { accountSnapshots, transactions, accounts } from '@/lib/db/schema';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 
 // Mock variables to control query responses
 let mockRealSnapshotsResponse: any[] = [];
@@ -9,6 +9,7 @@ let mockEarliestTxResponse: any[] = [];
 let mockPostedTxsResponse: any[] = [];
 let mockLatestRealSnapshotResponse: any[] = [];
 let mockAccountResponse: any[] = [{ externalId: 'imported-test-account-id' }];
+let mockInsertValues: any[] = [];
 
 // Mock query builder to support Drizzle chained method calls without DB connection
 class MockDbQueryBuilder {
@@ -28,6 +29,16 @@ class MockDbQueryBuilder {
   delete(table: any) {
     this._isDelete = true;
     this._fromTable = table;
+    return this;
+  }
+
+  insert(table: any) {
+    this._fromTable = table;
+    return this;
+  }
+
+  values(data: any) {
+    mockInsertValues.push(data);
     return this;
   }
 
@@ -351,6 +362,85 @@ describe('account-history', () => {
       }
 
       expect(inserted[0].isImported).toBe(false);
+    });
+  });
+
+  describe('recalculateNetWorthSnapshots', () => {
+    it('excludes refinanced or paid-off mortgage balances after their event date', async () => {
+      mockInsertValues = [];
+
+      // Set up accounts: a normal checking account, and a refinanced mortgage
+      mockAccountResponse = [
+        {
+          id: 'acc_checking',
+          name: 'Checking',
+          type: 'checking',
+          balance: '5000.00',
+          isExcludedFromNetWorth: false,
+          isHidden: false,
+          metadata: null,
+        },
+        {
+          id: 'acc_mortgage',
+          name: 'Nationstar Mortgage',
+          type: 'mortgage',
+          balance: '250000.00',
+          isExcludedFromNetWorth: false,
+          isHidden: false,
+          metadata: JSON.stringify({
+            mortgageStatus: 'refinanced',
+            refinanceDate: '2025-10-07',
+          }),
+        },
+      ];
+
+      // Set up snapshots for both accounts on three days:
+      // 2025-10-06 (before refinance)
+      // 2025-10-07 (refinance date, balance becomes 0)
+      // 2025-10-08 (after refinance, balance is still 0/should be excluded)
+      mockRealSnapshotsResponse = [
+        { accountId: 'acc_checking', snapshotDate: '2025-10-06', balance: '5000.00', isSynthetic: false, isImported: false },
+        { accountId: 'acc_mortgage', snapshotDate: '2025-10-06', balance: '250000.00', isSynthetic: false, isImported: false },
+
+        { accountId: 'acc_checking', snapshotDate: '2025-10-07', balance: '5100.00', isSynthetic: false, isImported: false },
+        { accountId: 'acc_mortgage', snapshotDate: '2025-10-07', balance: '0.00', isSynthetic: false, isImported: false },
+
+        { accountId: 'acc_checking', snapshotDate: '2025-10-08', balance: '5200.00', isSynthetic: false, isImported: false },
+        { accountId: 'acc_mortgage', snapshotDate: '2025-10-08', balance: '0.00', isSynthetic: false, isImported: false },
+      ];
+
+      await recalculateNetWorthSnapshots('user_123');
+
+      // Should have generated 3 net worth snapshots
+      expect(mockInsertValues).toHaveLength(3);
+
+      // Day 1: 2025-10-06 (mortgage active)
+      // totalAssets = 5000, totalLiabilities = 250000, netWorth = -245000
+      const day1 = mockInsertValues.find(v => v.snapshotDate === '2025-10-06');
+      expect(day1).toBeDefined();
+      expect(day1.totalAssets).toBe('5000');
+      expect(day1.totalLiabilities).toBe('250000');
+      expect(day1.netWorth).toBe('-245000');
+      expect(day1.breakdown.mortgage.value).toBe(250000);
+
+      // Day 2: 2025-10-07 (refinance date)
+      // totalAssets = 5100, totalLiabilities = 0, netWorth = 5100
+      const day2 = mockInsertValues.find(v => v.snapshotDate === '2025-10-07');
+      expect(day2).toBeDefined();
+      expect(day2.totalAssets).toBe('5100');
+      expect(day2.totalLiabilities).toBe('0');
+      expect(day2.netWorth).toBe('5100');
+      expect(day2.breakdown.mortgage.value).toBe(0);
+
+      // Day 3: 2025-10-08 (after refinance date)
+      // totalAssets = 5200, totalLiabilities = 0, netWorth = 5200
+      // Mortgage breakdown should not exist (excluded) or have count 0
+      const day3 = mockInsertValues.find(v => v.snapshotDate === '2025-10-08');
+      expect(day3).toBeDefined();
+      expect(day3.totalAssets).toBe('5200');
+      expect(day3.totalLiabilities).toBe('0');
+      expect(day3.netWorth).toBe('5200');
+      expect(day3.breakdown.mortgage).toBeUndefined();
     });
   });
 });

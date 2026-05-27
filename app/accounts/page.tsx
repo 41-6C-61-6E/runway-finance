@@ -808,7 +808,10 @@ export default function AccountsPage() {
     const firstAcc = accs[0];
     const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
 
-    const points = historyData.map((d) => {
+    const [startIdx, endIdx] = getTimeframeIndices(historyData, timeframe);
+    const slicedHistory = historyData.slice(startIdx, endIdx + 1);
+
+    const points = slicedHistory.map((d) => {
       let sum = 0;
       for (const acc of accs) {
         sum += (d[acc.id] ?? 0);
@@ -816,8 +819,8 @@ export default function AccountsPage() {
       return isLiab ? -sum : sum;
     });
 
-    const starting = Math.abs(points[0]);
-    const current = Math.abs(points[points.length - 1]);
+    const starting = points.length > 0 ? Math.abs(points[0]) : 0;
+    const current = points.length > 0 ? Math.abs(points[points.length - 1]) : 0;
 
     let change = 0;
     let percentChange = 0;
@@ -841,7 +844,7 @@ export default function AccountsPage() {
       historyPoints: points,
       isPositive,
     };
-  }, [historyData]);
+  }, [historyData, timeframe]);
 
   const formatChange = (change: number, percentChange: number, isLiab: boolean) => {
     const absChange = Math.abs(change);
