@@ -215,10 +215,19 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
 
     monthlyData[yearMonth].count++;
     transactionsProcessed++;
-    if (amount > 0 && (!category || category.isIncome)) {
-      monthlyData[yearMonth].income += amount;
-    } else if (amount < 0 && (!category || !category.isIncome)) {
-      monthlyData[yearMonth].expenses += Math.abs(amount);
+    if (amount > 0) {
+      if (category && !category.isIncome) {
+        monthlyData[yearMonth].expenses -= amount;
+      } else {
+        monthlyData[yearMonth].income += amount;
+      }
+    } else if (amount < 0) {
+      const absAmt = Math.abs(amount);
+      if (category && category.isIncome) {
+        monthlyData[yearMonth].income -= absAmt;
+      } else {
+        monthlyData[yearMonth].expenses += absAmt;
+      }
     }
   }
 
@@ -309,10 +318,10 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
   const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
-    if (!tx.categoryId || parseFloat(tx.amount) >= 0 || tx.ignored) continue;
+    if (!tx.categoryId || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
-    if (!category) continue;
+    if (!category || category.isIncome) continue;
 
     let excluded = category.excludeFromReports;
     if (!excluded && category.parentId) {
@@ -344,7 +353,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
       };
     }
 
-    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += Math.abs(parseFloat(tx.amount));
+    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += -parseFloat(tx.amount);
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
@@ -436,7 +445,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
-    if (!tx.categoryId || parseFloat(tx.amount) <= 0 || tx.ignored) continue;
+    if (!tx.categoryId || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
     if (!category || !category.isIncome) continue;

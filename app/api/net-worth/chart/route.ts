@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte, lt, desc, sql } from 'drizzle-orm';
+import { eq, and, or, gte, lte, lt, desc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -116,11 +116,25 @@ export async function GET(request: Request) {
 
   const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
 
+  const rawShowSynthetic = userSetting?.showSyntheticData;
+  const synthSettings = {
+    global: true,
+    netWorth: true,
+    realEstate: true,
+    cashFlowProjections: true,
+    ...(typeof rawShowSynthetic === 'object' && rawShowSynthetic !== null ? rawShowSynthetic : {}),
+  } as Record<string, boolean>;
+
+  const isNetWorthEnabled = synthSettings.global !== false && synthSettings.netWorth !== false;
+
   let [startDate, endDate] = getDateRange(timeframe);
   if (timeframe === 'all') {
     const earliestSnapConditions = [eq(accountSnapshots.userId, userId)];
     if (!isImportNetWorthEnabled) {
       earliestSnapConditions.push(eq(accountSnapshots.isImported, false));
+    }
+    if (!isNetWorthEnabled) {
+      earliestSnapConditions.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
     }
 
     const earliestSnap = await getDb()
@@ -156,6 +170,9 @@ export async function GET(request: Request) {
     ];
     if (!isImportNetWorthEnabled) {
       snapshotsConditionsInRange.push(eq(accountSnapshots.isImported, false));
+    }
+    if (!isNetWorthEnabled) {
+      snapshotsConditionsInRange.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
     }
 
     const accountSnapshotsInRange = await getDb()
@@ -233,6 +250,23 @@ export async function GET(request: Request) {
         if (!latest) continue;
 
         const accountType = account.type.toLowerCase();
+        let endEventDateStr: string | undefined = undefined;
+        if (accountType === 'mortgage' && account.metadata) {
+          try {
+            const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+            if (meta) {
+              const status = meta.mortgageStatus as string | undefined;
+              endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
+            }
+          } catch (err) {
+            // Ignore parse errors
+          }
+        }
+
+        if (endEventDateStr && dateStr > endEventDateStr) {
+          continue;
+        }
+
         let categoryName = 'Other';
 
         if (isAssetAccount(accountType)) {
