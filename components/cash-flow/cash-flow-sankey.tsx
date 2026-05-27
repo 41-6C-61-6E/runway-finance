@@ -395,12 +395,7 @@ function buildSankeyData(
     links.push({ source: hubId, target: fallbackId, value: totalExpenses });
   }
 
-  if (savings > 0) {
-    const savingsId = '__savings__';
-    const savingsPercentage = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
-    nodes.push({ id: savingsId, label: 'Savings', color: VIBRANT_COLORS[2], value: savings, percentage: savingsPercentage });
-    links.push({ source: hubId, target: savingsId, value: savings });
-  }
+
 
 
   return { nodes, links };
@@ -1121,6 +1116,7 @@ export function CashFlowSankey() {
                 nodePadding={nodePadding}
                 nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
                 margin={margin}
+                align="left"
               >
                 {sankeyTooltip}
               </Sankey>
