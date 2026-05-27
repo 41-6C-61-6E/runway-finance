@@ -210,9 +210,17 @@ export default function AdvancedTab() {
         credentials: 'include',
         body: text,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setBackupSuccess(data.message || 'Backup restored successfully.');
+      let data: any = null;
+      try {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await res.json();
+        }
+      } catch {
+        // Ignore JSON parse errors from non-JSON error pages
+      }
+      if (!res.ok) throw new Error((data && data.error) || `Import failed with status ${res.status}`);
+      setBackupSuccess((data && data.message) || 'Backup restored successfully.');
     } catch (err) {
       setBackupError(err instanceof Error ? err.message : 'Import failed');
     } finally {
