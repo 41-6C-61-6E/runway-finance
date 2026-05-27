@@ -141,8 +141,10 @@ export async function POST(request: Request) {
         rows = sortCategories(rows);
       }
 
+      const restoredRows = rows.map((row) => restoreTimestamps(row));
+
       const encrypted = await Promise.all(
-        rows.map((row) => encryptRow(dbName, { ...row, userId }, dek)),
+        restoredRows.map((row) => encryptRow(dbName, { ...row, userId }, dek)),
       );
       for (let i = 0; i < encrypted.length; i += 50) {
         const batch = encrypted.slice(i, i + 50);
@@ -189,4 +191,25 @@ function sortCategories(categories: Record<string, any>[]) {
     sorted.push(...remaining);
   }
   return sorted;
+}
+
+const TIMESTAMP_KEYS = new Set([
+  'createdAt',
+  'updatedAt',
+  'lastSyncAt',
+  'balanceDate',
+  'startedAt',
+  'completedAt',
+  'expiresAt',
+  'emailVerified',
+]);
+
+function restoreTimestamps<T extends Record<string, any>>(row: T): T {
+  const result = { ...row } as Record<string, any>;
+  for (const key of Object.keys(result)) {
+    if (TIMESTAMP_KEYS.has(key) && typeof result[key] === 'string' && result[key] !== '') {
+      result[key] = new Date(result[key]);
+    }
+  }
+  return result as T;
 }

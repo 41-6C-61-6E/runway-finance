@@ -143,12 +143,17 @@ export function EquityOverTimeChart() {
           }
         }
 
-        // Deconstruct individual mortgage balances by key (zero-out prior to loan origination)
+        // Deconstruct individual mortgage balances by key (zero-out prior to loan origination or after loan end)
         const mortgageBalances: Record<string, number | undefined> = {};
         let totalMortgageBalance = 0;
         for (const m of prop.linkedMortgages) {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
+          const status = m.metadata?.mortgageStatus as string | undefined;
+          const endEventDate = status === 'paid_off' ? m.metadata?.payoffDate : (status === 'refinanced' ? m.metadata?.refinanceDate : undefined);
+
           if (date < origDate) {
+            mortgageBalances[`mortgage_${m.id}`] = undefined;
+          } else if (endEventDate && date >= endEventDate) {
             mortgageBalances[`mortgage_${m.id}`] = undefined;
           } else {
             const bal = lastMortgageBalances[m.id] ?? 0;
@@ -189,12 +194,20 @@ export function EquityOverTimeChart() {
         const date = purchaseDate || new Date().toISOString().split('T')[0];
         const totalMort = prop.linkedMortgages.reduce((sum, m) => {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
-          return sum + (date >= origDate ? Math.abs(m.balance) : 0);
+          const status = m.metadata?.mortgageStatus as string | undefined;
+          const endEventDate = status === 'paid_off' ? m.metadata?.payoffDate : (status === 'refinanced' ? m.metadata?.refinanceDate : undefined);
+          const isBeforeOrig = date < origDate;
+          const isAfterEnd = endEventDate && date >= endEventDate;
+          return sum + ((isBeforeOrig || isAfterEnd) ? 0 : Math.abs(m.balance));
         }, 0);
         const mortgageBalances: Record<string, number | undefined> = {};
         for (const m of prop.linkedMortgages) {
           const origDate = m.metadata?.purchaseDate || m.metadata?.startDate || '1970-01-01';
-          const bal = date >= origDate ? Math.abs(m.balance) : 0;
+          const status = m.metadata?.mortgageStatus as string | undefined;
+          const endEventDate = status === 'paid_off' ? m.metadata?.payoffDate : (status === 'refinanced' ? m.metadata?.refinanceDate : undefined);
+          const isBeforeOrig = date < origDate;
+          const isAfterEnd = endEventDate && date >= endEventDate;
+          const bal = (isBeforeOrig || isAfterEnd) ? 0 : Math.abs(m.balance);
           mortgageBalances[`mortgage_${m.id}`] = bal <= 0 ? undefined : bal;
         }
         filteredTimeline.push({

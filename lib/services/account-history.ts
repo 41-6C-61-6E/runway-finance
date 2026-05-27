@@ -95,6 +95,7 @@ export async function getPostedTransactions(
     date: string;
     postedDate: string | null;
     amount: string;
+    description: string;
   }>
 > {
   return getDb()
@@ -102,6 +103,7 @@ export async function getPostedTransactions(
       date: transactions.date,
       postedDate: transactions.postedDate,
       amount: transactions.amount,
+      description: transactions.description,
     })
     .from(transactions)
     .where(
@@ -138,9 +140,13 @@ export async function generateHistoricalAccountSnapshots(
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
   const startedAt = Date.now();
 
-  // Fetch account to see if it is imported
+  // Fetch account to see if it is a mortgage
   const [account] = await getDb()
-    .select({ externalId: accounts.externalId })
+    .select({
+      externalId: accounts.externalId,
+      type: accounts.type,
+      metadata: accounts.metadata,
+    })
     .from(accounts)
     .where(
       and(
@@ -151,6 +157,34 @@ export async function generateHistoricalAccountSnapshots(
     .limit(1);
 
   const isAccountImported = account?.externalId?.startsWith('imported-') ?? false;
+
+  // Let's get the mortgage metadata if applicable
+  let isMortgage = false;
+  let interestRate = 0;
+  let escrowAmount = 0;
+  let expectedPayment = 0;
+  let endEventDateStr: string | undefined = undefined;
+
+  if (account?.type === 'mortgage' && account.metadata) {
+    try {
+      const decryptedMeta = dek ? await decryptField(account.metadata, dek) : account.metadata;
+      if (decryptedMeta) {
+        const meta = JSON.parse(decryptedMeta);
+        interestRate = parseFloat(meta.interestRate) || 0;
+        escrowAmount = parseFloat(meta.escrow) || parseFloat(meta.escrowAmount) || 0;
+        const monthlyPayment = parseFloat(meta.monthlyPayment) || 0;
+        expectedPayment = monthlyPayment + escrowAmount;
+        isMortgage = true;
+
+        const status = meta.mortgageStatus as string | undefined;
+        endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
+      }
+    } catch (err) {
+      logger.warn(`${LOG_TAG} Failed to decrypt metadata for mortgage account`, { accountId, err });
+    }
+  }
+
+  const calculationToDate = endEventDateStr && endEventDateStr < toDate ? endEventDateStr : toDate;
 
   // 1. Fetch all real snapshots for this account
   const realSnapshots = await getDb()
@@ -208,40 +242,39 @@ export async function generateHistoricalAccountSnapshots(
     .filter((d): d is string => !!d)
     .sort()[0];
 
-  // Delete all existing synthetic snapshots for this account to start with a clean slate
+  // Delete existing synthetic snapshots for this account from fromDate onwards to start with a clean slate
   await getDb()
     .delete(accountSnapshots)
     .where(
       and(
         eq(accountSnapshots.accountId, accountId),
         eq(accountSnapshots.userId, userId),
-        eq(accountSnapshots.isSynthetic, true)
+        eq(accountSnapshots.isSynthetic, true),
+        gte(accountSnapshots.snapshotDate, fromDate)
       )
     );
 
-  if (!calculationStartDate || calculationStartDate > toDate) {
-    logger.debug(`${LOG_TAG} No data within range to backfill for account`, { accountId, from: fromDate, to: toDate });
+  if (!calculationStartDate || calculationStartDate > calculationToDate) {
+    logger.debug(`${LOG_TAG} No data within range to backfill for account`, { accountId, from: fromDate, to: calculationToDate });
     return { syntheticCount: 0, skippedRealCount: 0 };
   }
 
   // We only query transactions and calculate balances starting from calculationStartDate
   const effectiveFromDate = calculationStartDate;
 
-  // 4. Fetch all posted transactions in the range [effectiveFromDate, Math.max(toDate, firstRealDate)]
-  const effectiveToDate = firstRealDate && firstRealDate > toDate ? firstRealDate : toDate;
+  // 4. Fetch all posted transactions in the range [effectiveFromDate, Math.max(calculationToDate, firstRealDate)]
+  const effectiveToDate = firstRealDate && firstRealDate > calculationToDate ? firstRealDate : calculationToDate;
   const txs = await getPostedTransactions(accountId, effectiveFromDate, effectiveToDate);
 
-  const txByDate = new Map<string, number>();
+  const txsByDate = new Map<string, Array<{ amount: number; description: string }>>();
   for (const tx of txs) {
     const txDate = tx.date;
-    const existing = txByDate.get(txDate) ?? 0;
     let amountStr = tx.amount;
     if (dek) {
       try {
         const decrypted = await decryptField(tx.amount, dek);
         if (decrypted) amountStr = decrypted;
       } catch (err) {
-        // Fallback: keep raw value
         logger.warn(`${LOG_TAG} Failed to decrypt transaction amount for snapshot calculations`, {
           accountId,
           error: err instanceof Error ? err.message : String(err),
@@ -249,8 +282,52 @@ export async function generateHistoricalAccountSnapshots(
       }
     }
     const amount = parseFloat(amountStr);
-    txByDate.set(txDate, existing + amount);
+
+    let descriptionStr = '';
+    if (tx.description) {
+      try {
+        descriptionStr = dek ? await decryptField(tx.description, dek) : tx.description;
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    if (!txsByDate.has(txDate)) {
+      txsByDate.set(txDate, []);
+    }
+    txsByDate.get(txDate)!.push({ amount, description: descriptionStr });
   }
+
+  const getDailyChange = (dateStr: string, currentBal: number): number => {
+    const dayTxs = txsByDate.get(dateStr);
+    if (!dayTxs || dayTxs.length === 0) return 0;
+
+    let netChange = 0;
+    for (const tx of dayTxs) {
+      if (isMortgage) {
+        const descLower = tx.description.toLowerCase();
+        let isPymt = descLower.includes('monthly payment') || descLower.includes('mortgage payment') || descLower.includes('mortgage pymt');
+        if (!isPymt && expectedPayment > 0) {
+          const ratio = tx.amount / expectedPayment;
+          if (ratio > 0.85 && ratio < 1.15 && !descLower.includes('additional') && !descLower.includes('extra') && !descLower.includes('payoff')) {
+            isPymt = true;
+          }
+        }
+
+        if (isPymt) {
+          const monthlyRate = interestRate / 100 / 12;
+          const interest = Math.abs(currentBal) * monthlyRate;
+          const principalReduction = tx.amount - interest - escrowAmount;
+          netChange += principalReduction;
+        } else {
+          netChange += tx.amount;
+        }
+      } else {
+        netChange += tx.amount;
+      }
+    }
+    return netChange;
+  };
 
   const balanceByDate = new Map<string, number>();
 
@@ -267,7 +344,7 @@ export async function generateHistoricalAccountSnapshots(
 
     while (current > startLimit) {
       const dateStr = current.toISOString().split('T')[0];
-      const dailyChange = txByDate.get(dateStr) ?? 0;
+      const dailyChange = getDailyChange(dateStr, runningBalance);
       runningBalance -= dailyChange;
 
       current.setUTCDate(current.getUTCDate() - 1);
@@ -275,9 +352,9 @@ export async function generateHistoricalAccountSnapshots(
       balanceByDate.set(prevDateStr, runningBalance);
     }
 
-    // Forward Pass: Calculate daily balances forward from firstRealDate to toDate
+    // Forward Pass: Calculate daily balances forward from firstRealDate to calculationToDate
     current = new Date(firstRealDate + 'T00:00:00Z');
-    const endLimit = new Date(toDate + 'T00:00:00Z');
+    const endLimit = new Date(calculationToDate + 'T00:00:00Z');
     runningBalance = anchorBalance;
 
     while (current < endLimit) {
@@ -288,7 +365,7 @@ export async function generateHistoricalAccountSnapshots(
       if (realBal !== undefined) {
         runningBalance = realBal;
       } else {
-        const dailyChange = txByDate.get(dateStr) ?? 0;
+        const dailyChange = getDailyChange(dateStr, runningBalance);
         runningBalance += dailyChange;
       }
       balanceByDate.set(dateStr, runningBalance);
@@ -296,25 +373,25 @@ export async function generateHistoricalAccountSnapshots(
   } else if (earliestTxDate) {
     // 6. Fallback (no real snapshots): Calculate forward from 0 starting at earliestTxDate
     let current = new Date(earliestTxDate + 'T00:00:00Z');
-    const endLimit = new Date(toDate + 'T00:00:00Z');
-    let runningBalance = txByDate.get(earliestTxDate) ?? 0;
+    const endLimit = new Date(calculationToDate + 'T00:00:00Z');
+    let runningBalance = getDailyChange(earliestTxDate, 0);
     balanceByDate.set(earliestTxDate, runningBalance);
 
     while (current < endLimit) {
       current.setUTCDate(current.getUTCDate() + 1);
       const dateStr = current.toISOString().split('T')[0];
-      const dailyChange = txByDate.get(dateStr) ?? 0;
+      const dailyChange = getDailyChange(dateStr, runningBalance);
       runningBalance += dailyChange;
       balanceByDate.set(dateStr, runningBalance);
     }
   }
 
-  // 7. Prepare synthetic snapshots starting from the earliest data date (effectiveFromDate)
-  // to ensure a full daily history is rebuilt after the slate was cleared.
+  // 7. Prepare synthetic snapshots starting from fromDate (or effectiveFromDate if fromDate is earlier)
+  // to ensure only requested snapshots are written to the database.
   const toInsert: Array<{ userId: string; accountId: string; snapshotDate: string; balance: string; isSynthetic: boolean; isImported: boolean }> = [];
-  const insertStartDate = effectiveFromDate;
+  const insertStartDate = fromDate && fromDate > effectiveFromDate ? fromDate : effectiveFromDate;
   const start = new Date(insertStartDate + 'T00:00:00Z');
-  const end = new Date(toDate + 'T00:00:00Z');
+  const end = new Date(calculationToDate + 'T00:00:00Z');
   let current = new Date(start);
   let skippedReal = 0;
 
@@ -481,8 +558,25 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
     for (const acc of decryptedAccounts) {
       if (acc.isExcludedFromNetWorth || acc.isHidden) continue;
 
-      const bal = latestByAccount.get(acc.id) ?? 0;
       const accountType = acc.type.toLowerCase();
+      let endEventDateStr: string | undefined = undefined;
+      if (accountType === 'mortgage' && acc.metadata) {
+        try {
+          const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
+          if (meta) {
+            const status = meta.mortgageStatus as string | undefined;
+            endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
+          }
+        } catch (err) {
+          // Ignore parse errors
+        }
+      }
+
+      if (endEventDateStr && dateStr > endEventDateStr) {
+        continue;
+      }
+
+      const bal = latestByAccount.get(acc.id) ?? 0;
 
       if (isAssetAccount(accountType)) {
         totalAssets += bal;

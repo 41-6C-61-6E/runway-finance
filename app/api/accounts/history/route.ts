@@ -121,13 +121,8 @@ export async function GET(request: Request) {
 
     // Filter reportable accounts based on settings
     let filteredAccounts = reportableAccounts;
-    if (!isNetWorthEnabled) {
-      filteredAccounts = filteredAccounts.filter(acc => {
-        if (acc.connectionId !== null) return true;
-        const isImported = acc.externalId?.startsWith('imported-');
-        if (isImported && isImportNetWorthEnabled) return true;
-        return false;
-      });
+    if (!isImportNetWorthEnabled) {
+      filteredAccounts = filteredAccounts.filter(acc => !acc.externalId?.startsWith('imported-'));
     }
     const realEstateTypes = [
       'realestate',
@@ -282,9 +277,27 @@ export async function GET(request: Request) {
         if (!latestByAccount.has(account.id)) {
           continue;
         }
-        const bal = latestByAccount.get(account.id)!;
 
         const accountType = account.type.toLowerCase();
+        let endEventDateStr: string | undefined = undefined;
+        if (accountType === 'mortgage' && account.metadata) {
+          try {
+            const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+            if (meta) {
+              const status = meta.mortgageStatus as string | undefined;
+              endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
+            }
+          } catch (err) {
+            // Ignore parse errors
+          }
+        }
+
+        if (endEventDateStr && dateStr > endEventDateStr) {
+          continue;
+        }
+
+        const bal = latestByAccount.get(account.id)!;
+
         if (isAssetAccount(accountType)) {
           // Assets: store as-is (positive balance = positive value)
           point[account.id] = bal;
