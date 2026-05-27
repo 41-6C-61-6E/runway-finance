@@ -16,7 +16,17 @@ function base64FromBytes(bytes: Uint8Array): string {
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
-  return new Uint8Array(atob(b64).split('').map((c) => c.charCodeAt(0)));
+  if (!b64) return new Uint8Array(0);
+  try {
+    // Normalize base64url to standard base64, strip whitespace and padding
+    let normalized = b64.trim().replace(/-/g, '+').replace(/_/g, '/');
+    while (normalized.length % 4 !== 0) {
+      normalized += '=';
+    }
+    return new Uint8Array(atob(normalized).split('').map((c) => c.charCodeAt(0)));
+  } catch {
+    return new Uint8Array(0);
+  }
 }
 
 function toBufferSource(data: Uint8Array): BufferSource {
@@ -83,9 +93,9 @@ export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Ar
     );
     decryptKeyCache.set(keyHex, cryptoKey);
   }
-  const ivBytes = hexToBytes(iv);
-  const ciphertextBytes = bytesFromBase64(ciphertext);
   try {
+    const ivBytes = hexToBytes(iv);
+    const ciphertextBytes = bytesFromBase64(ciphertext);
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: toBufferSource(ivBytes) },
       cryptoKey,
