@@ -23,6 +23,7 @@ import {
   aiProposals,
   importLog,
   userSettings,
+  syncLogs,
 } from '@/lib/db/schema';
 import { getPool } from '@/lib/db';
 
@@ -33,6 +34,7 @@ interface BackupPayload {
 }
 
 const DELETE_ORDER: { table: any; dbName: string }[] = [
+  { table: syncLogs, dbName: 'sync_logs' },
   { table: transactions, dbName: 'transactions' },
   { table: accountSnapshots, dbName: 'account_snapshots' },
   { table: importLog, dbName: 'import_log' },
@@ -132,8 +134,12 @@ export async function POST(request: Request) {
 
     // Insert data in dependency order
     for (const { table, dbName } of INSERT_ORDER) {
-      const rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
+      let rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
       if (!rows || rows.length === 0) continue;
+
+      if (dbName === 'categories') {
+        rows = sortCategories(rows);
+      }
 
       const encrypted = await Promise.all(
         rows.map((row) => encryptRow(dbName, { ...row, userId }, dek)),
@@ -157,4 +163,30 @@ export async function POST(request: Request) {
   } finally {
     client.release();
   }
+}
+
+function sortCategories(categories: Record<string, any>[]) {
+  const sorted: Record<string, any>[] = [];
+  const inserted = new Set<string>();
+  let remaining = [...categories];
+
+  let progress = true;
+  while (remaining.length > 0 && progress) {
+    progress = false;
+    const nextRemaining: Record<string, any>[] = [];
+    for (const cat of remaining) {
+      if (!cat.parentId || inserted.has(String(cat.parentId))) {
+        sorted.push(cat);
+        inserted.add(String(cat.id));
+        progress = true;
+      } else {
+        nextRemaining.push(cat);
+      }
+    }
+    remaining = nextRemaining;
+  }
+  if (remaining.length > 0) {
+    sorted.push(...remaining);
+  }
+  return sorted;
 }
