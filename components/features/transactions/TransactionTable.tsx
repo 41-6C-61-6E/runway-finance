@@ -56,6 +56,7 @@ type Transaction = {
   accountName: string | null;
   reviewed: boolean | null;
   categorizedByAi: boolean;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 type Category = {
@@ -65,6 +66,18 @@ type Category = {
   color: string;
   isIncome: boolean;
 };
+
+async function readErrorMessage(res: Response) {
+  const text = await res.text().catch(() => "");
+  if (!text) return `Request failed with status ${res.status}`;
+
+  try {
+    const data = JSON.parse(text);
+    return data?.message || data?.error || text;
+  } catch {
+    return text;
+  }
+}
 
 interface TransactionTableProps {
   filters: Record<string, string | null>;
@@ -81,6 +94,7 @@ const ALL_COLUMNS: string[] = [
   "ai",
   "account",
   "category",
+  "tags",
   "amount",
 ];
 
@@ -92,6 +106,7 @@ const COLUMN_LABELS: Record<string, string> = {
   ai: "AI",
   account: "Account",
   category: "Category",
+  tags: "Tags",
   amount: "Amount",
 };
 
@@ -537,6 +552,9 @@ export default function TransactionTable({
       const res = await fetch(`/api/transactions?${params.toString()}`, {
         credentials: "include",
       });
+      if (!res.ok) {
+        throw new Error(await readErrorMessage(res));
+      }
       const data = await res.json();
       setTransactions(
         (data.data || []).map((tx: any) => ({
@@ -561,13 +579,27 @@ export default function TransactionTable({
           fetch(`/api/transactions?${totalParams.toString()}`, {
             credentials: "include",
           })
-            .then((res) => res.json())
+            .then(async (res) => {
+              if (!res.ok) {
+                throw new Error(await readErrorMessage(res));
+              }
+              return res.json();
+            })
             .then((totalData) => {
               setTotalAmount(totalData.totalAmount ?? 0);
             })
-            .catch(() => setTotalAmount(0));
+            .catch((err) => {
+              console.error("Failed to fetch transaction total amount", err);
+              setTotalAmount(0);
+            });
         }
       }
+    } catch (err) {
+      console.error("Failed to fetch transactions", err);
+      setTransactions([]);
+      setTotal(0);
+      setTotalAmount(0);
+      onTotalChange?.(0);
     } finally {
       setLoading(false);
     }
@@ -1121,6 +1153,34 @@ export default function TransactionTable({
           );
         },
         meta: { className: "text-right" },
+      },
+      {
+        id: "tags",
+        accessorFn: (row) => row.tags?.map((t) => t.name).join(', ') ?? '',
+        header: 'Tags',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const txTags = row.original.tags ?? [];
+          if (txTags.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-1">
+              {txTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+                  style={{
+                    backgroundColor: `${tag.color}22`,
+                    color: tag.color,
+                    border: `1px solid ${tag.color}44`,
+                  }}
+                  title={tag.name}
+                >
+                  #{tag.name}
+                </span>
+              ))}
+            </div>
+          );
+        },
       },
     ],
     [

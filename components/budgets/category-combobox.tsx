@@ -10,6 +10,7 @@ interface Category {
   isIncome?: boolean;
   parentId?: string | null;
   color?: string;
+  categoryType?: string;
 }
 
 interface CategoryComboboxProps {
@@ -153,8 +154,10 @@ export function CategoryCombobox({ categories, value, onSelect, disabled }: Cate
               </div>
             ) : (
               <>
-                {renderCategoryGroup(parents.filter(p => !p.isIncome), "Expenses")}
-                {renderCategoryGroup(parents.filter(p => p.isIncome), "Income")}
+                {renderCategoryGroup(parents.filter(p => !p.isIncome && p.categoryType !== 'transfer'), "Expenses")}
+                {renderCategoryGroup(parents.filter(p => p.isIncome && p.name !== 'Paycheck Deductions'), "Income")}
+                {renderCategoryGroup(parents.filter(p => p.name === 'Paycheck Deductions'), "Paycheck Deductions")}
+                {renderCategoryGroup(parents.filter(p => p.categoryType === 'transfer'), "Transfers & Adjustments")}
               </>
             )}
           </div>

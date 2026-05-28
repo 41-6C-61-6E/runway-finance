@@ -16,6 +16,7 @@ import { Search, Check, X } from 'lucide-react';
 
 interface CategoryData {
   categoryId: string;
+  sourceCategoryId?: string;
   categoryName: string;
   categoryColor: string;
   isIncome: boolean;
@@ -24,6 +25,7 @@ interface CategoryData {
   previousAmount: number;
   change: number;
   percentChange: number;
+  categoryType?: string;
 }
 
 
@@ -180,9 +182,10 @@ export function SpendingBreakdown() {
   }, [allCategories]);
 
   const safeExcludedIds = excludedCategoryIds instanceof Set ? excludedCategoryIds : new Set<string>();
+  const getCategoryRouteId = (category: CategoryData) => category.sourceCategoryId || category.categoryId;
 
   const visibleCategories = useMemo(() => {
-    return expenseCategories.filter((c) => !safeExcludedIds.has(c.categoryId));
+    return expenseCategories.filter((c) => !safeExcludedIds.has(getCategoryRouteId(c)));
   }, [expenseCategories, safeExcludedIds]);
 
   const totalSpending = useMemo(() => {
@@ -197,21 +200,23 @@ export function SpendingBreakdown() {
         label: c.categoryName,
         value: c.amount,
         color: getThemeAdaptedColor(c.categoryColor, theme),
-        categoryId: c.categoryId,
+        categoryId: getCategoryRouteId(c),
+        sourceCategoryId: getCategoryRouteId(c),
       }));
     }
 
     const top14 = sorted.slice(0, 14);
     const rest = sorted.slice(14);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
-    const restIds = rest.map((c) => c.categoryId).join(',');
+    const restIds = rest.map((c) => getCategoryRouteId(c)).join(',');
 
     const mappedTop = top14.map((c) => ({
       id: c.categoryName,
       label: c.categoryName,
       value: c.amount,
       color: getThemeAdaptedColor(c.categoryColor, theme),
-      categoryId: c.categoryId,
+      categoryId: getCategoryRouteId(c),
+      sourceCategoryId: getCategoryRouteId(c),
     }));
 
     const otherItem = {
@@ -220,6 +225,7 @@ export function SpendingBreakdown() {
       value: restAmount,
       color: getThemeAdaptedColor('#94a3b8', theme),
       categoryId: restIds,
+      sourceCategoryId: restIds,
     };
 
     return [...mappedTop, otherItem];
@@ -335,7 +341,7 @@ export function SpendingBreakdown() {
                         dataKey="value"
                         radius={[0, 2, 2, 0]}
                         onClick={(data: any) => {
-                          const catId = data.categoryId || (data.payload && data.payload.categoryId);
+                          const catId = data.sourceCategoryId || data.categoryId || (data.payload && (data.payload.sourceCategoryId || data.payload.categoryId));
                           if (catId) handleClick(catId);
                         }}
                         className="cursor-pointer"
@@ -378,7 +384,7 @@ export function SpendingBreakdown() {
                         cornerRadius={3}
                         stroke="none"
                         onClick={(data: any) => {
-                          const catId = data.categoryId || (data.payload && data.payload.categoryId);
+                          const catId = data.sourceCategoryId || data.categoryId || (data.payload && (data.payload.sourceCategoryId || data.payload.categoryId));
                           if (catId) handleClick(catId);
                         }}
                         className="cursor-pointer"
@@ -451,7 +457,7 @@ export function SpendingBreakdown() {
               </button>
               <span className="text-muted-foreground/30">|</span>
               <button
-                onClick={() => setExcludedCategoryIds(new Set(expenseCategories.map((c) => c.categoryId)))}
+                onClick={() => setExcludedCategoryIds(new Set(expenseCategories.map((c) => getCategoryRouteId(c))))}
                 className="text-primary hover:text-primary/80 hover:underline font-semibold cursor-pointer transition-colors"
               >
                 Clear All
@@ -467,7 +473,8 @@ export function SpendingBreakdown() {
               </div>
             ) : (
               filteredCategories.map((c) => {
-                const isExcluded = safeExcludedIds.has(c.categoryId);
+                const routeId = getCategoryRouteId(c);
+                const isExcluded = safeExcludedIds.has(routeId);
                 const adaptedColor = getThemeAdaptedColor(c.categoryColor, theme);
                 const pct = totalSpending > 0 && !isExcluded
                   ? ((c.amount / totalSpending) * 100).toFixed(1)
@@ -478,7 +485,7 @@ export function SpendingBreakdown() {
                 return (
                   <div
                     key={c.categoryId}
-                    onClick={() => toggleCategory(c.categoryId)}
+                    onClick={() => toggleCategory(routeId)}
                     className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all select-none border border-transparent ${
                       isExcluded
                         ? 'bg-transparent text-muted-foreground/40 hover:bg-muted/5 opacity-60'

@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
-import { categories, transactions } from '@/lib/db/schema';
+import { budgets, categoryIncomeSummary, categoryRules, categorySpendingSummary, categories, transactions } from '@/lib/db/schema';
 import { eq, and, sql, isNull } from 'drizzle-orm';
+import { decryptRows } from '@/lib/crypto';
 
 type ChildCategoryDef = {
   name: string;
@@ -12,9 +13,157 @@ type CategoryDef = {
   name: string;
   color: string;
   isIncome: boolean;
+  categoryType?: string;
   excludeFromReports?: boolean;
   children?: ChildCategoryDef[];
 };
+
+type CompoundChildDef = {
+  name: string;
+  color: string;
+  expenseParentName: string;
+};
+
+type CategoryRow = {
+  id: string;
+  parentId: string | null;
+  expenseParentId: string | null;
+  name: string;
+  displayOrder: number;
+  isSystem: boolean;
+  createdAt: Date;
+};
+
+function normalizeCategoryName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function categoryMergeKey(parentId: string | null, name: string) {
+  return `${parentId ?? 'root'}::${normalizeCategoryName(name)}`;
+}
+
+function toTimestamp(value: Date | string): number {
+  return value instanceof Date ? value.getTime() : new Date(value).getTime();
+}
+
+function pickCanonicalCategory(rows: CategoryRow[]) {
+  return [...rows].sort((a, b) => {
+    const systemScore = Number(b.isSystem) - Number(a.isSystem);
+    if (systemScore !== 0) return systemScore;
+
+    const orderScore = a.displayOrder - b.displayOrder;
+    if (orderScore !== 0) return orderScore;
+
+    const timeScore = toTimestamp(a.createdAt) - toTimestamp(b.createdAt);
+    if (timeScore !== 0) return timeScore;
+
+    return a.id.localeCompare(b.id);
+  })[0];
+}
+
+export async function mergeDuplicateCategories(userId: string, dek?: Uint8Array): Promise<number> {
+  const db = getDb();
+  let mergedCount = 0;
+
+  for (let pass = 0; pass < 10; pass++) {
+    const allCategoriesRaw = await db
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        name: categories.name,
+        displayOrder: categories.displayOrder,
+        isSystem: categories.isSystem,
+        createdAt: categories.createdAt,
+      })
+      .from(categories)
+      .where(eq(categories.userId, userId));
+
+    const allCategories = dek
+      ? await decryptRows('categories', allCategoriesRaw, dek)
+      : allCategoriesRaw;
+
+    const duplicateGroups = new Map<string, CategoryRow[]>();
+    for (const cat of allCategories as CategoryRow[]) {
+      const key = categoryMergeKey(cat.parentId, cat.name);
+      const group = duplicateGroups.get(key) ?? [];
+      group.push(cat);
+      duplicateGroups.set(key, group);
+    }
+
+    const groupsToMerge = [...duplicateGroups.values()].filter((group) => group.length > 1);
+    if (groupsToMerge.length === 0) break;
+
+    let mergedThisPass = 0;
+    await db.transaction(async (tx) => {
+      for (const group of groupsToMerge) {
+        const canonical = pickCanonicalCategory(group);
+        const duplicates = group.filter((cat) => cat.id !== canonical.id);
+
+        for (const duplicate of duplicates) {
+          await tx.update(transactions)
+            .set({ categoryId: canonical.id })
+            .where(and(eq(transactions.userId, userId), eq(transactions.categoryId, duplicate.id)));
+
+          await tx.update(budgets)
+            .set({ categoryId: canonical.id })
+            .where(and(eq(budgets.userId, userId), eq(budgets.categoryId, duplicate.id)));
+
+          await tx.update(categoryRules)
+            .set({ setCategoryId: canonical.id })
+            .where(and(eq(categoryRules.userId, userId), eq(categoryRules.setCategoryId, duplicate.id)));
+
+          await tx.update(categorySpendingSummary)
+            .set({ categoryId: canonical.id })
+            .where(and(eq(categorySpendingSummary.userId, userId), eq(categorySpendingSummary.categoryId, duplicate.id)));
+
+          await tx.update(categoryIncomeSummary)
+            .set({ categoryId: canonical.id })
+            .where(and(eq(categoryIncomeSummary.userId, userId), eq(categoryIncomeSummary.categoryId, duplicate.id)));
+
+          await tx.update(categories)
+            .set({ parentId: canonical.id })
+            .where(and(eq(categories.userId, userId), eq(categories.parentId, duplicate.id)));
+
+          await tx.update(categories)
+            .set({ expenseParentId: canonical.id })
+            .where(and(eq(categories.userId, userId), eq(categories.expenseParentId, duplicate.id)));
+
+          await tx.delete(categories)
+            .where(and(eq(categories.userId, userId), eq(categories.id, duplicate.id)));
+
+          mergedCount++;
+          mergedThisPass++;
+        }
+      }
+    });
+
+    if (mergedThisPass === 0) break;
+  }
+
+  return mergedCount;
+}
+
+/** All default compound subcategories for Paycheck Deductions. */
+const COMPOUND_SUBCATEGORIES: CompoundChildDef[] = [
+  { name: '401k / Retirement',           color: '#6366f1', expenseParentName: 'Retirement' },
+  { name: 'Health Insurance Premiums',   color: '#8b5cf6', expenseParentName: 'Health & Medical' },
+  { name: 'Dental & Vision Premiums',    color: '#a78bfa', expenseParentName: 'Health & Medical' },
+  { name: 'HSA / FSA Contribution',      color: '#c4b5fd', expenseParentName: 'Health & Medical' },
+  { name: 'Life & Disability Insurance', color: '#a855f7', expenseParentName: 'Bills & Subscriptions' },
+  { name: 'Federal Withholding',         color: '#7c3aed', expenseParentName: 'Taxes' },
+  { name: 'State Withholding',           color: '#6d28d9', expenseParentName: 'Taxes' },
+  { name: 'Payroll Tax (SS / Medicare)', color: '#5b21b6', expenseParentName: 'Taxes' },
+  { name: 'Other Paycheck Deductions',   color: '#6b7280', expenseParentName: 'Transfers & Adjustments' },
+];
+
+/** All default compound subcategories for Employer Contributions. */
+const EMPLOYER_CONTRIBUTION_SUBCATEGORIES: CompoundChildDef[] = [
+  { name: 'Employer 401k Match',         color: '#4f46e5', expenseParentName: 'Retirement' },
+  { name: 'Employer HSA Contribution',   color: '#0891b2', expenseParentName: 'Health & Medical' },
+  { name: 'Employer Pension Contribution', color: '#4338ca', expenseParentName: 'Retirement' },
+  { name: 'Employer-paid Insurance',     color: '#7c3aed', expenseParentName: 'Bills & Subscriptions' },
+  { name: 'RSU / Stock Vesting',         color: '#0d9488', expenseParentName: 'Financial' },
+];
 
 export const DEFAULT_CATEGORIES: CategoryDef[] = [
   {
@@ -146,6 +295,16 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
     ],
   },
   {
+    name: 'Retirement',
+    color: '#4f46e5',
+    isIncome: false,
+    children: [
+      { name: '401k', color: '#6366f1' },
+      { name: 'Roth IRA', color: '#8b5cf6' },
+      { name: 'Traditional IRA', color: '#a855f7' },
+    ],
+  },
+  {
     name: 'Education',
     color: '#0ea5e9',
     isIncome: false,
@@ -196,16 +355,28 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
     name: 'Transfers & Adjustments',
     color: '#6b7280',
     isIncome: false,
-    excludeFromReports: true,
+    categoryType: 'transfer',
     children: [
-      { name: 'Transfer to Savings',     color: '#6b7280', excludeFromReports: true },
-      { name: 'Transfer to Checking',    color: '#9ca3af', excludeFromReports: true },
-      { name: 'Credit Card Payment',     color: '#4b5563', excludeFromReports: true },
-      { name: 'Investment Contribution', color: '#374151', excludeFromReports: true },
-      { name: 'Loan Principal Payment',  color: '#9ca3af', excludeFromReports: true },
-      { name: 'Internal Transfer',       color: '#d1d5db', excludeFromReports: true },
-      { name: 'Balance Adjustments',     color: '#6b7280', excludeFromReports: true },
+      { name: 'Transfer to Savings',     color: '#6b7280' },
+      { name: 'Transfer to Checking',    color: '#9ca3af' },
+      { name: 'Credit Card Payment',     color: '#4b5563' },
+      { name: 'Investment Contribution', color: '#374151' },
+      { name: 'Loan Principal Payment',  color: '#9ca3af' },
+      { name: 'Internal Transfer',       color: '#d1d5db' },
+      { name: 'Balance Adjustments',     color: '#6b7280' },
     ],
+  },
+  {
+    name: 'Paycheck Deductions',
+    color: '#8b5cf6',
+    isIncome: true,
+    categoryType: 'compound',
+  },
+  {
+    name: 'Employer Contributions',
+    color: '#4f46e5',
+    isIncome: true,
+    categoryType: 'compound',
   },
 ];
 
@@ -236,6 +407,7 @@ export async function seedUserCategories(userId: string) {
         name: group.name,
         color: group.color,
         isIncome: group.isIncome,
+        categoryType: group.categoryType ?? 'standard',
         isSystem: true,
         excludeFromReports: group.excludeFromReports ?? false,
         displayOrder: order++,
@@ -250,6 +422,7 @@ export async function seedUserCategories(userId: string) {
           name: child.name,
           color: child.color,
           isIncome: group.isIncome,
+          categoryType: group.categoryType ?? 'standard',
           isSystem: true,
           excludeFromReports: child.excludeFromReports ?? false,
           displayOrder: order++,
@@ -257,28 +430,94 @@ export async function seedUserCategories(userId: string) {
       }
     }
   }
+
+  // Seed Paycheck Deductions compound children
+  const paycheckParent = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(eq(categories.userId, userId), eq(categories.name, 'Paycheck Deductions')))
+    .limit(1);
+
+  if (paycheckParent[0]) {
+    order = await seedCompoundChildren(userId, paycheckParent[0].id, order, COMPOUND_SUBCATEGORIES);
+  }
+
+  // Seed Employer Contributions compound children
+  const employerParent = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(eq(categories.userId, userId), eq(categories.name, 'Employer Contributions')))
+    .limit(1);
+
+  if (employerParent[0]) {
+    await seedCompoundChildren(userId, employerParent[0].id, order, EMPLOYER_CONTRIBUTION_SUBCATEGORIES);
+  }
+}
+
+async function seedCompoundChildren(userId: string, parentId: string, startOrder: number, subcategories: CompoundChildDef[]): Promise<number> {
+  const db = getDb();
+  let order = startOrder;
+
+  // Build lookup of expense parent names to IDs
+  const allExpenseParents = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(and(eq(categories.userId, userId), isNull(categories.parentId)));
+
+  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c.id]));
+
+  for (const sub of subcategories) {
+    const expenseParentId = expenseParentByName.get(sub.expenseParentName);
+    await db.insert(categories).values({
+      userId,
+      parentId,
+      name: sub.name,
+      color: sub.color,
+      isIncome: true,
+      isSystem: true,
+      categoryType: 'compound',
+      expenseParentId: expenseParentId ?? null,
+      displayOrder: order++,
+    });
+  }
+
+  return order;
 }
 
 /** All default subcategories for Transfers & Adjustments, in display order. */
 const TRANSFER_SUBCATEGORIES: ChildCategoryDef[] = [
-  { name: 'Transfer to Savings',     color: '#6b7280', excludeFromReports: true },
-  { name: 'Transfer to Checking',    color: '#9ca3af', excludeFromReports: true },
-  { name: 'Credit Card Payment',     color: '#4b5563', excludeFromReports: true },
-  { name: 'Investment Contribution', color: '#374151', excludeFromReports: true },
-  { name: 'Loan Principal Payment',  color: '#9ca3af', excludeFromReports: true },
-  { name: 'Internal Transfer',       color: '#d1d5db', excludeFromReports: true },
-  { name: 'Balance Adjustments',     color: '#6b7280', excludeFromReports: true },
+  { name: 'Transfer to Savings',     color: '#6b7280' },
+  { name: 'Transfer to Checking',    color: '#9ca3af' },
+  { name: 'Credit Card Payment',     color: '#4b5563' },
+  { name: 'Investment Contribution', color: '#374151' },
+  { name: 'Loan Principal Payment',  color: '#9ca3af' },
+  { name: 'Internal Transfer',       color: '#d1d5db' },
+  { name: 'Balance Adjustments',     color: '#6b7280' },
 ];
 
-export async function ensureSystemCategories(userId: string) {
+export async function ensureSystemCategories(userId: string, dek?: Uint8Array) {
   const db = getDb();
 
-  // Find or create the Transfers & Adjustments parent
-  const existingParents = await db
-    .select()
+  await mergeDuplicateCategories(userId, dek);
+
+  const allCategoriesRaw = await db
+    .select({
+      id: categories.id,
+      parentId: categories.parentId,
+      expenseParentId: categories.expenseParentId,
+      name: categories.name,
+      displayOrder: categories.displayOrder,
+      isSystem: categories.isSystem,
+      createdAt: categories.createdAt,
+    })
     .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.name, 'Transfers & Adjustments')))
-    .limit(1);
+    .where(eq(categories.userId, userId));
+  const allCategories = dek
+    ? await decryptRows('categories', allCategoriesRaw, dek)
+    : allCategoriesRaw;
+
+  // Find or create the Transfers & Adjustments parent
+  const existingParents = allCategories.filter((c) => !c.parentId && c.name === 'Transfers & Adjustments');
 
   const [last] = await db
     .select({ maxOrder: sql<number>`max(${categories.displayOrder})` })
@@ -298,7 +537,7 @@ export async function ensureSystemCategories(userId: string) {
         color: '#6b7280',
         isIncome: false,
         isSystem: true,
-        excludeFromReports: true,
+        categoryType: 'transfer',
         displayOrder: order++,
       })
       .returning();
@@ -308,11 +547,7 @@ export async function ensureSystemCategories(userId: string) {
   }
 
   // Fetch all existing children of this parent
-  const existingChildren = await db
-    .select({ name: categories.name })
-    .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.parentId, parentId)));
-
+  const existingChildren = allCategories.filter((c) => c.parentId === parentId);
   const existingChildNames = new Set(existingChildren.map((c) => c.name));
 
   // Upsert any missing subcategories
@@ -321,11 +556,7 @@ export async function ensureSystemCategories(userId: string) {
     if (existingChildNames.has(sub.name)) {
       // Already exists — fetch its id only if it's Balance Adjustments (needed for migration below)
       if (sub.name === 'Balance Adjustments') {
-        const [found] = await db
-          .select({ id: categories.id })
-          .from(categories)
-          .where(and(eq(categories.userId, userId), eq(categories.parentId, parentId), eq(categories.name, 'Balance Adjustments')))
-          .limit(1);
+        const found = allCategories.find((c) => c.parentId === parentId && c.name === 'Balance Adjustments');
         balanceAdjId = found?.id;
       }
       continue;
@@ -338,6 +569,7 @@ export async function ensureSystemCategories(userId: string) {
         name: sub.name,
         color: sub.color,
         isIncome: false,
+        categoryType: 'transfer',
         isSystem: true,
         excludeFromReports: true,
         displayOrder: order++,
@@ -362,4 +594,130 @@ export async function ensureSystemCategories(userId: string) {
 
   // Return the Balance Adjustments subcategory ID (callers use this as categoryId for adj- transactions)
   return balanceAdjId ?? parentId;
+}
+
+/**
+ * Ensure compound categories exist for a given parent group.
+ * Idempotent — safe to call on every sync.
+ */
+async function ensureCompoundGroup(
+  userId: string,
+  parentName: string,
+  parentColor: string,
+  subcategories: CompoundChildDef[],
+  dek?: Uint8Array
+) {
+  const db = getDb();
+
+  await mergeDuplicateCategories(userId, dek);
+
+  const allCategoriesRaw = await db
+    .select({
+      id: categories.id,
+      parentId: categories.parentId,
+      expenseParentId: categories.expenseParentId,
+      name: categories.name,
+      displayOrder: categories.displayOrder,
+      isSystem: categories.isSystem,
+      createdAt: categories.createdAt,
+    })
+    .from(categories)
+    .where(eq(categories.userId, userId));
+  const allCategories = dek
+    ? await decryptRows('categories', allCategoriesRaw, dek)
+    : allCategoriesRaw;
+
+  const existingParents = allCategories.filter((c) => !c.parentId && c.name === parentName);
+
+  const [last] = await db
+    .select({ maxOrder: sql<number>`max(${categories.displayOrder})` })
+    .from(categories)
+    .where(eq(categories.userId, userId));
+  let order = (last?.maxOrder ?? 0) + 1;
+
+  let parentId: string;
+
+  if (existingParents.length === 0) {
+    const [parent] = await db
+      .insert(categories)
+      .values({
+        userId,
+        name: parentName,
+        color: parentColor,
+        isIncome: true,
+        categoryType: 'compound',
+        isSystem: true,
+        excludeFromReports: false,
+        displayOrder: order++,
+      })
+      .returning();
+    parentId = parent.id;
+  } else {
+    parentId = existingParents[0].id;
+  }
+
+  const existingChildren = allCategories.filter((c) => c.parentId === parentId);
+  const existingChildrenByName = new Map(existingChildren.map((c) => [c.name, c]));
+
+  const allExpenseParents = allCategories.filter((c) => !c.parentId);
+
+  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c.id]));
+  const neededExpenseParentNames = [...new Set(subcategories.map((sub) => sub.expenseParentName))];
+
+  for (const expenseParentName of neededExpenseParentNames) {
+    if (expenseParentByName.has(expenseParentName)) continue;
+
+    const defaultParent = DEFAULT_CATEGORIES.find((group) => group.name === expenseParentName);
+    if (!defaultParent) continue;
+
+    const [createdParent] = await db
+      .insert(categories)
+      .values({
+        userId,
+        name: defaultParent.name,
+        color: defaultParent.color,
+        isIncome: defaultParent.isIncome,
+        categoryType: defaultParent.categoryType ?? 'standard',
+        isSystem: true,
+        excludeFromReports: defaultParent.excludeFromReports ?? false,
+        displayOrder: order++,
+      })
+      .returning();
+
+    expenseParentByName.set(createdParent.name, createdParent.id);
+  }
+
+  for (const sub of subcategories) {
+    const expenseParentId = expenseParentByName.get(sub.expenseParentName);
+    const existingChild = existingChildrenByName.get(sub.name);
+    if (existingChild) {
+      if (expenseParentId && existingChild.expenseParentId !== expenseParentId) {
+        await db
+          .update(categories)
+          .set({ expenseParentId })
+          .where(and(eq(categories.userId, userId), eq(categories.id, existingChild.id)));
+      }
+      continue;
+    }
+
+    await db.insert(categories).values({
+      userId,
+      parentId,
+      name: sub.name,
+      color: sub.color,
+      isIncome: true,
+      isSystem: true,
+      categoryType: 'compound',
+      expenseParentId: expenseParentId ?? null,
+      displayOrder: order++,
+    });
+  }
+}
+
+export async function ensureCompoundCategories(userId: string, dek?: Uint8Array) {
+  await ensureCompoundGroup(userId, 'Paycheck Deductions', '#8b5cf6', COMPOUND_SUBCATEGORIES, dek);
+}
+
+export async function ensureEmployerContributions(userId: string, dek?: Uint8Array) {
+  await ensureCompoundGroup(userId, 'Employer Contributions', '#4f46e5', EMPLOYER_CONTRIBUTION_SUBCATEGORIES, dek);
 }

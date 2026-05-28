@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { categorySpendingSummary, categoryIncomeSummary, categories, transactions, accounts, userSettings } from '@/lib/db/schema';
-import { eq, and, or, gte, lte, sql, inArray, isNull } from 'drizzle-orm';
+import { eq, and, or, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 
@@ -43,7 +43,67 @@ export async function GET(request: Request) {
 
   const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
-  async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
+  let prevExpenseMap = new Map<string, number>();
+  let prevIncomeMap = new Map<string, number>();
+
+  function expandCategoryRecord(row: any, previousAmount = 0) {
+    const baseRecord = {
+      sourceCategoryId: row.sourceCategoryId || row.categoryId,
+      categoryName: row.categoryName,
+      categoryColor: row.categoryColor,
+      categoryType: row.categoryType || 'standard',
+      expenseParentId: row.expenseParentId || null,
+      previousAmount,
+    };
+
+    const buildMetrics = (amount: number, transactionCount: number, prev = previousAmount) => ({
+      amount,
+      transactionCount,
+      change: amount - prev,
+      percentChange: prev > 0 ? ((amount - prev) / prev) * 100 : 0,
+    });
+
+    if (row.categoryType !== 'compound') {
+      return [
+        {
+          ...baseRecord,
+          categoryId: row.categoryId,
+          isIncome: row.isIncome,
+          parentId: row.parentId || null,
+          side: 'standard',
+          ...buildMetrics(row.amount || 0, row.transactionCount || 0),
+        },
+      ];
+    }
+
+    const incomeAmount = Math.abs(row.compoundIncomeAmount ?? row.amount ?? 0);
+    const expenseAmount = Math.abs(row.compoundExpenseAmount ?? row.amount ?? 0);
+    const incomeCount = Math.abs(row.compoundIncomeCount ?? row.transactionCount ?? 0);
+    const expenseCount = Math.abs(row.compoundExpenseCount ?? row.transactionCount ?? 0);
+    const incomePreviousAmount = Math.abs(row.compoundIncomePreviousAmount ?? previousAmount ?? 0);
+    const expensePreviousAmount = Math.abs(row.compoundExpensePreviousAmount ?? previousAmount ?? 0);
+
+    return [
+      {
+        ...baseRecord,
+        categoryId: `${row.categoryId}::income`,
+        isIncome: true,
+        parentId: row.parentId || null,
+        side: 'income',
+        ...buildMetrics(incomeAmount, incomeCount, incomePreviousAmount),
+      },
+      {
+        ...baseRecord,
+        categoryId: `${row.categoryId}::expense`,
+        isIncome: false,
+        parentId: row.expenseParentId || null,
+        side: 'expense',
+        ...buildMetrics(expenseAmount, expenseCount, expensePreviousAmount),
+      },
+    ];
+  }
+
+    async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
     const conditions = [
       eq(transactions.userId, session.user.id),
       gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
@@ -56,10 +116,16 @@ export async function GET(request: Request) {
       or(
         isNull(transactions.categoryId),
         and(
-          sql`coalesce(${categories.excludeFromReports}, false) = false`,
+          ne(categories.categoryType, 'transfer'),
           or(
-            isNull(categories.parentId),
-            sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+            eq(categories.categoryType, 'compound'),
+            and(
+              sql`coalesce(${categories.excludeFromReports}, false) = false`,
+              or(
+                isNull(categories.parentId),
+                sql`NOT EXISTS (SELECT 1 FROM categories pc WHERE pc.id = ${categories.parentId} AND pc.exclude_from_reports = true)`
+              )
+            )
           )
         )
       ),
@@ -73,11 +139,14 @@ export async function GET(request: Request) {
     }
 
     // Fetch all matching transactions (we need to decrypt amounts in memory since SQL aggregations won't work on encrypted data)
-    const txRows = await db
+      const txRows = await db
       .select({
         amount: transactions.amount,
         categoryId: transactions.categoryId,
+        parentId: categories.parentId,
         isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
+        expenseParentId: categories.expenseParentId,
       })
       .from(transactions)
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -89,7 +158,10 @@ export async function GET(request: Request) {
     let catCounts = new Map<string, number>();
     for (const row of txRows) {
       if (!row.categoryId) continue;
-      if (row.isIncome !== isIncome) continue; // Category type must match requested type (income vs expense)
+      // Skip transfer categories entirely
+      if (row.categoryType === 'transfer') continue;
+      // Compound categories match BOTH income and expense requests
+      if (row.categoryType !== 'compound' && row.isIncome !== isIncome) continue;
 
       const decrypted = parseFloat(await decryptField(row.amount, dek)) || 0;
       const val = isIncome ? decrypted : -decrypted;
@@ -103,7 +175,15 @@ export async function GET(request: Request) {
     if (catIds.length === 0) return [];
 
     const cats = await db
-      .select({ id: categories.id, name: categories.name, color: categories.color, isIncome: categories.isIncome })
+      .select({
+        id: categories.id,
+        name: categories.name,
+        color: categories.color,
+        isIncome: categories.isIncome,
+        parentId: categories.parentId,
+        categoryType: categories.categoryType,
+        expenseParentId: categories.expenseParentId,
+      })
       .from(categories)
       .where(and(eq(categories.userId, session.user.id), inArray(categories.id, catIds)));
 
@@ -117,6 +197,9 @@ export async function GET(request: Request) {
         categoryName: info?.name || 'Uncategorized',
         categoryColor: info?.color || '#6366f1',
         isIncome: info?.isIncome || false,
+        parentId: info?.parentId || null,
+        categoryType: info?.categoryType || 'standard',
+        expenseParentId: info?.expenseParentId || null,
         amount: catTotals.get(catId) || 0,
         transactionCount: catCounts.get(catId) || 0,
       };
@@ -220,10 +303,13 @@ export async function GET(request: Request) {
             categoryId: categorySpendingSummary.categoryId,
             amount: categorySpendingSummary.amount,
             transactionCount: categorySpendingSummary.transactionCount,
-            categoryName: categories.name,
-            categoryColor: categories.color,
-            isIncome: categories.isIncome,
-          })
+        categoryName: categories.name,
+        categoryColor: categories.color,
+        isIncome: categories.isIncome,
+        parentId: categories.parentId,
+        categoryType: categories.categoryType,
+        expenseParentId: categories.expenseParentId,
+      })
           .from(categorySpendingSummary)
           .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
           .where(and(...spendingConditions));
@@ -236,6 +322,8 @@ export async function GET(request: Request) {
             categoryName: categories.name,
             categoryColor: categories.color,
             isIncome: categories.isIncome,
+            categoryType: categories.categoryType,
+            expenseParentId: categories.expenseParentId,
           })
           .from(categoryIncomeSummary)
           .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
@@ -246,36 +334,76 @@ export async function GET(request: Request) {
 
       // Decrypt and aggregate by categoryId
       const categoryMap = new Map<string, any>();
-      if (isImportTransactionsEnabled) {
-        for (const r of [...rows, ...incomeRows]) {
-          const decryptedAmt = await decryptField(r.amount, dek);
-          const catId = r.categoryId ?? '';
-          const decryptedCount = r.transactionCount ? parseInt(await decryptField(String(r.transactionCount), dek)) || 0 : 0;
-          const existing = categoryMap.get(catId);
+      const allCurrentRows = [
+        ...rows.map((r) => ({ ...r, isIncome: false, source: 'expense' as const })),
+        ...incomeRows.map((r) => ({ ...r, isIncome: true, source: 'income' as const })),
+      ];
+
+      for (const r of allCurrentRows) {
+        const decryptedAmt = isImportTransactionsEnabled ? await decryptField(r.amount, dek) : r.amount;
+        const catId = r.categoryId ?? '';
+        const amount = parseFloat(decryptedAmt);
+        const transactionCount = isImportTransactionsEnabled
+          ? (r.transactionCount ? parseInt(await decryptField(String(r.transactionCount), dek)) || 0 : 0)
+          : (r.transactionCount || 0);
+        const isCompound = r.categoryType === 'compound';
+        const existing = categoryMap.get(catId);
+
+        if (isCompound) {
+          const sideAmount = Math.abs(amount);
+          const sideCount = Math.abs(transactionCount);
+          const sidePreviousIncomeAmount = Math.abs(prevIncomeMap.get(catId) || 0);
+          const sidePreviousExpenseAmount = Math.abs(prevExpenseMap.get(catId) || 0);
+          const amountKey = r.source === 'income' ? 'compoundIncomeAmount' : 'compoundExpenseAmount';
+          const countKey = r.source === 'income' ? 'compoundIncomeCount' : 'compoundExpenseCount';
+          const prevAmountKey = r.source === 'income' ? 'compoundIncomePreviousAmount' : 'compoundExpensePreviousAmount';
+
           if (existing) {
-            existing.amount += parseFloat(decryptedAmt);
-            existing.transactionCount += decryptedCount;
+            existing[amountKey] = (existing[amountKey] || 0) + sideAmount;
+            existing[countKey] = (existing[countKey] || 0) + sideCount;
+            existing[prevAmountKey] = r.source === 'income' ? sidePreviousIncomeAmount : sidePreviousExpenseAmount;
+            existing.amount = Math.max(existing.compoundIncomeAmount || 0, existing.compoundExpenseAmount || 0);
+            existing.transactionCount = Math.max(existing.compoundIncomeCount || 0, existing.compoundExpenseCount || 0);
           } else {
-            const decryptedName = await decryptField(r.categoryName || 'Uncategorized', dek);
+            const categoryName = isImportTransactionsEnabled
+              ? await decryptField(r.categoryName || 'Uncategorized', dek)
+              : (r.categoryName || 'Uncategorized');
             categoryMap.set(catId, {
-              categoryId: catId,
-              categoryName: decryptedName,
-              categoryColor: r.categoryColor || '#6366f1',
-              isIncome: r.isIncome || false,
-              amount: parseFloat(decryptedAmt),
-              transactionCount: decryptedCount,
+            categoryId: catId,
+            categoryName,
+            categoryColor: r.categoryColor || '#6366f1',
+            isIncome: r.isIncome || false,
+            parentId: r.parentId || null,
+            categoryType: r.categoryType || 'compound',
+            expenseParentId: r.expenseParentId || null,
+              amount: sideAmount,
+              transactionCount: sideCount,
+              compoundIncomeAmount: r.source === 'income' ? sideAmount : 0,
+              compoundExpenseAmount: r.source === 'expense' ? sideAmount : 0,
+              compoundIncomeCount: r.source === 'income' ? sideCount : 0,
+              compoundExpenseCount: r.source === 'expense' ? sideCount : 0,
+              compoundIncomePreviousAmount: r.source === 'income' ? sidePreviousIncomeAmount : 0,
+              compoundExpensePreviousAmount: r.source === 'expense' ? sidePreviousExpenseAmount : 0,
             });
           }
-        }
-      } else {
-        for (const r of [...rows, ...incomeRows]) {
-          const catId = r.categoryId ?? '';
-          const existing = categoryMap.get(catId);
-          if (existing) {
-            existing.amount += r.amount;
-          } else {
-            categoryMap.set(catId, { ...r, categoryId: catId });
-          }
+        } else if (existing) {
+          existing.amount += amount;
+          existing.transactionCount += transactionCount;
+        } else {
+          const categoryName = isImportTransactionsEnabled
+            ? await decryptField(r.categoryName || 'Uncategorized', dek)
+            : (r.categoryName || 'Uncategorized');
+          categoryMap.set(catId, {
+            categoryId: catId,
+            categoryName,
+            categoryColor: r.categoryColor || '#6366f1',
+            isIncome: r.isIncome || false,
+            parentId: r.parentId || null,
+            categoryType: r.categoryType || 'standard',
+            expenseParentId: r.expenseParentId || null,
+            amount,
+            transactionCount,
+          });
         }
       }
       const data = Array.from(categoryMap.values());
@@ -301,8 +429,10 @@ export async function GET(request: Request) {
         });
       }
 
-      logger.info('GET /api/cash-flow/categories (range)', { startMonth, endMonth, accountIds: accountIdList, count: data.length });
-      return NextResponse.json(data);
+      const expandedData = data.flatMap((row) => expandCategoryRecord(row));
+
+      logger.info('GET /api/cash-flow/categories (range)', { startMonth, endMonth, accountIds: accountIdList, count: expandedData.length });
+      return NextResponse.json(expandedData);
     }
 
     // ── Single-month mode ───────────────────────────────────────────────
@@ -356,6 +486,8 @@ export async function GET(request: Request) {
           categoryName: categories.name,
           categoryColor: categories.color,
           isIncome: categories.isIncome,
+          categoryType: categories.categoryType,
+          expenseParentId: categories.expenseParentId,
         })
         .from(categorySpendingSummary)
         .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
@@ -369,6 +501,8 @@ export async function GET(request: Request) {
           categoryName: categories.name,
           categoryColor: categories.color,
           isIncome: categories.isIncome,
+          categoryType: categories.categoryType,
+          expenseParentId: categories.expenseParentId,
         })
         .from(categoryIncomeSummary)
         .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
@@ -430,9 +564,6 @@ export async function GET(request: Request) {
       return map;
     }
 
-    let prevExpenseMap = new Map<string, number>();
-    let prevIncomeMap = new Map<string, number>();
-
     if (isImportTransactionsEnabled) {
       const [expMap, incMap] = await Promise.all([
         fetchPreviousSummary(categorySpendingSummary, accountIdList),
@@ -492,30 +623,26 @@ export async function GET(request: Request) {
           ? await decryptField(row.categoryName || 'Uncategorized', dek)
           : (row.categoryName || 'Uncategorized');
 
-        currentCategoryMap.set(catId, {
-          categoryId: catId,
-          categoryName,
-          categoryColor: row.categoryColor || '#6366f1',
-          isIncome: row.isIncome,
-          amount,
-          transactionCount,
-        });
+      currentCategoryMap.set(catId, {
+        categoryId: catId,
+        categoryName,
+        categoryColor: row.categoryColor || '#6366f1',
+        isIncome: row.isIncome,
+        categoryType: row.categoryType,
+        expenseParentId: row.expenseParentId || null,
+        amount,
+        transactionCount,
+      });
       }
     }
 
-    const data: any[] = [];
-    for (const aggregated of currentCategoryMap.values()) {
+    const data = Array.from(currentCategoryMap.values()).flatMap((aggregated) => {
       const prevAmount = prevMap.get(aggregated.categoryId) || 0;
-      const change = aggregated.amount - prevAmount;
-      const percentChange = prevAmount > 0 ? ((aggregated.amount - prevAmount) / prevAmount) * 100 : 0;
-
-      data.push({
+      return expandCategoryRecord({
         ...aggregated,
-        previousAmount: prevAmount,
-        change,
-        percentChange,
-      });
-    }
+        sourceCategoryId: aggregated.categoryId,
+      }, prevAmount);
+    });
 
     logger.info('GET /api/cash-flow/categories', { month: resolvedMonth, accountIds: accountIdList, count: data.length });
     return NextResponse.json(data);
