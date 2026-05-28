@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { categoryRules, transactions } from '@/lib/db/schema';
+import { categoryRules, transactions, transactionTags } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { evaluateCondition } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
@@ -64,6 +64,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         .update(transactions)
         .set(updateData)
         .where(eq(transactions.id, txId));
+
+      // Apply tag if rule has setTagId
+      if (decryptedRule.setTagId) {
+        await getDb()
+          .insert(transactionTags)
+          .values({ transactionId: txId, tagId: decryptedRule.setTagId })
+          .onConflictDoNothing();
+      }
     }
   }
 

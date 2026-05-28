@@ -129,8 +129,15 @@ export async function GET() {
           const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
           const amount = parseFloat(await decryptField(tx.amount, dek)) || 0;
 
+          if (category?.categoryType === 'transfer') continue;
+          const isCompound = category?.categoryType === 'compound';
+
           if (ym === currentMonth) {
-            if (amount > 0) {
+            if (isCompound) {
+              const absAmt = Math.abs(amount);
+              income += absAmt;
+              expenses += absAmt;
+            } else if (amount > 0) {
               if (category && !category.isIncome) expenses -= amount;
               else income += amount;
             } else if (amount < 0) {
@@ -139,7 +146,11 @@ export async function GET() {
               else expenses += absAmt;
             }
           } else if (ym === previousMonth) {
-            if (amount > 0) {
+            if (isCompound) {
+              const absAmt = Math.abs(amount);
+              prevIncome += absAmt;
+              prevExpenses += absAmt;
+            } else if (amount > 0) {
               if (category && !category.isIncome) prevExpenses -= amount;
               else prevIncome += amount;
             } else if (amount < 0) {

@@ -3,6 +3,7 @@ import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapsho
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
+import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { userSettings } from '@/lib/db/schema';
 import { eq, and, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
@@ -215,7 +216,12 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
 
     monthlyData[yearMonth].count++;
     transactionsProcessed++;
-    if (amount > 0) {
+    if (category?.categoryType === 'transfer') continue;
+    if (category?.categoryType === 'compound') {
+      const absAmt = Math.abs(amount);
+      monthlyData[yearMonth].income += absAmt;
+      monthlyData[yearMonth].expenses += absAmt;
+    } else if (amount > 0) {
       if (category && !category.isIncome) {
         monthlyData[yearMonth].expenses -= amount;
       } else {
@@ -321,10 +327,12 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     if (!tx.categoryId || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
-    if (!category || category.isIncome) continue;
+    if (!category) continue;
+    if (category.categoryType === 'transfer') continue;
+    if (category.isIncome && category.categoryType !== 'compound') continue;
 
-    let excluded = category.excludeFromReports;
-    if (!excluded && category.parentId) {
+    let excluded = category.excludeFromReports && category.categoryType !== 'compound';
+    if (!excluded && category.parentId && category.categoryType !== 'compound') {
       const parent = catById.get(category.parentId.toString());
       if (parent?.excludeFromReports) excluded = true;
     }
@@ -353,7 +361,10 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
       };
     }
 
-    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += -parseFloat(tx.amount);
+    const absVal = category.categoryType === 'compound'
+      ? Math.abs(parseFloat(tx.amount))
+      : -parseFloat(tx.amount);
+    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += absVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
@@ -448,10 +459,12 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     if (!tx.categoryId || tx.ignored) continue;
 
     const category = catById.get(tx.categoryId.toString());
-    if (!category || !category.isIncome) continue;
+    if (!category) continue;
+    if (category.categoryType === 'transfer') continue;
+    if (!category.isIncome && category.categoryType !== 'compound') continue;
 
-    let excluded = category.excludeFromReports;
-    if (!excluded && category.parentId) {
+    let excluded = category.excludeFromReports && category.categoryType !== 'compound';
+    if (!excluded && category.parentId && category.categoryType !== 'compound') {
       const parent = catById.get(category.parentId.toString());
       if (parent?.excludeFromReports) excluded = true;
     }
@@ -480,7 +493,10 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
       };
     }
 
-    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += parseFloat(tx.amount);
+    const incVal = category.categoryType === 'compound'
+      ? Math.abs(parseFloat(tx.amount))
+      : parseFloat(tx.amount);
+    categoryByMonthAndAccount[yearMonth][catId][accountId].amount += incVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
@@ -570,6 +586,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       connection.accessUrlEncrypted,
       dek,
     );
+
+    // Ensure compound categories exist for this user
+    await ensureCompoundCategories(userId, dek);
+    await ensureEmployerContributions(userId, dek);
 
     const now = new Date();
     const startDate = connection.lastSyncAt

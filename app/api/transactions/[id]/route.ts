@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { transactions, accounts, categories, transactionTags, tags } from '@/lib/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { PatchTransactionSchema } from '@/lib/validations/transaction';
 import { sanitizeText } from '@/lib/utils/sanitize';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptField, decryptRow, encryptRow } from '@/lib/crypto';
+import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -66,10 +66,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     category = { ...category, name: await decryptField(category.name, dek) };
   }
 
+  // Fetch tags for this transaction
+  const tagRows = await getDb()
+    .select({ tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+    .from(transactionTags)
+    .leftJoin(tags, eq(transactionTags.tagId, tags.id))
+    .where(eq(transactionTags.transactionId, id));
+
+  const txTags = await Promise.all(
+    tagRows.map(async (r) => ({
+      id: r.tagId,
+      name: r.tagName ? await decryptField(r.tagName, dek) : '',
+      color: r.tagColor,
+    }))
+  );
+
   return NextResponse.json({
     ...decryptedTx,
     accountName: accountName ?? null,
     category: category ?? null,
+    tags: txTags,
   });
 }
 
@@ -118,10 +134,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const { categoryId, payee, notes, memo, reviewed, ignored } = parsed.data;
+  const { categoryId, tagIds, payee, notes, memo, reviewed, ignored } = parsed.data;
 
   const changedFields: string[] = [];
   if (categoryId !== undefined) changedFields.push('categoryId');
+  if (tagIds !== undefined) changedFields.push('tagIds');
   if (payee !== undefined) changedFields.push('payee');
   if (notes !== undefined) changedFields.push('notes');
   if (memo !== undefined) changedFields.push('memo');
@@ -147,6 +164,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set(encrypted)
     .where(eq(transactions.id, id))
     .returning();
+
+  // Replace tags if provided
+  if (tagIds !== undefined) {
+    await getDb().delete(transactionTags).where(eq(transactionTags.transactionId, id));
+    if (tagIds.length > 0) {
+      await getDb().insert(transactionTags).values(
+        tagIds.map((tagId) => ({ transactionId: id, tagId }))
+      );
+    }
+  }
 
   // Rebuild summaries since categories/transactions changed (non-blocking background task)
   Promise.all([

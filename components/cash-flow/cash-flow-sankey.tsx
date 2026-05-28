@@ -12,6 +12,8 @@ import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 
 interface CategoryData {
   categoryId: string;
+  sourceCategoryId?: string;
+  side?: 'standard' | 'income' | 'expense';
   categoryName: string;
   categoryColor: string;
   isIncome: boolean;
@@ -19,13 +21,8 @@ interface CategoryData {
   parentId?: string | null;
   parentName?: string | null;
   parentColor?: string | null;
-}
-
-interface SummaryData {
-  totalIncome: number;
-  totalExpenses: number;
-  netIncome: number;
-  savingsRate: number;
+  categoryType?: string;
+  expenseParentId?: string | null;
 }
 
 interface AccountData {
@@ -46,6 +43,7 @@ interface SankeyNode {
   label?: string;
   color?: string;
   categoryId?: string;
+  sourceCategoryId?: string;
   value?: number;
   percentage?: number;
 }
@@ -147,19 +145,8 @@ function vibrantColor(hex: string, isIncome: boolean): string {
   return `#${((pr << 16) | (pg << 8) | pb).toString(16).padStart(6, '0')}`;
 }
 
-function buildParentLookup(allCategoryInfo: CategoryInfo[]): Map<string, { parentId: string; parentName: string; parentColor: string }> {
-  const lookup = new Map<string, { parentId: string; parentName: string; parentColor: string }>();
-  const byId = new Map<string, CategoryInfo>();
-  allCategoryInfo.forEach((c) => byId.set(c.id, c));
-  allCategoryInfo.forEach((cat) => {
-    if (cat.parentId) {
-      const parent = byId.get(cat.parentId);
-      if (parent) {
-        lookup.set(cat.id, { parentId: cat.parentId, parentName: parent.name, parentColor: parent.color });
-      }
-    }
-  });
-  return lookup;
+function buildCategoryLookup(allCategoryInfo: CategoryInfo[]): Map<string, CategoryInfo> {
+  return new Map(allCategoryInfo.map((c) => [c.id, c]));
 }
 
 function buildSankeyData(
@@ -167,19 +154,39 @@ function buildSankeyData(
   totalIncome: number,
   totalExpenses: number,
   showParents: boolean,
-  parentLookup: Map<string, { parentId: string; parentName: string; parentColor: string }>,
+  categoryLookup: Map<string, CategoryInfo>,
 ): SankeyData {
   const enriched = categories.map((cat) => {
-    const parentInfo = parentLookup.get(cat.categoryId);
-    if (parentInfo) {
-      return { ...cat, parentId: parentInfo.parentId, parentName: parentInfo.parentName, parentColor: parentInfo.parentColor };
+    const sourceInfo = categoryLookup.get(cat.sourceCategoryId || cat.categoryId);
+    const treeParentId = sourceInfo?.parentId || cat.parentId || null;
+    const treeParentInfo = treeParentId ? categoryLookup.get(treeParentId) : undefined;
+
+    if (cat.categoryType === 'compound' && cat.side === 'expense') {
+      const expenseParentInfo = cat.expenseParentId ? categoryLookup.get(cat.expenseParentId) : undefined;
+      return {
+        ...cat,
+        parentId: cat.expenseParentId || null,
+        parentName: expenseParentInfo?.name || cat.parentName || null,
+        parentColor: expenseParentInfo?.color || cat.parentColor || null,
+      };
+    }
+
+    if (treeParentInfo) {
+      return {
+        ...cat,
+        parentId: treeParentId,
+        parentName: treeParentInfo.name,
+        parentColor: treeParentInfo.color,
+      };
     }
     return cat;
   });
 
+  const incomeItems = enriched.filter((c) => c.categoryType !== 'transfer' && c.isIncome && c.amount > 0);
+  const expenseItems = enriched.filter((c) => c.categoryType !== 'transfer' && !c.isIncome && c.amount > 0);
+
   // Sort and limit income categories to 20 items
-  const sortedIncome = enriched
-    .filter((c) => c.isIncome && c.amount > 0)
+  const sortedIncome = incomeItems
     .sort((a, b) => b.amount - a.amount);
 
   let incomeCategories: CategoryData[] = [];
@@ -189,16 +196,15 @@ function buildSankeyData(
     const top19 = sortedIncome.slice(0, 19);
     const rest = sortedIncome.slice(19);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
-    const restIds = rest.map((c) => c.categoryId).join(',');
+    const restIds = rest.map((c) => c.sourceCategoryId || c.categoryId).join(',');
     incomeCategories = [
       ...top19,
-      { categoryId: restIds, categoryName: 'Other Income', categoryColor: '#94a3b8', isIncome: true, amount: restAmount, parentId: null, parentName: null, parentColor: null },
+      { categoryId: restIds, sourceCategoryId: restIds, categoryName: 'Other Income', categoryColor: '#94a3b8', isIncome: true, amount: restAmount, parentId: null, parentName: null, parentColor: null },
     ];
   }
 
   // Sort and limit expense categories to 20 items
-  const sortedExpense = enriched
-    .filter((c) => !c.isIncome && c.amount > 0)
+  const sortedExpense = expenseItems
     .sort((a, b) => b.amount - a.amount);
 
   let expenseCategories: CategoryData[] = [];
@@ -208,14 +214,12 @@ function buildSankeyData(
     const top19 = sortedExpense.slice(0, 19);
     const rest = sortedExpense.slice(19);
     const restAmount = rest.reduce((sum, c) => sum + c.amount, 0);
-    const restIds = rest.map((c) => c.categoryId).join(',');
+    const restIds = rest.map((c) => c.sourceCategoryId || c.categoryId).join(',');
     expenseCategories = [
       ...top19,
-      { categoryId: restIds, categoryName: 'Other Expenses', categoryColor: '#94a3b8', isIncome: false, amount: restAmount, parentId: null, parentName: null, parentColor: null },
+      { categoryId: restIds, sourceCategoryId: restIds, categoryName: 'Other Expenses', categoryColor: '#94a3b8', isIncome: false, amount: restAmount, parentId: null, parentName: null, parentColor: null },
     ];
   }
-
-  const savings = Math.max(0, totalIncome - totalExpenses);
 
   const nodes: SankeyNode[] = [];
   const links: SankeyLink[] = [];
@@ -224,18 +228,20 @@ function buildSankeyData(
 
   // ── Income side ──────────────────────────────────────────────────────────
   if (showParents) {
+    const incomeTopLevel = incomeCategories.filter((cat) => !cat.parentId);
+    const incomeChildrenOnly = incomeCategories.filter((cat) => cat.parentId);
     const incomeByParent = new Map<string, CategoryData[]>();
 
-    incomeCategories.forEach((cat) => {
-      const pId = cat.parentId || cat.categoryId;
+    incomeChildrenOnly.forEach((cat) => {
+      const pId = cat.parentId!;
       const pName = cat.parentName || cat.categoryName;
       const pColor = cat.parentColor || cat.categoryColor;
-
       const arr = incomeByParent.get(pId);
+      const nextCat = { ...cat, parentId: pId, parentName: pName, parentColor: pColor };
       if (arr) {
-        arr.push({ ...cat, parentId: pId, parentName: pName, parentColor: pColor });
+        arr.push(nextCat);
       } else {
-        incomeByParent.set(pId, [{ ...cat, parentId: pId, parentName: pName, parentColor: pColor }]);
+        incomeByParent.set(pId, [nextCat]);
       }
     });
 
@@ -248,13 +254,29 @@ function buildSankeyData(
       return (incomeParentTotals.get(b) || 0) - (incomeParentTotals.get(a) || 0);
     });
 
+    incomeTopLevel
+      .sort((a, b) => b.amount - a.amount)
+      .forEach((cat) => {
+        const childNodeId = `inc_${cat.categoryId}`;
+        nodes.push({
+          id: childNodeId,
+          label: cat.categoryName,
+          color: vibrantColor(cat.categoryColor, true),
+          categoryId: cat.categoryId,
+          sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
+          value: cat.amount,
+          percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
+        });
+        links.push({ source: childNodeId, target: hubId, value: cat.amount });
+      });
+
     sortedIncomeParentIds.forEach((parentId) => {
       const children = incomeByParent.get(parentId)!;
       const parentNodeId = `inc_parent_${parentId}`;
       if (!createdParentNodes.has(parentNodeId)) {
         createdParentNodes.add(parentNodeId);
         const first = children[0];
-        const childIds = children.map((c) => c.categoryId).join(',');
+        const childIds = children.map((c) => c.sourceCategoryId || c.categoryId).join(',');
         const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[0];
         const totalForParent = incomeParentTotals.get(parentId) || 0;
         nodes.push({
@@ -262,20 +284,22 @@ function buildSankeyData(
           label: first.parentName || 'Income',
           color: vibrantColor(parentColor, true),
           categoryId: childIds,
+          sourceCategoryId: childIds,
           value: totalForParent,
           percentage: totalIncome > 0 ? (totalForParent / totalIncome) * 100 : 0,
         });
       }
 
       children.forEach((cat) => {
-        const childNodeId = `inc_${cat.categoryId}`;
-        nodes.push({
-          id: childNodeId,
-          label: cat.categoryName,
-          color: vibrantColor(cat.categoryColor, true),
-          categoryId: cat.categoryId,
-          value: cat.amount,
-          percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
+      const childNodeId = `inc_${cat.categoryId}`;
+      nodes.push({
+        id: childNodeId,
+        label: cat.categoryName,
+        color: vibrantColor(cat.categoryColor, true),
+        categoryId: cat.categoryId,
+        sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
+        value: cat.amount,
+        percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
         });
         links.push({ source: childNodeId, target: parentNodeId, value: cat.amount });
       });
@@ -293,6 +317,7 @@ function buildSankeyData(
         label,
         color: vibrantColor(cat.categoryColor, true),
         categoryId: cat.categoryId,
+        sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
         value: cat.amount,
         percentage: totalIncome > 0 ? (cat.amount / totalIncome) * 100 : 0,
       });
@@ -313,18 +338,20 @@ function buildSankeyData(
 
   // ── Expense side ─────────────────────────────────────────────────────────
   if (showParents) {
+    const expenseTopLevel = expenseCategories.filter((cat) => !cat.parentId);
+    const expenseChildrenOnly = expenseCategories.filter((cat) => cat.parentId);
     const expenseByParent = new Map<string, CategoryData[]>();
 
-    expenseCategories.forEach((cat) => {
-      const pId = cat.parentId || cat.categoryId;
+    expenseChildrenOnly.forEach((cat) => {
+      const pId = cat.parentId!;
       const pName = cat.parentName || cat.categoryName;
       const pColor = cat.parentColor || cat.categoryColor;
-
       const arr = expenseByParent.get(pId);
+      const nextCat = { ...cat, parentId: pId, parentName: pName, parentColor: pColor };
       if (arr) {
-        arr.push({ ...cat, parentId: pId, parentName: pName, parentColor: pColor });
+        arr.push(nextCat);
       } else {
-        expenseByParent.set(pId, [{ ...cat, parentId: pId, parentName: pName, parentColor: pColor }]);
+        expenseByParent.set(pId, [nextCat]);
       }
     });
 
@@ -337,13 +364,29 @@ function buildSankeyData(
       return (expenseParentTotals.get(b) || 0) - (expenseParentTotals.get(a) || 0);
     });
 
+    expenseTopLevel
+      .sort((a, b) => b.amount - a.amount)
+      .forEach((cat) => {
+        const childNodeId = `exp_${cat.categoryId}`;
+        nodes.push({
+          id: childNodeId,
+          label: cat.categoryName,
+          color: vibrantColor(cat.categoryColor, false),
+          categoryId: cat.categoryId,
+          sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
+          value: cat.amount,
+          percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
+        });
+        links.push({ source: hubId, target: childNodeId, value: cat.amount });
+      });
+
     sortedExpenseParentIds.forEach((parentId) => {
       const children = expenseByParent.get(parentId)!;
       const parentNodeId = `exp_parent_${parentId}`;
       if (!createdParentNodes.has(parentNodeId)) {
         createdParentNodes.add(parentNodeId);
         const first = children[0];
-        const childIds = children.map((c) => c.categoryId).join(',');
+        const childIds = children.map((c) => c.sourceCategoryId || c.categoryId).join(',');
         const parentColor = first.parentColor && first.parentColor !== '#6366f1' ? first.parentColor : VIBRANT_COLORS[1];
         const totalForParent = expenseParentTotals.get(parentId) || 0;
         nodes.push({
@@ -351,6 +394,7 @@ function buildSankeyData(
           label: first.parentName || 'Expenses',
           color: vibrantColor(parentColor, false),
           categoryId: childIds,
+          sourceCategoryId: childIds,
           value: totalForParent,
           percentage: totalExpenses > 0 ? (totalForParent / totalExpenses) * 100 : 0,
         });
@@ -382,6 +426,7 @@ function buildSankeyData(
         label,
         color: vibrantColor(cat.categoryColor, false),
         categoryId: cat.categoryId,
+        sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
         value: cat.amount,
         percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
       });
@@ -665,30 +710,27 @@ export function CashFlowSankey() {
         let totalExpenses = 0;
 
         if (timeframe === '1m') {
-          const [categoriesRes, summaryRes] = await Promise.all([
-            fetch(`/api/cash-flow/categories?month=${range.start}${acctParam}`),
-            fetch('/api/cash-flow/summary'),
-          ]);
+          const categoriesRes = await fetch(
+            `/api/cash-flow/categories?month=${range.start}${acctParam}`
+          );
           if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
           categories = await categoriesRes.json();
-          if (summaryRes.ok) {
-            const summary: SummaryData = await summaryRes.json();
-            const catIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-            const catExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-            totalIncome = catIncome || summary.totalIncome;
-            totalExpenses = catExpenses || summary.totalExpenses;
-          }
         } else {
           const range2 = getMonthRange(timeframe, month);
           const res = await fetch(`/api/cash-flow/categories?startMonth=${range2.start}&endMonth=${range2.end}${acctParam}`);
           if (!res.ok) throw new Error('Failed to fetch sankey data');
           categories = await res.json();
-          totalIncome = categories.filter((c) => c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
-          totalExpenses = categories.filter((c) => !c.isIncome && c.amount > 0).reduce((s, c) => s + c.amount, 0);
         }
 
-        const parentLookup = buildParentLookup(allCategoryInfo);
-        const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, parentLookup);
+        totalIncome = categories
+          .filter((c) => c.isIncome && c.amount > 0)
+          .reduce((s, c) => s + c.amount, 0);
+        totalExpenses = categories
+          .filter((c) => !c.isIncome && c.amount > 0)
+          .reduce((s, c) => s + c.amount, 0);
+
+        const categoryLookup = buildCategoryLookup(allCategoryInfo);
+        const data = buildSankeyData(categories, totalIncome, totalExpenses, showParents, categoryLookup);
         setSankeyData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -713,7 +755,10 @@ export function CashFlowSankey() {
   };
 
   const getNodeCategoryId = (nodeId: string): string | undefined =>
-    sankeyData?.nodes.find((n) => n.id === nodeId)?.categoryId;
+    (() => {
+      const node = sankeyData?.nodes.find((n) => n.id === nodeId);
+      return node?.sourceCategoryId || node?.categoryId;
+    })();
 
   const navigateToTransactions = (categoryIds: string) => {
     const range = getMonthRange(timeframe, month);

@@ -117,8 +117,14 @@ export async function GET(request: Request) {
             monthlyData[ym] = { income: 0, expenses: 0 };
           }
 
-          // Respect refunds & corrections
-          if (amount > 0) {
+          // Skip transfer categories entirely
+          if (category?.categoryType === 'transfer') continue;
+          // Compound categories count on both sides
+          if (category?.categoryType === 'compound') {
+            const absAmt = Math.abs(amount);
+            monthlyData[ym].income += absAmt;
+            monthlyData[ym].expenses += absAmt;
+          } else if (amount > 0) {
             if (category && !category.isIncome) {
               monthlyData[ym].expenses -= amount;
             } else {

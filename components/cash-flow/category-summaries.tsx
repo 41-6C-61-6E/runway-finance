@@ -11,6 +11,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 
 interface CategoryData {
   categoryId: string;
+  sourceCategoryId?: string;
   categoryName: string;
   categoryColor: string;
   isIncome: boolean;
@@ -19,6 +20,7 @@ interface CategoryData {
   previousAmount: number;
   change: number;
   percentChange: number;
+  categoryType?: string;
 }
 
 function MiniSparkline({ value, prev: rawPrev, isIncome }: { value: number; prev?: number; isIncome: boolean }) {
@@ -164,16 +166,18 @@ export function CategorySummaries() {
     return Array.from(map.values());
   }, [allCategories]);
 
+  const getCategoryRouteId = (category: CategoryData) => category.sourceCategoryId || category.categoryId;
+
   const income = useMemo(() =>
     processedCategories
-      .filter((c) => c.isIncome && c.amount > 0)
+      .filter((c) => c.categoryType !== 'transfer' && c.isIncome && c.amount > 0)
       .sort((a, b) => b.amount - a.amount),
     [processedCategories]
   );
 
   const expenses = useMemo(() =>
     processedCategories
-      .filter((c) => !c.isIncome && c.amount > 0)
+      .filter((c) => c.categoryType !== 'transfer' && !c.isIncome && c.amount > 0)
       .sort((a, b) => b.amount - a.amount),
     [processedCategories]
   );
@@ -224,6 +228,7 @@ export function CategorySummaries() {
   }
 
   function renderCategoryRow(cat: CategoryData, isIncome: boolean) {
+    const routeId = getCategoryRouteId(cat);
     const isUp = cat.change >= 0;
     let changeColor: string;
     if (isIncome) {
@@ -235,7 +240,7 @@ export function CategorySummaries() {
     return (
       <button
         key={cat.categoryId}
-        onClick={() => handleCategoryClick(cat.categoryId)}
+        onClick={() => handleCategoryClick(routeId)}
         className="flex items-center justify-between py-2.5 px-5 hover:bg-muted/30 transition-colors w-full text-left"
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">

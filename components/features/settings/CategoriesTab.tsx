@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Switch } from '@/components/ui/switch';
+
+type CategoryType = 'standard' | 'compound' | 'transfer';
+type FormCategoryType = 'expense' | 'income' | 'compound' | 'transfer';
 
 type Category = {
   id: string;
@@ -12,10 +14,13 @@ type Category = {
   name: string;
   color: string;
   isIncome: boolean;
+  categoryType: CategoryType;
+  expenseParentId: string | null;
   isSystem: boolean;
   createdByAi: boolean;
   excludeFromReports: boolean;
   displayOrder: number;
+  transactionCount: number;
 };
 
 const COLOR_OPTIONS = [
@@ -34,9 +39,10 @@ export default function CategoriesTab() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetResult, setResetResult] = useState<{ kept: number; deleted: number; created: number } | null>(null);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [showDescription, setShowDescription] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'compound' | 'transfer'>('all');
   const [filterSources, setFilterSources] = useState<Set<'system' | 'user' | 'ai'>>(
     new Set(['system', 'user', 'ai'])
   );
@@ -44,7 +50,8 @@ export default function CategoriesTab() {
   const [formName, setFormName] = useState('');
   const [formParentId, setFormParentId] = useState<string | null>(null);
   const [formColor, setFormColor] = useState('#6366f1');
-  const [formIsIncome, setFormIsIncome] = useState(false);
+  const [formCategoryType, setFormCategoryType] = useState<FormCategoryType>('expense');
+  const [formExpenseParentId, setFormExpenseParentId] = useState<string | null>(null);
   const [formOrder, setFormOrder] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +70,74 @@ export default function CategoriesTab() {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const categoryById = useMemo(() => new Map(categories.map((cat) => [cat.id, cat])), [categories]);
+
+  const categoryPathById = useMemo(() => {
+    const cache = new Map<string, string>();
+
+    const buildPath = (id: string | null | undefined, seen = new Set<string>()): string => {
+      if (!id) return '';
+      const cached = cache.get(id);
+      if (cached) return cached;
+
+      const cat = categoryById.get(id);
+      if (!cat) return '';
+      if (seen.has(id)) return cat.name;
+
+      const nextSeen = new Set(seen);
+      nextSeen.add(id);
+
+      const parentPath = buildPath(cat.parentId, nextSeen);
+      const path = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      cache.set(id, path);
+      return path;
+    };
+
+    categories.forEach((cat) => buildPath(cat.id));
+    return cache;
+  }, [categories, categoryById]);
+
+  const compoundExpenseOptions = useMemo(
+    () =>
+      categories
+        .filter((c) => c.categoryType !== 'compound' && c.categoryType !== 'transfer' && !c.isIncome)
+        .map((c) => ({
+          ...c,
+          path: categoryPathById.get(c.id) ?? c.name,
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+    [categories, categoryPathById]
+  );
+
+  const inferCompoundExpenseParentId = useCallback((compoundName: string) => {
+    const candidates = compoundName
+      .split('/')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .reverse();
+
+    for (const candidate of candidates) {
+      const match = compoundExpenseOptions.find((cat) => cat.name.toLowerCase() === candidate.toLowerCase());
+      if (match) return match.id;
+    }
+
+    return null;
+  }, [compoundExpenseOptions]);
+
+  useEffect(() => {
+    if (formCategoryType !== 'compound') return;
+    if (formExpenseParentId) return;
+    const inferred = inferCompoundExpenseParentId(formName);
+    if (inferred) {
+      setFormExpenseParentId(inferred);
+    }
+  }, [formCategoryType, formName, formExpenseParentId, inferCompoundExpenseParentId]);
+
+  const getCategoryPath = useCallback(
+    (id: string | null | undefined) => (id ? categoryPathById.get(id) ?? categoryById.get(id)?.name ?? '' : ''),
+    [categoryPathById, categoryById]
+  );
 
   const parents = categories.filter((c) => !c.parentId);
   const children = categories.filter((c) => c.parentId);
@@ -87,8 +162,10 @@ export default function CategoriesTab() {
 
   const categoryMatchesType = (cat: Category): boolean => {
     if (filterType === 'all') return true;
-    if (filterType === 'income' && cat.isIncome) return true;
-    if (filterType === 'expense' && !cat.isIncome) return true;
+    if (filterType === 'compound') return cat.categoryType === 'compound';
+    if (filterType === 'transfer') return cat.categoryType === 'transfer';
+    if (filterType === 'income') return cat.categoryType === 'compound' || cat.isIncome;
+    if (filterType === 'expense') return cat.categoryType !== 'compound' && cat.categoryType !== 'transfer' && !cat.isIncome;
     return false;
   };
 
@@ -108,16 +185,23 @@ export default function CategoriesTab() {
   };
 
   const filteredParents = useMemo(() => {
-    return parents.filter((parent) => {
-      const parentMatches =
-        categoryMatchesSearch(parent) &&
-        categoryMatchesType(parent) &&
-        categoryMatchesSource(parent);
+    return parents
+      .filter((parent) => {
+        const parentMatches =
+          categoryMatchesSearch(parent) &&
+          categoryMatchesType(parent) &&
+          categoryMatchesSource(parent);
 
-      if (parentMatches) return true;
-      if (parentHasMatchingChildren(parent.id)) return true;
-      return false;
-    });
+        if (parentMatches) return true;
+        if (parentHasMatchingChildren(parent.id)) return true;
+        return false;
+      })
+      .sort((a, b) => {
+        const aPriority = a.categoryType === 'compound' || a.categoryType === 'transfer' || a.name === 'Transfers & Adjustments' ? 0 : 1;
+        const bPriority = b.categoryType === 'compound' || b.categoryType === 'transfer' || b.name === 'Transfers & Adjustments' ? 0 : 1;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.displayOrder - b.displayOrder;
+      });
   }, [parents, searchQuery, filterType, filterSources]);
 
   const expandAll = () => {
@@ -133,7 +217,8 @@ export default function CategoriesTab() {
     setFormName('');
     setFormParentId(null);
     setFormColor('#6366f1');
-    setFormIsIncome(false);
+    setFormCategoryType('expense');
+    setFormExpenseParentId(null);
     setFormOrder(categories.length);
   };
 
@@ -142,7 +227,8 @@ export default function CategoriesTab() {
     setFormName(cat.name);
     setFormParentId(cat.parentId);
     setFormColor(cat.color);
-    setFormIsIncome(cat.isIncome);
+    setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
+    setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder);
   };
 
@@ -150,11 +236,18 @@ export default function CategoriesTab() {
     if (!formName.trim()) return;
     setSaving(true);
     try {
+      const isCompound = formCategoryType === 'compound';
+      const isTransfer = formCategoryType === 'transfer';
+      const resolvedExpenseParentId = isCompound
+        ? formExpenseParentId || inferCompoundExpenseParentId(formName)
+        : null;
       const body = {
         name: formName.trim(),
         parentId: formParentId || null,
         color: formColor,
-        isIncome: formIsIncome,
+        isIncome: isCompound ? true : isTransfer ? false : formCategoryType === 'income',
+        categoryType: isCompound ? 'compound' : isTransfer ? 'transfer' : 'standard',
+        expenseParentId: resolvedExpenseParentId,
         displayOrder: formOrder,
       };
 
@@ -227,13 +320,18 @@ export default function CategoriesTab() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-foreground">Categories</h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            disabled={resetting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Clean Up Categories
-          </button>
+          <div className="relative group/tooltip overflow-visible">
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              disabled={resetting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Refresh Categories
+            </button>
+            <div className="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-lg border border-border bg-popover/95 px-3 py-2 text-center text-xs font-medium text-popover-foreground shadow-xl backdrop-blur-sm opacity-0 invisible transition-all duration-150 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:visible whitespace-normal">
+              Removes unused categories, adds missing defaults, and re-classifies existing categories (e.g. marks Transfers as transfer type).
+            </div>
+          </div>
           <button
             onClick={openAdd}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
@@ -242,6 +340,26 @@ export default function CategoriesTab() {
             Add Category
           </button>
         </div>
+      </div>
+
+      {/* Explanation */}
+      <div className="mb-3 rounded-lg border border-border bg-muted/40">
+        <button
+          type="button"
+          onClick={() => setShowDescription((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/60 transition-colors rounded-lg"
+        >
+          <span>Category type guide</span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${showDescription ? 'rotate-180' : ''}`} />
+        </button>
+        {showDescription && (
+          <div className="px-3 pb-3 pt-1 text-xs text-muted-foreground space-y-1">
+            <p><strong className="text-foreground">Income</strong> — appears on the income side of charts (cash flow, sankey).</p>
+            <p><strong className="text-foreground">Expense</strong> — appears on the expense side of charts, tracked against budgets.</p>
+            <p><strong className="text-foreground">Compound</strong> — a single transaction that is rendered as both income <em>and</em> expense (e.g. 401k contributions, payroll deductions). In charts, the compound category itself is used on the income side, and its linked <em>Uses Expense Category</em> is used on the expense side, so one transaction can show up in both places while net cash flow stays $0. You can point these links at either top-level or sub-level categories, depending on how you want the transaction to roll up in reports and Sankey.</p>
+            <p><strong className="text-foreground">Transfer</strong> — a movement of funds between accounts (e.g. checking → savings). Does not affect income, expenses, or budgets.</p>
+          </div>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -270,7 +388,7 @@ export default function CategoriesTab() {
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-muted-foreground" />
           <div className="flex rounded-lg border border-border overflow-hidden">
-            {(['all', 'income', 'expense'] as const).map((type) => (
+            {(['all', 'income', 'expense', 'compound', 'transfer'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
@@ -280,7 +398,7 @@ export default function CategoriesTab() {
                     : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
-                {type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense'}
+                {type === 'all' ? 'All' : type === 'income' ? 'Income' : type === 'expense' ? 'Expense' : type === 'compound' ? 'Compound' : 'Transfer'}
               </button>
             ))}
           </div>
@@ -352,10 +470,13 @@ export default function CategoriesTab() {
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
                   <span className="text-foreground text-sm font-medium truncate">{parent.name}</span>
                   <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
-                    parent.isIncome ? 'bg-chart-1/20 text-chart-1' : 'bg-primary/20 text-primary'
+                    parent.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
+                    parent.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                    parent.isIncome ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                   }`}>
-                    {parent.isIncome ? 'Income' : 'Expense'}
+                    {parent.categoryType === 'compound' ? 'Compound' : parent.categoryType === 'transfer' ? 'Transfer' : parent.isIncome ? 'Income' : 'Expense'}
                   </span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground/60">{parent.transactionCount}</span>
                   {parent.isSystem && (
                     <span className="text-[10px] text-muted-foreground">System</span>
                   )}
@@ -372,6 +493,15 @@ export default function CategoriesTab() {
                   </button>
                 </div>
               </div>
+              {parent.categoryType === 'compound' && (parent.parentId || parent.expenseParentId) && (
+                <div className="px-3 pt-1 pb-0.5 text-[10px] text-muted-foreground">
+                  <span className="font-medium text-muted-foreground/80">Uses income category:</span>{' '}
+                  {getCategoryPath(parent.parentId) || 'Not set'}
+                  <span className="mx-1.5">•</span>
+                  <span className="font-medium text-muted-foreground/80">Uses expense category:</span>{' '}
+                  {getCategoryPath(parent.expenseParentId) || 'Not set'}
+                </div>
+              )}
                {(() => {
                  const filteredChildren = childList.filter(
                    (c) =>
@@ -383,31 +513,49 @@ export default function CategoriesTab() {
                  return (
                    <div className="ml-6 mt-1 space-y-1">
                      {filteredChildren.map((child) => (
-                    <div
-                      key={child.id}
-                      onClick={() => openEdit(child)}
-                      className="flex items-center justify-between p-2.5 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                        <span className="text-foreground/80 text-sm truncate">{child.name}</span>
-                        {child.isSystem && (
-                          <span className="text-[10px] text-muted-foreground">System</span>
-                        )}
-                        {child.createdByAi && (
-                          <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                   ))}
+                       <div key={child.id}>
+                         <div
+                           onClick={() => openEdit(child)}
+                           className="flex items-center justify-between p-2.5 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                         >
+                           <div className="flex items-center gap-2 min-w-0 flex-1">
+                             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                             <span className="text-foreground/80 text-sm truncate">{child.name}</span>
+                             <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
+                               child.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
+                               child.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                               child.isIncome ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                             }`}>
+                               {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
+                             </span>
+                             <span className="text-[11px] tabular-nums text-muted-foreground/60">{child.transactionCount}</span>
+                             {child.isSystem && (
+                               <span className="text-[10px] text-muted-foreground">System</span>
+                             )}
+                             {child.createdByAi && (
+                               <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
+                             )}
+                           </div>
+                           <div className="flex items-center gap-1 flex-shrink-0">
+                             <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                               <Pencil className="h-3 w-3" />
+                             </button>
+                             <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+                               <Trash2 className="h-3 w-3" />
+                             </button>
+                           </div>
+                         </div>
+                         {child.categoryType === 'compound' && (child.parentId || child.expenseParentId) && (
+                           <div className="px-2.5 pb-1 text-[10px] text-muted-foreground">
+                             <span className="font-medium text-muted-foreground/80">Uses income category:</span>{' '}
+                             {getCategoryPath(child.parentId) || 'Not set'}
+                             <span className="mx-1.5">•</span>
+                             <span className="font-medium text-muted-foreground/80">Uses expense category:</span>{' '}
+                             {getCategoryPath(child.expenseParentId) || 'Not set'}
+                           </div>
+                         )}
+                       </div>
+                     ))}
                    </div>
                  );
                })()}
@@ -437,13 +585,17 @@ export default function CategoriesTab() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Parent Group</label>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  {formCategoryType === 'compound' ? 'Uses Income Category' : 'Parent Group'}
+                </label>
                 <select
                   value={formParentId || ''}
                   onChange={(e) => setFormParentId(e.target.value || null)}
                   className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="">None (top-level group)</option>
+                  <option value="">
+                    {formCategoryType === 'compound' ? 'Select income category...' : 'None (top-level group)'}
+                  </option>
                   {parents.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -466,13 +618,51 @@ export default function CategoriesTab() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground/80">Income Category</span>
-                <Switch
-                  checked={formIsIncome}
-                  onCheckedChange={setFormIsIncome}
-                />
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Category Type</label>
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  {(['expense', 'income', 'compound', 'transfer'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setFormCategoryType(type);
+                        if (type === 'compound') {
+                          setFormExpenseParentId((prev) => prev || inferCompoundExpenseParentId(formName));
+                        } else {
+                          setFormExpenseParentId(null);
+                        }
+                      }}
+                      className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                        formCategoryType === type
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {type === 'expense' ? 'Expense' : type === 'income' ? 'Income' : type === 'compound' ? 'Compound' : 'Transfer'}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {formCategoryType === 'compound' && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Uses Expense Category</label>
+                  <select
+                    value={formExpenseParentId || ''}
+                    onChange={(e) => setFormExpenseParentId(e.target.value || null)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select expense category...</option>
+                    {compoundExpenseOptions
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>{p.path}</option>
+                      ))}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Display Order</label>
@@ -529,17 +719,17 @@ export default function CategoriesTab() {
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Clean Up Categories</AlertDialogTitle>
-            <AlertDialogDescription>
-              <p className="mb-2">
-                This will <strong>remove unused categories</strong> and add any missing default categories.
-              </p>
-              <p className="mb-2">
-                Categories that still have transactions, budgets, or rules assigned to them will be <strong>preserved</strong> to avoid uncategorizing your data.
-              </p>
-              <p>
-                If a default category matches the name of an existing one, it will be kept as-is rather than replaced. This action cannot be undone.
-              </p>
+            <AlertDialogTitle>Refresh Categories</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This will <strong>remove unused categories</strong>, add missing defaults, and re-classify existing categories (e.g. Transfers will be marked as transfer type).
+                </p>
+                <p>
+                  Categories that still have transactions, budgets, or rules assigned to them will be <strong>preserved</strong> to avoid uncategorizing your data.
+                </p>
+                <p>This action cannot be undone.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -547,9 +737,9 @@ export default function CategoriesTab() {
             <button
               onClick={handleResetToDefaults}
               disabled={resetting}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {resetting ? 'Cleaning...' : 'Clean Up'}
+              {resetting ? 'Refreshing...' : 'Refresh'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -559,7 +749,7 @@ export default function CategoriesTab() {
       {resetResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/15" onClick={() => setResetResult(null)}>
           <div className="bg-card border border-border rounded-xl shadow-lg p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground mb-3">Categories Reset</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-3">Categories Refreshed</h3>
             <div className="space-y-2 text-sm text-foreground/80">
               <p><strong className="text-foreground">{resetResult.kept}</strong> existing categories preserved</p>
               <p><strong className="text-foreground">{resetResult.deleted}</strong> unused categories removed</p>

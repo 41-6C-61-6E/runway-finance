@@ -184,6 +184,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   accounts: ['name', 'balance', 'institution', 'metadata'],
   categories: ['name'],
   category_rules: ['name', 'conditionValue', 'setPayee'],
+  tags: ['name', 'description'],
   budgets: ['amount', 'notes'],
   financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve'],
   net_worth_snapshots: ['totalAssets', 'totalLiabilities', 'netWorth'],
