@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { categoryRules, categories } from '@/lib/db/schema';
+import { categoryRules, categories, tags, transactionTags } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -17,6 +17,7 @@ const CreateRuleSchema = z.object({
   conditionValue: z.string().min(1).max(500),
   conditionCaseSensitive: z.boolean().default(false),
   setCategoryId: z.string().uuid().nullable().optional(),
+  setTagId: z.string().uuid().nullable().optional(),
   setPayee: z.string().max(200).nullable().optional(),
   setReviewed: z.boolean().nullable().optional(),
 });
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, setCategoryId, setPayee, setReviewed } = parsed.data;
+  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, setCategoryId, setTagId, setPayee, setReviewed } = parsed.data;
 
   const encryptedValues = await encryptRow('category_rules', {
     userId,
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
     conditionValue,
     conditionCaseSensitive,
     setCategoryId: setCategoryId ?? null,
+    setTagId: setTagId ?? null,
     setPayee: setPayee ?? null,
     setReviewed: setReviewed ?? null,
   }, dek);

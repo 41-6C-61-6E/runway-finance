@@ -6,6 +6,8 @@ import {
   accounts,
   categories,
   userSettings,
+  transactionTags,
+  tags,
 } from "@/lib/db/schema";
 import {
   eq,
@@ -33,6 +35,71 @@ import {
   updateMonthlyCashFlowSummaries,
 } from "@/lib/services/sync";
 
+const UNCATEGORIZED_CATEGORY_IDS = new Set([
+  "uncategorized",
+  "uncategorized_income",
+]);
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseCommaSeparatedIds(value?: string) {
+  return value
+    ? value
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [];
+}
+
+function buildCategoryConditions(
+  categoryId?: string,
+  categoryIds?: string,
+) {
+  if (categoryIds) {
+    const ids = parseCommaSeparatedIds(categoryIds);
+    if (ids.length === 0) return [];
+
+    const includesUncategorized = ids.some((id) =>
+      UNCATEGORIZED_CATEGORY_IDS.has(id),
+    );
+    const validCategoryIds = ids.filter((id) => UUID_PATTERN.test(id));
+
+    if (includesUncategorized && validCategoryIds.length > 0) {
+      return [
+        or(
+          isNull(transactions.categoryId),
+          inArray(transactions.categoryId, validCategoryIds),
+        ),
+      ];
+    }
+
+    if (includesUncategorized) {
+      return [isNull(transactions.categoryId)];
+    }
+
+    if (validCategoryIds.length > 0) {
+      return [inArray(transactions.categoryId, validCategoryIds)];
+    }
+
+    return [sql`false`];
+  }
+
+  if (categoryId) {
+    if (UNCATEGORIZED_CATEGORY_IDS.has(categoryId)) {
+      return [isNull(transactions.categoryId)];
+    }
+
+    if (UUID_PATTERN.test(categoryId)) {
+      return [eq(transactions.categoryId, categoryId)];
+    }
+
+    return [sql`false`];
+  }
+
+  return [];
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -57,6 +124,8 @@ export async function GET(request: Request) {
     endDate: searchParams.get("endDate") ?? undefined,
     categoryId: searchParams.get("categoryId") ?? undefined,
     categoryIds: searchParams.get("categoryIds") ?? undefined,
+    tagId: searchParams.get("tagId") ?? undefined,
+    tagIds: searchParams.get("tagIds") ?? undefined,
     search: searchParams.get("search") ?? undefined,
     type: searchParams.get("type") ?? undefined,
     pending: searchParams.get("pending") ?? undefined,
@@ -173,42 +242,39 @@ export async function GET(request: Request) {
     );
   }
 
-  // Handle category filter
-  if (filters.categoryIds) {
-    const ids = filters.categoryIds
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean);
-    if (ids.length > 0) {
-      const uncategorizedIdx = ids.findIndex(
-        (id) => id === "uncategorized" || id === "uncategorized_income",
-      );
-      if (uncategorizedIdx !== -1) {
-        const otherIds = ids.filter((_, i) => i !== uncategorizedIdx);
-        if (otherIds.length > 0) {
-          whereConditions.push(
-            or(
-              isNull(transactions.categoryId),
-              inArray(transactions.categoryId, otherIds),
-            ),
-          );
-        } else {
-          whereConditions.push(isNull(transactions.categoryId));
-        }
+  // Handle tag filter — resolve to matching transaction IDs via join
+  if (filters.tagIds) {
+    const tagIdList = filters.tagIds.split(',').map((id) => id.trim()).filter(Boolean);
+    if (tagIdList.length > 0) {
+      const taggedTxIds = await getDb()
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, tagIdList));
+      const txIds = taggedTxIds.map((r) => r.transactionId);
+      if (txIds.length > 0) {
+        whereConditions.push(inArray(transactions.id, txIds));
       } else {
-        whereConditions.push(inArray(transactions.categoryId, ids));
+        // No transactions match these tags — return empty
+        whereConditions.push(sql`false`);
       }
     }
-  } else if (filters.categoryId) {
-    if (
-      filters.categoryId === "uncategorized" ||
-      filters.categoryId === "uncategorized_income"
-    ) {
-      whereConditions.push(isNull(transactions.categoryId));
+  } else if (filters.tagId) {
+    const taggedTxIds = await getDb()
+      .select({ transactionId: transactionTags.transactionId })
+      .from(transactionTags)
+      .where(eq(transactionTags.tagId, filters.tagId));
+    const txIds = taggedTxIds.map((r) => r.transactionId);
+    if (txIds.length > 0) {
+      whereConditions.push(inArray(transactions.id, txIds));
     } else {
-      whereConditions.push(eq(transactions.categoryId, filters.categoryId));
+      whereConditions.push(sql`false`);
     }
   }
+
+  // Handle category filter
+  whereConditions.push(
+    ...buildCategoryConditions(filters.categoryId, filters.categoryIds),
+  );
 
   if (filters.idsOnly) {
     const hasEncryptedFilters = !!(
@@ -235,6 +301,7 @@ export async function GET(request: Request) {
         payee: transactions.payee,
         notes: transactions.notes,
         categoryName: categories.name,
+        categoryType: categories.categoryType,
       })
       .from(transactions)
       .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -270,11 +337,11 @@ export async function GET(request: Request) {
         }
         let matchesType = true;
         if (filters.type === "income") {
-          matchesType = decryptedAmt > 0;
+          matchesType = (decryptedAmt > 0 || row.categoryType === 'compound') && row.categoryType !== 'transfer';
         } else if (filters.type === "expense") {
-          matchesType = decryptedAmt < 0;
+          matchesType = (decryptedAmt < 0 || row.categoryType === 'compound') && row.categoryType !== 'transfer';
         }
-        return { id: row.id, amount, matchesSearch, matchesType };
+        return { id: row.id, amount, matchesSearch, matchesType, categoryType: row.categoryType };
       }),
     );
 
@@ -454,12 +521,42 @@ export async function GET(request: Request) {
       }),
     );
 
+    // Batch fetch tags for this page of transactions
+    const txIds = decryptedTxns.map((t: any) => t.id);
+    const tagRows = txIds.length > 0
+      ? await getDb()
+          .select({
+            transactionId: transactionTags.transactionId,
+            tagId: tags.id,
+            tagName: tags.name,
+            tagColor: tags.color,
+          })
+          .from(transactionTags)
+          .leftJoin(tags, eq(transactionTags.tagId, tags.id))
+          .where(inArray(transactionTags.transactionId, txIds))
+      : [];
+
+    // Decrypt tag names and build a map
+    const tagsByTxId = new Map<string, any[]>();
+    for (const row of tagRows) {
+      const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+      const tag = { id: row.tagId, name, color: row.tagColor };
+      const existing = tagsByTxId.get(row.transactionId) ?? [];
+      existing.push(tag);
+      tagsByTxId.set(row.transactionId, existing);
+    }
+
+    const txnsWithTags = decryptedTxns.map((tx: any) => ({
+      ...tx,
+      tags: tagsByTxId.get(tx.id) ?? [],
+    }));
+
     logger.info("Transactions fetched (SQL Paginated)", {
       total: totalBeforeFilters,
-      returned: decryptedTxns.length,
+      returned: txnsWithTags.length,
     });
     return NextResponse.json({
-      data: decryptedTxns,
+      data: txnsWithTags,
       total: totalBeforeFilters,
       totalAmount: null, // calculated lazily by client
       limit: filters.limit,
@@ -594,12 +691,41 @@ export async function GET(request: Request) {
   // Paginate
   const sliced = filtered.slice(filters.offset, filters.offset + filters.limit);
 
+  // Batch fetch tags for this page
+  const slicedIds = sliced.map((t: any) => t.id);
+  const sliceTagRows = slicedIds.length > 0
+    ? await getDb()
+        .select({
+          transactionId: transactionTags.transactionId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(transactionTags)
+        .leftJoin(tags, eq(transactionTags.tagId, tags.id))
+        .where(inArray(transactionTags.transactionId, slicedIds))
+    : [];
+
+  const sliceTagsByTxId = new Map<string, any[]>();
+  for (const row of sliceTagRows) {
+    const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+    const tag = { id: row.tagId, name, color: row.tagColor };
+    const existing = sliceTagsByTxId.get(row.transactionId) ?? [];
+    existing.push(tag);
+    sliceTagsByTxId.set(row.transactionId, existing);
+  }
+
+  const slicedWithTags = sliced.map((tx: any) => ({
+    ...tx,
+    tags: sliceTagsByTxId.get(tx.id) ?? [],
+  }));
+
   logger.info("Transactions fetched (In-Memory Fallback)", {
     total,
-    returned: sliced.length,
+    returned: slicedWithTags.length,
   });
   return NextResponse.json({
-    data: sliced,
+    data: slicedWithTags,
     total,
     totalAmount,
     limit: filters.limit,
@@ -745,43 +871,9 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (filterFields.categoryIds) {
-      const splitIds = filterFields.categoryIds
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      if (splitIds.length > 0) {
-        const uncategorizedIdx = splitIds.findIndex(
-          (id) => id === "uncategorized" || id === "uncategorized_income",
-        );
-        if (uncategorizedIdx !== -1) {
-          const otherIds = splitIds.filter((_, i) => i !== uncategorizedIdx);
-          if (otherIds.length > 0) {
-            whereConditions.push(
-              or(
-                isNull(transactions.categoryId),
-                inArray(transactions.categoryId, otherIds),
-              ),
-            );
-          } else {
-            whereConditions.push(isNull(transactions.categoryId));
-          }
-        } else {
-          whereConditions.push(inArray(transactions.categoryId, splitIds));
-        }
-      }
-    } else if (filterFields.categoryId) {
-      if (
-        filterFields.categoryId === "uncategorized" ||
-        filterFields.categoryId === "uncategorized_income"
-      ) {
-        whereConditions.push(isNull(transactions.categoryId));
-      } else {
-        whereConditions.push(
-          eq(transactions.categoryId, filterFields.categoryId),
-        );
-      }
-    }
+    whereConditions.push(
+      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds),
+    );
 
     const hasEncryptedFilters = !!(
       filterFields.search ||
@@ -1029,43 +1121,9 @@ export async function DELETE(request: Request) {
       );
     }
 
-    if (filterFields.categoryIds) {
-      const splitIds = filterFields.categoryIds
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      if (splitIds.length > 0) {
-        const uncategorizedIdx = splitIds.findIndex(
-          (id) => id === "uncategorized" || id === "uncategorized_income",
-        );
-        if (uncategorizedIdx !== -1) {
-          const otherIds = splitIds.filter((_, i) => i !== uncategorizedIdx);
-          if (otherIds.length > 0) {
-            whereConditions.push(
-              or(
-                isNull(transactions.categoryId),
-                inArray(transactions.categoryId, otherIds),
-              ),
-            );
-          } else {
-            whereConditions.push(isNull(transactions.categoryId));
-          }
-        } else {
-          whereConditions.push(inArray(transactions.categoryId, splitIds));
-        }
-      }
-    } else if (filterFields.categoryId) {
-      if (
-        filterFields.categoryId === "uncategorized" ||
-        filterFields.categoryId === "uncategorized_income"
-      ) {
-        whereConditions.push(isNull(transactions.categoryId));
-      } else {
-        whereConditions.push(
-          eq(transactions.categoryId, filterFields.categoryId),
-        );
-      }
-    }
+    whereConditions.push(
+      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds),
+    );
 
     const hasEncryptedFilters = !!(
       filterFields.search ||

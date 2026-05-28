@@ -19,6 +19,7 @@ type Rule = {
   setCategoryId: string | null;
   setPayee: string | null;
   setReviewed: boolean | null;
+  setTagId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
 };
@@ -29,6 +30,12 @@ type Category = {
   color: string;
   parentId: string | null;
   isIncome: boolean;
+};
+
+type TagItem = {
+  id: string;
+  name: string;
+  color: string;
 };
 
 const FIELD_OPTIONS = [
@@ -57,6 +64,7 @@ const OPERATOR_LABELS: Record<string, string> = {
 export default function RulesTab() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<TagItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
@@ -68,6 +76,7 @@ export default function RulesTab() {
   const [formValue, setFormValue] = useState('');
   const [formCaseSensitive, setFormCaseSensitive] = useState(false);
   const [formCategoryId, setFormCategoryId] = useState<string | null>(null);
+  const [formTagId, setFormTagId] = useState<string | null>(null);
   const [formSetPayee, setFormSetPayee] = useState('');
   const [formSetReviewed, setFormSetReviewed] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -225,10 +234,21 @@ export default function RulesTab() {
     }
   }, []);
 
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tags', { credentials: 'include' });
+      const data = await res.json();
+      setTags(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+      setTags([]);
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetchRules(), fetchCategories()])
+    Promise.all([fetchRules(), fetchCategories(), fetchTags()])
       .finally(() => setLoading(false));
-  }, [fetchRules, fetchCategories]);
+  }, [fetchRules, fetchCategories, fetchTags]);
 
   const openAdd = () => {
     setEditingRule(null);
@@ -238,6 +258,7 @@ export default function RulesTab() {
     setFormValue('');
     setFormCaseSensitive(false);
     setFormCategoryId(null);
+    setFormTagId(null);
     setFormSetPayee('');
     setFormSetReviewed(null);
     setDrawerOpen(true);
@@ -251,6 +272,7 @@ export default function RulesTab() {
     setFormValue(rule.conditionValue);
     setFormCaseSensitive(rule.conditionCaseSensitive);
     setFormCategoryId(rule.setCategoryId);
+    setFormTagId(rule.setTagId ?? null);
     setFormSetPayee(rule.setPayee ?? '');
     setFormSetReviewed(rule.setReviewed);
     setDrawerOpen(true);
@@ -267,6 +289,7 @@ export default function RulesTab() {
         conditionValue: formValue.trim(),
         conditionCaseSensitive: formCaseSensitive,
         setCategoryId: formCategoryId || null,
+        setTagId: formTagId || null,
         setPayee: formSetPayee.trim() || null,
         setReviewed: formSetReviewed ?? null,
         priority: editingRule ? editingRule.priority : rules.length,
@@ -718,6 +741,20 @@ export default function RulesTab() {
                     className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Override payee name"
                   />
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-xs text-muted-foreground mb-1">Set Tag (optional)</label>
+                  <select
+                    value={formTagId || ''}
+                    onChange={(e) => setFormTagId(e.target.value || null)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Don&apos;t set a tag</option>
+                    {tags.map((tag) => (
+                      <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">

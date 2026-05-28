@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { categories, transactions, budgets, categoryRules, categorySpendingSummary, categoryIncomeSummary } from '@/lib/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
-import { DEFAULT_CATEGORIES } from '@/lib/db/seed-categories';
+import { DEFAULT_CATEGORIES, mergeDuplicateCategories } from '@/lib/db/seed-categories';
+import { decryptRows } from '@/lib/crypto';
+import { getSessionDEK } from '@/lib/crypto-context';
 import { logger } from '@/lib/logger';
 
 export async function POST() {
@@ -14,6 +16,9 @@ export async function POST() {
 
   const userId = session.user.id;
   const db = getDb();
+  const dek = await getSessionDEK();
+
+  await mergeDuplicateCategories(userId, dek);
 
   // Collect all category IDs referenced by transactions, budgets, rules, and summaries
   const [txRefs, budgetRefs, ruleRefs, spendingRefs, incomeRefs] = await Promise.all([
@@ -45,10 +50,11 @@ export async function POST() {
   }
 
   // Load all user categories and walk up parent chains so ancestors are preserved
-  const allCats = await db
+  const allCatsRaw = await db
     .select({ id: categories.id, parentId: categories.parentId, name: categories.name, displayOrder: categories.displayOrder })
     .from(categories)
     .where(eq(categories.userId, userId));
+  const allCats = await decryptRows('categories', allCatsRaw, dek);
 
   const catById = new Map(allCats.map((c) => [c.id, c]));
 
@@ -62,6 +68,20 @@ export async function POST() {
     }
   }
 
+  // Re-classify Transfers & Adjustments parent and children as transfer type
+  const transferParent = allCats.find((c) => c.name === 'Transfers & Adjustments' && !c.parentId);
+  if (transferParent) {
+    await db
+      .update(categories)
+      .set({ categoryType: 'transfer' })
+      .where(and(eq(categories.userId, userId), eq(categories.id, transferParent.id)));
+
+    await db
+      .update(categories)
+      .set({ categoryType: 'transfer' })
+      .where(and(eq(categories.userId, userId), eq(categories.parentId, transferParent.id)));
+  }
+
   // Delete unreferenced categories
   const toDelete = allCats.filter((c) => !referencedIds.has(c.id)).map((c) => c.id);
   if (toDelete.length > 0) {
@@ -72,7 +92,6 @@ export async function POST() {
 
   // Determine which of the kept categories are parents and which are children
   const kept = allCats.filter((c) => referencedIds.has(c.id));
-  const keptNames = new Set(kept.map((c) => c.name));
 
   // Seed missing default categories
   let order = allCats.length > 0 ? Math.max(...allCats.map((c) => c.displayOrder)) + 1 : 0;
@@ -90,6 +109,7 @@ export async function POST() {
           name: group.name,
           color: group.color,
           isIncome: group.isIncome,
+          categoryType: group.categoryType ?? 'standard',
           isSystem: true,
           excludeFromReports: group.excludeFromReports ?? false,
           displayOrder: order++,
@@ -111,6 +131,7 @@ export async function POST() {
             name: child.name,
             color: child.color,
             isIncome: group.isIncome,
+            categoryType: group.categoryType ?? 'standard',
             isSystem: true,
             excludeFromReports: child.excludeFromReports ?? false,
             displayOrder: order++,

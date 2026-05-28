@@ -3,7 +3,7 @@ import { accounts, transactions, accountSnapshots, netWorthSnapshots, userSettin
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { logger } from '@/lib/logger';
-import { ensureSystemCategories } from '@/lib/db/seed-categories';
+import { ensureSystemCategories, ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -325,11 +325,15 @@ export async function createManualAccount(input: CreateManualAccountInput, dek?:
       payee: null,
       memo: null,
       pending: false,
-      categoryId: await ensureSystemCategories(input.userId),
+      categoryId: await ensureSystemCategories(input.userId, dek),
     };
     const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
     await db.insert(transactions).values(encryptedTxn);
   }
+
+  // Ensure compound categories exist
+  await ensureCompoundCategories(input.userId, dek);
+  await ensureEmployerContributions(input.userId, dek);
 
   // Generate synthetic historical snapshots if purchase info is present
   const meta = input.metadata ?? {};
@@ -458,12 +462,14 @@ export async function syncManualAccount(
       payee: null,
       memo: null,
       pending: false,
-      categoryId: await ensureSystemCategories(userId),
+      categoryId: await ensureSystemCategories(userId, dek),
     };
     const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
     await db.insert(transactions).values(encryptedTxn);
   }
 
+  await ensureCompoundCategories(userId, dek);
+  await ensureEmployerContributions(userId, dek);
   await createAccountSnapshotsForUser(userId, dek);
   await updateNetWorthSnapshot(userId, dek);
 
@@ -578,12 +584,14 @@ export async function adjustManualAccountValue(
       payee: null,
       memo: null,
       pending: false,
-      categoryId: await ensureSystemCategories(userId),
+      categoryId: await ensureSystemCategories(userId, dek),
     };
     const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
     await db.insert(transactions).values(encryptedTxn);
   }
 
+  await ensureCompoundCategories(userId, dek);
+  await ensureEmployerContributions(userId, dek);
   await createAccountSnapshotsForUser(userId, dek);
   await updateNetWorthSnapshot(userId, dek);
 

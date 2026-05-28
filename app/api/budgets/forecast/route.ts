@@ -152,7 +152,22 @@ export async function GET(request: Request) {
       }
       if (excluded) continue;
 
-      if (amount > 0) {
+      if (category?.categoryType === 'transfer') continue;
+      if (category?.categoryType === 'compound') {
+        const absAmt = Math.abs(amount);
+        if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
+        incomeByAccount.get(accId)!.push(absAmt);
+        if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
+        expenseByAccount.get(accId)!.push(absAmt);
+
+        if (txn.categoryId) {
+          if (!expenseByAccountAndCategory.has(accId)) expenseByAccountAndCategory.set(accId, new Map());
+          if (!expenseByAccountAndCategory.get(accId)!.has(txn.categoryId)) {
+            expenseByAccountAndCategory.get(accId)!.set(txn.categoryId, []);
+          }
+          expenseByAccountAndCategory.get(accId)!.get(txn.categoryId)!.push(absAmt);
+        }
+      } else if (amount > 0) {
         if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
         incomeByAccount.get(accId)!.push(amount);
       } else {

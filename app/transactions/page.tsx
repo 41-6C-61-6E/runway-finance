@@ -17,6 +17,8 @@ type FilterState = {
   accountTypes: string | null;
   categoryId: string | null;
   categoryIds: string | null;
+  tagId: string | null;
+  tagIds: string | null;
   search: string | null;
   type: string | null;
   startDate: string | null;
@@ -42,6 +44,8 @@ function TransactionsContent() {
     accountTypes: searchParams.get('accountTypes') ?? null,
     categoryId: searchParams.get('categoryId') ?? null,
     categoryIds: searchParams.get('categoryIds') ?? null,
+    tagId: searchParams.get('tagId') ?? null,
+    tagIds: searchParams.get('tagIds') ?? null,
     search: searchParams.get('search') ?? null,
     type: searchParams.get('type') ?? null,
     startDate: searchParams.get('startDate') ?? null,
@@ -77,6 +81,8 @@ function TransactionsContent() {
     if (filters.accountTypes) params.set('accountTypes', filters.accountTypes);
     if (filters.categoryId) params.set('categoryId', filters.categoryId);
     if (filters.categoryIds) params.set('categoryIds', filters.categoryIds);
+    if (filters.tagId) params.set('tagId', filters.tagId);
+    if (filters.tagIds) params.set('tagIds', filters.tagIds);
     if (filters.search) params.set('search', filters.search);
     if (filters.type) params.set('type', filters.type);
     if (filters.startDate) params.set('startDate', filters.startDate);
@@ -106,6 +112,8 @@ function TransactionsContent() {
   const spAccountTypes = searchParams.get('accountTypes');
   const spCategoryId = searchParams.get('categoryId');
   const spCategoryIds = searchParams.get('categoryIds');
+  const spTagId = searchParams.get('tagId');
+  const spTagIds = searchParams.get('tagIds');
   const spSearch = searchParams.get('search');
   const spType = searchParams.get('type');
   const spStartDate = searchParams.get('startDate');
@@ -125,6 +133,8 @@ function TransactionsContent() {
       const accountTypes = spAccountTypes ?? null;
       const categoryId = spCategoryId ?? null;
       const categoryIds = spCategoryIds ?? null;
+      const tagId = spTagId ?? null;
+      const tagIds = spTagIds ?? null;
       const search = spSearch ?? null;
       const type = spType ?? null;
       const startDate = spStartDate ?? null;
@@ -142,6 +152,8 @@ function TransactionsContent() {
         prev.accountTypes === accountTypes &&
         prev.categoryId === categoryId &&
         prev.categoryIds === categoryIds &&
+        prev.tagId === tagId &&
+        prev.tagIds === tagIds &&
         prev.search === search &&
         prev.type === type &&
         prev.startDate === startDate &&
@@ -156,9 +168,9 @@ function TransactionsContent() {
       ) {
         return prev;
       }
-      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
+      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, tagId, tagIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
     });
-    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
+    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spTagId, spTagIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
 
   const updateFilter = useCallback((key: keyof FilterState, value: string | null) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -171,6 +183,8 @@ function TransactionsContent() {
       accountTypes: null,
       categoryId: null,
       categoryIds: null,
+      tagId: null,
+      tagIds: null,
       search: null,
       type: null,
       startDate: null,
