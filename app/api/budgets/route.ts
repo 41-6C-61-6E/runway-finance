@@ -89,6 +89,7 @@ export async function GET(request: Request) {
         categoryName: categories.name,
         categoryColor: categories.color,
         isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
       })
       .from(budgets)
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
@@ -212,8 +213,8 @@ export async function GET(request: Request) {
       return totals;
     }
 
-    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome).map((b) => b.categoryId).filter(Boolean) as string[];
-    const expenseCategoryIds = decryptedBudgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId).filter(Boolean) as string[];
+    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome && b.categoryType !== 'compound' && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
+    const expenseCategoryIds = decryptedBudgetRows.filter((b) => (!b.isIncome || b.categoryType === 'compound') && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
 
     const [expenseActualMap, incomeActualMap] = await Promise.all([
       fetchActuals(expenseCategoryIds),
@@ -223,8 +224,11 @@ export async function GET(request: Request) {
     const data = decryptedBudgetRows.map((row) => {
       const budgeted = parseFloat(row.amount);
       const isIncome = row.isIncome ?? false;
-      const actual = (isIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
-      const remaining = isIncome ? actual - budgeted : budgeted - actual;
+      const isCompound = row.categoryType === 'compound';
+      // Compound budgets track expense-side amounts
+      const effectiveIsIncome = isIncome && !isCompound;
+      const actual = (effectiveIsIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
+      const remaining = effectiveIsIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
 
       return {
@@ -241,7 +245,7 @@ export async function GET(request: Request) {
         actual,
         remaining,
         percentUsed,
-        type: isIncome ? 'income' : 'expense',
+        type: effectiveIsIncome ? 'income' : 'expense',
       };
     });
 

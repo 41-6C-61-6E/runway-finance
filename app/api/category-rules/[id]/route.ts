@@ -17,6 +17,7 @@ const UpdateRuleSchema = z.object({
   conditionValue: z.string().min(1).max(500).optional(),
   conditionCaseSensitive: z.boolean().optional(),
   setCategoryId: z.string().uuid().nullable().optional(),
+  setTagId: z.string().uuid().nullable().optional(),
   setPayee: z.string().max(200).nullable().optional(),
   setReviewed: z.boolean().nullable().optional(),
 });

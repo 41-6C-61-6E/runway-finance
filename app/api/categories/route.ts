@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { categories } from '@/lib/db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { categories, transactions } from '@/lib/db/schema';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptRow } from '@/lib/crypto';
+import { ensureCompoundCategories, ensureEmployerContributions, mergeDuplicateCategories } from '@/lib/db/seed-categories';
+
+function normalizeCategoryName(name: string) {
+  return name.trim().toLowerCase();
+}
 
 const CreateCategorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -15,6 +20,8 @@ const CreateCategorySchema = z.object({
   isIncome: z.boolean().default(false),
   excludeFromReports: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
+  categoryType: z.enum(['standard', 'compound', 'transfer']).default('standard'),
+  expenseParentId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET() {
@@ -25,15 +32,36 @@ export async function GET() {
 
   const userId = session.user.id;
   const dek = await getSessionDEK();
-  const cats = await getDb()
-    .select()
-    .from(categories)
-    .where(eq(categories.userId, userId))
-    .orderBy(asc(categories.displayOrder));
+
+  // Ensure compound categories exist (idempotent — safe to call on every page load)
+  await ensureCompoundCategories(userId, dek);
+  await ensureEmployerContributions(userId, dek);
+
+  const [cats, txCounts] = await Promise.all([
+    getDb()
+      .select()
+      .from(categories)
+      .where(eq(categories.userId, userId))
+      .orderBy(asc(categories.displayOrder)),
+    getDb()
+      .select({
+        categoryId: transactions.categoryId,
+        count: sql<number>`cast(count(*) as int)`,
+      })
+      .from(transactions)
+      .where(and(eq(transactions.userId, userId), sql`${transactions.categoryId} IS NOT NULL`))
+      .groupBy(transactions.categoryId),
+  ]);
+
+  const countByCategoryId = new Map(txCounts.map((r) => [r.categoryId, r.count]));
 
   const decrypted = await decryptRows('categories', cats, dek);
-  logger.info('GET /api/categories', { userId, count: decrypted.length });
-  return NextResponse.json(decrypted);
+  const withCounts = decrypted.map((cat) => ({
+    ...cat,
+    transactionCount: countByCategoryId.get(cat.id) ?? 0,
+  }));
+  logger.info('GET /api/categories', { userId, count: withCounts.length });
+  return NextResponse.json(withCounts);
 }
 
 export async function POST(request: Request) {
@@ -59,7 +87,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, parentId, color, isIncome, excludeFromReports, displayOrder } = parsed.data;
+  const { name, parentId, color, isIncome, excludeFromReports, displayOrder, categoryType, expenseParentId } = parsed.data;
+
+  await mergeDuplicateCategories(userId, dek);
+
+  const existingCategories = await decryptRows(
+    'categories',
+    await getDb()
+      .select()
+      .from(categories)
+      .where(eq(categories.userId, userId)),
+    dek
+  );
+  const matchingExisting = existingCategories.find((cat) =>
+    normalizeCategoryName(cat.name) === normalizeCategoryName(name) &&
+    (cat.parentId ?? null) === (parentId ?? null)
+  );
+
+  if (matchingExisting) {
+    logger.info('POST /api/categories - reused existing', { userId, name, parentId, existingId: matchingExisting.id });
+    return NextResponse.json(matchingExisting, { status: 200 });
+  }
 
   const encryptedValues = await encryptRow('categories', {
     userId,
@@ -70,6 +118,8 @@ export async function POST(request: Request) {
     isSystem: false,
     excludeFromReports,
     displayOrder,
+    categoryType,
+    expenseParentId: expenseParentId ?? null,
   }, dek);
 
   const [cat] = await getDb()

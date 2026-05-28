@@ -203,6 +203,8 @@ export const categories = pgTable('categories', {
   color: text('color').notNull().default('#6366f1'),
   icon: text('icon'),
   isIncome: boolean('is_income').notNull().default(false),
+  categoryType: text('category_type').notNull().default('standard'),
+  expenseParentId: uuid('expense_parent_id'),
   isSystem: boolean('is_system').notNull().default(false),
   excludeFromReports: boolean('exclude_from_reports').notNull().default(false),
   displayOrder: integer('display_order').notNull().default(0),
@@ -277,6 +279,54 @@ export const syncLogs = pgTable('sync_logs', {
   details: text('details'),
 });
 
+// ── Tags ─────────────────────────────────────────────────────────────────────
+export const tags = pgTable('tags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#6366f1'),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Tag Join Tables ───────────────────────────────────────────────────────────
+export const transactionTags = pgTable(
+  'transaction_tags',
+  {
+    transactionId: uuid('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [unique().on(t.transactionId, t.tagId)]
+);
+
+export const accountTags = pgTable(
+  'account_tags',
+  {
+    accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [unique().on(t.accountId, t.tagId)]
+);
+
+export const budgetTags = pgTable(
+  'budget_tags',
+  {
+    budgetId: uuid('budget_id').notNull().references(() => budgets.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [unique().on(t.budgetId, t.tagId)]
+);
+
+export const goalTags = pgTable(
+  'goal_tags',
+  {
+    goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [unique().on(t.goalId, t.tagId)]
+);
+
 // ── Category Rules ───────────────────────────────────────────────────────────
 export const categoryRules = pgTable('category_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -289,6 +339,7 @@ export const categoryRules = pgTable('category_rules', {
   conditionValue: text('condition_value').notNull(),
   conditionCaseSensitive: boolean('condition_case_sensitive').notNull().default(false),
   setCategoryId: uuid('set_category_id').references(() => categories.id, { onDelete: 'set null' }),
+  setTagId: uuid('set_tag_id').references(() => tags.id, { onDelete: 'set null' }),
   setPayee: text('set_payee'),
   setReviewed: boolean('set_reviewed'),
   isSystem: boolean('is_system').notNull().default(false),

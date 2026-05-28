@@ -20,6 +20,7 @@ import ManualAccountsSection from '@/components/features/settings/ManualAccounts
 import AiTab from '@/components/features/settings/AiTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import ImportTab from '@/components/features/settings/ImportTab';
+import TagsTab from '@/components/features/settings/TagsTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
@@ -120,8 +121,8 @@ function SettingsPageBody() {
 
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
-  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'analytics', 'ai', 'import', 'advanced'].includes(urlTab)
-    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'analytics' | 'ai' | 'import' | 'advanced')
+  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'advanced'].includes(urlTab)
+    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'advanced')
     : 'general';
 
   const goToTab = useCallback((tab: typeof activeTab) => {
@@ -444,6 +445,14 @@ function SettingsPageBody() {
               Rules
             </button>
             <button
+              onClick={() => goToTab('tags')}
+              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'tags' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              Tags
+            </button>
+            <button
               onClick={() => goToTab('analytics')}
               className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -699,6 +708,12 @@ function SettingsPageBody() {
       {activeTab === 'categories' && (
         <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <CategoriesTab />
+        </div>
+      )}
+
+      {activeTab === 'tags' && (
+        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <TagsTab />
         </div>
       )}
 
