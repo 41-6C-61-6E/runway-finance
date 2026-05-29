@@ -6,6 +6,7 @@ import { ACCENT_NAMES } from '@/lib/utils/apply-accent';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { DEFAULTS } from '@/config/defaults';
+import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
 export async function GET() {
   const session = await auth();
@@ -47,6 +48,7 @@ export async function GET() {
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
+      paystubEnabled: created?.paystubEnabled ?? DEFAULTS.paystubEnabled,
       aiSystemPrompt: created?.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
       aiAutoAnalyze: created?.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
       aiAutoApprove: created?.aiAutoApprove ?? DEFAULTS.aiAutoApprove,
@@ -85,6 +87,7 @@ export async function GET() {
     hideAccountsSidebarByDefault: settings[0].hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: settings[0].chartSelections ?? DEFAULTS.chartSelections,
     showMathEnabled: settings[0].showMathEnabled ?? DEFAULTS.showMathEnabled,
+    paystubEnabled: settings[0].paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: settings[0].aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: settings[0].aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
     aiAutoApprove: settings[0].aiAutoApprove ?? DEFAULTS.aiAutoApprove,
@@ -128,6 +131,7 @@ export async function PATCH(request: Request) {
 	const aiActiveProviderId = body.aiActiveProviderId;
 	const apiKeys = body.apiKeys;
 	const showImportedData = body.showImportedData;
+	const paystubEnabled = body.paystubEnabled;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -221,6 +225,10 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid showMathEnabled value' }, { status: 400 });
 	}
 
+	if (paystubEnabled !== undefined && typeof paystubEnabled !== 'boolean') {
+		return Response.json({ error: 'Invalid paystubEnabled value' }, { status: 400 });
+	}
+
 	if (aiSystemPrompt !== undefined && aiSystemPrompt !== null && typeof aiSystemPrompt !== 'string') {
 		return Response.json({ error: 'Invalid aiSystemPrompt value' }, { status: 400 });
 	}
@@ -311,6 +319,7 @@ export async function PATCH(request: Request) {
     updates.chartSelections = { ...existingSelections, ...chartSelections };
   }
 	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
+	if (paystubEnabled !== undefined) updates.paystubEnabled = paystubEnabled;
 	if (aiSystemPrompt !== undefined) updates.aiSystemPrompt = aiSystemPrompt;
 	if (aiAutoAnalyze !== undefined) updates.aiAutoAnalyze = aiAutoAnalyze;
 	if (aiAutoApprove !== undefined) updates.aiAutoApprove = aiAutoApprove;
@@ -326,6 +335,16 @@ export async function PATCH(request: Request) {
     .set(updates)
     .where(eq(userSettings.userId, session.user.id))
     .returning();
+
+  if (paystubEnabled !== undefined) {
+    try {
+      await updateMonthlyCashFlowSummaries(session.user.id, dek);
+      await updateCategorySpendingSummaries(session.user.id, dek);
+      await updateCategoryIncomeSummaries(session.user.id, dek);
+    } catch (e) {
+      console.error('Failed to update summaries after toggling paystubs:', e);
+    }
+  }
 
   let updatedApiKeys: Record<string, string> = {};
   if (updated.apiKeys) {
@@ -352,6 +371,7 @@ export async function PATCH(request: Request) {
     hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
     showMathEnabled: updated.showMathEnabled ?? DEFAULTS.showMathEnabled,
+    paystubEnabled: updated.paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: updated.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: updated.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
     aiAutoApprove: updated.aiAutoApprove ?? DEFAULTS.aiAutoApprove,

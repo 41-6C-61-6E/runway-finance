@@ -6,9 +6,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Check, Settings } from 'lucide-react';
+import { 
+  Check, 
+  Settings, 
+  Landmark, 
+  LayoutGrid, 
+  GitBranch, 
+  Tag, 
+  BarChart3, 
+  Sparkles, 
+  UploadCloud, 
+  FileText, 
+  ShieldAlert,
+  ChevronRight,
+  Menu
+} from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import ModeToggle from '@/components/mode-toggle';
-import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
+import { useSidebar } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
@@ -20,6 +42,7 @@ import ManualAccountsSection from '@/components/features/settings/ManualAccounts
 import AiTab from '@/components/features/settings/AiTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import ImportTab from '@/components/features/settings/ImportTab';
+import PayrollTab from '@/components/features/settings/PayrollTab';
 import TagsTab from '@/components/features/settings/TagsTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
@@ -69,11 +92,25 @@ type Account = {
   balanceDate: string | null;
 };
 
+const SETTINGS_TABS = [
+  { id: 'general' as const, label: 'General', description: 'Appearance, accent color, and layout preferences', icon: Settings },
+  { id: 'accounts' as const, label: 'Accounts', description: 'Linked bank credentials and manual accounts', icon: Landmark },
+  { id: 'categories' as const, label: 'Categories', description: 'Transaction category display and structure', icon: LayoutGrid },
+  { id: 'rules' as const, label: 'Rules', description: 'Automatic transaction categorization rules', icon: GitBranch },
+  { id: 'tags' as const, label: 'Tags', description: 'Labels for transactional tagging and filtering', icon: Tag },
+  { id: 'analytics' as const, label: 'Analytics', description: 'Chart color schemes and forecasting bounds', icon: BarChart3 },
+  { id: 'ai' as const, label: 'AI Suggestions', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
+  { id: 'import' as const, label: 'Import', description: 'Manually upload statement files (CSV/OFX)', icon: UploadCloud },
+  { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
+  { id: 'advanced' as const, label: 'Advanced', description: 'Backups, dev tools, and database settings', icon: ShieldAlert },
+];
+
 function SettingsPageBody() {
   const router = useRouter();
   const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -121,8 +158,8 @@ function SettingsPageBody() {
 
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
-  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'advanced'].includes(urlTab)
-    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'advanced')
+  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'advanced'].includes(urlTab)
+    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'advanced')
     : 'general';
 
   const goToTab = useCallback((tab: typeof activeTab) => {
@@ -399,92 +436,116 @@ function SettingsPageBody() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Settings" icon={Settings} />
-      <div 
-        className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6 ml-0 md:ml-[var(--settings-margin-left)]" 
-        style={{ 
-          '--settings-margin-left': `${COLLAPSED_WIDTH}px` 
-        } as React.CSSProperties}
-      >
-        <div className="max-w-2xl w-full space-y-6">
+      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-6xl w-full">
 
           {/* Setup Checklist */}
-          <OnboardingChecklist />
-
-          {/* Tab Bar */}
-          <div className="flex rounded-lg bg-card border border-border overflow-x-auto no-scrollbar whitespace-nowrap w-full">
-            <button
-              onClick={() => goToTab('general')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'general' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              General
-            </button>
-            <button
-              onClick={() => goToTab('accounts')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'accounts' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Accounts
-            </button>
-            <button
-              onClick={() => goToTab('categories')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'categories' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Categories
-            </button>
-            <button
-              onClick={() => goToTab('rules')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'rules' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Rules
-            </button>
-            <button
-              onClick={() => goToTab('tags')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'tags' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Tags
-            </button>
-            <button
-              onClick={() => goToTab('analytics')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Analytics
-            </button>
-            <button
-              onClick={() => goToTab('ai')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              AI
-            </button>
-            <button
-              onClick={() => goToTab('import')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'import' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Import
-            </button>
-            <button
-              onClick={() => goToTab('advanced')}
-              className={`flex-1 flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'advanced' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              Advanced
-            </button>
+          <div className="mb-6">
+            <OnboardingChecklist />
           </div>
+
+          <div className="flex flex-col lg:flex-row gap-8 items-start">
+            
+            {/* Mobile Navigation Dropdown-like Trigger */}
+            <div className="lg:hidden w-full mb-6">
+              <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
+                <SheetTrigger asChild>
+                  <button className="w-full flex items-center justify-between p-4 bg-card border border-border rounded-xl shadow-sm text-foreground hover:bg-muted/50 transition-all cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      {(() => {
+                        const currentTab = SETTINGS_TABS.find(t => t.id === activeTab) || SETTINGS_TABS[0];
+                        const TabIcon = currentTab.icon;
+                        return (
+                          <>
+                            <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                              <TabIcon className="w-4 h-4" />
+                            </div>
+                            <div className="text-left">
+                              <div className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">Settings Section</div>
+                              <div className="text-sm font-semibold">{currentTab.label}</div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <Menu className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-3xl border-t border-border p-4 pb-8 max-h-[85vh] overflow-y-auto bg-card">
+                  <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-5" />
+                  <SheetHeader className="pb-4 border-b border-border text-left">
+                    <SheetTitle className="text-left flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-primary" /> Settings Navigation
+                    </SheetTitle>
+                    <SheetDescription className="text-left">Select a section to configure your preferences.</SheetDescription>
+                  </SheetHeader>
+                  <div className="py-4 space-y-1">
+                    {SETTINGS_TABS.map((tab) => {
+                      const TabIcon = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToTab(tab.id);
+                            setIsMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-start gap-4 p-3.5 rounded-xl transition-all text-left border ${
+                            isActive 
+                              ? 'bg-primary/10 border-primary/20 text-foreground' 
+                              : 'bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <div className={`p-2 rounded-lg ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <TabIcon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold">{tab.label}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{tab.description}</div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground/50 self-center" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            {/* Desktop Navigation Sidebar */}
+            <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-1 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-3 rounded-xl shadow-sm">
+              <div className="px-2 pb-2 mb-1.5 border-b border-border/60">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Settings Navigation</h3>
+              </div>
+              <nav className="space-y-0.5">
+                {SETTINGS_TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => goToTab(tab.id)}
+                      className={`w-full flex items-start gap-2.5 py-2 px-3 rounded-lg transition-all text-left group relative border ${
+                        isActive
+                          ? 'bg-primary border-primary/10 text-primary-foreground shadow-sm shadow-primary/15'
+                          : 'bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/75'
+                      }`}
+                    >
+                      <TabIcon className={`w-4 h-4 mt-0.5 shrink-0 transition-transform group-hover:scale-110 duration-200 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold leading-none">{tab.label}</div>
+                        <div className={`text-[11px] mt-1 line-clamp-2 leading-snug ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70 group-hover:text-muted-foreground'}`}>
+                          {tab.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
+            </aside>
+
+            {/* Settings Tab Content */}
+            <main className="flex-1 w-full min-w-0 max-w-3xl space-y-6">
 
           {activeTab === 'general' && (
           <>
@@ -1226,6 +1287,13 @@ function SettingsPageBody() {
       {activeTab === 'import' && (
         <ImportTab />
       )}
+
+      {activeTab === 'payroll' && (
+        <PayrollTab />
+      )}
+
+            </main>
+          </div>
 
       {/* Connection Details Dialog */}
           <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
