@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { monthlyCashFlow, accounts, categories, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, inArray } from 'drizzle-orm';
+import { eq, and, gte, inArray, ne } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     } as Record<string, boolean>;
 
     const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+    const isPaystubEnabled = userSetting?.paystubEnabled ?? false;
 
     let data: Array<{ yearMonth: string; income: number; expenses: number; netCashFlow: number }> = [];
 
@@ -81,6 +82,17 @@ export async function GET(request: Request) {
           .where(eq(categories.userId, userId));
         const catById = new Map(allCategories.map(cat => [cat.id.toString(), cat]));
 
+        const conditions = [
+              inArray(transactions.accountId, userAccounts.map(a => a.id)),
+              eq(transactions.deleted, false),
+              eq(transactions.pending, false),
+              eq(transactions.ignored, false),
+              eq(transactions.isImported, false),
+            ];
+        if (!isPaystubEnabled) {
+          conditions.push(ne(transactions.source, 'paystub'));
+        }
+
         const allTransactions = await db
           .select({
             date: transactions.date,
@@ -88,15 +100,7 @@ export async function GET(request: Request) {
             categoryId: transactions.categoryId,
           })
           .from(transactions)
-          .where(
-            and(
-              inArray(transactions.accountId, userAccounts.map(a => a.id)),
-              eq(transactions.deleted, false),
-              eq(transactions.pending, false),
-              eq(transactions.ignored, false),
-              eq(transactions.isImported, false)
-            )
-          );
+          .where(and(...conditions));
 
         const monthlyData: Record<string, { income: number; expenses: number }> = {};
 
