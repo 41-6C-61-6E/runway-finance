@@ -16,6 +16,7 @@ export const GENERAL_DEFAULTS = {
   cardStyle: 'default',
   hiddenPages: {},
   showMathEnabled: false,
+  paystubEnabled: false,
 } as const;
 
 // ── Analytics / Chart Settings ───────────────────────────────────────────────

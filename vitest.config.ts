@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname),
+      'auth': path.resolve(__dirname, 'tests/unit/mocks/auth.ts'),
     },
   },
 });

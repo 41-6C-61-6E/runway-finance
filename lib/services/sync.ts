@@ -191,11 +191,19 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
 
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
+  const [settings] = await getDb()
+    .select({ paystubEnabled: userSettings.paystubEnabled })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const isPaystubEnabled = settings?.paystubEnabled ?? false;
+
   const monthlyData: Record<string, { income: number; expenses: number; count: number }> = {};
   let transactionsProcessed = 0;
 
   for (const tx of decryptedTxns) {
     if (tx.ignored) continue;
+    if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
     const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
 
@@ -314,6 +322,13 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
 
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
+  const [settings] = await getDb()
+    .select({ paystubEnabled: userSettings.paystubEnabled })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const isPaystubEnabled = settings?.paystubEnabled ?? false;
+
   const categoryByMonthAndAccount: Record<
     string,
     Record<
@@ -325,6 +340,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
 
   for (const tx of decryptedTxns) {
     if (!tx.categoryId || tx.ignored) continue;
+    if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
     const category = catById.get(tx.categoryId.toString());
     if (!category) continue;
@@ -446,6 +462,13 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
   const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
 
+  const [settings] = await getDb()
+    .select({ paystubEnabled: userSettings.paystubEnabled })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const isPaystubEnabled = settings?.paystubEnabled ?? false;
+
   const categoryByMonthAndAccount: Record<
     string,
     Record<
@@ -457,6 +480,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
   for (const tx of decryptedTxns) {
     if (!tx.categoryId || tx.ignored) continue;
+    if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
     const category = catById.get(tx.categoryId.toString());
     if (!category) continue;
