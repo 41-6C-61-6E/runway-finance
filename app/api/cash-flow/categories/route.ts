@@ -42,6 +42,7 @@ export async function GET(request: Request) {
   } as Record<string, boolean>;
 
   const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+  const isPaystubEnabled = userSetting?.paystubEnabled ?? false;
 
   let prevExpenseMap = new Map<string, number>();
   let prevIncomeMap = new Map<string, number>();
@@ -132,6 +133,9 @@ export async function GET(request: Request) {
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
+    }
+    if (!isPaystubEnabled) {
+      conditions.push(ne(transactions.source, 'paystub'));
     }
     let whereClause = and(...conditions);
     if (accountIds.length > 0) {
@@ -225,6 +229,9 @@ export async function GET(request: Request) {
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
+    }
+    if (!isPaystubEnabled) {
+      conditions.push(ne(transactions.source, 'paystub'));
     }
     let whereClause = and(...conditions);
     if (accountIds.length > 0) {

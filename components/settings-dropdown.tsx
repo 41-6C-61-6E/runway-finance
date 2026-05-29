@@ -2,17 +2,30 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
-import { Settings, Landmark, Layers, FileText, BarChart, Sparkles, Upload, Calculator } from 'lucide-react';
+import { 
+  Settings, 
+  Landmark, 
+  LayoutGrid, 
+  GitBranch, 
+  Tag, 
+  BarChart3, 
+  Sparkles, 
+  UploadCloud, 
+  FileText, 
+  ShieldAlert 
+} from 'lucide-react';
 
 const settingsSections = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'accounts', label: 'Accounts', icon: Landmark },
-  { id: 'categories', label: 'Categories', icon: Layers },
-  { id: 'rules', label: 'Rules', icon: FileText },
-  { id: 'analytics', label: 'Analytics', icon: BarChart },
-  { id: 'ai', label: 'AI', icon: Sparkles },
-  { id: 'import', label: 'Import', icon: Upload },
-  { id: 'advanced', label: 'Advanced', icon: Calculator },
+  { id: 'categories', label: 'Categories', icon: LayoutGrid },
+  { id: 'rules', label: 'Rules', icon: GitBranch },
+  { id: 'tags', label: 'Tags', icon: Tag },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'ai', label: 'AI Suggestions', icon: Sparkles },
+  { id: 'import', label: 'Import', icon: UploadCloud },
+  { id: 'payroll', label: 'Payroll', icon: FileText },
+  { id: 'advanced', label: 'Advanced', icon: ShieldAlert },
 ] as const;
 
 export default function SettingsDropdown() {

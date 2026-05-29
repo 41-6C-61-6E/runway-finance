@@ -3,38 +3,15 @@
 # TO DO LIST
 
 ## CHANGES:
-- Spending Breakdown pi and bar charts should actually use the category colors (or versions of them depending on theme) rather than the color scheme colors. 
-
-- 
-
-## NEW FEATUES:
-- explore the idea of transfer categories, paired tx or tags
-- Better PWA support
 - Vuln patch
 
-
-- Currently there is no way to capture 401k match, tax withholding, other paycheck deductions (union dues, cafeteria, insurance) to be used in the analytics. Think about this wholistically and plan for other areas of the app that may also need to reflect these changes. Understand the schema. There may need to be a manual transaction type feature. Where would it make sense to solicit this data form the user and incorporate it? Possibly a rule the triggers when a paycheck is detected and then the witholdings are auto created or somehting like that. Help me witht he logic and flow. make some proposals and ask quesitons. 
-
+## NEW FEATUES:
 - investments page with holdings and other metrics
 - screen grab projection lab and do that stuff
 
-
-- #Import feature
-    - Plan an import engine that will allow users to import transaciotns and account snapshots into the database. Thnk through the logic of things like what shoudl be required on import, how the data will be stored, what options the user needs to make this easy to use and manage, how it impacts charts and analytics, etc. Fully think through the logic of this feature. Ask guiding questions to get it right. 
-    - It should mark the data as 'imported' rather than real or synthetic so that it can be filtered out later if needed, possibly with something like "IsImported" in the database
-    - there are two import types allowed, account snapshots and transacitons 
-    - the import engine should accept csv files, then display a column mapping tool to map columns from old values to new ones
-    - there should be an account mapping step / tool to map accounts, or, if no existing account matches the data to add as a new manual account
-    - there should be a category mapping step that allows category mapping or the option to add as new
-    - the "Synthetic & Estimated Data" section in the settings needs to be updated with toggles for imported data to be turned on or off
-    - after an import, there needs to be a listing of all imported datafiles and the option to remove them from the database later if desired
-    - for now, the import engine can be on its own settigns tab
-
-
-
 ## BUGS:
+- 
 
-- real estate patoff chart - make sure the x axis shows the totality of both ilines
 
 - [DONE] There is an issue with the way the manual and simpleFIN syncs are happening. Investigate and fix. Ideally the user does not have to log in first and the syncs will start for all users when the server starts. There is an encryption key in the env that should be able to start the syncs without the user logging in.
 
@@ -113,3 +90,15 @@
 - [DONE] Implement a Stacked volume line chart for net worth line chart on the dashboard. The net worth line chart should show shaded stacked acccoutn types using the same colors in the "Breakdown" pie chart. For example Assets should show as stacked volume of real estate, retirement, savings, etc. and liabilities should subract from the volume for loans, credit, etc.
 
 - [DONE] Plan an accounts page with account balance over time. A previous agent worked on an accounts page but it was not fully finished, so you may run into some remnants of that and need to do some cleanup. The accounts page should have a stacked volume line chart showing account balance over time and should be filterable by accounts, or account type or group type so that the chart updated based on the filtered accounts. There should also be an option to select a bar chart that will show the same data but in stacked bars (showing each account or acount group or type). Below the chart should be an tree like expandable area showing every account, expandable by group and type, and with relevant statistics about that account, like balance trend, a little simple history chart indicator for just that account, recent activity, etc or whatever makes sense to show. Make sure to update Nav bar and other areas of the project that may be needed.
+
+
+[DONE] - #Import feature
+    - Plan an import engine that will allow users to import transaciotns and account snapshots into the database. Thnk through the logic of things like what shoudl be required on import, how the data will be stored, what options the user needs to make this easy to use and manage, how it impacts charts and analytics, etc. Fully think through the logic of this feature. Ask guiding questions to get it right. 
+    - It should mark the data as 'imported' rather than real or synthetic so that it can be filtered out later if needed, possibly with something like "IsImported" in the database
+    - there are two import types allowed, account snapshots and transacitons 
+    - the import engine should accept csv files, then display a column mapping tool to map columns from old values to new ones
+    - there should be an account mapping step / tool to map accounts, or, if no existing account matches the data to add as a new manual account
+    - there should be a category mapping step that allows category mapping or the option to add as new
+    - the "Synthetic & Estimated Data" section in the settings needs to be updated with toggles for imported data to be turned on or off
+    - after an import, there needs to be a listing of all imported datafiles and the option to remove them from the database later if desired
+    - for now, the import engine can be on its own settigns tab
