@@ -183,7 +183,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   transactions: ['description', 'payee', 'memo', 'notes', 'amount'],
   accounts: ['name', 'balance', 'institution', 'metadata'],
   categories: ['name'],
-  category_rules: ['name', 'conditionValue', 'setPayee'],
+  category_rules: ['name', 'conditionValue', 'setPayee', 'conditions'],
   tags: ['name', 'description'],
   budgets: ['amount', 'notes'],
   financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve'],
@@ -213,7 +213,12 @@ export async function encryptRow<T extends Record<string, any>>(table: string, r
   for (const field of fields) {
     const val = result[field];
     if (val != null && val !== '') {
-      result[field] = await encryptField(typeof val === 'object' ? JSON.stringify(val) : String(val), key);
+      const encryptedStr = await encryptField(typeof val === 'object' ? JSON.stringify(val) : String(val), key);
+      try {
+        result[field] = JSON.parse(encryptedStr);
+      } catch {
+        result[field] = encryptedStr;
+      }
     }
   }
   return result as T;
@@ -224,16 +229,34 @@ export async function decryptRow<T extends Record<string, any>>(table: string, r
   if (!fields) return row;
   const result: any = { ...row };
   for (const field of fields) {
-    const val = result[field];
+    let val = result[field];
     if (val != null && val !== '') {
-      const decrypted = await decryptField(String(val), key);
+      const payloadStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      const decrypted = await decryptField(payloadStr, key);
       // Fields that store JSON objects were stringified before encryption;
       // parse them back so the caller receives the original type.
       try {
-        result[field] = JSON.parse(decrypted);
+        val = JSON.parse(decrypted);
       } catch {
-        result[field] = decrypted;
+        val = decrypted;
       }
+
+      // Handle legacy rules where conditions array itself is plaintext in DB but individual values inside are encrypted.
+      if (field === 'conditions' && Array.isArray(val)) {
+        val = await Promise.all(
+          val.map(async (cond: any) => {
+            if (cond && typeof cond === 'object' && cond.value != null && cond.value !== '') {
+              return {
+                ...cond,
+                value: await decryptField(String(cond.value), key),
+              };
+            }
+            return cond;
+          })
+        );
+      }
+
+      result[field] = val;
     }
   }
   return result as T;
