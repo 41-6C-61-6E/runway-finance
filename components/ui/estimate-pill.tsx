@@ -11,7 +11,7 @@ export function EstimatePill({ className }: EstimatePillProps) {
   
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    router.push('/settings#analytics');
+    router.push('/settings?tab=analytics');
   };
 
   return (

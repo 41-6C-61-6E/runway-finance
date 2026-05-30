@@ -1287,7 +1287,7 @@ export default function TransactionTable({
               No transactions found.
             </p>
             <a
-              href="/settings"
+              href="/settings?tab=accounts"
               className="inline-block px-5 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
             >
               Connect a Financial Institution

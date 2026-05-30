@@ -187,10 +187,11 @@ export function IncomeExpenseChart() {
       <div className="px-5 pb-2">
         <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
       </div>
-      <div className="h-[320px] px-2 pb-2">
-        <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-            {chartType === 'bar' ? (
+      <div className="h-[320px]">
+        <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+          <div className="min-w-max h-full px-2 pb-2">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+              {chartType === 'bar' ? (
               <ComposedChart data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 {sharedAxes}
                 <Bar
@@ -262,8 +263,9 @@ export function IncomeExpenseChart() {
                   activeDot={{ r: 4 }}
                 />
               </ComposedChart>
-            )}
-          </ResponsiveContainer>
+              )}
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
