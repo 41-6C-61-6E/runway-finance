@@ -72,7 +72,7 @@ export function OnboardingChecklist() {
       icon: Landmark,
       title: 'Add accounts',
       text: 'Connect SimpleFIN or create manual accounts.',
-      href: '/settings',
+      href: '/settings?tab=accounts',
     },
     {
       done: state.transactions > 0,

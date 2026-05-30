@@ -1581,7 +1581,7 @@ export default function AccountsPage() {
                   <div className="p-12 text-center border border-dashed border-border/40 rounded-xl">
                     <p className="text-muted-foreground text-sm mb-4">No accounts linked yet.</p>
                     <Link
-                      href="/settings"
+                      href="/settings?tab=accounts"
                       className="px-5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all flex items-center gap-2 mx-auto w-fit"
                     >
                       <Plus className="w-4 h-4" /> Link Institution
