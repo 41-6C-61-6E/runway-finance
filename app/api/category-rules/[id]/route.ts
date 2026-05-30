@@ -16,6 +16,13 @@ const UpdateRuleSchema = z.object({
   conditionOperator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']).optional(),
   conditionValue: z.string().min(1).max(500).optional(),
   conditionCaseSensitive: z.boolean().optional(),
+  // Multi-condition support
+  conditions: z.array(z.object({
+    field: z.enum(['description', 'payee', 'amount', 'memo']),
+    operator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
+    value: z.string().min(1).max(500),
+    caseSensitive: z.boolean().default(false),
+  })).optional(),
   setCategoryId: z.string().uuid().nullable().optional(),
   setTagId: z.string().uuid().nullable().optional(),
   setPayee: z.string().max(200).nullable().optional(),

@@ -341,6 +341,7 @@ export const categoryRules = pgTable('category_rules', {
   conditionOperator: text('condition_operator').notNull(),
   conditionValue: text('condition_value').notNull(),
   conditionCaseSensitive: boolean('condition_case_sensitive').notNull().default(false),
+  conditions: jsonb('conditions'), // Array of conditions for multi-condition rules
   setCategoryId: uuid('set_category_id').references(() => categories.id, { onDelete: 'set null' }),
   setTagId: uuid('set_tag_id').references(() => tags.id, { onDelete: 'set null' }),
   setPayee: text('set_payee'),
@@ -580,6 +581,8 @@ export const paystubFieldMappings = pgTable('paystub_field_mappings', {
   employerName: text('employer_name').notNull().default(''),
   isDefault: boolean('is_default').notNull().default(false),
   mappings: jsonb('mappings').notNull().default({}),
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

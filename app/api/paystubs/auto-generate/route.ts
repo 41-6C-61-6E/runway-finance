@@ -8,6 +8,13 @@ import {
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { createTransactionsFromLineItems } from '../route';
+import { getSessionDEK } from '@/lib/crypto-context';
+import {
+  updateCategorySpendingSummaries,
+  updateCategoryIncomeSummaries,
+  updateMonthlyCashFlowSummaries,
+} from '@/lib/services/sync';
+import { addFrequencyInterval, getFrequencyDays } from '@/lib/utils/paystub';
 
 export async function GET() {
   const session = await auth();
@@ -89,54 +96,7 @@ export async function POST(request: Request) {
   return Response.json(created, { status: 201 });
 }
 
-/**
- * Add a frequency interval to a date string (YYYY-MM-DD).
- */
-export function addFrequencyInterval(dateStr: string, frequency: string): string {
-  const date = new Date(dateStr + 'T00:00:00Z');
 
-  switch (frequency) {
-    case 'weekly':
-      date.setUTCDate(date.getUTCDate() + 7);
-      break;
-    case 'biweekly':
-      date.setUTCDate(date.getUTCDate() + 14);
-      break;
-    case 'semimonthly':
-      date.setUTCDate(date.getUTCDate() + 15);
-      break;
-    case 'monthly': {
-      const originalDay = date.getUTCDate();
-      date.setUTCMonth(date.getUTCMonth() + 1);
-      if (date.getUTCDate() !== originalDay) {
-        date.setUTCDate(0);
-      }
-      break;
-    }
-    default:
-      date.setUTCDate(date.getUTCDate() + 14); // Default to biweekly
-  }
-
-  return date.toISOString().split('T')[0];
-}
-
-/**
- * Compute the number of days in a frequency interval.
- */
-export function getFrequencyDays(frequency: string): number {
-  switch (frequency) {
-    case 'weekly':
-      return 7;
-    case 'biweekly':
-      return 14;
-    case 'semimonthly':
-      return 15;
-    case 'monthly':
-      return 30;
-    default:
-      return 14;
-  }
-}
 
 export async function PATCH() {
   const session = await auth();
@@ -147,6 +107,7 @@ export async function PATCH() {
   const db = getDb();
   const userId = session.user.id;
   const today = new Date().toISOString().split('T')[0];
+  const dek = await getSessionDEK();
 
   // Get all enabled auto-generate settings for this user
   const settings = await db
@@ -277,7 +238,8 @@ export async function PATCH() {
       newPaystub,
       clonedLineItems,
       basePaystub.employerName,
-      newCheckDate
+      newCheckDate,
+      dek
     );
 
     // Update lastGeneratedDate
@@ -291,6 +253,11 @@ export async function PATCH() {
 
     generated++;
   }
+
+  // Recalculate summaries to update charts
+  await updateCategorySpendingSummaries(userId, dek);
+  await updateCategoryIncomeSummaries(userId, dek);
+  await updateMonthlyCashFlowSummaries(userId, dek);
 
   return Response.json({ generated });
 }

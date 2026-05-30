@@ -330,20 +330,31 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
             )}
 
             {/* Toggles */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground/80">Hide from list</span>
-                <Switch
-                  checked={isHidden}
-                  onCheckedChange={setIsHidden}
-                />
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground/80">Hide from list</span>
+                  <Switch
+                    checked={isHidden}
+                    onCheckedChange={setIsHidden}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-normal">
+                  Completely removes the account from dashboards, filters, and lists. Its transactions and data are hidden globally.
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground/80">Exclude from net worth</span>
-                <Switch
-                  checked={isExcludedFromNetWorth}
-                  onCheckedChange={setIsExcludedFromNetWorth}
-                />
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground/80">Exclude from net worth</span>
+                  <Switch
+                    checked={isExcludedFromNetWorth}
+                    onCheckedChange={setIsExcludedFromNetWorth}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-normal">
+                  Keeps the account visible on your dashboard hierarchy list (with an "Excluded" badge) but omits its balance from Net Worth charts, calculations, transactions, and goals.
+                </p>
               </div>
             </div>
           </div>

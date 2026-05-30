@@ -205,6 +205,7 @@ export default function TransactionTable({
     categoryId: string;
     categoryName: string;
   } | null>(null);
+  const [creatingAndRunningRule, setCreatingAndRunningRule] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -528,6 +529,51 @@ export default function TransactionTable({
     });
     setProposedRule(null);
   }, [proposedRule]);
+
+  const handleCreateAndRunRule = useCallback(async () => {
+    if (!proposedRule) return;
+    setCreatingAndRunningRule(true);
+    try {
+      // Create the rule
+      const createRes = await fetch("/api/category-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: `Auto-rule: ${proposedRule.payee}`,
+          conditionField: "payee",
+          conditionOperator: "contains",
+          conditionValue: proposedRule.payee,
+          setCategoryId: proposedRule.categoryId,
+        }),
+      });
+
+      if (!createRes.ok) {
+        throw new Error("Failed to create rule");
+      }
+
+      const rule = await createRes.json();
+
+      // Apply the rule to all transactions
+      const applyRes = await fetch(`/api/category-rules/${rule.id}/apply`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!applyRes.ok) {
+        throw new Error("Failed to apply rule");
+      }
+
+      // Refresh the transactions table
+      setPage(0);
+      setProposedRule(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingAndRunningRule(false);
+    }
+  }, [proposedRule]);
+
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -1494,9 +1540,17 @@ export default function TransactionTable({
             <AlertDialogCancel>No thanks</AlertDialogCancel>
             <button
               onClick={handleCreateRule}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+              disabled={creatingAndRunningRule}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               Create Rule
+            </button>
+            <button
+              onClick={handleCreateAndRunRule}
+              disabled={creatingAndRunningRule}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {creatingAndRunningRule ? "Running..." : "Add and Run Now"}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>
