@@ -280,7 +280,7 @@ export default function RulesTab() {
     setFormName(rule.name);
     // Use multi-condition format if available, fallback to single condition
     const conditions = rule.conditions && rule.conditions.length > 0 
-      ? rule.conditions 
+      ? rule.conditions.map((c) => ({ ...c, id: c.id || Math.random().toString() }))
       : [{
           id: Math.random().toString(),
           field: rule.conditionField,
