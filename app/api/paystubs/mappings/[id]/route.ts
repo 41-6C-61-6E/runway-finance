@@ -74,6 +74,8 @@ export async function PATCH(
   if (body.employerName !== undefined) updates.employerName = body.employerName;
   if (body.mappings !== undefined) updates.mappings = body.mappings;
   if (body.isDefault !== undefined) updates.isDefault = body.isDefault;
+  if (body.accountId !== undefined) updates.accountId = body.accountId;
+  if (body.tagId !== undefined) updates.tagId = body.tagId;
 
   // If setting as default, unset all other defaults for this user
   if (body.isDefault === true) {

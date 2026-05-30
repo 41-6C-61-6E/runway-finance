@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { name, employerName, isDefault, mappings } = body;
+  const { name, employerName, isDefault, mappings, accountId, tagId } = body;
 
   if (!name) {
     return Response.json({ error: 'name is required' }, { status: 400 });
@@ -61,6 +61,8 @@ export async function POST(request: Request) {
       employerName: employerName || '',
       isDefault: isDefault || false,
       mappings: mappings || {},
+      accountId: accountId || null,
+      tagId: tagId || null,
     })
     .returning();
 

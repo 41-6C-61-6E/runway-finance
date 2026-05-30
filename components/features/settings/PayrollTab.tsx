@@ -11,6 +11,8 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 type FieldMapping = {
   action: 'import' | 'ignore';
   categoryId: string | null;
+  accountId?: string | null;
+  tagId?: string | null;
 };
 
 type MappingTemplate = {
@@ -19,6 +21,8 @@ type MappingTemplate = {
   employerName: string;
   isDefault: boolean;
   mappings: Record<string, FieldMapping>;
+  accountId?: string | null;
+  tagId?: string | null;
   createdAt: string;
 };
 
@@ -71,6 +75,8 @@ export default function PayrollTab() {
   const [mappingsLoading, setMappingsLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [autoGenSettings, setAutoGenSettings] = useState<AutoGenerateSettings[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
 
   // ── Import State ──
   const [importMode, setImportMode] = useState<'idle' | 'upload' | 'mapping' | 'importing' | 'done'>('idle');
@@ -89,6 +95,8 @@ export default function PayrollTab() {
   const [mappingEditorFields, setMappingEditorFields] = useState<Record<string, FieldMapping>>({});
   const [mappingEditorName, setMappingEditorName] = useState('');
   const [mappingEditorEmployer, setMappingEditorEmployer] = useState('');
+  const [mappingEditorAccount, setMappingEditorAccount] = useState<string>('');
+  const [mappingEditorTag, setMappingEditorTag] = useState<string>('');
   const [mappingSaving, setMappingSaving] = useState(false);
 
   // ── Auto-Generate Editor ──
@@ -108,6 +116,8 @@ export default function PayrollTab() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteMapping, setDeleteMapping] = useState<MappingTemplate | null>(null);
   const [deleteMappingLoading, setDeleteMappingLoading] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
 
   // ── Fetch functions ──
 
@@ -122,7 +132,7 @@ export default function PayrollTab() {
   const fetchPaystubs = useCallback(async () => {
     setPaystubsLoading(true);
     try {
-      const res = await fetch('/api/paystubs?limit=100', { credentials: 'include' });
+      const res = await fetch('/api/paystubs?limit=1000', { credentials: 'include' });
       const data = await res.json();
       setPaystubs(Array.isArray(data) ? data : []);
     } catch {
@@ -165,13 +175,35 @@ export default function PayrollTab() {
     }
   }, []);
 
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/accounts', { credentials: 'include' });
+      const data = await res.json();
+      setAccounts(Array.isArray(data) ? data : []);
+    } catch {
+      setAccounts([]);
+    }
+  }, []);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tags', { credentials: 'include' });
+      const data = await res.json();
+      setTags(Array.isArray(data) ? data : []);
+    } catch {
+      setTags([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchPaystubs();
     fetchMappings();
     fetchCategories();
     fetchAutoGenSettings();
-  }, [fetchSettings, fetchPaystubs, fetchMappings, fetchCategories, fetchAutoGenSettings]);
+    fetchAccounts();
+    fetchTags();
+  }, [fetchSettings, fetchPaystubs, fetchMappings, fetchCategories, fetchAutoGenSettings, fetchAccounts, fetchTags]);
 
   // ── Toggle handler ──
 
@@ -210,7 +242,7 @@ export default function PayrollTab() {
           const allDescs = extractDescriptions(arr);
           const newFields: Record<string, FieldMapping> = {};
           for (const desc of allDescs) {
-            newFields[desc] = { action: 'import', categoryId: null };
+            newFields[desc] = { action: 'import', categoryId: null, accountId: null, tagId: null };
           }
           setMappingEditorFields(newFields);
           setMappingEditorName('Default Mapping');
@@ -298,6 +330,8 @@ export default function PayrollTab() {
             name: mappingEditorName,
             employerName: mappingEditorEmployer,
             mappings: flatMappings,
+            accountId: mappingEditorAccount || null,
+            tagId: mappingEditorTag || null,
           }),
         });
       } else {
@@ -310,6 +344,8 @@ export default function PayrollTab() {
             employerName: mappingEditorEmployer,
             isDefault: mappings.length === 0,
             mappings: flatMappings,
+            accountId: mappingEditorAccount || null,
+            tagId: mappingEditorTag || null,
           }),
         });
       }
@@ -326,16 +362,20 @@ export default function PayrollTab() {
       setMappingEditorName(mapping.name);
       setMappingEditorEmployer(mapping.employerName);
       setMappingEditorFields(mapping.mappings as Record<string, FieldMapping>);
+      setMappingEditorAccount(mapping.accountId || '');
+      setMappingEditorTag(mapping.tagId || '');
     } else {
       setEditingMapping(null);
       setMappingEditorName('');
       setMappingEditorEmployer('');
+      setMappingEditorAccount('');
+      setMappingEditorTag('');
       // If we have import data, pre-populate from it
       if (importData.length > 0) {
         const allDescs = extractDescriptions(importData);
         const newFields: Record<string, FieldMapping> = {};
         for (const desc of allDescs) {
-          newFields[desc] = { action: 'import', categoryId: null };
+          newFields[desc] = { action: 'import', categoryId: null, accountId: null, tagId: null };
         }
         setMappingEditorFields(newFields);
       } else {
@@ -405,6 +445,19 @@ export default function PayrollTab() {
       fetchPaystubs();
     } catch {}
     setDeleteLoading(false);
+  };
+
+  const handleDeleteAllPaystubs = async () => {
+    setDeleteAllLoading(true);
+    try {
+      await fetch(`/api/paystubs?filter=${paystubFilter}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      setShowDeleteAllConfirm(false);
+      fetchPaystubs();
+    } catch {}
+    setDeleteAllLoading(false);
   };
 
   // ── Helpers ──
@@ -769,20 +822,30 @@ export default function PayrollTab() {
               {paystubs.length} paystub{paystubs.length !== 1 ? 's' : ''} on file
             </p>
           </div>
-          <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
-            {(['all', 'imported', 'auto'] as const).map((filter) => (
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
+              {(['all', 'imported', 'auto'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setPaystubFilter(filter)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    paystubFilter === filter
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {filter === 'all' ? 'All' : filter === 'imported' ? 'Imported' : 'Auto'}
+                </button>
+              ))}
+            </div>
+            {filteredPaystubs.length > 0 && (
               <button
-                key={filter}
-                onClick={() => setPaystubFilter(filter)}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  paystubFilter === filter
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                onClick={() => setShowDeleteAllConfirm(true)}
+                className="px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 hover:border-destructive/30 rounded-lg transition-colors"
               >
-                {filter === 'all' ? 'All' : filter === 'imported' ? 'Imported' : 'Auto'}
+                Delete All
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -860,6 +923,39 @@ export default function PayrollTab() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Target Account</label>
+                <select
+                  value={mappingEditorAccount}
+                  onChange={(e) => setMappingEditorAccount(e.target.value)}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">No Account (Virtual: From Paystub)</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.institution || 'Manual'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Transaction Tag</label>
+                <select
+                  value={mappingEditorTag}
+                  onChange={(e) => setMappingEditorTag(e.target.value)}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Default (paystub)</option>
+                  {tags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Add new field */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Add Field</label>
@@ -885,7 +981,7 @@ export default function PayrollTab() {
                     if (section && name) {
                       setMappingEditorFields((prev) => ({
                         ...prev,
-                        [`${section}:${name}`]: { action: 'import', categoryId: null },
+                        [`${section}:${name}`]: { action: 'import', categoryId: null, accountId: null, tagId: null },
                       }));
                       (document.getElementById('newFieldName') as HTMLInputElement).value = '';
                     }
@@ -907,57 +1003,97 @@ export default function PayrollTab() {
                   {keys.map((key) => {
                     const field = mappingEditorFields[key];
                     return (
-                      <div key={key} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-                        <span className="text-xs text-foreground flex-1 min-w-0 truncate">
-                          {descriptionLabel(key)}
-                        </span>
-                        <select
-                          value={field.action}
-                          onChange={(e) => {
-                            setMappingEditorFields((prev) => ({
-                              ...prev,
-                              [key]: { ...prev[key], action: e.target.value as 'import' | 'ignore' },
-                            }));
-                          }}
-                          className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground w-20"
-                        >
-                          <option value="import">Import</option>
-                          <option value="ignore">Ignore</option>
-                        </select>
-                        {field.action === 'import' && (
+                      <div key={key} className="flex flex-col gap-2 p-2.5 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center justify-between min-w-0">
+                          <span className="text-xs font-medium text-foreground truncate flex-1 pr-2">
+                            {descriptionLabel(key)}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setMappingEditorFields((prev) => {
+                                const next = { ...prev };
+                                delete next[key];
+                                return next;
+                              });
+                            }}
+                            className="text-xs text-destructive hover:text-destructive/80 px-1.5"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
                           <select
-                            value={field.categoryId || ''}
+                            value={field.action}
                             onChange={(e) => {
                               setMappingEditorFields((prev) => ({
                                 ...prev,
-                                [key]: { ...prev[key], categoryId: e.target.value || null },
+                                [key]: { ...prev[key], action: e.target.value as 'import' | 'ignore' },
                               }));
                             }}
-                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground w-36"
+                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground"
                           >
-                            <option value="">No category</option>
-                            {categories
-                              .filter((c) => c.categoryType !== 'transfer')
-                              .sort((a, b) => a.name.localeCompare(b.name))
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} {c.isIncome ? '(Income)' : ''}
-                                </option>
-                              ))}
+                            <option value="import">Import</option>
+                            <option value="ignore">Ignore</option>
                           </select>
-                        )}
-                        <button
-                          onClick={() => {
-                            setMappingEditorFields((prev) => {
-                              const next = { ...prev };
-                              delete next[key];
-                              return next;
-                            });
-                          }}
-                          className="text-xs text-destructive hover:text-destructive/80 px-1"
-                        >
-                          ✕
-                        </button>
+                          {field.action === 'import' && (
+                            <>
+                              <select
+                                value={field.categoryId || ''}
+                                onChange={(e) => {
+                                  setMappingEditorFields((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], categoryId: e.target.value || null },
+                                  }));
+                                }}
+                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[130px]"
+                              >
+                                <option value="">No category</option>
+                                {categories
+                                  .filter((c) => c.categoryType === 'compound')
+                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} {c.isIncome ? '(Income)' : ''}
+                                    </option>
+                                  ))}
+                              </select>
+                              <select
+                                value={field.accountId || ''}
+                                onChange={(e) => {
+                                  setMappingEditorFields((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], accountId: e.target.value || null },
+                                  }));
+                                }}
+                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[130px]"
+                              >
+                                <option value="">Default Account</option>
+                                {accounts.map((acc) => (
+                                  <option key={acc.id} value={acc.id}>
+                                    {acc.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={field.tagId || ''}
+                                onChange={(e) => {
+                                  setMappingEditorFields((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], tagId: e.target.value || null },
+                                  }));
+                                }}
+                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[110px]"
+                              >
+                                <option value="">Default Tag</option>
+                                {tags.map((tag) => (
+                                  <option key={tag.id} value={tag.id}>
+                                    {tag.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -1199,6 +1335,29 @@ export default function PayrollTab() {
               className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {deleteMappingLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Delete All Paystubs Confirmation ── */}
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={(open) => !open && setShowDeleteAllConfirm(false)}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Paystubs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete all {paystubFilter === 'all' ? '' : `${paystubFilter} `}paystubs on file?
+              This will also permanently delete all transactions created from these paystubs. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleDeleteAllPaystubs}
+              disabled={deleteAllLoading}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {deleteAllLoading ? 'Deleting...' : 'Delete All'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

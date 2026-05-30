@@ -5,7 +5,7 @@ import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { userSettings } from '@/lib/db/schema';
-import { eq, and, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
@@ -157,8 +157,13 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     .from(accounts)
     .where(and(
       eq(accounts.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false)
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      )
     ));
 
   if (userAccounts.length === 0) {
@@ -288,8 +293,13 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     .from(accounts)
     .where(and(
       eq(accounts.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false)
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      )
     ));
 
   if (userAccounts.length === 0) {
@@ -428,8 +438,13 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     .from(accounts)
     .where(and(
       eq(accounts.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false)
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      )
     ));
 
   if (userAccounts.length === 0) {

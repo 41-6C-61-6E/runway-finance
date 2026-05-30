@@ -3,7 +3,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
-import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
+
+type Condition = {
+  id: string; // temp id for UI
+  field: string;
+  operator: string;
+  value: string;
+  caseSensitive: boolean;
+};
 
 type Rule = {
   id: string;
@@ -16,6 +24,7 @@ type Rule = {
   conditionOperator: string;
   conditionValue: string;
   conditionCaseSensitive: boolean;
+  conditions?: Condition[];
   setCategoryId: string | null;
   setPayee: string | null;
   setReviewed: boolean | null;
@@ -71,10 +80,7 @@ export default function RulesTab() {
   const [deleting, setDeleting] = useState<Rule | null>(null);
 
   const [formName, setFormName] = useState('');
-  const [formField, setFormField] = useState('description');
-  const [formOperator, setFormOperator] = useState('contains');
-  const [formValue, setFormValue] = useState('');
-  const [formCaseSensitive, setFormCaseSensitive] = useState(false);
+  const [formConditions, setFormConditions] = useState<Condition[]>([]);
   const [formCategoryId, setFormCategoryId] = useState<string | null>(null);
   const [formTagId, setFormTagId] = useState<string | null>(null);
   const [formSetPayee, setFormSetPayee] = useState('');
@@ -253,10 +259,15 @@ export default function RulesTab() {
   const openAdd = () => {
     setEditingRule(null);
     setFormName('');
-    setFormField('description');
-    setFormOperator('contains');
-    setFormValue('');
-    setFormCaseSensitive(false);
+    setFormConditions([
+      {
+        id: Math.random().toString(),
+        field: 'description',
+        operator: 'contains',
+        value: '',
+        caseSensitive: false,
+      }
+    ]);
     setFormCategoryId(null);
     setFormTagId(null);
     setFormSetPayee('');
@@ -267,10 +278,17 @@ export default function RulesTab() {
   const openEdit = (rule: Rule) => {
     setEditingRule(rule);
     setFormName(rule.name);
-    setFormField(rule.conditionField);
-    setFormOperator(rule.conditionOperator);
-    setFormValue(rule.conditionValue);
-    setFormCaseSensitive(rule.conditionCaseSensitive);
+    // Use multi-condition format if available, fallback to single condition
+    const conditions = rule.conditions && rule.conditions.length > 0 
+      ? rule.conditions 
+      : [{
+          id: Math.random().toString(),
+          field: rule.conditionField,
+          operator: rule.conditionOperator,
+          value: rule.conditionValue,
+          caseSensitive: rule.conditionCaseSensitive,
+        }];
+    setFormConditions(conditions);
     setFormCategoryId(rule.setCategoryId);
     setFormTagId(rule.setTagId ?? null);
     setFormSetPayee(rule.setPayee ?? '');
@@ -279,15 +297,26 @@ export default function RulesTab() {
   };
 
   const handleSave = async () => {
-    if (!formName.trim() || !formValue.trim()) return;
+    if (!formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())) return;
     setSaving(true);
     try {
-      const body = {
+      // Use first condition for backward compatibility with older rules
+      const firstCondition = formConditions[0];
+      const body: any = {
         name: formName.trim(),
-        conditionField: formField,
-        conditionOperator: formOperator,
-        conditionValue: formValue.trim(),
-        conditionCaseSensitive: formCaseSensitive,
+        conditionField: firstCondition.field,
+        conditionOperator: firstCondition.operator,
+        conditionValue: firstCondition.value.trim(),
+        conditionCaseSensitive: firstCondition.caseSensitive,
+        // Include multi-condition format if there are multiple conditions
+        ...(formConditions.length > 1 && {
+          conditions: formConditions.map(c => ({
+            field: c.field,
+            operator: c.operator,
+            value: c.value.trim(),
+            caseSensitive: c.caseSensitive,
+          }))
+        }),
         setCategoryId: formCategoryId || null,
         setTagId: formTagId || null,
         setPayee: formSetPayee.trim() || null,
@@ -417,9 +446,20 @@ export default function RulesTab() {
 
   const formatCondition = (rule: Rule) => {
     try {
-      const field = FIELD_OPTIONS.find((f) => f.value === rule.conditionField)?.label ?? rule.conditionField;
-      const op = OPERATOR_LABELS[rule.conditionOperator] ?? rule.conditionOperator;
-      return `${field} ${op} "${rule.conditionValue}"`;
+      const conditions = rule.conditions && rule.conditions.length > 0 
+        ? rule.conditions 
+        : [{
+            field: rule.conditionField,
+            operator: rule.conditionOperator,
+            value: rule.conditionValue,
+            caseSensitive: rule.conditionCaseSensitive,
+          }];
+      
+      return conditions.map(cond => {
+        const field = FIELD_OPTIONS.find((f) => f.value === cond.field)?.label ?? cond.field;
+        const op = OPERATOR_LABELS[cond.operator] ?? cond.operator;
+        return `${field} ${op} "${cond.value}"`;
+      }).join(' AND ');
     } catch (error) {
       console.error('Error formatting condition:', error);
       return 'Invalid condition';
@@ -668,50 +708,106 @@ export default function RulesTab() {
               </div>
 
               <div className="border-t border-border pt-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">Condition</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">Field</label>
-                    <select
-                      value={formField}
-                      onChange={(e) => setFormField(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      {FIELD_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">Operator</label>
-                    <select
-                      value={formOperator}
-                      onChange={(e) => setFormOperator(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      {OPERATOR_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-foreground">Conditions (all must match)</h4>
+                  <button
+                    onClick={() => {
+                      setFormConditions([...formConditions, {
+                        id: Math.random().toString(),
+                        field: 'description',
+                        operator: 'contains',
+                        value: '',
+                        caseSensitive: false,
+                      }]);
+                    }}
+                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Condition
+                  </button>
                 </div>
+                
+                <div className="space-y-3">
+                  {formConditions.map((condition, idx) => (
+                    <div key={condition.id} className="p-3 bg-muted/30 border border-border rounded-lg">
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs text-muted-foreground mb-1">Field</label>
+                          <select
+                            value={condition.field}
+                            onChange={(e) => {
+                              const updated = [...formConditions];
+                              updated[idx] = { ...updated[idx], field: e.target.value };
+                              setFormConditions(updated);
+                            }}
+                            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            {FIELD_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-muted-foreground mb-1">Operator</label>
+                          <select
+                            value={condition.operator}
+                            onChange={(e) => {
+                              const updated = [...formConditions];
+                              updated[idx] = { ...updated[idx], operator: e.target.value };
+                              setFormConditions(updated);
+                            }}
+                            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            {OPERATOR_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
 
-                <div className="mt-3">
-                  <label className="block text-xs text-muted-foreground mb-1">Value</label>
-                  <input
-                    value={formValue}
-                    onChange={(e) => setFormValue(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="e.g., AMAZON"
-                  />
-                </div>
+                      <div className="mb-3">
+                        <label className="block text-xs text-muted-foreground mb-1">Value</label>
+                        <input
+                          value={condition.value}
+                          onChange={(e) => {
+                            const updated = [...formConditions];
+                            updated[idx] = { ...updated[idx], value: e.target.value };
+                            setFormConditions(updated);
+                          }}
+                          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          placeholder="e.g., AMAZON"
+                        />
+                      </div>
 
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-foreground/80">Case Sensitive</span>
-                  <Switch
-                    checked={formCaseSensitive}
-                    onCheckedChange={setFormCaseSensitive}
-                  />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={condition.caseSensitive}
+                            onChange={(e) => {
+                              const updated = [...formConditions];
+                              updated[idx] = { ...updated[idx], caseSensitive: e.target.checked };
+                              setFormConditions(updated);
+                            }}
+                            className="rounded border-border text-primary focus:ring-ring"
+                            id={`case-${condition.id}`}
+                          />
+                          <label htmlFor={`case-${condition.id}`} className="text-xs text-foreground/80 cursor-pointer">Case Sensitive</label>
+                        </div>
+                        {formConditions.length > 1 && (
+                          <button
+                            onClick={() => {
+                              setFormConditions(formConditions.filter((_, i) => i !== idx));
+                            }}
+                            className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Remove condition"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -776,7 +872,7 @@ export default function RulesTab() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !formName.trim() || !formValue.trim()}
+                disabled={saving || !formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? 'Saving...' : editingRule ? 'Update' : 'Create'}

@@ -9,6 +9,13 @@ import {
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { createTransactionsFromLineItems } from '../route';
+import { getSessionDEK } from '@/lib/crypto-context';
+import {
+  updateCategorySpendingSummaries,
+  updateCategoryIncomeSummaries,
+  updateMonthlyCashFlowSummaries,
+} from '@/lib/services/sync';
+import { parseDate } from '@/lib/utils/paystub';
 
 interface RawPaystub {
   employeeName?: string;
@@ -49,12 +56,7 @@ interface RawPaystub {
   }>;
 }
 
-export function parseDate(dateStr: string): string {
-  const parts = dateStr.split('/');
-  if (parts.length !== 3) return dateStr; // Return as-is if not parseable
-  const [month, day, year] = parts;
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-}
+
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
+  const dek = await getSessionDEK();
 
   let body: {
     paystubs: RawPaystub[];
@@ -185,7 +188,8 @@ export async function POST(request: Request) {
       if (!items || !Array.isArray(items)) return;
       for (const item of items) {
         const descKey = item.description || '';
-        const mappingEntry = mappingsJson[descKey];
+        const lookupKey = `${section}:${descKey}`;
+        const mappingEntry = mappingsJson[lookupKey];
         const mappingAction = mappingEntry?.action || 'import';
         const categoryId = mappingEntry?.categoryId || null;
 
@@ -223,11 +227,17 @@ export async function POST(request: Request) {
       paystub,
       allLineItems,
       employerName,
-      checkDate
+      checkDate,
+      dek
     );
 
     imported++;
   }
+
+  // Recalculate summaries to update charts
+  await updateCategorySpendingSummaries(userId, dek);
+  await updateCategoryIncomeSummaries(userId, dek);
+  await updateMonthlyCashFlowSummaries(userId, dek);
 
   return Response.json({ imported, skipped, total });
 }
