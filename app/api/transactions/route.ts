@@ -195,8 +195,13 @@ export async function GET(request: Request) {
   // Hidden and excluded accounts are global exclusions for user-facing data.
   const whereConditions = [
     eq(transactions.userId, userId),
-    eq(accounts.isHidden, false),
-    eq(accounts.isExcludedFromNetWorth, false),
+    or(
+      and(
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
+      ),
+      eq(accounts.type, 'paystub')
+    ),
     eq(transactions.deleted, false),
   ];
 
@@ -817,8 +822,13 @@ export async function PATCH(request: Request) {
 
     const whereConditions = [
       eq(transactions.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false),
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      ),
       eq(transactions.deleted, false),
     ];
 
@@ -1067,8 +1077,13 @@ export async function DELETE(request: Request) {
 
     const whereConditions = [
       eq(transactions.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false),
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      ),
       eq(transactions.deleted, false),
     ];
 

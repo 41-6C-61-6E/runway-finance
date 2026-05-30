@@ -281,6 +281,13 @@
       "when": 1779800000000,
       "tag": "0039_add_paystubs",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780095639606,
+      "tag": "0040_add_paystub_mapping_fields",
+      "breakpoints": true
     }
   ]
 }

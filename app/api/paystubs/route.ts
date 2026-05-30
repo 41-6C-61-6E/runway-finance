@@ -1,7 +1,14 @@
 import { auth } from 'auth';
 import { getDb } from '@/lib/db';
-import { paystubs, paystubLineItems, transactions, accounts } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { paystubs, paystubLineItems, transactions, accounts, paystubFieldMappings, tags, transactionTags } from '@/lib/db/schema';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+import { encryptRow, decryptRows } from '@/lib/crypto';
+import { getSessionDEK } from '@/lib/crypto-context';
+import {
+  updateCategorySpendingSummaries,
+  updateCategoryIncomeSummaries,
+  updateMonthlyCashFlowSummaries,
+} from '@/lib/services/sync';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -122,14 +129,21 @@ export async function POST(request: Request) {
   }
 
   // Create transactions from mapped line items
+  const dek = await getSessionDEK();
   await createTransactionsFromLineItems(
     db,
     userId,
     paystub,
     insertedLineItems,
     employerName,
-    checkDate
+    checkDate,
+    dek
   );
+
+  // Recalculate summaries to update charts
+  await updateCategorySpendingSummaries(userId, dek);
+  await updateCategoryIncomeSummaries(userId, dek);
+  await updateMonthlyCashFlowSummaries(userId, dek);
 
   // Re-fetch line items to include any transactionId updates
   const finalLineItems = await db
@@ -141,13 +155,92 @@ export async function POST(request: Request) {
 }
 
 /**
+ * Ensures that a hidden virtual account "From Paystub" exists for the user.
+ */
+async function ensureVirtualPaystubAccount(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  dek?: Uint8Array
+): Promise<string> {
+  const userAccounts = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.type, 'paystub')))
+    .limit(1);
+
+  if (userAccounts.length > 0) {
+    return userAccounts[0].id;
+  }
+
+  const rawValues = {
+    userId,
+    connectionId: null,
+    externalId: `virtual-paystub-${userId}`,
+    name: 'From Paystub',
+    currency: 'USD',
+    balance: '0',
+    balanceDate: new Date(),
+    type: 'paystub',
+    metadata: null,
+    institution: null,
+    isHidden: true,
+    isExcludedFromNetWorth: true,
+    displayOrder: 0,
+  };
+
+  const values = dek ? await encryptRow('accounts', rawValues, dek) : rawValues;
+
+  const [created] = await db
+    .insert(accounts)
+    .values(values)
+    .returning();
+
+  return created.id;
+}
+
+/**
+ * Ensures that a tag named "paystub" exists for the user.
+ */
+async function ensurePaystubTag(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  dek?: Uint8Array
+): Promise<string> {
+  const userTags = await db
+    .select()
+    .from(tags)
+    .where(eq(tags.userId, userId));
+
+  const decrypted = dek ? await decryptRows('tags', userTags, dek) : userTags;
+  const existing = decrypted.find((t) => t.name.toLowerCase() === 'paystub');
+  if (existing) {
+    return existing.id;
+  }
+
+  const rawValues = {
+    userId,
+    name: 'paystub',
+    color: '#6366f1',
+    description: 'Auto-applied to paystub transactions',
+  };
+
+  const values = dek ? await encryptRow('tags', rawValues, dek) : rawValues;
+  const [created] = await db
+    .insert(tags)
+    .values(values)
+    .returning();
+
+  return created.id;
+}
+
+/**
  * Create transactions from paystub line items.
  * Shared logic used by manual POST, import, and auto-generate.
  */
 export async function createTransactionsFromLineItems(
   db: ReturnType<typeof getDb>,
   userId: string,
-  paystub: { id: string; checkDate: string },
+  paystub: { id: string; checkDate: string; mappingId?: string | null },
   lineItems: Array<{
     id: string;
     section: string;
@@ -157,17 +250,56 @@ export async function createTransactionsFromLineItems(
     categoryId: string | null;
   }>,
   employerName: string,
-  checkDate: string
+  checkDate: string,
+  dek?: Uint8Array
 ) {
-  // Find any account belonging to this user
-  const [userAccount] = await db
-    .select()
-    .from(accounts)
-    .where(eq(accounts.userId, userId))
-    .limit(1);
+  // Resolve target account, tag, and mappings JSON from the field mapping template if specified
+  let mappingsJson: Record<string, { action: string; categoryId: string | null; accountId?: string | null; tagId?: string | null }> = {};
+  let targetAccountId: string | null = null;
+  let targetTagId: string | null = null;
 
-  if (!userAccount) {
-    return; // No account found, skip transaction creation
+  if (paystub.mappingId) {
+    const [mapping] = await db
+      .select({
+        accountId: paystubFieldMappings.accountId,
+        tagId: paystubFieldMappings.tagId,
+        mappings: paystubFieldMappings.mappings,
+      })
+      .from(paystubFieldMappings)
+      .where(eq(paystubFieldMappings.id, paystub.mappingId))
+      .limit(1);
+
+    if (mapping) {
+      targetAccountId = mapping.accountId;
+      targetTagId = mapping.tagId;
+      mappingsJson = (mapping.mappings || {}) as any;
+    }
+  }
+
+  // Pre-resolve virtual fallbacks lazily
+  let virtualAccountId: string | null = null;
+  let defaultTagId: string | null = null;
+
+  async function getFallbackAccountId() {
+    if (!virtualAccountId) {
+      virtualAccountId = await ensureVirtualPaystubAccount(db, userId, dek);
+    }
+    return virtualAccountId;
+  }
+
+  async function getFallbackTagId() {
+    if (!defaultTagId) {
+      defaultTagId = await ensurePaystubTag(db, userId, dek);
+    }
+    return defaultTagId;
+  }
+
+  async function resolveAccountAndTagForLine(section: string, description: string) {
+    const lookupKey = `${section}:${description}`;
+    const mappingEntry = mappingsJson[lookupKey];
+    const accId = mappingEntry?.accountId || targetAccountId || (await getFallbackAccountId());
+    const tgId = mappingEntry?.tagId || targetTagId || (await getFallbackTagId());
+    return { accountId: accId, tagId: tgId };
   }
 
   const mappedItems = lineItems.filter(
@@ -176,22 +308,32 @@ export async function createTransactionsFromLineItems(
 
   if (mappedItems.length === 0) return;
 
-  // EARNINGS: Create a single transaction for gross amount
+  // EARNINGS: Group earnings items by their resolved account and tag
   const earningsItems = mappedItems.filter((item) => item.section === 'earnings');
   if (earningsItems.length > 0) {
-    // Compute total earnings from mapped line items
-    const totalEarnings = earningsItems.reduce(
-      (sum, item) => sum + parseFloat(item.amount || '0'),
-      0
-    );
-    const firstEarningsCategoryId = earningsItems[0].categoryId;
-    const earningsExternalId = `paystub-${paystub.id}-${earningsItems[0].id}`;
+    const groups: Record<string, { items: typeof earningsItems; accountId: string; tagId: string }> = {};
 
-    const [txn] = await db
-      .insert(transactions)
-      .values({
+    for (const item of earningsItems) {
+      const { accountId, tagId } = await resolveAccountAndTagForLine(item.section, item.description);
+      const key = `${accountId}::${tagId}`;
+      if (!groups[key]) {
+        groups[key] = { items: [], accountId, tagId };
+      }
+      groups[key].items.push(item);
+    }
+
+    for (const groupKey of Object.keys(groups)) {
+      const { items, accountId, tagId } = groups[groupKey];
+      const totalEarnings = items.reduce(
+        (sum, item) => sum + parseFloat(item.amount || '0'),
+        0
+      );
+      const firstEarningsCategoryId = items[0].categoryId;
+      const earningsExternalId = `paystub-${paystub.id}-${items[0].id}`;
+
+      const txnValues = {
         userId,
-        accountId: userAccount.id,
+        accountId: accountId,
         externalId: earningsExternalId,
         date: checkDate,
         amount: String(totalEarnings),
@@ -200,15 +342,27 @@ export async function createTransactionsFromLineItems(
         paystubId: paystub.id,
         categoryId: firstEarningsCategoryId,
         reviewed: true,
-      })
-      .returning();
+      };
+      const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
 
-    // Link all earnings line items to this transaction
-    for (const item of earningsItems) {
-      await db
-        .update(paystubLineItems)
-        .set({ transactionId: txn.id })
-        .where(eq(paystubLineItems.id, item.id));
+      const [txn] = await db
+        .insert(transactions)
+        .values(encryptedTxn)
+        .returning();
+
+      // Link tag to transaction
+      await db.insert(transactionTags).values({
+        transactionId: txn.id,
+        tagId: tagId,
+      });
+
+      // Link all matching earnings line items to this transaction
+      for (const item of items) {
+        await db
+          .update(paystubLineItems)
+          .set({ transactionId: txn.id })
+          .where(eq(paystubLineItems.id, item.id));
+      }
     }
   }
 
@@ -225,21 +379,32 @@ export async function createTransactionsFromLineItems(
     const negativeAmount = -Math.abs(amount);
     const externalId = `paystub-${paystub.id}-${item.id}`;
 
+    const { accountId, tagId } = await resolveAccountAndTagForLine(item.section, item.description);
+
+    const txnValues = {
+      userId,
+      accountId: accountId,
+      externalId,
+      date: checkDate,
+      amount: String(negativeAmount),
+      description: item.description,
+      source: 'paystub',
+      paystubId: paystub.id,
+      categoryId: item.categoryId,
+      reviewed: true,
+    };
+    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+
     const [txn] = await db
       .insert(transactions)
-      .values({
-        userId,
-        accountId: userAccount.id,
-        externalId,
-        date: checkDate,
-        amount: String(negativeAmount),
-        description: item.description,
-        source: 'paystub',
-        paystubId: paystub.id,
-        categoryId: item.categoryId,
-        reviewed: true,
-      })
+      .values(encryptedTxn)
       .returning();
+
+    // Link tag to transaction
+    await db.insert(transactionTags).values({
+      transactionId: txn.id,
+      tagId: tagId,
+    });
 
     await db
       .update(paystubLineItems)
@@ -247,3 +412,59 @@ export async function createTransactionsFromLineItems(
       .where(eq(paystubLineItems.id, item.id));
   }
 }
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const db = getDb();
+  const userId = session.user.id;
+  const { searchParams } = new URL(request.url);
+  const filter = searchParams.get('filter') || 'all';
+
+  const conditions = [eq(paystubs.userId, userId)];
+  if (filter === 'imported') {
+    conditions.push(eq(paystubs.isAutoGenerated, false));
+  } else if (filter === 'auto') {
+    conditions.push(eq(paystubs.isAutoGenerated, true));
+  }
+
+  const targetPaystubs = await db
+    .select({ id: paystubs.id })
+    .from(paystubs)
+    .where(and(...conditions));
+
+  if (targetPaystubs.length === 0) {
+    return Response.json({ success: true, deleted: 0 });
+  }
+
+  const ids = targetPaystubs.map((p) => p.id);
+
+  // Delete all transactions linked to these paystubs
+  await db
+    .delete(transactions)
+    .where(and(eq(transactions.userId, userId), inArray(transactions.paystubId, ids)));
+
+  // Delete the paystubs (cascade deletes line items)
+  await db
+    .delete(paystubs)
+    .where(and(eq(paystubs.userId, userId), inArray(paystubs.id, ids)));
+
+  // Recalculate spending summaries, etc.
+  try {
+    const dek = await getSessionDEK();
+    if (dek) {
+      await updateCategorySpendingSummaries(userId, dek);
+      await updateCategoryIncomeSummaries(userId, dek);
+      await updateMonthlyCashFlowSummaries(userId, dek);
+    }
+  } catch (err) {
+    console.warn('Could not recalculate summaries after paystub deletion:', err);
+  }
+
+  return Response.json({ success: true, deleted: ids.length });
+}
+
+

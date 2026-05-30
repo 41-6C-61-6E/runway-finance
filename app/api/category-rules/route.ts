@@ -16,6 +16,13 @@ const CreateRuleSchema = z.object({
   conditionOperator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
   conditionValue: z.string().min(1).max(500),
   conditionCaseSensitive: z.boolean().default(false),
+  // Multi-condition support
+  conditions: z.array(z.object({
+    field: z.enum(['description', 'payee', 'amount', 'memo']),
+    operator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
+    value: z.string().min(1).max(500),
+    caseSensitive: z.boolean().default(false),
+  })).optional(),
   setCategoryId: z.string().uuid().nullable().optional(),
   setTagId: z.string().uuid().nullable().optional(),
   setPayee: z.string().max(200).nullable().optional(),
@@ -86,7 +93,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, setCategoryId, setTagId, setPayee, setReviewed } = parsed.data;
+  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, conditions, setCategoryId, setTagId, setPayee, setReviewed } = parsed.data;
+
+  // Prepare the conditions array (use provided conditions or create from single condition fields)
+  const conditionsData = conditions || [{
+    field: conditionField,
+    operator: conditionOperator,
+    value: conditionValue,
+    caseSensitive: conditionCaseSensitive,
+  }];
 
   const encryptedValues = await encryptRow('category_rules', {
     userId,
@@ -97,6 +112,7 @@ export async function POST(request: Request) {
     conditionOperator,
     conditionValue,
     conditionCaseSensitive,
+    conditions: conditionsData, // Store conditions array as JSON
     setCategoryId: setCategoryId ?? null,
     setTagId: setTagId ?? null,
     setPayee: setPayee ?? null,
