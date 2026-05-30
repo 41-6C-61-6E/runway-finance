@@ -127,13 +127,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     body.balance !== undefined
   ) {
     const today = new Date().toISOString().split('T')[0];
-    await Promise.all([
+    Promise.all([
       createAccountSnapshots(userId, dek, today),
       createNetWorthSnapshot(userId, dek, today),
       updateMonthlyCashFlowSummaries(userId, dek),
       updateCategorySpendingSummaries(userId, dek),
       updateCategoryIncomeSummaries(userId, dek),
-    ]);
+    ]).catch((err) => {
+      logger.error('Error in background sync/recalc after manual account PATCH', {
+        accountId: id,
+        userId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   logger.info('PATCH /api/manual-accounts/[id]', { userId, id, fieldsChanged: Object.keys(updateData) });

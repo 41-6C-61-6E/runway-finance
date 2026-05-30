@@ -317,8 +317,10 @@ export function SpendingBreakdown() {
                 const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
                 
                 return (
-                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                    <BarChart
+                  <div className="overflow-x-auto overflow-y-hidden h-full w-full">
+                    <div className="min-w-max h-full">
+                      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                        <BarChart
                       layout="vertical"
                       data={pieData}
                       margin={isMobile ? { top: 10, right: 10, left: 5, bottom: 10 } : { top: 10, right: 10, left: 10, bottom: 10 }}
@@ -366,7 +368,9 @@ export function SpendingBreakdown() {
                         cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
                       />
                     </BarChart>
-                  </ResponsiveContainer>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
                 );
               })() : (
                 <>

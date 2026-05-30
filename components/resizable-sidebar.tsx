@@ -1,7 +1,6 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ChartSpline, Receipt, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
@@ -12,7 +11,7 @@ export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from
 
 const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
   { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
-  { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'netWorth' },
+  { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'settings' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow' },
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
@@ -41,7 +40,6 @@ export default function ResizableSidebar() {
   const pathname = usePathname()
   const { sidebarWidth, isHovering, handleNavResizeDown, handleMouseEnter, handleMouseLeave } = useSidebar()
   const [isResizing, setIsResizing] = useState(false)
-  const { data: session } = useSession()
   const [mounted, setMounted] = useState(false)
 
   const { isHidden } = useHiddenPages()
@@ -140,20 +138,6 @@ export default function ResizableSidebar() {
           })}
         </nav>
 
-        {/* Bottom section */}
-        {session?.user && (
-          <div className={isCollapsed ? 'space-y-2 pb-4 flex flex-col items-center' : 'space-y-3 p-3'}>
-            {isCollapsed && session?.user?.name && (
-              <SimpleTooltip label={session.user.name} show={isCollapsed}>
-                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mb-1">
-                  <span className="text-xs font-semibold text-primary">
-                    {session.user.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              </SimpleTooltip>
-            )}
-          </div>
-        )}
       </aside>
 
       {/* Resize Handle */}

@@ -66,7 +66,6 @@ type AutoGenerateSettings = {
 export default function PayrollTab() {
   // ── Feature Toggle State ──
   const [paystubEnabled, setPaystubEnabled] = useState(false);
-  const [toggleLoading, setToggleLoading] = useState(false);
 
   // ── Data State ──
   const [paystubs, setPaystubs] = useState<Paystub[]>([]);
@@ -208,17 +207,18 @@ export default function PayrollTab() {
   // ── Toggle handler ──
 
   const handleToggle = async (enabled: boolean) => {
-    setToggleLoading(true);
+    setPaystubEnabled(enabled);
     try {
-      await fetch('/api/user-settings', {
+      const res = await fetch('/api/user-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ paystubEnabled: enabled }),
       });
-      setPaystubEnabled(enabled);
-    } catch {}
-    setToggleLoading(false);
+      if (!res.ok) throw new Error('Failed to save paystub setting');
+    } catch {
+      setPaystubEnabled(!enabled);
+    }
   };
 
   // ── Import flow ──
@@ -527,7 +527,6 @@ export default function PayrollTab() {
           <Switch
             checked={paystubEnabled}
             onCheckedChange={handleToggle}
-            disabled={toggleLoading}
           />
         </div>
       </div>

@@ -337,13 +337,13 @@ export async function PATCH(request: Request) {
     .returning();
 
   if (paystubEnabled !== undefined) {
-    try {
-      await updateMonthlyCashFlowSummaries(session.user.id, dek);
-      await updateCategorySpendingSummaries(session.user.id, dek);
-      await updateCategoryIncomeSummaries(session.user.id, dek);
-    } catch (e) {
-      console.error('Failed to update summaries after toggling paystubs:', e);
-    }
+    Promise.all([
+      updateMonthlyCashFlowSummaries(session.user.id, dek),
+      updateCategorySpendingSummaries(session.user.id, dek),
+      updateCategoryIncomeSummaries(session.user.id, dek),
+    ]).catch((e) => {
+      console.error('Failed to update summaries after toggling paystubs in background:', e);
+    });
   }
 
   let updatedApiKeys: Record<string, string> = {};
