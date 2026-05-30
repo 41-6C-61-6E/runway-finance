@@ -1100,7 +1100,10 @@ function SettingsPageBody() {
           {hasConnection && (
             <div className="p-5 bg-card border border-border rounded-xl">
               <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
-              <p className="text-xs text-muted-foreground mb-4">Hidden and excluded accounts are omitted everywhere: dashboards, charts, transactions, forecasts, goals, and exports.</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
+                <strong> Exclude</strong> keeps the account visible on your dashboard hierarchy list with an &quot;Excluded&quot; badge, but removes it from net worth charts, total calculations, transactions, and forecasts.
+              </p>
 
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex rounded-lg bg-muted border border-border overflow-hidden">

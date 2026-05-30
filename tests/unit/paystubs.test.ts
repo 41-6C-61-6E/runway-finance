@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addFrequencyInterval, getFrequencyDays } from '@/app/api/paystubs/auto-generate/route';
-import { parseDate } from '@/app/api/paystubs/import/route';
+import { addFrequencyInterval, getFrequencyDays, parseDate } from '@/lib/utils/paystub';
 
 describe('Paystubs Helpers', () => {
   describe('parseDate', () => {

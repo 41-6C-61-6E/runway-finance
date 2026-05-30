@@ -69,15 +69,39 @@ export function evaluateCondition(
   rule: typeof categoryRules.$inferSelect,
   tx: TransactionData
 ): boolean {
-  const fieldValue = getFieldValue(rule.conditionField, tx);
+  // Use multi-condition format if available, fallback to single condition
+  const conditions = (rule.conditions as any[]) && (rule.conditions as any[]).length > 0
+    ? (rule.conditions as any[])
+    : [{
+        field: rule.conditionField,
+        operator: rule.conditionOperator,
+        value: rule.conditionValue,
+        caseSensitive: rule.conditionCaseSensitive,
+      }];
+
+  // All conditions must match (AND logic)
+  for (const condition of conditions) {
+    if (!evaluateSingleCondition(condition, tx)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function evaluateSingleCondition(
+  condition: any,
+  tx: TransactionData
+): boolean {
+  const fieldValue = getFieldValue(condition.field, tx);
   if (fieldValue === null || fieldValue === undefined) return false;
 
-  const searchValue = rule.conditionValue;
+  const searchValue = condition.value;
   const fieldStr = String(fieldValue);
-  const searchStr = rule.conditionCaseSensitive ? searchValue : searchValue.toLowerCase();
-  const targetStr = rule.conditionCaseSensitive ? fieldStr : fieldStr.toLowerCase();
+  const searchStr = condition.caseSensitive ? searchValue : searchValue.toLowerCase();
+  const targetStr = condition.caseSensitive ? fieldStr : fieldStr.toLowerCase();
 
-  switch (rule.conditionOperator) {
+  switch (condition.operator) {
     case 'contains':
       return targetStr.includes(searchStr);
     case 'equals':
@@ -88,7 +112,7 @@ export function evaluateCondition(
       return targetStr.endsWith(searchStr);
     case 'regex':
       try {
-        const flags = rule.conditionCaseSensitive ? '' : 'i';
+        const flags = condition.caseSensitive ? '' : 'i';
         return new RegExp(searchValue, flags).test(fieldStr);
       } catch {
         return false;
