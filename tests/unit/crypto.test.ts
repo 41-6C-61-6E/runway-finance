@@ -13,6 +13,8 @@ describe('Crypto', () => {
   let deriveKeyFromPassword: (password: string, salt: Uint8Array) => Promise<Uint8Array>;
   let wrapKey: (dek: Uint8Array, kek: Uint8Array) => Promise<{ ciphertext: string; iv: string; tag: string }>;
   let unwrapKey: (payload: { ciphertext: string; iv: string; tag: string }, kek: Uint8Array) => Promise<Uint8Array>;
+  let encryptRow: (table: string, row: any, key: Uint8Array) => Promise<any>;
+  let decryptRow: (table: string, row: any, key: Uint8Array) => Promise<any>;
 
   beforeAll(async () => {
     // Set a valid ENCRYPTION_KEY for getServerKey to work
@@ -25,6 +27,8 @@ describe('Crypto', () => {
     deriveKeyFromPassword = mod.deriveKeyFromPassword;
     wrapKey = mod.wrapKey;
     unwrapKey = mod.unwrapKey;
+    encryptRow = mod.encryptRow;
+    decryptRow = mod.decryptRow;
     testKey = hexToBytes('00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff');
   });
 
@@ -71,5 +75,47 @@ describe('Crypto', () => {
 
   it('field decrypt returns empty string on decryption failure', async () => {
     await expect(decryptField('{"ct":"invalid","iv":"0123456789abcdef01234567"}', testKey)).resolves.toBe('');
+  });
+
+  it('row-level encrypt/decrypt roundtrips for JSONB objects (conditions)', async () => {
+    const row = {
+      name: 'Test Rule',
+      conditionField: 'payee',
+      conditionOperator: 'contains',
+      conditionValue: 'Amazon',
+      conditions: [
+        { field: 'payee', operator: 'contains', value: 'Amazon', caseSensitive: false }
+      ]
+    };
+    const encrypted = await encryptRow('category_rules', row, testKey);
+    expect(encrypted.name).not.toBe(row.name);
+    expect(encrypted.conditionValue).not.toBe(row.conditionValue);
+    expect(encrypted.conditions).not.toEqual(row.conditions);
+    expect(encrypted.conditions.ct).toBeDefined();
+    expect(encrypted.conditions.iv).toBeDefined();
+
+    const decrypted = await decryptRow('category_rules', encrypted, testKey);
+    expect(decrypted.name).toBe(row.name);
+    expect(decrypted.conditionValue).toBe(row.conditionValue);
+    expect(decrypted.conditions).toEqual(row.conditions);
+  });
+
+  it('decryptRow handles legacy category_rules with unencrypted outer conditions array and encrypted inner condition values', async () => {
+    const encryptedVal = await encryptField('Starbucks', testKey);
+    const legacyRow = {
+      name: 'Test Legacy Rule',
+      conditionField: 'payee',
+      conditionOperator: 'contains',
+      conditionValue: encryptedVal,
+      conditions: [
+        { field: 'payee', operator: 'contains', value: encryptedVal, caseSensitive: false }
+      ]
+    };
+
+    const decrypted = await decryptRow('category_rules', legacyRow, testKey);
+    expect(decrypted.conditionValue).toBe('Starbucks');
+    expect(decrypted.conditions).toEqual([
+      { field: 'payee', operator: 'contains', value: 'Starbucks', caseSensitive: false }
+    ]);
   });
 });
