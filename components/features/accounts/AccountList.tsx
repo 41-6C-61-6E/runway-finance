@@ -256,7 +256,7 @@ export default function AccountList({ initialAccounts, showHidden = false }: { i
       <div className="p-12 bg-muted rounded-xl border border-border text-center">
         <p className="text-muted-foreground text-lg mb-4">No accounts linked yet.</p>
         <a
-          href="/settings"
+          href="/settings?tab=accounts"
           className="inline-block px-6 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
         >
           Connect a Financial Institution

@@ -172,7 +172,6 @@ function SettingsPageBody() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountFilter, setAccountFilter] = useState<'all' | 'hidden' | 'excluded'>('all');
-  const [togglingAccount, setTogglingAccount] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
 
@@ -203,19 +202,26 @@ function SettingsPageBody() {
   const handleToggleAccount = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
       e.stopPropagation();
-      setTogglingAccount(accountId);
       const account = accounts.find((a) => a.id === accountId);
       if (!account) return;
+      const originalValue = account[field];
+      const newValue = !originalValue;
+      // Optimistically update the UI state immediately
+      setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: newValue } : a)));
       try {
-        await fetch(`/api/accounts/${accountId}`, {
+        const res = await fetch(`/api/accounts/${accountId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ [field]: !account[field] }),
+          body: JSON.stringify({ [field]: newValue }),
         });
-        setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: !a[field] } : a)));
-      } catch {}
-      setTogglingAccount(null);
+        if (!res.ok) {
+          throw new Error('Failed to update account');
+        }
+      } catch {
+        // Roll back if request fails
+        setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: originalValue } : a)));
+      }
     },
     [accounts]
   );
@@ -1200,10 +1206,9 @@ function SettingsPageBody() {
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={handleToggleAccount(account.id, 'isHidden')}
-                                      disabled={togglingAccount === account.id}
                                       className={`relative w-10 h-5 rounded-full transition-colors ${
                                         account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
-                                      } disabled:opacity-50`}
+                                      }`}
                                       title={account.isHidden ? 'Show account' : 'Hide account'}
                                     >
                                       <span
@@ -1217,10 +1222,9 @@ function SettingsPageBody() {
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                      disabled={togglingAccount === account.id}
                                       className={`relative w-10 h-5 rounded-full transition-colors ${
                                         account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
-                                      } disabled:opacity-50`}
+                                      }`}
                                       title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
                                     >
                                       <span

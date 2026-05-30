@@ -389,16 +389,23 @@ export default function RulesTab() {
   };
 
   const handleToggleActive = async (rule: Rule) => {
+    const originalValue = rule.isActive;
+    const newValue = !originalValue;
+    // Optimistically update rules list state
+    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, isActive: newValue } : r)));
     try {
-      await fetch(`/api/category-rules/${rule.id}`, {
+      const res = await fetch(`/api/category-rules/${rule.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ isActive: !rule.isActive }),
+        body: JSON.stringify({ isActive: newValue }),
       });
+      if (!res.ok) throw new Error('Failed to update active status');
       await fetchRules();
     } catch (error) {
       console.error('Error toggling rule active status:', error);
+      // Rollback on error
+      setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, isActive: originalValue } : r)));
     }
   };
 

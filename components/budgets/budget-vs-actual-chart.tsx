@@ -130,10 +130,11 @@ export function BudgetVsActualChart() {
           <span className="text-xs text-muted-foreground">Exclude Income</span>
         </label>
       </div>
-      <div className="h-[350px] px-2 pb-2">
-        <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-            <BarChart
+      <div className="h-[350px]">
+        <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+          <div className="min-w-max h-full px-2 pb-2">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+              <BarChart
               layout="vertical"
               data={allChartData}
               margin={isMobile ? { top: 10, right: 15, left: 10, bottom: 10 } : { top: 10, right: 60, left: 10, bottom: 10 }}
@@ -217,7 +218,8 @@ export function BudgetVsActualChart() {
                 fill="var(--color-destructive)"
               />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
       <div className="px-5 py-2.5 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">

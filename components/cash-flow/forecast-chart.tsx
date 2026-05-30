@@ -51,9 +51,10 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
 
   return (
     <div className="h-[320px]">
-      <div className="financial-chart h-full">
-        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-          <LineChart
+      <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+        <div className="min-w-max h-full px-2 pb-2">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+            <LineChart
             data={chartData}
             margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
           >
@@ -117,8 +118,9 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
                 />
               );
             })}
-          </LineChart>
-        </ResponsiveContainer>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
