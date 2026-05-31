@@ -8,6 +8,9 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { TrendingUp, TrendingDown, BarChart3, Table2 } from 'lucide-react';
 import { EstimatePill } from '@/components/ui/estimate-pill';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 
 type ForecastMode = 'historical' | 'budget' | 'hybrid';
 
@@ -64,6 +67,8 @@ const MODE_DESCRIPTIONS: Record<ForecastMode, string> = {
 };
 
 export function CashFlowForecast() {
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashFlowForecast');
+  const [showFilters, setShowFilters] = useState(false);
   const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,10 +145,16 @@ export function CashFlowForecast() {
 
   const loadingSpinner = (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2">
-        <h3 className="text-sm font-semibold text-foreground">Cash Flow Forecast</h3>
-      </div>
-      <LoadingSpinner category="forecast" className="h-[200px]" />
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> Cash Flow Forecast
+          </h3>
+        }
+      />
+      {!isCollapsed && <LoadingSpinner category="forecast" className="h-[200px]" />}
     </div>
   );
 
@@ -153,18 +164,34 @@ export function CashFlowForecast() {
 
   if (error && !data) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Cash Flow Forecast</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Cash Flow Forecast"
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (!data || data.accounts.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Cash Flow Forecast</h3>
-        <ChartEmptyState variant="nodata" description="No banking accounts available. Add accounts or link budgets to see projections." />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Cash Flow Forecast"
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" description="No banking accounts available. Add accounts or link budgets to see projections." />
+          </div>
+        )}
       </div>
     );
   }
@@ -178,200 +205,200 @@ export function CashFlowForecast() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm relative">
-      <div className="p-5 pb-3">
-        <h3 className="text-sm font-semibold text-foreground">Cash Flow Forecast</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Projected account balances based on {forecastMode === 'historical' ? 'historical averages' : forecastMode === 'budget' ? 'budgeted amounts' : 'budgets and historical data'}
-        </p>
-        {showCashFlowProjections && (
-          <div className="absolute top-2 right-2 z-10">
-            <EstimatePill />
-          </div>
-        )}
-      </div>
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> Cash Flow Forecast
+          </h3>
+        }
+      />
 
-      {/* Config Bar */}
-      <div className="px-5 pb-4 flex flex-wrap items-center gap-3 border-b border-border">
-        {/* Mode Selector */}
-        <div className="flex flex-wrap gap-1">
-          {(Object.keys(MODE_LABELS) as ForecastMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setForecastMode(mode)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                forecastMode === mode
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-              title={MODE_DESCRIPTIONS[mode]}
-            >
-              {MODE_LABELS[mode]}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Lookback Months */}
-        <select
-          value={lookbackMonths}
-          onChange={(e) => setLookbackMonths(Number(e.target.value))}
-          className="px-2 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground border-0 cursor-pointer"
-        >
-          <option value={1}>1mo lookback</option>
-          <option value={3}>3mo lookback</option>
-          <option value={6}>6mo lookback</option>
-          <option value={12}>12mo lookback</option>
-        </select>
-
-        {/* Forecast Months */}
-        <select
-          value={forecastMonths}
-          onChange={(e) => setForecastMonths(Number(e.target.value))}
-          className="px-2 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground border-0 cursor-pointer"
-        >
-          <option value={3}>3mo forecast</option>
-          <option value={6}>6mo forecast</option>
-          <option value={12}>12mo forecast</option>
-        </select>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* View toggle */}
-        {showCashFlowProjections && (
-          <div className="flex gap-1">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                viewMode === 'table'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              <Table2 className="w-3 h-3" />
-              Table
-            </button>
-            <button
-              onClick={() => setViewMode('chart')}
-              className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                viewMode === 'chart'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              <BarChart3 className="w-3 h-3" />
-              Chart
-            </button>
-          </div>
-        )}
-
-        {/* Account filter */}
-        <div className="w-px h-5 bg-border" />
-        <select
-          value={accountFilter}
-          onChange={(e) => setAccountFilter(e.target.value as 'all' | 'selected')}
-          className="px-2 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground border-0 cursor-pointer"
-        >
-          <option value="all">All Banking Accounts</option>
-          <option value="selected">Selected Accounts</option>
-        </select>
-      </div>
-
-      {/* Account selection chips (when 'selected' mode) */}
-      {accountFilter === 'selected' && allAccounts.length > 0 && (
-        <div className="px-5 py-2 border-b border-border flex flex-wrap gap-1.5">
-          {allAccounts.map((acc) => (
-            <button
-              key={acc.id}
-              onClick={() => toggleAccount(acc.id)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
-                selectedAccountIds.has(acc.id)
-                  ? 'bg-primary/20 text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              {acc.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Chart View */}
-      {viewMode === 'chart' && chartData.length > 0 && (
-        <div className="pt-3 px-2">
-          <ForecastChart data={chartData} showProjections={isEnabled('cashFlowProjections')} />
-          <div className="px-3 pb-2 flex items-center gap-4 text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 bg-foreground inline-block" />
-              Actual
-            </div>
-            {isEnabled('cashFlowProjections') && (
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-0.5 bg-foreground inline-block" style={{ background: 'none', borderTop: '1px dashed var(--color-muted-foreground)' }} />
-                Projected
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {viewMode === 'chart' && chartData.length === 0 && !loading && (
-        <div className="h-[200px]">
-          <ChartEmptyState variant="nodata" description="Not enough historical data for chart. Sync your accounts to see balance history." />
-        </div>
-      )}
-
-      {/* Table View */}
-      {viewMode === 'table' && (
+      {!isCollapsed && (
         <>
-          {loading && (
-            <LoadingSpinner category="forecast" className="h-[200px]" />
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  Mode: {MODE_LABELS[forecastMode]}
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  Lookback: {lookbackMonths}M
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  Forecast: {forecastMonths}M
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  View: {viewMode.toUpperCase()}
+                </span>
+                {showCashFlowProjections && <EstimatePill />}
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {/* Row 1: Mode Selector & Date Params */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Forecast Mode</span>
+                  <div className="flex bg-muted border border-border/30 rounded-lg p-0.5">
+                    {(Object.keys(MODE_LABELS) as ForecastMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setForecastMode(mode)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          forecastMode === mode
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        title={MODE_DESCRIPTIONS[mode]}
+                        type="button"
+                      >
+                        {MODE_LABELS[mode]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lookback</span>
+                    <select
+                      value={lookbackMonths}
+                      onChange={(e) => setLookbackMonths(Number(e.target.value))}
+                      className="px-2 py-1 rounded bg-background border border-input text-xs text-foreground font-medium cursor-pointer"
+                    >
+                      <option value={1}>1 Month</option>
+                      <option value={3}>3 Months</option>
+                      <option value={6}>6 Months</option>
+                      <option value={12}>12 Months</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Forecast</span>
+                    <select
+                      value={forecastMonths}
+                      onChange={(e) => setForecastMonths(Number(e.target.value))}
+                      className="px-2 py-1 rounded bg-background border border-input text-xs text-foreground font-medium cursor-pointer"
+                    >
+                      <option value={3}>3 Months</option>
+                      <option value={6}>6 Months</option>
+                      <option value={12}>12 Months</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: View toggle & Account filters */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
+                <div className="flex items-center gap-3">
+                  {showCashFlowProjections && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Display View</span>
+                      <div className="flex bg-muted border border-border/30 rounded-lg p-0.5">
+                        <button
+                          onClick={() => setViewMode('table')}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
+                            viewMode === 'table'
+                              ? 'bg-card text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          type="button"
+                        >
+                          <Table2 className="w-3 h-3" />
+                          Table
+                        </button>
+                        <button
+                          onClick={() => setViewMode('chart')}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
+                            viewMode === 'chart'
+                              ? 'bg-card text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          type="button"
+                        >
+                          <BarChart3 className="w-3 h-3" />
+                          Chart
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Accounts</span>
+                  <select
+                    value={accountFilter}
+                    onChange={(e) => setAccountFilter(e.target.value as 'all' | 'selected')}
+                    className="px-2 py-1 rounded bg-background border border-input text-xs text-foreground font-medium cursor-pointer"
+                  >
+                    <option value="all">All Banking Accounts</option>
+                    <option value="selected">Selected Accounts</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Account selection chips (when 'selected' mode) */}
+              {accountFilter === 'selected' && allAccounts.length > 0 && (
+                <div className="p-3 bg-muted/20 border border-border/20 rounded-xl flex flex-wrap gap-1.5">
+                  {allAccounts.map((acc) => (
+                    <button
+                      key={acc.id}
+                      onClick={() => toggleAccount(acc.id)}
+                      className={`px-2.5 py-1 rounded text-[10px] font-semibold border transition-all ${
+                        selectedAccountIds.has(acc.id)
+                          ? 'bg-primary/15 border-primary/50 text-primary shadow-sm'
+                          : 'bg-background hover:bg-muted border-border/50 text-muted-foreground hover:text-foreground'
+                      }`}
+                      type="button"
+                    >
+                      {acc.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CollapsibleFilterPanel>
+
+          {/* Chart View */}
+          {viewMode === 'chart' && chartData.length > 0 && (
+            <div className="p-5 h-[300px]">
+              <ForecastChart data={chartData} showProjections={showCashFlowProjections} />
+            </div>
           )}
-          {!loading && (
+
+          {/* Table View */}
+          {viewMode === 'table' && showCashFlowProjections && (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px] md:min-w-full">
+              <table className="w-full text-xs text-left border-collapse">
                 <thead>
-                  <tr className="border-t border-border">
-                    <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Account</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Current</th>
+                  <tr className="border-b border-border text-muted-foreground bg-muted/20">
+                    <th className="px-4 py-3 font-semibold">Account</th>
+                    <th className="px-4 py-3 font-semibold text-right">Current Balance</th>
                     {data.forecast.map((m) => (
-                      <th key={m.month} className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{m.label}</th>
+                      <th key={m.month} className="px-4 py-3 font-semibold text-right min-w-[100px]">{m.label}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="border-t border-border">
-                  {data.accounts.map((acct) => (
-                    <tr key={acct.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-foreground font-medium">{acct.name}</span>
-                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground capitalize">{acct.type}</span>
+                <tbody className="divide-y divide-border">
+                  {allAccounts.filter((acc) => accountFilter === 'all' || selectedAccountIds.has(acc.id)).map((acct) => (
+                    <tr key={acct.id} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-foreground">{acct.name}</div>
+                        <div className="text-[10px] text-muted-foreground capitalize">
+                          {acct.type}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(acct.balance)}</td>
                       {data.forecast.map((m) => {
                         const proj = m.accounts.find((a) => a.accountId === acct.id);
-                        if (!proj) return <td key={m.month} className="px-4 py-3 text-right font-mono text-muted-foreground/50">&mdash;</td>;
-                        const isPositive = proj.projectedBalance >= 0;
+                        if (!proj) return <td key={m.month} className="px-4 py-3 text-right text-muted-foreground">-</td>;
                         return (
-                          <td key={m.month} className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {isPositive ? (
-                                <TrendingUp className="w-3 h-3 text-chart-2" />
-                              ) : (
-                                <TrendingDown className="w-3 h-3 text-destructive" />
-                              )}
-                              <span className={`font-mono blur-number ${
-                                proj.projectedBalance >= proj.startingBalance ? 'text-chart-2' : 'text-destructive'
-                              }`}>
-                                {formatCurrency(proj.projectedBalance)}
-                              </span>
-                            </div>
-                            <div className="text-[9px] text-muted-foreground/50">
-                              {proj.inflows > 0 || proj.outflows > 0
-                                ? `${formatCurrency(proj.inflows)} in / ${formatCurrency(proj.outflows)} out`
-                                : 'No projections'}
-                            </div>
+                          <td key={m.month} className="px-4 py-3 text-right font-mono text-foreground">
+                            {formatCurrency(proj.projectedBalance)}
                           </td>
                         );
                       })}
@@ -381,15 +408,15 @@ export function CashFlowForecast() {
               </table>
             </div>
           )}
+
+          <div className="px-5 py-2.5 border-t border-border">
+            <p className="text-[10px] text-muted-foreground">
+              Mode: {MODE_LABELS[forecastMode]}, lookback: {lookbackMonths}mo, forecast: {forecastMonths}mo.
+              Credit card spending is budgeted at transaction time. Actual cash outflow occurs when the CC bill is paid.
+            </p>
+          </div>
         </>
       )}
-
-      <div className="px-5 py-2.5 border-t border-border">
-        <p className="text-[10px] text-muted-foreground">
-          Mode: {MODE_LABELS[forecastMode]}, lookback: {lookbackMonths}mo, forecast: {forecastMonths}mo.
-          Credit card spending is budgeted at transaction time. Actual cash outflow occurs when the CC bill is paid.
-        </p>
-      </div>
     </div>
   );
 }

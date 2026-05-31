@@ -5,6 +5,9 @@ import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveCo
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { HelpCircle } from 'lucide-react';
 
 interface FireScenario {
   currentAge: number;
@@ -34,6 +37,7 @@ function calculateYearsToFI(
 }
 
 export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario }) {
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('whatIfAnalysis');
   const { rows, baseline } = useMemo(() => {
     const fireNumber = baseScenario.safeWithdrawalRate > 0
       ? baseScenario.targetAnnualExpenses / baseScenario.safeWithdrawalRate
@@ -115,74 +119,98 @@ export function WhatIfAnalysis({ baseScenario }: { baseScenario: FireScenario })
 
   if (chartData.length === 0 || maxY >= 999) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">What-If Analysis</h3>
-        <ChartEmptyState variant="nodata" description="Adjust scenario inputs to see what-if analysis" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-primary" /> What-If Analysis
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" description="Adjust scenario inputs to see what-if analysis" />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-foreground mb-4">What-If Analysis</h3>
-      <p className="text-xs text-muted-foreground mb-4">
-        Baseline: {baseline === Infinity ? '∞' : `${baseline.toFixed(1)} yrs`} to FI
-      </p>
-      <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-          <BarChart
-            layout="vertical"
-            data={chartData}
-            margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
-            <XAxis
-              type="number"
-              tickLine={false}
-              axisLine={{ stroke: 'var(--color-border)' }}
-              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-              label={{ value: 'Years to FI', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="scenario"
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-              tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v}
-              width={110}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload || !payload.length) return null;
-                const item = payload[0].payload;
-                return (
-                  <ChartTooltip>
-                    <TooltipHeader>{String(item.scenario)}</TooltipHeader>
-                    <TooltipRow label="Years to FI" value={`${item.years.toFixed(1)} yrs`} />
-                    {item.isFaster ? (
-                      <TooltipRow label="vs Baseline" value={`-${item.diff.toFixed(1)} yrs`} color="var(--color-chart-1)" />
-                    ) : !item.diff ? (
-                      <TooltipRow label="vs Baseline" value="Same" color="var(--color-muted-foreground)" />
-                    ) : (
-                      <TooltipRow label="vs Baseline" value={`+${Math.abs(item.diff).toFixed(1)} yrs`} color="var(--color-destructive)" />
-                    )}
-                  </ChartTooltip>
-                );
-              }}
-              cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
-            />
-            <Bar dataKey="years" radius={[0, 4, 4, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.isFaster ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+    <div className="bg-card border border-border rounded-xl shadow-sm">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-primary" /> What-If Analysis
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <div className="p-5">
+          <p className="text-xs text-muted-foreground mb-4">
+            Baseline: {baseline === Infinity ? '∞' : `${baseline.toFixed(1)} yrs`} to FI
+          </p>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+              <BarChart
+                layout="vertical"
+                data={chartData}
+                margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
+                <XAxis
+                  type="number"
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                  label={{ value: 'Years to FI', position: 'insideBottom', offset: -5, fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                 />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+                <YAxis
+                  type="category"
+                  dataKey="scenario"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                  tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v}
+                  width={110}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const item = payload[0].payload;
+                    return (
+                      <ChartTooltip>
+                        <TooltipHeader>{String(item.scenario)}</TooltipHeader>
+                        <TooltipRow label="Years to FI" value={`${item.years.toFixed(1)} yrs`} />
+                        {item.isFaster ? (
+                          <TooltipRow label="vs Baseline" value={`-${item.diff.toFixed(1)} yrs`} color="var(--color-chart-1)" />
+                        ) : !item.diff ? (
+                          <TooltipRow label="vs Baseline" value="Same" color="var(--color-muted-foreground)" />
+                        ) : (
+                          <TooltipRow label="vs Baseline" value={`+${Math.abs(item.diff).toFixed(1)} yrs`} color="var(--color-destructive)" />
+                        )}
+                      </ChartTooltip>
+                    );
+                  }}
+                  cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
+                />
+                <Bar dataKey="years" radius={[0, 4, 4, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.isFaster ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

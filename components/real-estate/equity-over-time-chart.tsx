@@ -19,6 +19,10 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { TrendingUp } from 'lucide-react';
 
 interface PropertySnapshot {
   date: string;
@@ -53,12 +57,14 @@ interface RealEstateData {
 }
 
 export function EquityOverTimeChart() {
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('equityOverTimeChart');
   const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = usePersistentState<TimeRange>('runway:real-estate:timeRange', 'all');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetch('/api/real-estate?months=600', { credentials: 'include' })
@@ -356,28 +362,58 @@ export function EquityOverTimeChart() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
-        </div>
-        <LoadingSpinner category="chart" className="h-[300px]" />
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
+            </h3>
+          }
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[300px]" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Equity Over Time</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (properties.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Equity Over Time</h3>
-        <ChartEmptyState variant="nodata" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" />
+          </div>
+        )}
       </div>
     );
   }
@@ -430,157 +466,189 @@ export function EquityOverTimeChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Equity Over Time</h3>
-          {hasEstimated && <EstimatePill />}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {properties.length > 1 && (
-            <select
-              value={selectedPropertyId}
-              onChange={(e) => setSelectedPropertyId(e.target.value)}
-              className="bg-card text-foreground hover:bg-muted text-xs font-medium px-3 py-1.5 rounded-lg border border-border focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer transition-colors"
-            >
-              <option value="all">All Properties</option>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
-        </div>
-      </div>
-      <div className="h-[300px] px-2 pb-2">
-        <div className="financial-chart h-full">
-          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-            <ComposedChart
-              data={activeTimeline}
-              margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
-            >
-              <defs>
-                <linearGradient id="colorHomeValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.12}/>
-                  <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.01}/>
-                </linearGradient>
-                <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
-                  <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
-                </linearGradient>
-                {activeMortgageKeys.map((key, index) => {
-                  const color = mortgageColors[index % mortgageColors.length];
-                  return (
-                    <linearGradient key={key} id={`color_${key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={color} stopOpacity={0.12}/>
-                      <stop offset="95%" stopColor={color} stopOpacity={0.01}/>
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
+            </h3>
+            {!isCollapsed && hasEstimated && <EstimatePill />}
+          </div>
+        }
+      />
+
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {properties.find(p => p.id === selectedPropertyId)?.name ?? 'ALL PROPERTIES'}
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeRange.toUpperCase()}
+                </span>
+              </div>
+            }
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              {properties.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Property</span>
+                  <select
+                    value={selectedPropertyId}
+                    onChange={(e) => setSelectedPropertyId(e.target.value)}
+                    className="bg-card text-foreground hover:bg-muted text-xs font-medium px-3 py-1.5 rounded-lg border border-border focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer transition-colors"
+                  >
+                    <option value="all">All Properties</option>
+                    {properties.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="h-[300px] px-2 pb-2">
+            <div className="financial-chart h-full">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                <ComposedChart
+                  data={activeTimeline}
+                  margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="colorHomeValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.12}/>
+                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.01}/>
                     </linearGradient>
-                  );
-                })}
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={{ stroke: 'var(--color-border)' }}
-                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                ticks={xAxisTicks}
-                tickFormatter={(d) => {
-                  if (!d) return '';
-                  if (timeRange === '1m') {
-                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                  } else if (timeRange === '5y' || timeRange === 'all') {
-                    return formatSafeUTCDate(d, { year: 'numeric' });
-                  } else {
-                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                  }
-                }}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={{ stroke: 'var(--color-border)' }}
-                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                domain={[0, maxVal * 1.05]}
-                tickFormatter={(v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  if (v === 0) return '$0';
-                  return `$${v.toFixed(0)}`;
-                }}
-              />
-              <RechartsTooltip
-                content={<CustomTooltip />}
-                cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }}
-              />
-              
-              {/* Home Value Area (renders behind) */}
-              <Area
-                type="monotone"
-                dataKey="homeValue"
-                name="Home Value"
-                stroke="var(--color-chart-2)"
-                strokeWidth={2}
-                fill="url(#colorHomeValue)"
-                dot={false}
-              />
-              
-              {/* Equity Area (renders in front) */}
-              <Area
-                type="monotone"
-                dataKey="equity"
-                name="Equity"
-                stroke="var(--color-chart-1)"
-                strokeWidth={2}
-                fill="url(#colorEquity)"
-                dot={false}
-              />
-              
-              {/* Mortgage Balance Areas */}
-              {activeMortgageKeys.map((key, index) => {
-                const color = mortgageColors[index % mortgageColors.length];
-                const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
-                return (
+                    <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
+                    </linearGradient>
+                    {activeMortgageKeys.map((key, index) => {
+                      const color = mortgageColors[index % mortgageColors.length];
+                      return (
+                        <linearGradient key={key} id={`color_${key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={color} stopOpacity={0.12}/>
+                          <stop offset="95%" stopColor={color} stopOpacity={0.01}/>
+                        </linearGradient>
+                      );
+                    })}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={{ stroke: 'var(--color-border)' }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                    ticks={xAxisTicks}
+                    tickFormatter={(d) => {
+                      if (!d) return '';
+                      if (timeRange === '1m') {
+                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                      } else if (timeRange === '5y' || timeRange === 'all') {
+                        return formatSafeUTCDate(d, { year: 'numeric' });
+                      } else {
+                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                      }
+                    }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={{ stroke: 'var(--color-border)' }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                    domain={[0, maxVal * 1.05]}
+                    tickFormatter={(v: number) => {
+                      if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                      if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                      if (v === 0) return '$0';
+                      return `$${v.toFixed(0)}`;
+                    }}
+                  />
+                  <RechartsTooltip
+                    content={<CustomTooltip />}
+                    cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }}
+                  />
+                  
+                  {/* Home Value Area (renders behind) */}
                   <Area
-                    key={key}
                     type="monotone"
-                    dataKey={key}
-                    name={name}
-                    stroke={color}
+                    dataKey="homeValue"
+                    name="Home Value"
+                    stroke="var(--color-chart-2)"
                     strokeWidth={2}
-                    strokeDasharray="5 5"
-                    fill={`url(#color_${key})`}
+                    fill="url(#colorHomeValue)"
                     dot={false}
                   />
-                );
-              })}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="px-5 pb-4 flex items-center justify-center gap-6 flex-wrap text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-2)' }} />
-          <span className="text-muted-foreground">Home Value</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-1)' }} />
-          <span className="text-muted-foreground">Equity</span>
-        </div>
-        {activeMortgageKeys.map((key, index) => {
-          const color = mortgageColors[index % mortgageColors.length];
-          const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
-          return (
-            <div key={key} className="flex items-center gap-2">
-              <div className="w-3 h-0.5 rounded" style={{
-                background: color,
-                backgroundImage: `repeating-linear-gradient(90deg, ${color} 0, ${color} 4px, transparent 4px, transparent 6px)`
-              }} />
-              <span className="text-muted-foreground">{name}</span>
+                  
+                  {/* Equity Area (renders in front) */}
+                  <Area
+                    type="monotone"
+                    dataKey="equity"
+                    name="Equity"
+                    stroke="var(--color-chart-1)"
+                    strokeWidth={2}
+                    fill="url(#colorEquity)"
+                    dot={false}
+                  />
+                  
+                  {/* Mortgage Balance Areas */}
+                  {activeMortgageKeys.map((key, index) => {
+                    const color = mortgageColors[index % mortgageColors.length];
+                    const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
+                    return (
+                      <Area
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        name={name}
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        fill={`url(#color_${key})`}
+                        dot={false}
+                      />
+                    );
+                  })}
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-          );
-        })}
-      </div>
+          </div>
+          <div className="px-5 pb-4 flex items-center justify-center gap-6 flex-wrap text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-2)' }} />
+              <span className="text-muted-foreground">Home Value</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-1)' }} />
+              <span className="text-muted-foreground">Equity</span>
+            </div>
+            {activeMortgageKeys.map((key, index) => {
+              const color = mortgageColors[index % mortgageColors.length];
+              const name = mortgageNamesMap.get(key) || 'Mortgage Balance';
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <div className="w-3 h-0.5 rounded" style={{
+                    background: color,
+                    backgroundImage: `repeating-linear-gradient(90deg, ${color} 0, ${color} 4px, transparent 4px, transparent 6px)`
+                  }} />
+                  <span className="text-muted-foreground">{name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

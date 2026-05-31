@@ -5,6 +5,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { TrendingDown } from 'lucide-react';
 
 const CHART_COLOR_MAP = [
   'var(--chart-1)',
@@ -76,10 +80,12 @@ interface CategoryEntry {
 
 export function DebtBreakdown() {
   const router = useRouter();
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('debtBreakdown');
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [unit, setUnit] = useState<'$' | '%'>('$');
   const [activeTab, setActiveTab] = useState<'assets' | 'debt'>('assets');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetch('/api/accounts', { credentials: 'include' })
@@ -162,160 +168,194 @@ export function DebtBreakdown() {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm animate-pulse">
-        <div className="h-5 bg-muted rounded w-32 mb-4" />
-        <div className="h-[180px] bg-muted rounded mb-4" />
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-4 bg-muted rounded w-full" />
-          ))}
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-primary" /> Breakdown
+            </h3>
+          }
+        />
+        <div className="p-5 animate-pulse">
+          <div className="h-[180px] bg-muted rounded mb-4" />
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-4 bg-muted rounded w-full" />
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-foreground">Breakdown</h3>
-        <div className="flex bg-muted rounded-lg p-0.5">
-          <button
-            onClick={() => setUnit('$')}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-              unit === '$'
-                ? 'bg-card text-foreground shadow-sm border border-border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+    <div className="bg-card border border-border rounded-xl shadow-sm">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <TrendingDown className="w-4 h-4 text-primary" /> Breakdown
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                UNIT: {unit === '$' ? 'Value ($)' : 'Percentage (%)'}
+              </span>
+            }
           >
-            $
-          </button>
-          <button
-            onClick={() => setUnit('%')}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-              unit === '%'
-                ? 'bg-card text-foreground shadow-sm border border-border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            %
-          </button>
-        </div>
-      </div>
-
-      <div className="flex gap-4 mb-5 border-b border-border">
-        <button
-          onClick={() => setActiveTab('assets')}
-          className={`pb-2 text-sm font-medium transition-colors relative ${
-            activeTab === 'assets'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Assets
-          {activeTab === 'assets' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('debt')}
-          className={`pb-2 text-sm font-medium transition-colors relative ${
-            activeTab === 'debt'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Debt
-          {activeTab === 'debt' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
-          )}
-        </button>
-      </div>
-
-      <div className="text-center mb-4">
-        <p className="text-xs text-muted-foreground mb-0.5">
-          {activeTab === 'assets' ? 'Total Assets' : 'Total Debt'}
-        </p>
-        <p className="text-xl font-bold text-foreground financial-value">
-          {formatCompact(activeTotal)}
-        </p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-        <div className="h-[200px] sm:h-[220px] flex-shrink-0 w-full sm:w-[45%] max-w-[240px] sm:max-w-none">
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="id"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="65%"
-                  outerRadius="100%"
-                  paddingAngle={0.5}
-                  cornerRadius={3}
-                  stroke="none"
-                  onClick={(data) => {
-                    const key = data.key || (data.payload && data.payload.key);
-                    if (key) handleClick(key);
-                  }}
-                  className="cursor-pointer"
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Display Unit</span>
+              <div className="flex bg-muted rounded-lg p-0.5">
+                <button
+                  onClick={() => setUnit('$')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    unit === '$'
+                      ? 'bg-card text-foreground shadow-sm border border-border'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload || !payload.length) return null;
-                    const datum = payload[0].payload;
-                    return (
-                      <ChartTooltip>
-                        <TooltipHeader>{String(datum.id)}</TooltipHeader>
-                        <TooltipRow label="Amount" value={formatCompact(datum.amount)} />
-                        {activeTotal > 0 && (
-                          <TooltipRow
-                            label="Share"
-                            value={`${((datum.amount / activeTotal) * 100).toFixed(1)}%`}
-                          />
-                        )}
-                      </ChartTooltip>
-                    );
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-              No {activeTab} categories
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 space-y-2 max-h-[220px] overflow-y-auto pt-1">
-          {activeCategories.map((cat, index) => {
-            const share = activeTotal > 0 ? (cat.amount / activeTotal) * 100 : 0;
-            const colorIndex = index % CHART_COLOR_MAP.length;
-            return (
-              <div
-                key={cat.label}
-                className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                onClick={() => handleClick(cat.key)}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: CHART_COLOR_MAP[colorIndex] }}
-                />
-                <span className="text-xs text-foreground/80 flex-1">{cat.label}</span>
-                <span className="text-xs text-foreground font-medium tabular-nums blur-number">
-                  {unit === '$' ? formatCompact(cat.amount) : `${share.toFixed(1)}%`}
-                </span>
+                  $
+                </button>
+                <button
+                  onClick={() => setUnit('%')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    unit === '%'
+                      ? 'bg-card text-foreground shadow-sm border border-border'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  %
+                </button>
               </div>
-            );
-          })}
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="px-5 py-4">
+          <div className="flex gap-4 mb-5 border-b border-border">
+            <button
+              onClick={() => setActiveTab('assets')}
+              className={`pb-2 text-sm font-medium transition-colors relative ${
+                activeTab === 'assets'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Assets
+              {activeTab === 'assets' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('debt')}
+              className={`pb-2 text-sm font-medium transition-colors relative ${
+                activeTab === 'debt'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Debt
+              {activeTab === 'debt' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
+              )}
+            </button>
+          </div>
+
+          <div className="text-center mb-4">
+            <p className="text-xs text-muted-foreground mb-0.5">
+              {activeTab === 'assets' ? 'Total Assets' : 'Total Debt'}
+            </p>
+            <p className="text-xl font-bold text-foreground financial-value">
+              {formatCompact(activeTotal)}
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+            <div className="h-[200px] sm:h-[220px] flex-shrink-0 w-full sm:w-[45%] max-w-[240px] sm:max-w-none">
+              {pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="id"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="65%"
+                      outerRadius="100%"
+                      paddingAngle={0.5}
+                      cornerRadius={3}
+                      stroke="none"
+                      onClick={(data) => {
+                        const key = data.key || (data.payload && data.payload.key);
+                        if (key) handleClick(key);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const datum = payload[0].payload;
+                        return (
+                          <ChartTooltip>
+                            <TooltipHeader>{String(datum.id)}</TooltipHeader>
+                            <TooltipRow label="Amount" value={formatCompact(datum.amount)} />
+                            {activeTotal > 0 && (
+                              <TooltipRow
+                                label="Share"
+                                value={`${((datum.amount / activeTotal) * 100).toFixed(1)}%`}
+                              />
+                            )}
+                          </ChartTooltip>
+                        );
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                  No {activeTab} categories
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-2 max-h-[220px] overflow-y-auto pt-1">
+              {activeCategories.map((cat, index) => {
+                const share = activeTotal > 0 ? (cat.amount / activeTotal) * 100 : 0;
+                const colorIndex = index % CHART_COLOR_MAP.length;
+                return (
+                  <div
+                    key={cat.label}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                    onClick={() => handleClick(cat.key)}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: CHART_COLOR_MAP[colorIndex] }}
+                    />
+                    <span className="text-xs text-foreground/80 flex-1">{cat.label}</span>
+                    <span className="text-xs text-foreground font-medium tabular-nums blur-number">
+                      {unit === '$' ? formatCompact(cat.amount) : `${share.toFixed(1)}%`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
   );
 }

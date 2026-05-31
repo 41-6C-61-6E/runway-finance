@@ -295,6 +295,13 @@
       "when": 1780095639607,
       "tag": "0041_add_multiple_conditions_to_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780095639608,
+      "tag": "0042_add_card_collapsed_states",
+      "breakpoints": true
     }
   ]
 }

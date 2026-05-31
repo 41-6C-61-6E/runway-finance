@@ -12,7 +12,10 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useTheme } from 'next-themes';
-import { Search, Check, X } from 'lucide-react';
+import { Search, Check, X, PieChart as PieIcon } from 'lucide-react';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 
 interface CategoryData {
   categoryId: string;
@@ -123,6 +126,8 @@ const typeOptions = [
 export function SpendingBreakdown() {
   const router = useRouter();
   const { theme } = useTheme();
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('spendingBreakdown');
+  const [showFilters, setShowFilters] = useState(false);
   
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,288 +267,316 @@ export function SpendingBreakdown() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Spending Breakdown</h3>
-        </div>
-        <LoadingSpinner category="chart" className="h-[380px]" />
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
+            </h3>
+          }
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[380px]" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Spending Breakdown</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+      <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
+    </div>
+  );
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      {/* ── Card Header ── */}
-      <div className="p-5 border-b border-border flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Spending Breakdown</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Analyze your expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-          <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
-        </div>
-      </div>
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
+          </h3>
+        }
+      />
 
       {/* ── Card Content Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
-        {/* Chart Column (3/5) */}
-        <div className="lg:col-span-3 h-[380px] relative flex flex-col justify-center">
-          {pieData.length === 0 ? (
-            <ChartEmptyState
-              variant={safeExcludedIds.size > 0 ? 'empty' : 'nodata'}
-              description={
-                safeExcludedIds.size > 0
-                  ? 'All categories are excluded. Adjust your filters.'
-                  : 'No spending data for this period'
-              }
-            />
-          ) : (
-            <div className="financial-chart h-full w-full relative">
-              {chartType === 'bar' ? (() => {
-                const maxLabelLen = pieData.length > 0
-                  ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
-                  : 0;
-                const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
-                
-                return (
-                  <div className="overflow-x-auto overflow-y-hidden h-full w-full">
-                    <div className="min-w-max h-full">
-                      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                        <BarChart
-                      layout="vertical"
-                      data={pieData}
-                      margin={isMobile ? { top: 10, right: 10, left: 5, bottom: 10 } : { top: 10, right: 10, left: 10, bottom: 10 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} vertical={true} />
-                      <XAxis type="number" hide />
-                      <YAxis
-                        type="category"
-                        dataKey="id"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                        width={dynamicLeft}
-                        tickFormatter={(v) => {
-                          const maxLen = isMobile ? 10 : 20;
-                          return v.length > maxLen ? `${v.slice(0, maxLen)}...` : v;
-                        }}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[0, 2, 2, 0]}
-                        onClick={(data: any) => {
-                          const catId = data.sourceCategoryId || data.categoryId || (data.payload && (data.payload.sourceCategoryId || data.payload.categoryId));
-                          if (catId) handleClick(catId);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (!active || !payload || !payload.length) return null;
-                          const datum = payload[0].payload;
-                          const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
-                          return (
-                            <ChartTooltip>
-                              <TooltipHeader>{String(datum.id)}</TooltipHeader>
-                              <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-                              <TooltipRow label="Percent" value={`${pct}%`} />
-                            </ChartTooltip>
-                          );
-                        }}
-                        cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
-                      />
-                    </BarChart>
-                      </ResponsiveContainer>
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeframe.toUpperCase()}
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {chartType.toUpperCase()}
+                </span>
+              </div>
+            }
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
+                <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
+          {/* Chart Column (3/5) */}
+          <div className="lg:col-span-3 h-[380px] relative flex flex-col justify-center">
+            {pieData.length === 0 ? (
+              <ChartEmptyState
+                variant={safeExcludedIds.size > 0 ? 'empty' : 'nodata'}
+                description={
+                  safeExcludedIds.size > 0
+                    ? 'All categories are excluded. Adjust your filters.'
+                    : 'No spending data for this period'
+                }
+              />
+            ) : (
+              <div className="financial-chart h-full w-full relative">
+                {chartType === 'bar' ? (() => {
+                  const maxLabelLen = pieData.length > 0
+                    ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
+                    : 0;
+                  const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
+                  
+                  return (
+                    <div className="overflow-x-auto overflow-y-hidden h-full w-full">
+                      <div className="min-w-max h-full">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                          <BarChart
+                            layout="vertical"
+                            data={pieData}
+                            margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+                            <XAxis type="number" tickFormatter={(v) => `$${v}`} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
+                            <YAxis dataKey="label" type="category" width={dynamicLeft - 10} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload || !payload.length) return null;
+                                const data = payload[0].payload;
+                                const pct = totalSpending > 0 ? ((data.value / totalSpending) * 100).toFixed(1) : '0';
+                                return (
+                                  <ChartTooltip>
+                                    <TooltipHeader>{data.label}</TooltipHeader>
+                                    <TooltipRow label="Amount" value={formatCurrency(data.value)} />
+                                    <TooltipRow label="Percentage" value={`${pct}%`} />
+                                  </ChartTooltip>
+                                );
+                              }}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={20} onClick={(data: any) => handleClick(data.categoryId)} className="cursor-pointer">
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
-                  </div>
-                );
-              })() : (
-                <>
-                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="id"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="65%"
-                        outerRadius="80%"
-                        paddingAngle={0.5}
-                        cornerRadius={3}
-                        stroke="none"
-                        onClick={(data: any) => {
-                          const catId = data.sourceCategoryId || data.categoryId || (data.payload && (data.payload.sourceCategoryId || data.payload.categoryId));
-                          if (catId) handleClick(catId);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (!active || !payload || !payload.length) return null;
-                          const datum = payload[0].payload;
-                          const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
-                          return (
-                            <ChartTooltip>
-                              <TooltipHeader>{datum.label}</TooltipHeader>
-                              <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-                              <TooltipRow label="Percent" value={`${pct}%`} />
-                            </ChartTooltip>
-                          );
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                    <div className="text-xl font-bold text-foreground blur-number font-mono">{formatCurrency(totalSpending)}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Spending</div>
-                  </div>
-                </>
+                  );
+                })() : (
+                  <>
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                      <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={isMobile ? 55 : 75}
+                          outerRadius={isMobile ? 80 : 105}
+                          paddingAngle={0.5}
+                          cornerRadius={3}
+                          stroke="none"
+                          onClick={(data: any) => {
+                            const catId = data.sourceCategoryId || data.categoryId || (data.payload && (data.payload.sourceCategoryId || data.payload.categoryId));
+                            if (catId) handleClick(catId);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload || !payload.length) return null;
+                            const datum = payload[0].payload;
+                            const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
+                            return (
+                              <ChartTooltip>
+                                <TooltipHeader>{datum.label}</TooltipHeader>
+                                <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
+                                <TooltipRow label="Percent" value={`${pct}%`} />
+                              </ChartTooltip>
+                            );
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                      <div className="text-xl font-bold text-foreground blur-number font-mono">{formatCurrency(totalSpending)}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Spending</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Legend / Filter Column (2/5) */}
+          <div className="lg:col-span-2 flex flex-col h-[380px]">
+            {/* Search bar */}
+            <div className="relative mb-3">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search className="h-4 w-4 text-muted-foreground/60" />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search categories..."
+                className="w-full pl-9 pr-8 py-1.5 text-xs bg-muted/20 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Legend / Filter Column (2/5) */}
-        <div className="lg:col-span-2 flex flex-col h-[380px]">
-          {/* Search bar */}
-          <div className="relative mb-3">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search className="h-4 w-4 text-muted-foreground/60" />
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search categories..."
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-muted/20 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Controls Panel */}
-          <div className="flex items-center justify-between text-xs mb-3 pb-2 border-b border-border/60">
-            <span className="text-muted-foreground font-medium">
-              Showing {expenseCategories.length - safeExcludedIds.size} of {expenseCategories.length}
-            </span>
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => setExcludedCategoryIds(new Set())}
-                className="text-primary hover:text-primary/80 hover:underline font-semibold cursor-pointer transition-colors"
-              >
-                Select All
-              </button>
-              <span className="text-muted-foreground/30">|</span>
-              <button
-                onClick={() => setExcludedCategoryIds(new Set(expenseCategories.map((c) => getCategoryRouteId(c))))}
-                className="text-primary hover:text-primary/80 hover:underline font-semibold cursor-pointer transition-colors"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive Scrollable Legend List */}
-          <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 scrollbar-thin">
-            {filteredCategories.length === 0 ? (
-              <div className="text-center py-8 text-xs text-muted-foreground">
-                No categories match "{searchQuery}"
+            {/* Controls Panel */}
+            <div className="flex items-center justify-between text-xs mb-3 pb-2 border-b border-border/60">
+              <span className="text-muted-foreground font-medium">
+                Showing {expenseCategories.length - safeExcludedIds.size} of {expenseCategories.length}
+              </span>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setExcludedCategoryIds(new Set())}
+                  className="text-primary hover:text-primary/80 hover:underline font-semibold cursor-pointer transition-colors"
+                >
+                  Select All
+                </button>
+                <span className="text-muted-foreground/30">|</span>
+                <button
+                  onClick={() => setExcludedCategoryIds(new Set(expenseCategories.map((c) => getCategoryRouteId(c))))}
+                  className="text-primary hover:text-primary/80 hover:underline font-semibold cursor-pointer transition-colors"
+                >
+                  Deselect All
+                </button>
               </div>
-            ) : (
-              filteredCategories.map((c) => {
-                const routeId = getCategoryRouteId(c);
-                const isExcluded = safeExcludedIds.has(routeId);
-                const adaptedColor = getThemeAdaptedColor(c.categoryColor, theme);
-                const pct = totalSpending > 0 && !isExcluded
-                  ? ((c.amount / totalSpending) * 100).toFixed(1)
-                  : totalSpending === 0 && !isExcluded
-                    ? '0.0'
-                    : null;
+            </div>
 
-                return (
-                  <div
-                    key={c.categoryId}
-                    onClick={() => toggleCategory(routeId)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all select-none border border-transparent ${
-                      isExcluded
-                        ? 'bg-transparent text-muted-foreground/40 hover:bg-muted/5 opacity-60'
-                        : 'bg-muted/10 hover:bg-muted/20 border-border/30 text-foreground hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {/* Interactive toggle box */}
-                      <div
-                        className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-all border ${
-                          isExcluded
-                            ? 'border-muted-foreground/30 bg-transparent'
-                            : 'border-primary bg-primary text-primary-foreground'
-                        }`}
-                        style={{
-                          borderColor: isExcluded ? undefined : adaptedColor,
-                          backgroundColor: isExcluded ? undefined : adaptedColor,
-                        }}
-                      >
-                        {!isExcluded && <Check className="h-2.5 w-2.5 stroke-[3px] text-white" />}
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 select-none">
+              {filteredCategories.length === 0 ? (
+                <div className="text-center text-muted-foreground text-xs py-8">
+                  No matching categories found
+                </div>
+              ) : (
+                filteredCategories.map((c) => {
+                  const routeId = getCategoryRouteId(c);
+                  const isExcluded = safeExcludedIds.has(routeId);
+                  const adaptedColor = getThemeAdaptedColor(c.categoryColor, theme);
+                  const pct = totalSpending > 0 && !isExcluded
+                    ? ((c.amount / totalSpending) * 100).toFixed(1)
+                    : totalSpending === 0 && !isExcluded
+                      ? '0.0'
+                      : null;
+
+                  return (
+                    <div
+                      key={c.categoryId}
+                      onClick={() => toggleCategory(routeId)}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all select-none border border-transparent ${
+                        isExcluded
+                          ? 'bg-transparent text-muted-foreground/40 hover:bg-muted/5 opacity-60'
+                          : 'bg-muted/10 hover:bg-muted/20 border-border/30 text-foreground hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Interactive toggle box */}
+                        <div
+                          className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-all border ${
+                            isExcluded
+                              ? 'border-muted-foreground/30 bg-transparent'
+                              : 'border-primary bg-primary text-primary-foreground'
+                          }`}
+                          style={{
+                            borderColor: isExcluded ? undefined : adaptedColor,
+                            backgroundColor: isExcluded ? undefined : adaptedColor,
+                          }}
+                        >
+                          {!isExcluded && <Check className="h-2.5 w-2.5 stroke-[3px] text-white" />}
+                        </div>
+
+                        {/* Colored circular dot */}
+                        <div
+                          className="w-2 h-2 rounded-full border border-black/10 dark:border-white/10 flex-shrink-0"
+                          style={{
+                            backgroundColor: isExcluded ? 'var(--color-border)' : adaptedColor,
+                          }}
+                        />
+
+                        {/* Category Name */}
+                        <span className={`font-medium truncate ${isExcluded ? 'line-through text-muted-foreground/30' : ''}`}>
+                          {c.categoryName}
+                        </span>
                       </div>
 
-                      {/* Colored circular dot */}
-                      <div
-                        className="w-2 h-2 rounded-full border border-black/10 dark:border-white/10 flex-shrink-0"
-                        style={{
-                          backgroundColor: isExcluded ? 'var(--color-border)' : adaptedColor,
-                        }}
-                      />
-
-                      {/* Category Name */}
-                      <span className={`font-medium truncate ${isExcluded ? 'line-through text-muted-foreground/30' : ''}`}>
-                        {c.categoryName}
-                      </span>
-                    </div>
-
-                    {/* Values */}
-                    <div className="flex items-center gap-2.5 text-right flex-shrink-0 ml-2">
-                      {pct !== null && (
-                        <span className="text-[10px] text-muted-foreground/80 bg-muted/40 dark:bg-muted/20 px-1.5 py-0.5 rounded font-mono font-medium">
-                          {pct}%
+                      {/* Values */}
+                      <div className="flex items-center gap-2.5 text-right flex-shrink-0 ml-2">
+                        {pct !== null && (
+                          <span className="text-[10px] text-muted-foreground/80 bg-muted/40 dark:bg-muted/20 px-1.5 py-0.5 rounded font-mono font-medium">
+                            {pct}%
+                          </span>
+                        )}
+                        <span className={`font-semibold font-mono blur-number ${isExcluded ? 'text-muted-foreground/20' : ''}`}>
+                          {formatCurrency(c.amount)}
                         </span>
-                      )}
-                      <span className={`font-semibold font-mono blur-number ${isExcluded ? 'text-muted-foreground/20' : ''}`}>
-                        {formatCurrency(c.amount)}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

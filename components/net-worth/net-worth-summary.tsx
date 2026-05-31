@@ -5,11 +5,14 @@ import { formatCurrency } from '@/lib/utils/format';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/account-types';
 import { useShowMath } from '@/lib/hooks/use-show-math';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { buildNetWorthTraces } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { Sparkline } from '@/components/ui/sparkline';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import type { AccountData, ChartPoint, CalculationTrace } from '@/lib/types/financial';
+import { DollarSign } from 'lucide-react';
 
 interface ChartResponse {
   data: ChartPoint[];
@@ -29,6 +32,7 @@ export function NetWorthSummary() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'totals' | 'percentages'>('totals');
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthSummary');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -132,35 +136,72 @@ export function NetWorthSummary() {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm animate-pulse h-full">
-      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border h-full">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="p-5 space-y-3">
-              <div className="h-4 bg-muted rounded w-24" />
-              <div className="h-8 bg-muted rounded w-32" />
-              <div className="h-4 bg-muted rounded w-20" />
+      <div className="bg-card border border-border rounded-xl shadow-sm h-full">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="animate-pulse">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border h-full">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-5 space-y-3">
+                  <div className="h-4 bg-muted rounded w-24" />
+                  <div className="h-8 bg-muted rounded w-32" />
+                  <div className="h-4 bg-muted rounded w-20" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm h-full">
-        <p className="text-sm text-muted-foreground">{error}</p>
+      <div className="bg-card border border-border rounded-xl shadow-sm h-full">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm h-full">
-      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
         {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
         {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, liabilityTrendPositive, traces[1])}
         {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
       </div>
+      )}
     </div>
   );
 }

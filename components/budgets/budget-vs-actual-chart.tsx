@@ -4,10 +4,14 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { useBudgetPeriod } from './budget-period-selector';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { formatCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { Scale } from 'lucide-react';
 
 interface BudgetData {
   id: string;
@@ -29,6 +33,8 @@ export function BudgetVsActualChart() {
   const [error, setError] = useState<string | null>(null);
   const [excludeIncome, setExcludeIncome] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('budgetVsActualChart');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -90,49 +96,87 @@ export function BudgetVsActualChart() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
-        </div>
-        <LoadingSpinner category="chart" className="h-[300px]" />
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Budget vs Actual"
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[300px] m-5" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Budget vs Actual</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Budget vs Actual"
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (allChartData.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Budget vs Actual</h3>
-        <ChartEmptyState variant="nodata" description="Add a budget to see the comparison" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Budget vs Actual"
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" description="Add a budget to see the comparison" />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Budget vs Actual</h3>
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={excludeIncome}
-            onChange={(e) => setExcludeIncome(e.target.checked)}
-            className="rounded border-border text-primary focus:ring-primary"
-          />
-          <span className="text-xs text-muted-foreground">Exclude Income</span>
-        </label>
-      </div>
-      <div className="h-[350px]">
-        <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
-          <div className="min-w-max h-full px-2 pb-2">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Scale className="w-4 h-4 text-primary" /> Budget vs Actual
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                {excludeIncome ? 'EXCLUDING INCOME' : 'INCLUDING INCOME'}
+              </span>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={excludeIncome}
+                  onChange={(e) => setExcludeIncome(e.target.checked)}
+                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Exclude Income Categories</span>
+              </label>
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="h-[350px] pt-2">
+            <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+              <div className="min-w-max h-full px-2 pb-2">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               <BarChart
               layout="vertical"
@@ -236,6 +280,8 @@ export function BudgetVsActualChart() {
           Over Budget
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
