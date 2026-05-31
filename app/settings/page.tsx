@@ -19,7 +19,8 @@ import {
   FileText, 
   ShieldAlert,
   ChevronRight,
-  Menu
+  Menu,
+  AlertCircle
 } from 'lucide-react';
 import {
   Sheet,
@@ -87,6 +88,7 @@ type Account = {
   currency: string;
   institution: string | null;
   connectionId: string | null;
+  externalId?: string | null;
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
@@ -175,6 +177,13 @@ function SettingsPageBody() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
 
+  const [isRemapDialogOpen, setIsRemapDialogOpen] = useState(false);
+  const [remapSourceId, setRemapSourceId] = useState('');
+  const [remapTargetId, setRemapTargetId] = useState('');
+  const [remapLoading, setRemapLoading] = useState(false);
+  const [remapError, setRemapError] = useState('');
+  const [remapSuccess, setRemapSuccess] = useState('');
+
   const fetchConnections = useCallback(async () => {
     try {
       const res = await fetch('/api/connections', { credentials: 'include' });
@@ -198,6 +207,42 @@ function SettingsPageBody() {
       setAccountsLoading(false);
     }
   }, []);
+
+  const handleRemap = useCallback(async () => {
+    if (!remapSourceId || !remapTargetId) {
+      setRemapError('Please select both accounts.');
+      return;
+    }
+    setRemapLoading(true);
+    setRemapError('');
+    setRemapSuccess('');
+    try {
+      const res = await fetch('/api/accounts/remap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceAccountId: remapSourceId,
+          targetAccountId: remapTargetId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to remap accounts');
+      }
+      setRemapSuccess('Accounts re-mapped successfully!');
+      setRemapSourceId('');
+      setRemapTargetId('');
+      await fetchAccounts();
+      setTimeout(() => {
+        setIsRemapDialogOpen(false);
+        setRemapSuccess('');
+      }, 1500);
+    } catch (err) {
+      setRemapError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setRemapLoading(false);
+    }
+  }, [remapSourceId, remapTargetId, fetchAccounts]);
 
   const handleToggleAccount = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
@@ -438,6 +483,18 @@ function SettingsPageBody() {
   };
 
   const hasConnection = connections.length > 0;
+
+  const orphanedAccounts = accounts.filter(
+    (a) =>
+      !a.connectionId &&
+      a.externalId &&
+      a.type !== 'paystub' &&
+      !a.externalId.startsWith('manual-') &&
+      !a.externalId.startsWith('adj-') &&
+      !a.externalId.startsWith('virtual-')
+  );
+
+  const activeAutomaticAccounts = accounts.filter((a) => a.connectionId !== null);
 
   return (
     <div className="min-h-screen w-full">
@@ -808,6 +865,29 @@ function SettingsPageBody() {
 
           {accountSubTab === 'automatic' && (
         <>
+          {orphanedAccounts.length > 0 && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-4 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    You have {orphanedAccounts.length} automatic account{orphanedAccounts.length !== 1 ? 's' : ''} no longer linked to a bank connection. Re-map {orphanedAccounts.length === 1 ? 'it' : 'them'} to a currently active synced account to preserve its full history.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRemapSourceId(orphanedAccounts[0]?.id || '');
+                  setRemapTargetId(activeAutomaticAccounts[0]?.id || '');
+                  setIsRemapDialogOpen(true);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors flex-shrink-0"
+              >
+                Re-map Account
+              </button>
+            </div>
+          )}
           {/* Existing Connections */}
           {hasConnection && (
             <div className="p-5 bg-card border border-border rounded-xl mb-4">
@@ -1442,6 +1522,98 @@ function SettingsPageBody() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Re-mapping Dialog */}
+          <Dialog open={isRemapDialogOpen} onOpenChange={setIsRemapDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Re-map Unlinked Account</DialogTitle>
+                <DialogDescription>
+                  Reconnect an orphaned automatic account to an active synced account to preserve all history.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1">
+                    Orphaned Account (Source)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    The original account with all your historical transactions and balance snapshots.
+                  </p>
+                  <select
+                    value={remapSourceId}
+                    onChange={(e) => setRemapSourceId(e.target.value)}
+                    className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Select orphaned account...</option>
+                    {orphanedAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.institution || 'Unknown Bank'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1">
+                    Active Synced Account (Target)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    The newly synced duplicate account that you want to merge into the old account.
+                  </p>
+                  <select
+                    value={remapTargetId}
+                    onChange={(e) => setRemapTargetId(e.target.value)}
+                    className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Select active synced account...</option>
+                    {activeAutomaticAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.institution || 'Unknown Bank'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <strong className="text-foreground">Important:</strong> Any new transactions on the target account will be moved to the source account, its external credentials will be updated, and the duplicate target account record will be deleted.
+                  </p>
+                </div>
+
+                {remapError && (
+                  <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg text-sm text-destructive">
+                    {remapError}
+                  </div>
+                )}
+
+                {remapSuccess && (
+                  <div className="p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg text-sm text-chart-1">
+                    {remapSuccess}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <button
+                  onClick={() => setIsRemapDialogOpen(false)}
+                  disabled={remapLoading}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRemap}
+                  disabled={remapLoading || !remapSourceId || !remapTargetId}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
+                >
+                  {remapLoading ? 'Re-mapping...' : 'Re-map Account'}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Account Detail Drawer */}
           <AccountDetailDrawer
