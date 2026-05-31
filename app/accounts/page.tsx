@@ -43,6 +43,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 
 import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
@@ -63,6 +66,61 @@ interface Account {
   isExcludedFromNetWorth: boolean;
   connectionId?: string | null;
 }
+
+interface ChartPreset {
+  id: string;
+  name: string;
+  timeframe: TimeRange;
+  chartType: ChartType;
+  groupMode: GroupingMode;
+  selectedGroups: string[];
+  selectedTypes: string[];
+  selectedAccounts: string[];
+  isCustom?: boolean;
+}
+
+const DEFAULT_PRESETS: ChartPreset[] = [
+  {
+    id: 'net-worth',
+    name: 'Net Worth Summary',
+    timeframe: 'all',
+    chartType: 'line',
+    groupMode: 'group',
+    selectedGroups: [],
+    selectedTypes: [],
+    selectedAccounts: [],
+  },
+  {
+    id: 'cash-checking',
+    name: 'Cash & Checking',
+    timeframe: '3m',
+    chartType: 'line',
+    groupMode: 'account',
+    selectedGroups: ['Banking'],
+    selectedTypes: ['Cash & Checking'],
+    selectedAccounts: [],
+  },
+  {
+    id: 'brokerage-savings',
+    name: 'Brokerage & Savings',
+    timeframe: '1y',
+    chartType: 'line',
+    groupMode: 'type',
+    selectedGroups: ['Banking', 'Investments'],
+    selectedTypes: ['Savings', 'Taxable Brokerage', 'Retirement'],
+    selectedAccounts: [],
+  },
+  {
+    id: 'debt-overview',
+    name: 'Debt Overview',
+    timeframe: '6m',
+    chartType: 'bar',
+    groupMode: 'account',
+    selectedGroups: ['Credit', 'Loans', 'Liabilities'],
+    selectedTypes: [],
+    selectedAccounts: [],
+  },
+];
 
 const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: string }> = {
   checking:   { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
@@ -140,9 +198,11 @@ const getSeriesColor = (key: string, mode: GroupingMode, index: number, isAsset:
 // ── On-demand Transaction Sub-row Component ──────────────────────────────────
 interface AccountTransactionsProps {
   accountId: string;
+  historyData: any[];
+  isLiability: boolean;
 }
 
-function AccountTransactions({ accountId }: AccountTransactionsProps) {
+function AccountTransactions({ accountId, historyData, isLiability }: AccountTransactionsProps) {
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId],
     queryFn: async () => {
@@ -151,6 +211,8 @@ function AccountTransactions({ accountId }: AccountTransactionsProps) {
       return res.json();
     },
   });
+
+  const [miniTimeframe, setMiniTimeframe] = useState<TimeRange>('3m');
 
   const formatTransactionAmount = (amount: string) => {
     const num = parseFloat(amount);
@@ -165,67 +227,199 @@ function AccountTransactions({ accountId }: AccountTransactionsProps) {
     };
   };
 
-  if (isLoading) {
+  // Compile history points for this account
+  const accountHistory = useMemo(() => {
+    if (!historyData || historyData.length === 0) return [];
+    return historyData
+      .map((d) => {
+        const val = d[accountId];
+        return {
+          date: d.date,
+          // Show absolute balance for standard display
+          balance: val !== undefined ? Math.abs(val) : undefined,
+        };
+      })
+      .filter((d) => d.balance !== undefined);
+  }, [historyData, accountId]);
+
+  const visibleMiniData = useMemo(() => {
+    if (accountHistory.length === 0) return [];
+    const [startIdx, endIdx] = getTimeframeIndices(accountHistory, miniTimeframe);
+    return accountHistory.slice(startIdx, endIdx + 1);
+  }, [accountHistory, miniTimeframe]);
+
+  const { minVal, maxVal } = useMemo(() => {
+    if (visibleMiniData.length === 0) return { minVal: 0, maxVal: 1000 };
+    const vals = visibleMiniData.map(d => d.balance ?? 0);
+    const rawMax = Math.max(...vals, 10);
+    const rawMin = Math.min(...vals, 0);
+    // Add 10% padding
+    const padding = (rawMax - rawMin) * 0.1 || 10;
+    return {
+      minVal: Math.max(0, rawMin - padding),
+      maxVal: rawMax + padding,
+    };
+  }, [visibleMiniData]);
+
+  const miniTicks = useMemo(() => {
+    if (visibleMiniData.length < 2) return [];
+    if (visibleMiniData.length === 2) return [visibleMiniData[0].date, visibleMiniData[1].date];
+    const first = visibleMiniData[0].date;
+    const last = visibleMiniData[visibleMiniData.length - 1].date;
+    const midIdx = Math.floor(visibleMiniData.length / 2);
+    const mid = visibleMiniData[midIdx].date;
+    return [first, mid, last];
+  }, [visibleMiniData]);
+
+  const MiniTooltip = useCallback(({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const point = payload[0].payload;
     return (
-      <div className="py-3 px-6 space-y-2 bg-muted/10">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
+      <div className="bg-card/95 border border-border/80 px-2.5 py-1.5 rounded-lg shadow-lg text-[10px] space-y-0.5 backdrop-blur-sm">
+        <p className="font-semibold text-muted-foreground">{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        <p className="font-mono font-bold text-foreground">{formatCurrency(point.balance)}</p>
       </div>
     );
-  }
+  }, []);
 
-  if (error || !txData) {
-    return (
-      <div className="py-3 px-6 text-xs text-destructive bg-muted/10">
-        Failed to load transactions.
-      </div>
-    );
-  }
+  const chartColor = isLiability ? 'var(--color-destructive)' : 'var(--color-primary)';
 
-  const txs = txData.data || [];
-
-  if (txs.length === 0) {
-    return (
-      <div className="py-4 px-6 text-xs text-muted-foreground text-center bg-muted/10">
-        No recent activity found for this account.
-      </div>
-    );
-  }
+  const txs = txData?.data || [];
 
   return (
-    <div className="py-3 px-6 bg-muted/10 border-t border-border/40 transition-all duration-300">
-      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <Activity className="w-3.5 h-3.5" /> Recent Activity (Last 5 Transactions)
-      </div>
-      <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
-        {txs.map((tx: any) => {
-          const { text, isExpense } = formatTransactionAmount(tx.amount);
-          return (
-            <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
-              <div className="min-w-0 flex-1 pr-4">
-                <p className="font-medium text-foreground truncate">{tx.description || tx.payee || 'Unidentified Transaction'}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-muted-foreground">{formatDate(tx.date)}</span>
-                  {tx.category && (
-                    <span 
-                      className="px-1.5 py-0.2 text-[9px] rounded-full font-medium"
-                      style={{ 
-                        backgroundColor: `${tx.category.color}15`, 
-                        color: tx.category.color 
-                      }}
-                    >
-                      {tx.category.name}
-                    </span>
-                  )}
-                </div>
+    <div className="py-4 px-4 sm:px-6 bg-muted/10 border-t border-border/40 transition-all duration-300">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        {/* Left Side: Balance History Mini-Chart */}
+        <div className="md:col-span-3 flex flex-col space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
+              <Activity className="w-3.5 h-3.5" /> Balance History
+            </span>
+            {accountHistory.length >= 2 && (
+              <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5">
+                {(['1m', '3m', '6m', '1y', 'all'] as const).map((r) => (
+                  <button
+                    type="button"
+                    key={r}
+                    onClick={() => setMiniTimeframe(r)}
+                    className={`px-2 py-0.5 text-[9px] font-semibold rounded capitalize transition-all ${
+                      miniTimeframe === r
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {r === 'all' ? 'All' : r.toUpperCase()}
+                  </button>
+                ))}
               </div>
-              <span className={`font-mono font-semibold ${isExpense ? 'text-destructive' : 'text-emerald-500'}`}>
-                {text}
-              </span>
-            </div>
-          );
-        })}
+            )}
+          </div>
+
+          <div className="h-[140px] w-full relative bg-card/20 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
+            {accountHistory.length < 2 ? (
+              <span className="text-[10px] text-muted-foreground/60 italic">Insufficient historical data for this account</span>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                <AreaChart data={visibleMiniData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.15} />
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    ticks={miniTicks}
+                    tickFormatter={(d) => {
+                      if (!d) return '';
+                      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                    }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    domain={[minVal, maxVal]}
+                    tickFormatter={(v) => {
+                      const absV = Math.abs(v);
+                      if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
+                      if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
+                      return `$${absV.toFixed(0)}`;
+                    }}
+                  />
+                  <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="balance"
+                    stroke={chartColor}
+                    strokeWidth={1.5}
+                    fill={`url(#gradient-mini-${accountId})`}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Recent Transactions */}
+        <div className="md:col-span-2 flex flex-col space-y-3">
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
+            <Activity className="w-3.5 h-3.5" /> Recent Activity (Last 5)
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center min-h-[140px]">
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ) : error || !txData ? (
+              <div className="text-[10px] text-destructive text-center py-4 bg-card/25 rounded-lg border border-border/20">
+                Failed to load transactions.
+              </div>
+            ) : txs.length === 0 ? (
+              <div className="text-[10px] text-muted-foreground/60 italic text-center py-8 bg-card/25 rounded-lg border border-border/20">
+                No recent activity found.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
+                {txs.map((tx: any) => {
+                  const { text, isExpense } = formatTransactionAmount(tx.amount);
+                  return (
+                    <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
+                      <div className="min-w-0 flex-1 pr-4">
+                        <p className="font-medium text-foreground truncate text-[11px]">{tx.description || tx.payee || 'Unidentified Transaction'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] text-muted-foreground">{formatDate(tx.date)}</span>
+                          {tx.category && (
+                            <span 
+                              className="px-1.5 py-0.2 text-[8px] rounded-full font-medium"
+                              style={{ 
+                                backgroundColor: `${tx.category.color}15`, 
+                                color: tx.category.color 
+                              }}
+                            >
+                              {tx.category.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`font-mono text-[11px] font-semibold ${isExpense ? 'text-destructive' : 'text-emerald-500'}`}>
+                        {text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -284,6 +478,10 @@ export default function AccountsPage() {
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('runway:accounts:groupMode', 'type');
   const [showHidden, setShowHidden] = usePersistentState<boolean>('runway:accounts:showHidden', false);
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('balanceHistoryChart');
+  const [hierarchyCollapsed, setHierarchyCollapsed] = useCardCollapsed('accountsHierarchy');
+  const [showHistoryFilters, setShowHistoryFilters] = useState(false);
+  const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
 
   // ── Chart pan/zoom viewport state ────────────────────────────────────────────
   const [viewStart, setViewStart] = useState<number | null>(null);
@@ -312,19 +510,98 @@ export default function AccountsPage() {
   const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('runway:accounts:selectedTypes', new Set(), setOptions);
   const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:selectedAccounts', new Set(), setOptions);
 
+  // Dropdown filter selections for Hierarchy
+  const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedGroups', new Set(), setOptions);
+  const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTypes', new Set(), setOptions);
+  const [hierarchySelectedAccounts, setHierarchySelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedAccounts', new Set(), setOptions);
+  const [hierarchyShowHidden, setHierarchyShowHidden] = usePersistentState<boolean>('runway:accounts:hierarchyShowHidden', false);
+
+  // ── Presets / Quick Views State & Handlers ──
+  const [customPresets, setCustomPresets] = usePersistentState<ChartPreset[]>('runway:accounts:customPresets', []);
+  const [isSavingView, setIsSavingView] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+
+  const allPresets = useMemo(() => {
+    return [...DEFAULT_PRESETS, ...(customPresets || [])];
+  }, [customPresets]);
+
+  const handleApplyPreset = useCallback((preset: ChartPreset) => {
+    setTimeframe(preset.timeframe);
+    setChartType(preset.chartType);
+    setGroupMode(preset.groupMode);
+    setSelectedGroups(new Set(preset.selectedGroups));
+    setSelectedTypes(new Set(preset.selectedTypes));
+    setSelectedAccounts(new Set(preset.selectedAccounts));
+  }, [setTimeframe, setChartType, setGroupMode, setSelectedGroups, setSelectedTypes, setSelectedAccounts]);
+
+  const handleSaveCurrentView = useCallback((name: string) => {
+    if (!name.trim()) return;
+    const newPreset: ChartPreset = {
+      id: `custom-${Date.now()}`,
+      name: name.trim(),
+      timeframe,
+      chartType,
+      groupMode,
+      selectedGroups: Array.from(selectedGroups),
+      selectedTypes: Array.from(selectedTypes),
+      selectedAccounts: Array.from(selectedAccounts),
+      isCustom: true,
+    };
+    setCustomPresets((prev) => [...(prev || []), newPreset]);
+    setIsSavingView(false);
+    setNewPresetName('');
+  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts, setCustomPresets]);
+
+  const handleDeletePreset = useCallback((id: string) => {
+    setCustomPresets((prev) => (prev || []).filter((p) => p.id !== id));
+  }, [setCustomPresets]);
+
+  const isPresetActive = useCallback((preset: ChartPreset) => {
+    if (preset.timeframe !== timeframe) return false;
+    if (preset.chartType !== chartType) return false;
+    if (preset.groupMode !== groupMode) return false;
+    if (preset.selectedGroups.length !== selectedGroups.size) return false;
+    for (const g of preset.selectedGroups) {
+      if (!selectedGroups.has(g)) return false;
+    }
+    if (preset.selectedTypes.length !== selectedTypes.size) return false;
+    for (const t of preset.selectedTypes) {
+      if (!selectedTypes.has(t)) return false;
+    }
+    if (preset.selectedAccounts.length !== selectedAccounts.size) return false;
+    for (const a of preset.selectedAccounts) {
+      if (!selectedAccounts.has(a)) return false;
+    }
+    return true;
+  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts]);
+
   // Dropdown open states
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
   const [accountsOpen, setAccountsOpen] = useState(false);
 
+  // Dropdown open states for Hierarchy
+  const [hierarchyGroupsOpen, setHierarchyGroupsOpen] = useState(false);
+  const [hierarchyTypesOpen, setHierarchyTypesOpen] = useState(false);
+  const [hierarchyAccountsOpen, setHierarchyAccountsOpen] = useState(false);
+
   // Search filter states
   const [typeSearch, setTypeSearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
+
+  // Search filter states for Hierarchy
+  const [hierarchyTypeSearch, setHierarchyTypeSearch] = useState('');
+  const [hierarchyAccountSearch, setHierarchyAccountSearch] = useState('');
 
   // Refs for closing dropdowns when clicking outside
   const groupsRef = useRef<HTMLDivElement>(null);
   const typesRef = useRef<HTMLDivElement>(null);
   const accountsRef = useRef<HTMLDivElement>(null);
+
+  // Refs for closing dropdowns for Hierarchy
+  const hierarchyGroupsRef = useRef<HTMLDivElement>(null);
+  const hierarchyTypesRef = useRef<HTMLDivElement>(null);
+  const hierarchyAccountsRef = useRef<HTMLDivElement>(null);
 
   // Click outside listener
   useEffect(() => {
@@ -339,6 +616,19 @@ export default function AccountsPage() {
       if (accountsRef.current && !accountsRef.current.contains(e.target as Node)) {
         setAccountsOpen(false);
         setAccountSearch('');
+      }
+
+      // Hierarchy Refs
+      if (hierarchyGroupsRef.current && !hierarchyGroupsRef.current.contains(e.target as Node)) {
+        setHierarchyGroupsOpen(false);
+      }
+      if (hierarchyTypesRef.current && !hierarchyTypesRef.current.contains(e.target as Node)) {
+        setHierarchyTypesOpen(false);
+        setHierarchyTypeSearch('');
+      }
+      if (hierarchyAccountsRef.current && !hierarchyAccountsRef.current.contains(e.target as Node)) {
+        setHierarchyAccountsOpen(false);
+        setHierarchyAccountSearch('');
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -403,6 +693,30 @@ export default function AccountsPage() {
     const list = filteredAllAccounts.filter(acc => !acc.isHidden || showHidden);
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [filteredAllAccounts, showHidden]);
+
+  // Compute available Groups, Types, and Accounts for hierarchy dropdowns
+  const hierarchyAvailableGroups = useMemo(() => {
+    const groups = new Set<string>();
+    for (const acc of filteredAllAccounts) {
+      if (acc.isHidden && !hierarchyShowHidden) continue;
+      groups.add(getHierarchy(acc.type).group);
+    }
+    return Array.from(groups).sort();
+  }, [filteredAllAccounts, hierarchyShowHidden]);
+
+  const hierarchyAvailableTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const acc of filteredAllAccounts) {
+      if (acc.isHidden && !hierarchyShowHidden) continue;
+      types.add(getHierarchy(acc.type).subGroup);
+    }
+    return Array.from(types).sort();
+  }, [filteredAllAccounts, hierarchyShowHidden]);
+
+  const hierarchyAvailableAccounts = useMemo(() => {
+    const list = filteredAllAccounts.filter(acc => !acc.isHidden || hierarchyShowHidden);
+    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredAllAccounts, hierarchyShowHidden]);
 
   // 2. Fetch Accounts History Chart Data (only reportable accounts)
   const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[]; accounts: any[] }>({
@@ -864,22 +1178,22 @@ export default function AccountsPage() {
     const map = new Map<string, Map<string, Account[]>>();
 
     for (const acc of filteredAllAccounts) {
-      if (acc.isHidden && !showHidden) continue;
+      if (acc.isHidden && !hierarchyShowHidden) continue;
 
       const { group, subGroup } = getHierarchy(acc.type);
 
       // Filter by Group
-      if (selectedGroups.size > 0 && !selectedGroups.has(group)) {
+      if (hierarchySelectedGroups.size > 0 && !hierarchySelectedGroups.has(group)) {
         continue;
       }
       
       // Filter by Type (subGroup)
-      if (selectedTypes.size > 0 && !selectedTypes.has(subGroup)) {
+      if (hierarchySelectedTypes.size > 0 && !hierarchySelectedTypes.has(subGroup)) {
         continue;
       }
       
       // Filter by Account ID
-      if (selectedAccounts.size > 0 && !selectedAccounts.has(acc.id)) {
+      if (hierarchySelectedAccounts.size > 0 && !hierarchySelectedAccounts.has(acc.id)) {
         continue;
       }
 
@@ -890,7 +1204,7 @@ export default function AccountsPage() {
     }
 
     return map;
-  }, [filteredAllAccounts, showHidden, selectedGroups, selectedTypes, selectedAccounts]);
+  }, [filteredAllAccounts, hierarchyShowHidden, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts]);
 
   const sortedGroups = useMemo(() => {
     return Array.from(treeHierarchy.keys()).sort((a, b) => {
@@ -988,304 +1302,432 @@ export default function AccountsPage() {
 
             {/* ── Graphics / Chart Card ── */}
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
-              <CardHeader className="p-5 pb-3 border-b border-border/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <CollapsibleCardHeader
+                isCollapsed={isCollapsed}
+                onToggle={setIsCollapsed}
+                title={
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                     <Activity className="w-4 h-4 text-primary" /> Balance History
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">Stacked balance over time and aggregate net worth trend.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Timeframe selector */}
-                  <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-                  
-                  {/* Chart type selector */}
-                  <ChartTypeSelector 
-                    value={chartType} 
-                    options={[
-                      { value: 'line', label: 'Area' },
-                      { value: 'bar', label: 'Bar' }
-                    ]} 
-                    onChange={(t) => setChartType(t as ChartType)} 
-                  />
+                  </h3>
+                }
+              />
+              {!isCollapsed && (
+                <>
+                  <CollapsibleFilterPanel
+                    isOpen={showHistoryFilters}
+                    onToggle={() => setShowHistoryFilters(!showHistoryFilters)}
+                    feedback={
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                          {timeframe.toUpperCase()}
+                        </span>
+                        <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                          {chartType === 'line' ? 'Area' : 'Bar'}
+                        </span>
+                        <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                          BY {groupMode.toUpperCase()}
+                        </span>
+                        {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0) && (
+                          <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                            FILTERED
+                          </span>
+                        )}
+                      </div>
+                    }
+                  >
+                    <div className="space-y-4">
+                      {/* Timeframe & Chart Style Row */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
+                          <ChartTypeSelector 
+                            value={chartType} 
+                            options={[
+                              { value: 'line', label: 'Area' },
+                              { value: 'bar', label: 'Bar' }
+                            ]} 
+                            onChange={(t) => setChartType(t as ChartType)} 
+                          />
+                        </div>
+                      </div>
 
-                </div>
-              </CardHeader>
-              <CardContent className="p-5 space-y-5">
-                {/* ── Chart Controls / Groupings & Contextual Filters ── */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
-                  {/* Mode Pill Selector */}
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Group By</span>
-                    <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5">
-                      {(['group', 'type', 'account'] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          onClick={() => handleGroupModeChange(mode)}
-                          className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-all ${
-                            groupMode === mode
-                              ? 'bg-card text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          {mode === 'type' ? 'Type' : mode}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Filter Dropdown for the selected group mode */}
-                  <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                    {groupMode === 'group' && (
-                      <div className="relative z-30" ref={groupsRef}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGroupsOpen(!groupsOpen);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                            selectedGroups.size > 0
-                              ? 'bg-primary/15 border border-primary text-primary'
-                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                          }`}
-                        >
-                          <span>Group</span>
-                          {selectedGroups.size > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                              {selectedGroups.size}
-                            </span>
-                          )}
-                          <svg className={`h-3 w-3 transition-transform ${groupsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      {/* Quick Views Presets */}
+                      <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/20 border border-border/20 rounded-xl">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mr-1 select-none">
+                          <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                           </svg>
-                        </button>
-                        {groupsOpen && (
-                          <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                            <div className="overflow-y-auto flex-1 p-1">
-                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedGroups.size === availableGroups.length && availableGroups.length > 0}
-                                  onChange={() => {
-                                    if (selectedGroups.size === availableGroups.length) {
-                                      setSelectedGroups(new Set());
-                                    } else {
-                                      setSelectedGroups(new Set(availableGroups));
-                                    }
-                                  }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                />
-                                Select All
-                              </label>
-                              {availableGroups.map((group) => (
-                                <label
-                                  key={group}
-                                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedGroups.has(group)}
-                                    onChange={() => {
-                                      const next = new Set(selectedGroups);
-                                      if (next.has(group)) {
-                                        next.delete(group);
-                                      } else {
-                                        next.add(group);
-                                      }
-                                      setSelectedGroups(next);
+                          Quick Views
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {allPresets.map((preset) => {
+                            const active = isPresetActive(preset);
+                            return (
+                              <button
+                                type="button"
+                                key={preset.id}
+                                onClick={() => handleApplyPreset(preset)}
+                                className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                  active
+                                    ? 'bg-primary/15 border-primary/50 text-primary shadow-sm'
+                                    : 'bg-background hover:bg-muted border-border/50 text-muted-foreground hover:text-foreground'
+                                }`}
+                              >
+                                <span>{preset.name}</span>
+                                {preset.isCustom && (
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePreset(preset.id);
                                     }}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                  />
-                                  <span>{group}</span>
-                                </label>
+                                    className="w-3.5 h-3.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center text-[10px] ml-0.5 opacity-60 group-hover:opacity-100 transition-opacity"
+                                    title="Delete view"
+                                  >
+                                    &times;
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+
+                          {/* Save Current View Form */}
+                          {isSavingView ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveCurrentView(newPresetName);
+                              }}
+                              className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-200"
+                            >
+                              <input
+                                type="text"
+                                value={newPresetName}
+                                onChange={(e) => setNewPresetName(e.target.value)}
+                                placeholder="Name this view..."
+                                className="px-2.5 py-1 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-32 transition-all"
+                                autoFocus
+                                required
+                              />
+                              <button
+                                type="submit"
+                                className="px-2.5 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90 transition-opacity"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsSavingView(false);
+                                  setNewPresetName('');
+                                }}
+                                className="px-2.5 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-lg hover:bg-muted/80 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsSavingView(true)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-dashed border-primary/45 hover:border-primary text-primary hover:bg-primary/5 transition-all"
+                            >
+                              <span className="text-[14px] leading-none">+</span> Save View
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Chart Controls / Groupings & Contextual Filters */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
+                        {/* Mode Pill Selector & Show Hidden Toggle */}
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Group By</span>
+                            <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5">
+                              {(['group', 'type', 'account'] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  onClick={() => handleGroupModeChange(mode)}
+                                  className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-all ${
+                                    groupMode === mode
+                                      ? 'bg-card text-foreground shadow-sm'
+                                      : 'text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  {mode === 'type' ? 'Type' : mode}
+                                </button>
                               ))}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    )}
 
-                    {groupMode === 'type' && (
-                      <div className="relative z-30" ref={typesRef}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTypesOpen(!typesOpen);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                            selectedTypes.size > 0
-                              ? 'bg-primary/15 border border-primary text-primary'
-                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                          }`}
-                        >
-                          <span>Type</span>
-                          {selectedTypes.size > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                              {selectedTypes.size}
-                            </span>
-                          )}
-                          <svg className={`h-3 w-3 transition-transform ${typesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {typesOpen && (
-                          <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                            <div className="p-2 border-b border-border/50">
-                              <input
-                                type="text"
-                                value={typeSearch}
-                                onChange={(e) => setTypeSearch(e.target.value)}
-                                placeholder="Search types..."
-                                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-                              />
-                            </div>
-                            <div className="overflow-y-auto flex-1 p-1">
-                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedTypes.size === availableTypes.length && availableTypes.length > 0}
-                                  onChange={() => {
-                                    if (selectedTypes.size === availableTypes.length) {
-                                      setSelectedTypes(new Set());
-                                    } else {
-                                      setSelectedTypes(new Set(availableTypes));
-                                    }
-                                  }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                />
-                                Select All
-                              </label>
-                              {availableTypes
-                                .filter(t => !typeSearch || t.toLowerCase().includes(typeSearch.toLowerCase()))
-                                .map((type) => (
-                                  <label
-                                    key={type}
-                                    className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedTypes.has(type)}
-                                      onChange={() => {
-                                        const next = new Set(selectedTypes);
-                                        if (next.has(type)) {
-                                          next.delete(type);
-                                        } else {
-                                          next.add(type);
-                                        }
-                                        setSelectedTypes(next);
-                                      }}
-                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                    />
-                                    <span>{type}</span>
-                                  </label>
-                                ))}
-                            </div>
+                          <div className="flex items-center gap-2 sm:border-l sm:border-border/30 sm:pl-4">
+                            <Switch
+                              id="chart-show-hidden"
+                              checked={showHidden}
+                              onCheckedChange={setShowHidden}
+                            />
+                            <label htmlFor="chart-show-hidden" className="text-xs font-medium text-muted-foreground cursor-pointer">
+                              Show Hidden
+                            </label>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
 
-                    {groupMode === 'account' && (
-                      <div className="relative z-30" ref={accountsRef}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAccountsOpen(!accountsOpen);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                            selectedAccounts.size > 0
-                              ? 'bg-primary/15 border border-primary text-primary'
-                              : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                          }`}
-                        >
-                          <span>Account</span>
-                          {selectedAccounts.size > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                              {selectedAccounts.size}
-                            </span>
+                        {/* Filter Dropdown for the selected group mode */}
+                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                          {groupMode === 'group' && (
+                            <div className="relative z-30" ref={groupsRef}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGroupsOpen(!groupsOpen);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                  selectedGroups.size > 0
+                                    ? 'bg-primary/15 border border-primary text-primary'
+                                    : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                                }`}
+                              >
+                                <span>Group</span>
+                                {selectedGroups.size > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                    {selectedGroups.size}
+                                  </span>
+                                )}
+                                <svg className={`h-3 w-3 transition-transform ${groupsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {groupsOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                  <div className="overflow-y-auto flex-1 p-1">
+                                    <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedGroups.size === availableGroups.length && availableGroups.length > 0}
+                                        onChange={() => {
+                                          if (selectedGroups.size === availableGroups.length) {
+                                            setSelectedGroups(new Set());
+                                          } else {
+                                            setSelectedGroups(new Set(availableGroups));
+                                          }
+                                        }}
+                                        className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                      />
+                                      Select All
+                                    </label>
+                                    {availableGroups.map((group) => (
+                                      <label
+                                        key={group}
+                                        className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedGroups.has(group)}
+                                          onChange={() => {
+                                            const next = new Set(selectedGroups);
+                                            if (next.has(group)) {
+                                              next.delete(group);
+                                            } else {
+                                              next.add(group);
+                                            }
+                                            setSelectedGroups(next);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                        />
+                                        <span>{group}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
-                          <svg className={`h-3 w-3 transition-transform ${accountsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {accountsOpen && (
-                          <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                            <div className="p-2 border-b border-border/50">
-                              <input
-                                type="text"
-                                value={accountSearch}
-                                onChange={(e) => setAccountSearch(e.target.value)}
-                                placeholder="Search accounts..."
-                                className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-                              />
-                            </div>
-                            <div className="overflow-y-auto flex-1 p-1">
-                              <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedAccounts.size === availableAccounts.length && availableAccounts.length > 0}
-                                  onChange={() => {
-                                    if (selectedAccounts.size === availableAccounts.length) {
-                                      setSelectedAccounts(new Set());
-                                    } else {
-                                      setSelectedAccounts(new Set(availableAccounts.map(a => a.id)));
-                                    }
-                                  }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                />
-                                Select All
-                              </label>
-                              {availableAccounts
-                                .filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(accountSearch.toLowerCase())))
-                                .map((acc) => (
-                                  <label
-                                    key={acc.id}
-                                    className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                  >
+
+                          {groupMode === 'type' && (
+                            <div className="relative z-30" ref={typesRef}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTypesOpen(!typesOpen);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                  selectedTypes.size > 0
+                                    ? 'bg-primary/15 border border-primary text-primary'
+                                    : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                                }`}
+                              >
+                                <span>Type</span>
+                                {selectedTypes.size > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                    {selectedTypes.size}
+                                  </span>
+                                )}
+                                <svg className={`h-3 w-3 transition-transform ${typesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {typesOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                  <div className="p-2 border-b border-border/50">
                                     <input
-                                      type="checkbox"
-                                      checked={selectedAccounts.has(acc.id)}
-                                      onChange={() => {
-                                        const next = new Set(selectedAccounts);
-                                        if (next.has(acc.id)) {
-                                          next.delete(acc.id);
-                                        } else {
-                                          next.add(acc.id);
-                                        }
-                                        setSelectedAccounts(next);
-                                      }}
-                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                      type="text"
+                                      value={typeSearch}
+                                      onChange={(e) => setTypeSearch(e.target.value)}
+                                      placeholder="Search types..."
+                                      className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
                                     />
-                                    <div className="text-left">
-                                      <p className="font-medium text-foreground">{acc.name}</p>
-                                      {acc.institution && <p className="text-[10px] text-muted-foreground">{acc.institution}</p>}
-                                    </div>
-                                  </label>
-                                ))}
+                                  </div>
+                                  <div className="overflow-y-auto flex-1 p-1">
+                                    <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedTypes.size === availableTypes.length && availableTypes.length > 0}
+                                        onChange={() => {
+                                          if (selectedTypes.size === availableTypes.length) {
+                                            setSelectedTypes(new Set());
+                                          } else {
+                                            setSelectedTypes(new Set(availableTypes));
+                                          }
+                                        }}
+                                        className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                      />
+                                      Select All
+                                    </label>
+                                    {availableTypes
+                                      .filter(t => !typeSearch || t.toLowerCase().includes(typeSearch.toLowerCase()))
+                                      .map((type) => (
+                                        <label
+                                          key={type}
+                                          className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedTypes.has(type)}
+                                            onChange={() => {
+                                              const next = new Set(selectedTypes);
+                                              if (next.has(type)) {
+                                                next.delete(type);
+                                              } else {
+                                                next.add(type);
+                                              }
+                                              setSelectedTypes(next);
+                                            }}
+                                            className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                          />
+                                          <span>{type}</span>
+                                        </label>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          )}
+
+                          {groupMode === 'account' && (
+                            <div className="relative z-30" ref={accountsRef}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAccountsOpen(!accountsOpen);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                  selectedAccounts.size > 0
+                                    ? 'bg-primary/15 border border-primary text-primary'
+                                    : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                                }`}
+                              >
+                                <span>Account</span>
+                                {selectedAccounts.size > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                    {selectedAccounts.size}
+                                  </span>
+                                )}
+                                <svg className={`h-3 w-3 transition-transform ${accountsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {accountsOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                  <div className="p-2 border-b border-border/50">
+                                    <input
+                                      type="text"
+                                      value={accountSearch}
+                                      onChange={(e) => setAccountSearch(e.target.value)}
+                                      placeholder="Search accounts..."
+                                      className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                                    />
+                                  </div>
+                                  <div className="overflow-y-auto flex-1 p-1">
+                                    <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedAccounts.size === availableAccounts.length && availableAccounts.length > 0}
+                                        onChange={() => {
+                                          if (selectedAccounts.size === availableAccounts.length) {
+                                            setSelectedAccounts(new Set());
+                                          } else {
+                                            setSelectedAccounts(new Set(availableAccounts.map(a => a.id)));
+                                          }
+                                        }}
+                                        className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                      />
+                                      Select All
+                                    </label>
+                                    {availableAccounts
+                                      .filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(accountSearch.toLowerCase())))
+                                      .map((acc) => (
+                                        <label
+                                          key={acc.id}
+                                          className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedAccounts.has(acc.id)}
+                                            onChange={() => {
+                                              const next = new Set(selectedAccounts);
+                                              if (next.has(acc.id)) {
+                                                next.delete(acc.id);
+                                              } else {
+                                                next.add(acc.id);
+                                              }
+                                              setSelectedAccounts(next);
+                                            }}
+                                            className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                          />
+                                          <div className="text-left">
+                                            <p className="font-medium text-foreground">{acc.name}</p>
+                                            {acc.institution && <p className="text-[10px] text-muted-foreground">{acc.institution}</p>}
+                                          </div>
+                                        </label>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Reset/Clear button inside the same row if there are selected items */}
+                          {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0) && (
+                            <button
+                              onClick={() => {
+                                setSelectedGroups(new Set());
+                                setSelectedTypes(new Set());
+                                setSelectedAccounts(new Set());
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                            >
+                              Clear Filters
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-
-                    {/* Reset/Clear button inside the same row if there are selected items */}
-                    {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0) && (
-                      <button
-                        onClick={() => {
-                          setSelectedGroups(new Set());
-                          setSelectedTypes(new Set());
-                          setSelectedAccounts(new Set());
-                        }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
-                      >
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Chart Container ── */}
-                <div className="h-[380px] w-full relative">
+                    </div>
+                  </CollapsibleFilterPanel>
+                  <CardContent className="p-5">
                   {historyLoading ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-card/20 backdrop-blur-[1px]">
                       <LoadingSpinner category="analysis" />
@@ -1558,19 +2000,24 @@ export default function AccountsPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </>
+            )}
+          </Card>
 
             {/* ── Expandable Accounts Tree View ── */}
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
-              <CardHeader className="p-5 pb-3 border-b border-border/30">
-                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                  <Landmark className="w-4 h-4 text-primary" /> Accounts Hierarchy
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Hierarchical directory of linked accounts with historical trend sparklines.</p>
-              </CardHeader>
-              <CardContent className="p-5">
+              <CollapsibleCardHeader
+                isCollapsed={hierarchyCollapsed}
+                onToggle={setHierarchyCollapsed}
+                title={
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-primary" /> Accounts Hierarchy
+                  </h3>
+                }
+              />
+              {!hierarchyCollapsed && (
+                <CardContent className="p-5">
                 {accountsLoading ? (
                   <div className="space-y-4">
                     <Skeleton className="h-12 w-full" />
@@ -1588,7 +2035,279 @@ export default function AccountsPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <>
+                    <CollapsibleFilterPanel
+                      isOpen={showHierarchyFilters}
+                      onToggle={() => setShowHierarchyFilters(!showHierarchyFilters)}
+                      feedback={
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                            Showing {filteredAllAccounts.length} Accounts
+                          </span>
+                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0) && (
+                            <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                              FILTERED
+                            </span>
+                          )}
+                        </div>
+                      }
+                      className="mb-4 border border-border/40 rounded-xl bg-muted/5"
+                    >
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        {/* Left side: Show Hidden Accounts Toggle */}
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="hierarchy-show-hidden"
+                            checked={hierarchyShowHidden}
+                            onCheckedChange={setHierarchyShowHidden}
+                          />
+                          <label htmlFor="hierarchy-show-hidden" className="text-xs font-medium text-muted-foreground cursor-pointer select-none">
+                            Show Hidden Accounts
+                          </label>
+                        </div>
+
+                        {/* Right side: Dropdown Filters */}
+                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+                          {/* Group Dropdown */}
+                          <div className="relative z-30" ref={hierarchyGroupsRef}>
+                            <button
+                              type="button"
+                              onClick={() => setHierarchyGroupsOpen(!hierarchyGroupsOpen)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                hierarchySelectedGroups.size > 0
+                                  ? 'bg-primary/15 border border-primary text-primary'
+                                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              <span>Group</span>
+                              {hierarchySelectedGroups.size > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                  {hierarchySelectedGroups.size}
+                                </span>
+                              )}
+                              <svg className={`h-3 w-3 transition-transform ${hierarchyGroupsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {hierarchyGroupsOpen && (
+                              <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                <div className="overflow-y-auto flex-1 p-1">
+                                  <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                    <input
+                                      type="checkbox"
+                                      checked={hierarchySelectedGroups.size === hierarchyAvailableGroups.length && hierarchyAvailableGroups.length > 0}
+                                      onChange={() => {
+                                        if (hierarchySelectedGroups.size === hierarchyAvailableGroups.length) {
+                                          setHierarchySelectedGroups(new Set());
+                                        } else {
+                                          setHierarchySelectedGroups(new Set(hierarchyAvailableGroups));
+                                        }
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    Select All
+                                  </label>
+                                  {hierarchyAvailableGroups.map((group) => (
+                                    <label
+                                      key={group}
+                                      className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={hierarchySelectedGroups.has(group)}
+                                        onChange={() => {
+                                          const next = new Set(hierarchySelectedGroups);
+                                          if (next.has(group)) {
+                                            next.delete(group);
+                                          } else {
+                                            next.add(group);
+                                          }
+                                          setHierarchySelectedGroups(next);
+                                        }}
+                                        className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                      />
+                                      <span>{group}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Type Dropdown */}
+                          <div className="relative z-30" ref={hierarchyTypesRef}>
+                            <button
+                              type="button"
+                              onClick={() => setHierarchyTypesOpen(!hierarchyTypesOpen)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                hierarchySelectedTypes.size > 0
+                                  ? 'bg-primary/15 border border-primary text-primary'
+                                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              <span>Type</span>
+                              {hierarchySelectedTypes.size > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                  {hierarchySelectedTypes.size}
+                                </span>
+                              )}
+                              <svg className={`h-3 w-3 transition-transform ${hierarchyTypesOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {hierarchyTypesOpen && (
+                              <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                <div className="p-2 border-b border-border/50">
+                                  <input
+                                    type="text"
+                                    value={hierarchyTypeSearch}
+                                    onChange={(e) => setHierarchyTypeSearch(e.target.value)}
+                                    placeholder="Search types..."
+                                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                                  />
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-1">
+                                  <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                    <input
+                                      type="checkbox"
+                                      checked={hierarchySelectedTypes.size === hierarchyAvailableTypes.length && hierarchyAvailableTypes.length > 0}
+                                      onChange={() => {
+                                        if (hierarchySelectedTypes.size === hierarchyAvailableTypes.length) {
+                                          setHierarchySelectedTypes(new Set());
+                                        } else {
+                                          setHierarchySelectedTypes(new Set(hierarchyAvailableTypes));
+                                        }
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    Select All
+                                  </label>
+                                  {hierarchyAvailableTypes
+                                    .filter(t => !hierarchyTypeSearch || t.toLowerCase().includes(hierarchyTypeSearch.toLowerCase()))
+                                    .map((type) => (
+                                      <label
+                                        key={type}
+                                        className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={hierarchySelectedTypes.has(type)}
+                                          onChange={() => {
+                                            const next = new Set(hierarchySelectedTypes);
+                                            if (next.has(type)) {
+                                              next.delete(type);
+                                            } else {
+                                              next.add(type);
+                                            }
+                                            setHierarchySelectedTypes(next);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                        />
+                                        <span>{type}</span>
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Account Dropdown */}
+                          <div className="relative z-30" ref={hierarchyAccountsRef}>
+                            <button
+                              type="button"
+                              onClick={() => setHierarchyAccountsOpen(!hierarchyAccountsOpen)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                hierarchySelectedAccounts.size > 0
+                                  ? 'bg-primary/15 border border-primary text-primary'
+                                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              <span>Account</span>
+                              {hierarchySelectedAccounts.size > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                  {hierarchySelectedAccounts.size}
+                                </span>
+                              )}
+                              <svg className={`h-3 w-3 transition-transform ${hierarchyAccountsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {hierarchyAccountsOpen && (
+                              <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                <div className="p-2 border-b border-border/50">
+                                  <input
+                                    type="text"
+                                    value={hierarchyAccountSearch}
+                                    onChange={(e) => setHierarchyAccountSearch(e.target.value)}
+                                    placeholder="Search accounts..."
+                                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                                  />
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-1">
+                                  <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                    <input
+                                      type="checkbox"
+                                      checked={hierarchySelectedAccounts.size === hierarchyAvailableAccounts.length && hierarchyAvailableAccounts.length > 0}
+                                      onChange={() => {
+                                        if (hierarchySelectedAccounts.size === hierarchyAvailableAccounts.length) {
+                                          setHierarchySelectedAccounts(new Set());
+                                        } else {
+                                          setHierarchySelectedAccounts(new Set(hierarchyAvailableAccounts.map(a => a.id)));
+                                        }
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    Select All
+                                  </label>
+                                  {hierarchyAvailableAccounts
+                                    .filter(a => !hierarchyAccountSearch || a.name.toLowerCase().includes(hierarchyAccountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(hierarchyAccountSearch.toLowerCase())))
+                                    .map((acc) => (
+                                      <label
+                                        key={acc.id}
+                                        className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={hierarchySelectedAccounts.has(acc.id)}
+                                          onChange={() => {
+                                            const next = new Set(hierarchySelectedAccounts);
+                                            if (next.has(acc.id)) {
+                                              next.delete(acc.id);
+                                            } else {
+                                              next.add(acc.id);
+                                            }
+                                            setHierarchySelectedAccounts(next);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                        />
+                                        <div className="text-left">
+                                          <p className="font-medium text-foreground">{acc.name}</p>
+                                          {acc.institution && <p className="text-[10px] text-muted-foreground">{acc.institution}</p>}
+                                        </div>
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reset/Clear button inside the same row if there are selected items */}
+                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0) && (
+                            <button
+                              onClick={() => {
+                                setHierarchySelectedGroups(new Set());
+                                setHierarchySelectedTypes(new Set());
+                                setHierarchySelectedAccounts(new Set());
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                            >
+                              Clear Filters
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </CollapsibleFilterPanel>
+                    <div className="space-y-3">
                     {sortedGroups.map((group) => {
                       const subMap = treeHierarchy.get(group);
                       if (!subMap) return null;
@@ -1634,7 +2353,7 @@ export default function AccountsPage() {
                               />
                             </div>
 
-                            <div className="flex-shrink-0 w-36 text-right">
+                            <div className="flex-shrink-0 w-28 sm:w-36 text-right">
                               <p className="font-mono text-sm font-bold text-foreground blur-number">
                                 {formatCurrency(groupStats.current)}
                               </p>
@@ -1667,7 +2386,7 @@ export default function AccountsPage() {
                                         onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
                                         className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
                                       >
-                                        <div className="flex items-center min-w-0 flex-1 pl-1.5 sm:pl-4">
+                                        <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
                                           <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                             {isSubExpanded ? (
                                               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
@@ -1688,7 +2407,7 @@ export default function AccountsPage() {
                                           />
                                         </div>
 
-                                        <div className="flex-shrink-0 w-36 text-right">
+                                        <div className="flex-shrink-0 w-28 sm:w-36 text-right">
                                           <p className="font-mono text-xs font-bold text-muted-foreground blur-number">
                                             {formatCurrency(subStats.current)}
                                           </p>
@@ -1714,7 +2433,7 @@ export default function AccountsPage() {
                                                 acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                               }`}
                                             >
-                                              <div className="flex items-center min-w-0 flex-1 pl-3 sm:pl-8">
+                                              <div className="flex items-center min-w-0 flex-1 pl-1 sm:pl-8">
                                                 <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                                 </div>
@@ -1741,7 +2460,7 @@ export default function AccountsPage() {
                                                 />
                                               </div>
 
-                                              <div className="flex-shrink-0 w-36 text-right pr-2">
+                                              <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
                                                 <p className="font-mono text-xs font-bold text-foreground blur-number">
                                                   {formatCurrency(acc.balance)}
                                                 </p>
@@ -1757,7 +2476,11 @@ export default function AccountsPage() {
 
                                             {/* Inline Transactions Drawer */}
                                             {isAccExpanded && (
-                                              <AccountTransactions accountId={acc.id} />
+                                              <AccountTransactions 
+                                                accountId={acc.id} 
+                                                historyData={historyData}
+                                                isLiability={isLiabilityAccount(acc.type)}
+                                              />
                                             )}
                                           </Fragment>
                                         );
@@ -1780,7 +2503,7 @@ export default function AccountsPage() {
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
                                     >
-                                      <div className="flex items-center min-w-0 flex-1 pl-1.5 sm:pl-4">
+                                      <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
                                         <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                           <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                         </div>
@@ -1810,7 +2533,7 @@ export default function AccountsPage() {
                                         />
                                       </div>
 
-                                      <div className="flex-shrink-0 w-36 text-right pr-2">
+                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
                                         <p className="font-mono text-xs font-bold text-foreground blur-number">
                                           {formatCurrency(acc.balance)}
                                         </p>
@@ -1826,7 +2549,11 @@ export default function AccountsPage() {
 
                                     {/* Inline Transactions Drawer */}
                                     {isAccExpanded && (
-                                      <AccountTransactions accountId={acc.id} />
+                                      <AccountTransactions 
+                                        accountId={acc.id} 
+                                        historyData={historyData}
+                                        isLiability={isLiabilityAccount(acc.type)}
+                                      />
                                     )}
                                   </Fragment>
                                 );
@@ -1837,8 +2564,10 @@ export default function AccountsPage() {
                       );
                     })}
                   </div>
+                </>
                 )}
               </CardContent>
+              )}
             </Card>
           </>
       </div>
