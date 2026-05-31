@@ -529,9 +529,9 @@ export default function AccountsPage() {
     setTimeframe(preset.timeframe);
     setChartType(preset.chartType);
     setGroupMode(preset.groupMode);
-    setSelectedGroups(new Set(preset.selectedGroups));
-    setSelectedTypes(new Set(preset.selectedTypes));
-    setSelectedAccounts(new Set(preset.selectedAccounts));
+    setSelectedGroups(new Set(preset.selectedGroups || []));
+    setSelectedTypes(new Set(preset.selectedTypes || []));
+    setSelectedAccounts(new Set(preset.selectedAccounts || []));
   }, [setTimeframe, setChartType, setGroupMode, setSelectedGroups, setSelectedTypes, setSelectedAccounts]);
 
   const handleSaveCurrentView = useCallback((name: string) => {
@@ -560,16 +560,22 @@ export default function AccountsPage() {
     if (preset.timeframe !== timeframe) return false;
     if (preset.chartType !== chartType) return false;
     if (preset.groupMode !== groupMode) return false;
-    if (preset.selectedGroups.length !== selectedGroups.size) return false;
-    for (const g of preset.selectedGroups) {
+    
+    const presetGroups = preset.selectedGroups || [];
+    if (presetGroups.length !== selectedGroups.size) return false;
+    for (const g of presetGroups) {
       if (!selectedGroups.has(g)) return false;
     }
-    if (preset.selectedTypes.length !== selectedTypes.size) return false;
-    for (const t of preset.selectedTypes) {
+    
+    const presetTypes = preset.selectedTypes || [];
+    if (presetTypes.length !== selectedTypes.size) return false;
+    for (const t of presetTypes) {
       if (!selectedTypes.has(t)) return false;
     }
-    if (preset.selectedAccounts.length !== selectedAccounts.size) return false;
-    for (const a of preset.selectedAccounts) {
+    
+    const presetAccounts = preset.selectedAccounts || [];
+    if (presetAccounts.length !== selectedAccounts.size) return false;
+    for (const a of presetAccounts) {
       if (!selectedAccounts.has(a)) return false;
     }
     return true;
@@ -1728,279 +1734,281 @@ export default function AccountsPage() {
                     </div>
                   </CollapsibleFilterPanel>
                   <CardContent className="p-5">
-                  {historyLoading ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-card/20 backdrop-blur-[1px]">
-                      <LoadingSpinner category="analysis" />
-                    </div>
-                  ) : reportableAccounts.length === 0 ? (
-                    <ChartEmptyState 
-                      variant="nodata" 
-                      description="Connect a SimpleFIN link first to import account balances and generate trends." 
-                    />
-                  ) : historyData.length < 2 ? (
-                    <ChartEmptyState variant="insufficient" />
-                  ) : selectedSeriesKeys.size === 0 ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted/10 border border-dashed border-border/40 rounded-xl">
-                      <p className="text-xs text-muted-foreground">Select one or more filters above to render the chart.</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col md:flex-row gap-4 h-full w-full">
-                      {/* Chart Area */}
-                      <div
-                        ref={chartContainerRef}
-                        className="flex-1 min-w-0 h-full relative select-none"
-                        style={{ cursor: isDraggingCursor ? 'grabbing' : 'grab' }}
-                        onMouseDown={handleChartMouseDown}
-                        onMouseMove={handleChartMouseMove}
-                        onMouseUp={handleChartMouseUp}
-                        onMouseLeave={handleChartMouseUp}
-                        onDoubleClick={handleChartDoubleClick}
-                      >
-                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                          {chartType === 'bar' ? (
-                            <BarChart
-                              data={visibleData}
-                              stackOffset="sign"
-                              margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                              <XAxis
-                                dataKey="date"
-                                tickLine={false}
-                                axisLine={{ stroke: 'var(--color-border)' }}
-                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                                ticks={xAxisTicks}
-                                tickFormatter={(d) => {
-                                  if (!d) return '';
-                                  if (timeframe === '1m') {
-                                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                                  } else if (timeframe === '5y' || timeframe === 'all') {
-                                    return formatSafeUTCDate(d, { year: 'numeric' });
-                                  } else {
-                                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                                  }
-                                }}
-                              />
-                              <YAxis
-                                tickLine={false}
-                                axisLine={{ stroke: 'var(--color-border)' }}
-                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                                domain={[minVal, maxVal]}
-                                ticks={(() => {
-                                  const step = (maxVal - minVal) / 4;
-                                  const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                                  const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                                  return withZero;
-                                })()}
-                                tickFormatter={(v: number) => {
-                                  const absV = Math.abs(v);
-                                  const sign = v < 0 ? '-' : '';
-                                  if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                                  if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                                  if (absV === 0) return '$0';
-                                  return `${sign}$${absV.toFixed(0)}`;
-                                }}
-                              />
-                              <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                              <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
-                              
-                              {/* Render assets bars (positive stack) */}
-                              {activeAssets.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <Bar
-                                    key={key}
-                                    dataKey={key}
-                                    stackId="stack"
-                                    fill={info?.color || 'var(--color-chart-1)'}
-                                    radius={[0, 0, 0, 0]}
+                    <div className="h-[380px] w-full relative">
+                      {historyLoading ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-card/20 backdrop-blur-[1px]">
+                          <LoadingSpinner category="analysis" />
+                        </div>
+                      ) : reportableAccounts.length === 0 ? (
+                        <ChartEmptyState 
+                          variant="nodata" 
+                          description="Connect a SimpleFIN link first to import account balances and generate trends." 
+                        />
+                      ) : historyData.length < 2 ? (
+                        <ChartEmptyState variant="insufficient" />
+                      ) : selectedSeriesKeys.size === 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted/10 border border-dashed border-border/40 rounded-xl">
+                          <p className="text-xs text-muted-foreground">Select one or more filters above to render the chart.</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col md:flex-row gap-4 h-full w-full">
+                          {/* Chart Area */}
+                          <div
+                            ref={chartContainerRef}
+                            className="flex-1 min-w-0 h-full relative select-none"
+                            style={{ cursor: isDraggingCursor ? 'grabbing' : 'grab' }}
+                            onMouseDown={handleChartMouseDown}
+                            onMouseMove={handleChartMouseMove}
+                            onMouseUp={handleChartMouseUp}
+                            onMouseLeave={handleChartMouseUp}
+                            onDoubleClick={handleChartDoubleClick}
+                          >
+                            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                              {chartType === 'bar' ? (
+                                <BarChart
+                                  data={visibleData}
+                                  stackOffset="sign"
+                                  margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                                  <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={{ stroke: 'var(--color-border)' }}
+                                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                    ticks={xAxisTicks}
+                                    tickFormatter={(d) => {
+                                      if (!d) return '';
+                                      if (timeframe === '1m') {
+                                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                                      } else if (timeframe === '5y' || timeframe === 'all') {
+                                        return formatSafeUTCDate(d, { year: 'numeric' });
+                                      } else {
+                                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                                      }
+                                    }}
                                   />
-                                );
-                              })}
+                                  <YAxis
+                                    tickLine={false}
+                                    axisLine={{ stroke: 'var(--color-border)' }}
+                                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                    domain={[minVal, maxVal]}
+                                    ticks={(() => {
+                                      const step = (maxVal - minVal) / 4;
+                                      const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                                      const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                                      return withZero;
+                                    })()}
+                                    tickFormatter={(v: number) => {
+                                      const absV = Math.abs(v);
+                                      const sign = v < 0 ? '-' : '';
+                                      if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                                      if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                                      if (absV === 0) return '$0';
+                                      return `${sign}$${absV.toFixed(0)}`;
+                                    }}
+                                  />
+                                  <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                                  <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                                  
+                                  {/* Render assets bars (positive stack) */}
+                                  {activeAssets.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <Bar
+                                        key={key}
+                                        dataKey={key}
+                                        stackId="stack"
+                                        fill={info?.color || 'var(--color-chart-1)'}
+                                        radius={[0, 0, 0, 0]}
+                                      />
+                                    );
+                                  })}
 
-                              {/* Render liabilities bars (negative stack) */}
-                              {activeLiabilities.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <Bar
-                                    key={key}
-                                    dataKey={key}
-                                    stackId="stack"
-                                    fill={info?.color || 'var(--color-destructive)'}
-                                    radius={[0, 0, 0, 0]}
+                                  {/* Render liabilities bars (negative stack) */}
+                                  {activeLiabilities.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <Bar
+                                        key={key}
+                                        dataKey={key}
+                                        stackId="stack"
+                                        fill={info?.color || 'var(--color-destructive)'}
+                                        radius={[0, 0, 0, 0]}
+                                      />
+                                    );
+                                  })}
+                                </BarChart>
+                              ) : (
+                                <ComposedChart
+                                  data={visibleData}
+                                  stackOffset="sign"
+                                  margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                                >
+                                  <defs>
+                                    {[...activeAssets, ...activeLiabilities].map((key) => {
+                                      const info = seriesInfoMap.get(key);
+                                      const color = info?.color || (activeAssets.includes(key) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
+                                      const id = `gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                                      return (
+                                        <linearGradient key={key} id={id} x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+                                          <stop offset="95%" stopColor={color} stopOpacity={0.03} />
+                                        </linearGradient>
+                                      );
+                                    })}
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                                  <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={{ stroke: 'var(--color-border)' }}
+                                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                    ticks={xAxisTicks}
+                                    tickFormatter={(d) => {
+                                      if (!d) return '';
+                                      if (timeframe === '1m') {
+                                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                                      } else if (timeframe === '5y' || timeframe === 'all') {
+                                        return formatSafeUTCDate(d, { year: 'numeric' });
+                                      } else {
+                                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+                                      }
+                                    }}
                                   />
-                                );
-                              })}
-                            </BarChart>
-                          ) : (
-                            <ComposedChart
-                              data={visibleData}
-                              stackOffset="sign"
-                              margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
-                            >
-                              <defs>
-                                {[...activeAssets, ...activeLiabilities].map((key) => {
-                                  const info = seriesInfoMap.get(key);
-                                  const color = info?.color || (activeAssets.includes(key) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
-                                  const id = `gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                                  return (
-                                    <linearGradient key={key} id={id} x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={color} stopOpacity={0.25} />
-                                      <stop offset="95%" stopColor={color} stopOpacity={0.03} />
-                                    </linearGradient>
-                                  );
-                                })}
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                              <XAxis
-                                dataKey="date"
-                                tickLine={false}
-                                axisLine={{ stroke: 'var(--color-border)' }}
-                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                                ticks={xAxisTicks}
-                                tickFormatter={(d) => {
-                                  if (!d) return '';
-                                  if (timeframe === '1m') {
-                                    return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                                  } else if (timeframe === '5y' || timeframe === 'all') {
-                                    return formatSafeUTCDate(d, { year: 'numeric' });
-                                  } else {
-                                    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                                  }
-                                }}
-                              />
-                              <YAxis
-                                tickLine={false}
-                                axisLine={{ stroke: 'var(--color-border)' }}
-                                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                                domain={[minVal, maxVal]}
-                                ticks={(() => {
-                                  const step = (maxVal - minVal) / 4;
-                                  const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                                  const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                                  return withZero;
-                                })()}
-                                tickFormatter={(v: number) => {
-                                  const absV = Math.abs(v);
-                                  const sign = v < 0 ? '-' : '';
-                                  if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                                  if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                                  if (absV === 0) return '$0';
-                                  return `${sign}$${absV.toFixed(0)}`;
-                                }}
-                              />
-                              <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                              <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
-                              
-                              {/* Render assets areas (positive stack) */}
-                              {activeAssets.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <Area
-                                    key={key}
-                                    type="monotone"
-                                    dataKey={key}
-                                    stackId="stack"
-                                    stroke={info?.color || 'var(--color-chart-1)'}
-                                    strokeWidth={2}
-                                    fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
-                                    dot={false}
+                                  <YAxis
+                                    tickLine={false}
+                                    axisLine={{ stroke: 'var(--color-border)' }}
+                                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                                    domain={[minVal, maxVal]}
+                                    ticks={(() => {
+                                      const step = (maxVal - minVal) / 4;
+                                      const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+                                      const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+                                      return withZero;
+                                    })()}
+                                    tickFormatter={(v: number) => {
+                                      const absV = Math.abs(v);
+                                      const sign = v < 0 ? '-' : '';
+                                      if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
+                                      if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
+                                      if (absV === 0) return '$0';
+                                      return `${sign}$${absV.toFixed(0)}`;
+                                    }}
                                   />
-                                );
-                              })}
+                                  <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                                  <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
+                                  
+                                  {/* Render assets areas (positive stack) */}
+                                  {activeAssets.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <Area
+                                        key={key}
+                                        type="monotone"
+                                        dataKey={key}
+                                        stackId="stack"
+                                        stroke={info?.color || 'var(--color-chart-1)'}
+                                        strokeWidth={2}
+                                        fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                                        dot={false}
+                                      />
+                                    );
+                                  })}
 
-                              {/* Render liabilities areas (negative stack) */}
-                              {activeLiabilities.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <Area
-                                    key={key}
-                                    type="monotone"
-                                    dataKey={key}
-                                    stackId="stack"
-                                    stroke={info?.color || 'var(--color-destructive)'}
-                                    strokeWidth={2}
-                                    fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
-                                    dot={false}
-                                  />
-                                );
-                              })}
-                            </ComposedChart>
-                          )}
-                        </ResponsiveContainer>
+                                  {/* Render liabilities areas (negative stack) */}
+                                  {activeLiabilities.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <Area
+                                        key={key}
+                                        type="monotone"
+                                        dataKey={key}
+                                        stackId="stack"
+                                        stroke={info?.color || 'var(--color-destructive)'}
+                                        strokeWidth={2}
+                                        fill={`url(#gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')})`}
+                                        dot={false}
+                                      />
+                                    );
+                                  })}
+                                </ComposedChart>
+                              )}
+                            </ResponsiveContainer>
 
-                        {/* Date range pill + Reset View */}
-                        {visibleDateRange && (
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                              {visibleDateRange}
-                            </span>
-                            {isPanned && (
-                              <button
-                                className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 border border-primary/40 text-primary hover:bg-primary/25 transition-colors pointer-events-auto"
-                                onClick={() => { setViewStart(null); setViewEnd(null); }}
-                                title="Reset to full view"
-                              >
-                                Reset View
-                              </button>
+                            {/* Date range pill + Reset View */}
+                            {visibleDateRange && (
+                              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                                  {visibleDateRange}
+                                </span>
+                                {isPanned && (
+                                  <button
+                                    className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 border border-primary/40 text-primary hover:bg-primary/25 transition-colors pointer-events-auto"
+                                    onClick={() => { setViewStart(null); setViewEnd(null); }}
+                                    title="Reset to full view"
+                                  >
+                                    Reset View
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
 
-                      {/* Legend Column */}
-                      <div className="w-full md:w-56 flex-shrink-0 flex flex-col justify-start border-t md:border-t-0 md:border-l border-border/20 pt-3 md:pt-0 md:pl-4 overflow-y-auto max-h-[120px] md:max-h-full gap-3">
-                        {activeAssets.length > 0 && (
-                          <div>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                              Assets ({activeAssets.length})
-                            </span>
-                            <div className="space-y-1.5">
-                              {activeAssets.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
-                                    <span 
-                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                      style={{ backgroundColor: info?.color || 'var(--color-chart-1)' }}
-                                    />
-                                    <span className="truncate" title={info?.label || key}>
-                                      {info?.label || key}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                          {/* Legend Column */}
+                          <div className="w-full md:w-56 flex-shrink-0 flex flex-col justify-start border-t md:border-t-0 md:border-l border-border/20 pt-3 md:pt-0 md:pl-4 overflow-y-auto max-h-[120px] md:max-h-full gap-3">
+                            {activeAssets.length > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                                  Assets ({activeAssets.length})
+                                </span>
+                                <div className="space-y-1.5">
+                                  {activeAssets.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
+                                        <span 
+                                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                          style={{ backgroundColor: info?.color || 'var(--color-chart-1)' }}
+                                        />
+                                        <span className="truncate" title={info?.label || key}>
+                                          {info?.label || key}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {activeLiabilities.length > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                                  Liabilities ({activeLiabilities.length})
+                                </span>
+                                <div className="space-y-1.5">
+                                  {activeLiabilities.map((key) => {
+                                    const info = seriesInfoMap.get(key);
+                                    return (
+                                      <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
+                                        <span 
+                                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                          style={{ backgroundColor: info?.color || 'var(--color-destructive)' }}
+                                        />
+                                        <span className="truncate" title={info?.label || key}>
+                                          {info?.label || key}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        
-                        {activeLiabilities.length > 0 && (
-                          <div>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                              Liabilities ({activeLiabilities.length})
-                            </span>
-                            <div className="space-y-1.5">
-                              {activeLiabilities.map((key) => {
-                                const info = seriesInfoMap.get(key);
-                                return (
-                                  <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
-                                    <span 
-                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                      style={{ backgroundColor: info?.color || 'var(--color-destructive)' }}
-                                    />
-                                    <span className="truncate" title={info?.label || key}>
-                                      {info?.label || key}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </CardContent>
+                  </CardContent>
               </>
             )}
           </Card>
