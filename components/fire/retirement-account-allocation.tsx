@@ -8,6 +8,9 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { PieChart as PieIcon } from 'lucide-react';
 
 const SUBGROUP_COLORS: Record<string, string> = {
   '401(k)': 'var(--color-chart-1)',
@@ -35,6 +38,7 @@ interface AccountData {
 }
 
 export function RetirementAccountAllocation() {
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('retirementAccountAllocation');
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,94 +93,133 @@ export function RetirementAccountAllocation() {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Investment Account Allocation</h3>
-        <LoadingSpinner category="chart" className="h-[280px]" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
+            </h3>
+          }
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[280px]" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Investment Account Allocation</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (groups.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Investment Account Allocation</h3>
-        <div className="h-[280px]">
-          <ChartEmptyState variant="nodata" description="Link investment accounts to see allocation" />
-        </div>
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="px-5 pb-5">
+            <div className="h-[280px]">
+              <ChartEmptyState variant="nodata" description="Link investment accounts to see allocation" />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-3">
-        <h3 className="text-sm font-semibold text-foreground mb-1">Investment Account Allocation</h3>
-        <p className="text-xs text-muted-foreground">
-          {investmentAccounts.length} accounts &middot; {formatCurrency(totalInvested)} total
-        </p>
-      </div>
-      <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="id"
-              cx="50%"
-              cy="50%"
-              innerRadius="55%"
-              outerRadius="80%"
-              paddingAngle={0.5}
-              cornerRadius={3}
-              stroke="none"
-            >
-              {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="id"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="55%"
+                  outerRadius="80%"
+                  paddingAngle={0.5}
+                  cornerRadius={3}
+                  stroke="none"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const datum = payload[0].payload;
+                    return (
+                      <ChartTooltip>
+                        <TooltipHeader>{String(datum.id)}</TooltipHeader>
+                        <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
+                        <TooltipRow label="Share" value={`${((datum.value / totalInvested) * 100).toFixed(1)}%`} />
+                      </ChartTooltip>
+                    );
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 10, color: 'var(--color-muted-foreground)', paddingTop: 10 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="px-5 pb-4 pt-2 border-t border-border mt-2">
+            <div className="space-y-1.5">
+              {groups.map((g) => (
+                <div key={g.label} className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">{g.label}</span>
+                  <span className="text-foreground font-medium">
+                    {((g.total / totalInvested) * 100).toFixed(1)}%
+                  </span>
+                </div>
               ))}
-            </Pie>
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload || !payload.length) return null;
-                const datum = payload[0].payload;
-                return (
-                  <ChartTooltip>
-                    <TooltipHeader>{String(datum.id)}</TooltipHeader>
-                    <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-                    <TooltipRow label="Share" value={`${((datum.value / totalInvested) * 100).toFixed(1)}%`} />
-                  </ChartTooltip>
-                );
-              }}
-            />
-            <Legend
-              verticalAlign="bottom"
-              iconType="circle"
-              iconSize={8}
-              wrapperStyle={{ fontSize: 10, color: 'var(--color-muted-foreground)', paddingTop: 10 }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="px-5 pb-4 pt-2 border-t border-border mt-2">
-        <div className="space-y-1.5">
-          {groups.map((g) => (
-            <div key={g.label} className="flex justify-between text-xs">
-              <span className="text-muted-foreground">{g.label}</span>
-              <span className="text-foreground font-medium">
-                {((g.total / totalInvested) * 100).toFixed(1)}%
-              </span>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ export const GENERAL_DEFAULTS = {
   hideAccountSubheadings: false,
   hideAccountsSidebarByDefault: false,
   chartSelections: {},
+  cardCollapsedStates: {},
   cardStyle: 'default',
   hiddenPages: {},
   showMathEnabled: false,

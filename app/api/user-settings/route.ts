@@ -47,6 +47,7 @@ export async function GET() {
       hideAccountSubheadings: created?.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
+      cardCollapsedStates: created?.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       paystubEnabled: created?.paystubEnabled ?? DEFAULTS.paystubEnabled,
       aiSystemPrompt: created?.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
@@ -86,6 +87,7 @@ export async function GET() {
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
     hideAccountsSidebarByDefault: settings[0].hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: settings[0].chartSelections ?? DEFAULTS.chartSelections,
+    cardCollapsedStates: settings[0].cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
     showMathEnabled: settings[0].showMathEnabled ?? DEFAULTS.showMathEnabled,
     paystubEnabled: settings[0].paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: settings[0].aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
@@ -121,6 +123,7 @@ export async function PATCH(request: Request) {
   const hideAccountSubheadings = body.hideAccountSubheadings;
   const hideAccountsSidebarByDefault = body.hideAccountsSidebarByDefault;
   const chartSelections = body.chartSelections;
+  const cardCollapsedStates = body.cardCollapsedStates;
 	const showMathEnabled = body.showMathEnabled;
 	const aiSystemPrompt = body.aiSystemPrompt;
 	const aiAutoAnalyze = body.aiAutoAnalyze;
@@ -217,6 +220,10 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid chartSelections value' }, { status: 400 });
   }
 
+  if (cardCollapsedStates !== undefined && (typeof cardCollapsedStates !== 'object' || cardCollapsedStates === null || Array.isArray(cardCollapsedStates))) {
+    return Response.json({ error: 'Invalid cardCollapsedStates value' }, { status: 400 });
+  }
+
   if (apiKeys !== undefined && (typeof apiKeys !== 'object' || apiKeys === null || Array.isArray(apiKeys))) {
     return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
   }
@@ -292,6 +299,7 @@ export async function PATCH(request: Request) {
       hideAccountSubheadings: created?.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
+      cardCollapsedStates: created?.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       apiKeys: created?.apiKeys ?? {},
     });
@@ -317,6 +325,10 @@ export async function PATCH(request: Request) {
   if (chartSelections !== undefined) {
     const existingSelections = (settings[0].chartSelections as Record<string, any>) || {};
     updates.chartSelections = { ...existingSelections, ...chartSelections };
+  }
+  if (cardCollapsedStates !== undefined) {
+    const existingStates = (settings[0].cardCollapsedStates as Record<string, any>) || {};
+    updates.cardCollapsedStates = { ...existingStates, ...cardCollapsedStates };
   }
 	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
 	if (paystubEnabled !== undefined) updates.paystubEnabled = paystubEnabled;
@@ -370,6 +382,7 @@ export async function PATCH(request: Request) {
     hideAccountSubheadings: updated.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
     hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
+    cardCollapsedStates: updated.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
     showMathEnabled: updated.showMathEnabled ?? DEFAULTS.showMathEnabled,
     paystubEnabled: updated.paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: updated.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
