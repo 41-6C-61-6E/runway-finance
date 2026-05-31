@@ -35,16 +35,17 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const updateSetting = useCallback(async (key: string, value: any) => {
     // Optimistically update local state
     setSettings((prev) => {
-      if (key === 'chartSelections') {
-        const mergedSelections = { ...(prev.chartSelections || {}), ...value };
-        return { ...prev, chartSelections: mergedSelections };
+      if (key === 'chartSelections' || key === 'cardCollapsedStates') {
+        const existingData = prev[key] || {};
+        const mergedData = { ...existingData, ...value };
+        return { ...prev, [key]: mergedData };
       }
       return { ...prev, [key]: value };
     });
 
     try {
-      const bodyPayload = key === 'chartSelections'
-        ? { chartSelections: value } // For chartSelections, value is just the delta key-value object
+      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates')
+        ? { [key]: value } // For these, value is just the delta key-value object
         : { [key]: value };
 
       const res = await fetch('/api/user-settings', {

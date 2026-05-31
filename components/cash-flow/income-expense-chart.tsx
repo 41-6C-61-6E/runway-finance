@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   ComposedChart,
   Bar,
@@ -23,7 +24,10 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
+import { ArrowRightLeft } from 'lucide-react';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 
 interface MonthlyData {
   yearMonth: string;
@@ -50,6 +54,8 @@ export function IncomeExpenseChart() {
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:income-expense:chartType', 'bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -150,46 +156,103 @@ export function IncomeExpenseChart() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Income vs Expenses</h3>
-        </div>
-        <LoadingSpinner category="chart" className="h-[320px]" />
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
+            </h3>
+          }
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[320px] m-5" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Income vs Expenses</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Income vs Expenses</h3>
-        <ChartEmptyState variant="nodata" description="Income and expense data will appear once you sync your accounts" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" description="Income and expense data will appear once you sync your accounts" />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-sm font-semibold text-foreground">Income vs Expenses</h3>
-        <div className="flex items-center gap-2">
-          <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
-        </div>
-      </div>
-      <div className="px-5 pb-2">
-        <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
-      </div>
-      <div className="h-[320px]">
-        <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
-          <div className="min-w-max h-full px-2 pb-2">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
+          </h3>
+        }
+      />
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeframe.toUpperCase()}
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {chartType.toUpperCase()}
+                </span>
+              </div>
+            }
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
+                <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="h-[320px]">
+            <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+              <div className="min-w-max h-full px-2 pb-2">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               {chartType === 'bar' ? (
               <ComposedChart data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
@@ -268,6 +331,8 @@ export function IncomeExpenseChart() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

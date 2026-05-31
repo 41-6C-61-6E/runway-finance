@@ -10,12 +10,14 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import { NetWorthChart } from '@/components/net-worth/net-worth-chart';
 
 function NetWorthContent() {
   const { isVisible } = useChartVisibility();
 
   const showSummary = isVisible('netWorthSummary');
   const showRatio = isVisible('debtToAssetRatio');
+  const showChart = isVisible('netWorthChart');
 
   return (
     <div className="min-h-screen w-full">
@@ -24,6 +26,17 @@ function NetWorthContent() {
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
           
+          {showChart && (
+            <div className="mb-5">
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <div className="space-y-5">
+                  <NetWorthChart />
+                  <MathDescription chartId="netWorthChart" />
+                </div>
+              </Suspense>
+            </div>
+          )}
+
           {showSummary && showRatio && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">

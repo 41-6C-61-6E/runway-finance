@@ -9,6 +9,10 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { GitMerge } from 'lucide-react';
 
 interface CategoryData {
   categoryId: string;
@@ -619,6 +623,8 @@ const SankeyCustomLink = ({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function CashFlowSankey() {
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashFlowSankey');
+  const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const currentMonth = getCurrentMonth();
   const [timeframe, setTimeframe] = useState<TimeRange>('1m');
@@ -990,19 +996,29 @@ export function CashFlowSankey() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
-        </div>
-        <LoadingSpinner category="sankey" className="h-[450px]" />
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Cash Flow Sankey"
+        />
+        {!isCollapsed && <LoadingSpinner category="sankey" className="h-[450px]" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Cash Flow Sankey</h3>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Cash Flow Sankey"
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
@@ -1011,12 +1027,20 @@ export function CashFlowSankey() {
 
   if (!sankeyData || sankeyData.nodes.length === 0 || sankeyData.links.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Cash Flow Sankey</h3>
-        <ChartEmptyState
-          variant={allAccountsExcluded ? 'empty' : 'nodata'}
-          description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title="Cash Flow Sankey"
         />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState
+              variant={allAccountsExcluded ? 'empty' : 'nodata'}
+              description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -1028,149 +1052,191 @@ export function CashFlowSankey() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      {/* Header row */}
-      <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-sm font-semibold text-foreground">Cash Flow Sankey</h3>
-        <div className="flex items-center gap-3">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <GitMerge className="w-4 h-4 text-primary" /> Cash Flow Sankey
+          </h3>
+        }
+      />
 
-          {/* % toggle — switches node labels + tooltip between currency and percentage */}
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <span className="text-[10px] text-muted-foreground">{showPercentages ? '%' : '$'}</span>
-            <button
-              onClick={() => setShowPercentages((v) => !v)}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                showPercentages ? 'bg-primary' : 'bg-muted-foreground/30'
-              }`}
-            >
-              <span
-                className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
-                  showPercentages ? 'translate-x-[14px]' : 'translate-x-[2px]'
-                }`}
-              />
-            </button>
-          </label>
-          {/* Account filter */}
-          {allAccounts.length > 0 && (
-            <div className="relative" ref={accountFilterRef}>
-              <button
-                type="button"
-                onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
-                className="px-2.5 py-1 bg-background border border-input rounded-lg text-foreground text-[10px] focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <span>Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}</span>
-                <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {accountFilterOpen && (
-                <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 flex flex-col">
-                  <div className="p-2 border-b border-border">
-                    <input
-                      type="text"
-                      value={accountSearch}
-                      onChange={(e) => setAccountSearch(e.target.value)}
-                      placeholder="Search accounts..."
-                      className="w-full px-2 py-1 bg-background border border-input rounded text-[10px] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeframe.toUpperCase()}{timeframe !== 'all' ? ` (${monthLabel})` : ''}
+                </span>
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {showPercentages ? '%' : '$'}
+                </span>
+                {excludedAccountIds.size > 0 && (
+                  <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    {allAccounts.length - excludedAccountIds.size} ACCOUNTS
+                  </span>
+                )}
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {/* Row 1: Time Range and Navigation */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                  <TimeRangeFilter
+                    value={timeframe}
+                    presets={[
+                      { label: '1M', value: '1m' },
+                      { label: '3M', value: '3m' },
+                      { label: '6M', value: '6m' },
+                      { label: '1Y', value: '1y' },
+                      { label: 'YTD', value: 'ytd' },
+                      { label: 'All', value: 'all' },
+                    ]}
+                    onChange={(tf) => setTimeframe(tf)}
+                  />
+                </div>
+                {showMonthNav && (
+                  <div className="flex items-center gap-2">
+                    <button onClick={prevMonth} className="px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
+                      &larr;
+                    </button>
+                    <span className="text-xs font-medium text-foreground min-w-[120px] text-center">{monthLabel}</span>
+                    <button
+                      onClick={nextMonth}
+                      disabled={isNextDisabled}
+                      className={`px-2 py-0.5 rounded-md text-xs transition-all ${
+                        isNextDisabled
+                          ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
+                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      }`}
+                      type="button"
+                    >
+                      &rarr;
+                    </button>
                   </div>
-                  <div className="overflow-y-auto flex-1 p-1">
-                    {filteredAccounts.length === 0 ? (
-                      <div className="px-2 py-3 text-[10px] text-muted-foreground text-center">No results</div>
-                    ) : (
-                      <>
-                        <label className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
+                )}
+              </div>
+
+              {/* Row 2: Metric Toggle and Accounts Selection */}
+              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
+                {/* Percentage switch */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Show Percentage</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <span className="text-[10px] text-muted-foreground font-semibold">{showPercentages ? '%' : '$'}</span>
+                    <button
+                      onClick={() => setShowPercentages((v) => !v)}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                        showPercentages ? 'bg-primary' : 'bg-muted-foreground/30'
+                      }`}
+                      type="button"
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
+                          showPercentages ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </label>
+                </div>
+
+                {/* Account filter dropdown */}
+                {allAccounts.length > 0 && (
+                  <div className="relative flex items-center gap-1.5 border-l border-border/30 pl-4" ref={accountFilterRef}>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Filtered Accounts</span>
+                    <button
+                      type="button"
+                      onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
+                      className="px-2.5 py-1 bg-background border border-input rounded-lg text-foreground text-[10px] focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <span>Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}</span>
+                      <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {accountFilterOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-52 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 flex flex-col">
+                        <div className="p-2 border-b border-border">
                           <input
-                            type="checkbox"
-                            checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
-                            onChange={() => {
-                              const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
-                              const next = new Set(excludedAccountIds);
-                              filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
-                              setExcludedAccountIds(next);
-                            }}
-                            className="rounded border-border bg-background text-primary focus:ring-ring"
+                            type="text"
+                            value={accountSearch}
+                            onChange={(e) => setAccountSearch(e.target.value)}
+                            placeholder="Search accounts..."
+                            className="w-full px-2 py-1 bg-background border border-input rounded text-[10px] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                           />
-                          Select All
-                        </label>
-                        {filteredAccounts.map((acc) => (
-                          <label key={acc.id} className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={!excludedAccountIds.has(acc.id)}
-                              onChange={() => toggleAccount(acc.id)}
-                              className="rounded border-border bg-background text-primary focus:ring-ring"
-                            />
-                            {acc.name}
-                          </label>
-                        ))}
-                      </>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-1">
+                          {filteredAccounts.length === 0 ? (
+                            <div className="px-2 py-3 text-[10px] text-muted-foreground text-center">No results</div>
+                          ) : (
+                            <>
+                              <label className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
+                                  onChange={() => {
+                                    const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
+                                    const next = new Set(excludedAccountIds);
+                                    filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
+                                    setExcludedAccountIds(next);
+                                  }}
+                                  className="rounded border-border bg-background text-primary focus:ring-ring"
+                                />
+                                Select All
+                              </label>
+                              {filteredAccounts.map((acc) => (
+                                <label key={acc.id} className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={!excludedAccountIds.has(acc.id)}
+                                    onChange={() => toggleAccount(acc.id)}
+                                    className="rounded border-border bg-background text-primary focus:ring-ring"
+                                  />
+                                  {acc.name}
+                                </label>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+          </CollapsibleFilterPanel>
 
-      {/* Time controls */}
-      <div className="px-5 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <TimeRangeFilter
-          value={timeframe}
-          presets={[
-            { label: '1M', value: '1m' },
-            { label: '3M', value: '3m' },
-            { label: '6M', value: '6m' },
-            { label: '1Y', value: '1y' },
-            { label: 'YTD', value: 'ytd' },
-            { label: 'All', value: 'all' },
-          ]}
-          onChange={(tf) => setTimeframe(tf)}
-        />
-        {showMonthNav && (
-          <div className="flex items-center gap-2">
-            <button onClick={prevMonth} className="px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all">
-              &larr;
-            </button>
-            <span className="text-xs font-medium text-foreground min-w-[120px] text-center">{monthLabel}</span>
-            <button
-              onClick={nextMonth}
-              disabled={isNextDisabled}
-              className={`px-2 py-0.5 rounded-md text-xs transition-all ${
-                isNextDisabled
-                  ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
-                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-            >
-              &rarr;
-            </button>
+          {/* Chart */}
+          <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
+            <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+              <div className="min-w-max h-full px-2 pb-2">
+                {processedData.nodes.length > 0 && processedData.links.length > 0 && (
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                    <Sankey
+                      data={processedData}
+                      node={sankeyNode}
+                      link={sankeyLink}
+                      iterations={0}
+                      nodePadding={nodePadding}
+                      nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
+                      margin={margin}
+                      align="left"
+                    >
+                      {sankeyTooltip}
+                    </Sankey>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Chart */}
-      <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
-        <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
-          <div className="min-w-max h-full px-2 pb-2">
-            {processedData.nodes.length > 0 && processedData.links.length > 0 && (
-              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                <Sankey
-                  data={processedData}
-                  node={sankeyNode}
-                  link={sankeyLink}
-                  iterations={0}
-                  nodePadding={nodePadding}
-                  nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
-                  margin={margin}
-                  align="left"
-                >
-                  {sankeyTooltip}
-                </Sankey>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
