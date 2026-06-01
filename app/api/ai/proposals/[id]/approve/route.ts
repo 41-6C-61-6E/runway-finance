@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function POST(
   request: Request,
@@ -139,6 +140,7 @@ export async function POST(
       }
     }
 
+    invalidateUserSearchCache(userId);
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

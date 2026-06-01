@@ -13,6 +13,7 @@ import {
   updateCategorySpendingSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -185,6 +186,7 @@ export async function POST(request: Request) {
       });
     });
 
+    invalidateUserSearchCache(userId);
     return NextResponse.json({ success: true, message: 'Account remapped successfully' });
   } catch (error) {
     logger.error('Failed to remap accounts', {

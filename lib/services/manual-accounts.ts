@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { logger } from '@/lib/logger';
 import { ensureSystemCategories, ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -348,6 +349,10 @@ export async function createManualAccount(input: CreateManualAccountInput, dek?:
 
   logger.info(`${LOG_TAG} Account created`, { accountId: account.id, name: account.name, type: input.type, initialValue });
 
+  if (initialValue !== 0) {
+    invalidateUserSearchCache(input.userId);
+  }
+
   return account;
 }
 
@@ -500,6 +505,10 @@ export async function syncManualAccount(
   const changed = Math.abs(delta) > 0.0001;
   logger.info(`${LOG_TAG} Account synced`, { accountId, type: account.type, oldBalance, newValue, changed });
 
+  if (changed) {
+    invalidateUserSearchCache(userId);
+  }
+
   return {
     status: 'success',
     newBalance: newValue,
@@ -598,6 +607,10 @@ export async function adjustManualAccountValue(
   const changed = Math.abs(delta) > 0.0001;
   logger.info(`${LOG_TAG} Account value adjusted`, { accountId, type: account.type, oldBalance, newValue: finalNewValue, changed, note });
 
+  if (changed) {
+    invalidateUserSearchCache(userId);
+  }
+
   return {
     status: 'success',
     newBalance: newValue,
@@ -634,6 +647,8 @@ export async function deleteManualAccount(
     await updateNetWorthSnapshot(userId, dek);
     logger.info(`${LOG_TAG} Account deleted`, { accountId, name: account.name, type: account.type });
   }
+
+  invalidateUserSearchCache(userId);
 }
 
 async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {

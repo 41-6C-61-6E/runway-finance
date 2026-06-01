@@ -173,9 +173,19 @@ export default function TransactionTable({
   const [totalAmount, setTotalAmount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const lastTotalParamsRef = useRef<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [prevFilters, setPrevFilters] = useState(filters);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   if (JSON.stringify(prevFilters) !== JSON.stringify(filters)) {
     setPrevFilters(filters);
     setPage(0);
@@ -576,6 +586,14 @@ export default function TransactionTable({
 
 
   const fetchTransactions = useCallback(async () => {
+    // Abort any active request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const signal = abortController.signal;
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -597,6 +615,7 @@ export default function TransactionTable({
       }
       const res = await fetch(`/api/transactions?${params.toString()}`, {
         credentials: "include",
+        signal,
       });
       if (!res.ok) {
         throw new Error(await readErrorMessage(res));
@@ -624,6 +643,7 @@ export default function TransactionTable({
           totalParams.set("totalAmountOnly", "true");
           fetch(`/api/transactions?${totalParams.toString()}`, {
             credentials: "include",
+            signal,
           })
             .then(async (res) => {
               if (!res.ok) {
@@ -632,22 +652,29 @@ export default function TransactionTable({
               return res.json();
             })
             .then((totalData) => {
-              setTotalAmount(totalData.totalAmount ?? 0);
+              // Ensure we only update state if this fetch matches the current active request
+              if (abortControllerRef.current === abortController) {
+                setTotalAmount(totalData.totalAmount ?? 0);
+              }
             })
             .catch((err) => {
+              if (err.name === 'AbortError') return;
               console.error("Failed to fetch transaction total amount", err);
               setTotalAmount(0);
             });
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch transactions", err);
       setTransactions([]);
       setTotal(0);
       setTotalAmount(0);
       onTotalChange?.(0);
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === abortController) {
+        setLoading(false);
+      }
     }
   }, [filters, page, sorting]);
 

@@ -264,6 +264,17 @@ export async function decryptRow<T extends Record<string, any>>(table: string, r
 
 export async function decryptRows<T extends Record<string, any>>(table: string, rows: T[], key: Uint8Array): Promise<T[]> {
   const fields = ENCRYPTED_FIELDS[table];
-  if (!fields) return rows;
-  return Promise.all(rows.map((row) => decryptRow(table, row, key)));
+  if (!fields || rows.length === 0) return rows;
+
+  const CHUNK_SIZE = 100;
+  const results: T[] = [];
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const decryptedChunk = await Promise.all(chunk.map((row) => decryptRow(table, row, key)));
+    results.push(...decryptedChunk);
+    if (rows.length > CHUNK_SIZE && i + CHUNK_SIZE < rows.length) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+  return results;
 }
