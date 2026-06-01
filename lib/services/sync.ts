@@ -1,5 +1,5 @@
 import { getDb, getPool } from '@/lib/db';
-import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
+import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories, transactionTags } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
@@ -839,17 +839,33 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           durationMs: ms(startedAt),
         });
         for (const [txId, action] of ruleResults) {
-          const updateData: Record<string, unknown> = { updatedAt: new Date() };
-          if (action.categoryId) updateData.categoryId = action.categoryId;
-          if (action.payee) {
-            updateData.payee = await encryptField(action.payee, dek);
+          if (action.shouldUpdateCategory) {
+            const updateData: Record<string, unknown> = { updatedAt: new Date() };
+            if (action.categoryId) updateData.categoryId = action.categoryId;
+            if (action.payee) {
+              updateData.payee = await encryptField(action.payee, dek);
+            }
+            if (action.reviewed !== null) updateData.reviewed = action.reviewed;
+            if (Object.keys(updateData).length > 1) {
+              await getDb()
+                .update(transactions)
+                .set(updateData)
+                .where(eq(transactions.id, txId));
+            }
           }
-          if (action.reviewed !== null) updateData.reviewed = action.reviewed;
-          if (Object.keys(updateData).length > 1) {
-            await getDb()
-              .update(transactions)
-              .set(updateData)
-              .where(eq(transactions.id, txId));
+
+          if (action.shouldUpdateTags) {
+            if (action.overrideExisting) {
+              await getDb()
+                .delete(transactionTags)
+                .where(eq(transactionTags.transactionId, txId));
+            }
+            if (action.setTagId) {
+              await getDb()
+                .insert(transactionTags)
+                .values({ transactionId: txId, tagId: action.setTagId })
+                .onConflictDoNothing();
+            }
           }
         }
       } else {
