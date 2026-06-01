@@ -21,7 +21,13 @@ const initialState: ChecklistState = {
 export function OnboardingChecklist() {
   const [state, setState] = useState<ChecklistState>(initialState);
   const [loading, setLoading] = useState(true);
-  const [dismissed, setDismissed] = useState(() => typeof window !== 'undefined' && localStorage.getItem('onboarding-checklist-dismissed') === 'true');
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setDismissed(localStorage.getItem('onboarding-checklist-dismissed') === 'true');
+    }
+  }, []);
 
   function dismiss() {
     localStorage.setItem('onboarding-checklist-dismissed', 'true');

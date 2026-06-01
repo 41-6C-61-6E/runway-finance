@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { addFrequencyInterval, getFrequencyDays, parseDate, normalizeBackendInput } from '@/lib/utils/paystub';
 
 describe('Paystubs Helpers', () => {
