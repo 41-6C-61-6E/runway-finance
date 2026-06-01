@@ -38,9 +38,16 @@ export default function AiTab() {
   });
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [testPromptExpanded, setTestPromptExpanded] = useState(false);
-  const [testPrompt, setTestPrompt] = useState<string>(() => {
-    try { return localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? ''; } catch { return ''; }
-  });
+  const [testPrompt, setTestPrompt] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(TEST_PROMPT_STORAGE_KEY);
+      if (stored) {
+        setTestPrompt(stored);
+      }
+    } catch { /* ignore */ }
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
