@@ -349,6 +349,7 @@ export const categoryRules = pgTable('category_rules', {
   setReviewed: boolean('set_reviewed'),
   isSystem: boolean('is_system').notNull().default(false),
   createdByAi: boolean('created_by_ai').notNull().default(false),
+  overrideExisting: boolean('override_existing').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

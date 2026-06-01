@@ -830,11 +830,11 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       });
 
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
-      if (uncategorized.length > 0) {
-        const ruleResults = await applyRulesToTransactions(uncategorized, userId, dek);
+      if (syncedWithPlaintext.length > 0) {
+        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, userId, dek);
         logger.info(`${LOG_TAG} Categorization rules applied`, {
           connectionId,
-          uncategorizedBefore: uncategorized.length,
+          transactionsEvaluated: syncedWithPlaintext.length,
           matchedByRules: ruleResults.size,
           durationMs: ms(startedAt),
         });

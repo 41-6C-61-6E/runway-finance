@@ -31,6 +31,7 @@ type Rule = {
   setTagId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
+  overrideExisting: boolean;
 };
 
 type Category = {
@@ -85,6 +86,7 @@ export default function RulesTab() {
   const [formTagId, setFormTagId] = useState<string | null>(null);
   const [formSetPayee, setFormSetPayee] = useState('');
   const [formSetReviewed, setFormSetReviewed] = useState<boolean | null>(null);
+  const [formOverrideExisting, setFormOverrideExisting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [runningRuleId, setRunningRuleId] = useState<string | null>(null);
   const [runningAll, setRunningAll] = useState(false);
@@ -272,6 +274,7 @@ export default function RulesTab() {
     setFormTagId(null);
     setFormSetPayee('');
     setFormSetReviewed(null);
+    setFormOverrideExisting(false);
     setDrawerOpen(true);
   };
 
@@ -293,6 +296,7 @@ export default function RulesTab() {
     setFormTagId(rule.setTagId ?? null);
     setFormSetPayee(rule.setPayee ?? '');
     setFormSetReviewed(rule.setReviewed);
+    setFormOverrideExisting(!!rule.overrideExisting);
     setDrawerOpen(true);
   };
 
@@ -321,6 +325,7 @@ export default function RulesTab() {
         setTagId: formTagId || null,
         setPayee: formSetPayee.trim() || null,
         setReviewed: formSetReviewed ?? null,
+        overrideExisting: formOverrideExisting,
         priority: editingRule ? editingRule.priority : rules.length,
       };
 
@@ -866,6 +871,21 @@ export default function RulesTab() {
                     checked={formSetReviewed === true}
                     onCheckedChange={(checked) => setFormSetReviewed(checked ? true : null)}
                   />
+                </div>
+
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-foreground/80 font-medium">Override Existing Category</span>
+                    <Switch
+                      checked={formOverrideExisting}
+                      onCheckedChange={(checked) => setFormOverrideExisting(checked)}
+                    />
+                  </div>
+                  {formOverrideExisting && (
+                    <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 font-normal">
+                      ⚠️ Warning: Enabling this option will cause this rule to overwrite existing category assignments on matching transactions.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

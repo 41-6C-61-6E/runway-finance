@@ -327,6 +327,7 @@ export async function GET(request: Request) {
         notes: transactions.notes,
         categoryName: categories.name,
         categoryType: categories.categoryType,
+        accountName: accounts.name,
       })
       .from(transactions)
       .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -354,11 +355,15 @@ export async function GET(request: Request) {
           const catDec = row.categoryName
             ? (await decryptField(row.categoryName, dek)).toLowerCase()
             : "";
+          const accDec = row.accountName
+            ? (await decryptField(row.accountName, dek)).toLowerCase()
+            : "";
           matchesSearch =
             descDec.includes(q) ||
             payeeDec.includes(q) ||
             notesDec.includes(q) ||
-            catDec.includes(q);
+            catDec.includes(q) ||
+            accDec.includes(q);
         }
         let matchesType = true;
         if (filters.type === "income") {
@@ -394,6 +399,7 @@ export async function GET(request: Request) {
       selectFields.payee = transactions.payee;
       selectFields.notes = transactions.notes;
       selectFields.categoryName = categories.name;
+      selectFields.accountName = accounts.name;
     }
 
     let query = getDb()
@@ -430,11 +436,15 @@ export async function GET(request: Request) {
           const catDec = row.categoryName
             ? (await decryptField(row.categoryName, dek)).toLowerCase()
             : "";
+          const accDec = row.accountName
+            ? (await decryptField(row.accountName, dek)).toLowerCase()
+            : "";
           matchesSearch =
             descDec.includes(q) ||
             payeeDec.includes(q) ||
             notesDec.includes(q) ||
-            catDec.includes(q);
+            catDec.includes(q) ||
+            accDec.includes(q);
         }
         let matchesType = true;
         if (filters.type === "income") {
@@ -635,7 +645,8 @@ export async function GET(request: Request) {
         (String(t.description ?? "").toLowerCase().includes(q)) ||
         (String(t.payee ?? "").toLowerCase().includes(q)) ||
         (String(t.notes ?? "").toLowerCase().includes(q)) ||
-        (String(t.category?.name ?? "").toLowerCase().includes(q)),
+        (String(t.category?.name ?? "").toLowerCase().includes(q)) ||
+        (String(t.accountName ?? "").toLowerCase().includes(q)),
     );
   }
 
