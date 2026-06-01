@@ -61,6 +61,74 @@ type AutoGenerateSettings = {
   lastGeneratedDate: string | null;
 };
 
+const PAYSTUB_JSON_TEMPLATE = [
+  {
+    "employeeName": "John Doe",
+    "payPeriodStart": "05/15/2026",
+    "payPeriodEnd": "05/28/2026",
+    "checkDate": "05/29/2026",
+    "adviceNumber": "ADVICE12345",
+    "grossCurrent": 3721.15,
+    "grossYTD": 38400.00,
+    "taxesCurrent": 778.42,
+    "taxesYTD": 8200.50,
+    "deductionsCurrent": 486.20,
+    "deductionsYTD": 5100.20,
+    "netCurrent": 2456.53,
+    "hoursAndEarnings": [
+      {
+        "description": "Regular Pay",
+        "hours": 80,
+        "rate": 45.00,
+        "amount": 3600.00,
+        "ytdHours": 800,
+        "ytdAmount": 36000.00
+      },
+      {
+        "description": "Travel Reimbursement",
+        "amount": 121.15,
+        "ytdAmount": 2400.00
+      }
+    ],
+    "taxes": [
+      {
+        "description": "Fed Withholding",
+        "amount": 449.20,
+        "ytdAmount": 4700.00
+      },
+      {
+        "description": "FICA Medicare",
+        "amount": 53.94,
+        "ytdAmount": 550.00
+      },
+      {
+        "description": "OASDI/SS",
+        "amount": 230.71,
+        "ytdAmount": 2350.00
+      }
+    ],
+    "beforeTaxDeductions": [
+      {
+        "description": "Savings-SSP/401k",
+        "amount": 372.12,
+        "ytdAmount": 3900.00
+      },
+      {
+        "description": "Medical",
+        "amount": 91.08,
+        "ytdAmount": 950.20
+      }
+    ],
+    "afterTaxDeductions": [
+      {
+        "description": "Roth SSP",
+        "amount": 100.00,
+        "ytdAmount": 1000.00
+      }
+    ]
+  }
+];
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PayrollTab() {
@@ -117,6 +185,25 @@ export default function PayrollTab() {
   const [deleteMappingLoading, setDeleteMappingLoading] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+
+  const [showGuidance, setShowGuidance] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const downloadTemplate = () => {
+    const blob = new Blob([JSON.stringify(PAYSTUB_JSON_TEMPLATE, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'paystubs_template.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyTemplate = () => {
+    navigator.clipboard.writeText(JSON.stringify(PAYSTUB_JSON_TEMPLATE, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // ── Fetch functions ──
 
@@ -223,6 +310,72 @@ export default function PayrollTab() {
 
   // ── Import flow ──
 
+  const normalizeInput = (json: any): any[] => {
+    if (!json) return [];
+
+    // Check if this is the "paychecks" format
+    if (json.paychecks && Array.isArray(json.paychecks)) {
+      const employeeName = json.employee?.name || null;
+      const employerName = json.employee?.company || '';
+      if (employerName && !importEmployerName) {
+        setImportEmployerName(employerName);
+      }
+      return json.paychecks.map((paycheck: any) => {
+        // Find pay period dates
+        let payPeriodStart = paycheck.checkDate || '';
+        let payPeriodEnd = paycheck.checkDate || '';
+        if (paycheck.earnings && paycheck.earnings.length > 0) {
+          const firstEarning = paycheck.earnings[0];
+          payPeriodStart = firstEarning.beginDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
+          payPeriodEnd = firstEarning.endDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
+        }
+
+        const grossCurrent = paycheck.totals?.earningsAmount ?? 0;
+        const taxesCurrent = paycheck.totals?.taxesAmount ?? 0;
+        const deductionsCurrent = paycheck.totals?.deductionsAmount ?? 0;
+        const netCurrent = Number(grossCurrent) - Number(taxesCurrent) - Number(deductionsCurrent);
+
+        // Build earnings
+        const hoursAndEarnings = (paycheck.earnings || []).map((e: any) => ({
+          description: e.description,
+          hours: e.hours,
+          amount: e.amount,
+        }));
+
+        // Build taxes
+        const taxes = (paycheck.taxes || []).map((t: any) => ({
+          description: t.description,
+          amount: t.amount,
+        }));
+
+        // Build deductions
+        const beforeTaxDeductions = (paycheck.deductions || []).map((d: any) => ({
+          description: d.description,
+          amount: d.amount,
+        }));
+
+        return {
+          employeeName,
+          payPeriodStart,
+          payPeriodEnd,
+          checkDate: paycheck.checkDate,
+          adviceNumber: paycheck.checkNumber,
+          grossCurrent: String(grossCurrent),
+          taxesCurrent: String(taxesCurrent),
+          deductionsCurrent: String(deductionsCurrent),
+          netCurrent: String(netCurrent),
+          hoursAndEarnings,
+          taxes,
+          beforeTaxDeductions,
+          afterTaxDeductions: [],
+        };
+      });
+    }
+
+    if (Array.isArray(json)) return json;
+    return [json];
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -233,7 +386,7 @@ export default function PayrollTab() {
     reader.onload = (ev) => {
       try {
         const json = JSON.parse(ev.target?.result as string);
-        const arr = Array.isArray(json) ? json : [json];
+        const arr = normalizeInput(json);
         setImportData(arr);
         setImportMode('upload');
 
@@ -544,6 +697,12 @@ export default function PayrollTab() {
               >
                 📄 Import JSON
               </button>
+              <button
+                onClick={() => setShowGuidance(!showGuidance)}
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+              >
+                {showGuidance ? '🙈 Hide Guidance' : 'ℹ️ Format Help & Template'}
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -555,6 +714,60 @@ export default function PayrollTab() {
             {importError && (
               <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
                 <p className="text-destructive text-sm">{importError}</p>
+              </div>
+            )}
+
+            {showGuidance && (
+              <div className="mt-4 p-5 bg-muted/30 border border-border rounded-xl space-y-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-foreground">Getting Started Guide</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    To import your payroll history, prepare a JSON file formatted as an array of paystub objects.
+                    Runway Finance maps your payroll descriptions (like "Regular Pay", "Fed Withholding") to account categories using field mappings.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Required Schema:</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                    <div className="p-3 bg-background border border-border rounded-lg space-y-1">
+                      <div className="font-medium text-foreground">Header Details</div>
+                      <p><code className="text-primary font-mono font-bold">checkDate</code>: date paid (<code className="bg-muted px-1 rounded">MM/DD/YYYY</code>)</p>
+                      <p><code className="text-primary font-mono font-bold">payPeriodStart</code> / <code className="text-primary font-mono font-bold">payPeriodEnd</code>: (<code className="bg-muted px-1 rounded">MM/DD/YYYY</code>)</p>
+                      <p><code className="text-primary font-mono font-bold">grossCurrent</code> / <code className="text-primary font-mono font-bold">netCurrent</code>: total earnings / net pay</p>
+                    </div>
+                    <div className="p-3 bg-background border border-border rounded-lg space-y-1">
+                      <div className="font-medium text-foreground">Line Item Sections</div>
+                      <p><code className="text-primary font-mono font-bold">hoursAndEarnings</code>: base pay, bonuses, reimbursements</p>
+                      <p><code className="text-primary font-mono font-bold">taxes</code>: federal, state, and local withholdings</p>
+                      <p><code className="text-primary font-mono font-bold">beforeTaxDeductions</code>: pre-tax 401k, health premium</p>
+                      <p><code className="text-primary font-mono font-bold">afterTaxDeductions</code>: post-tax Roth, life insurance</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Template JSON Preview:</h4>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={downloadTemplate}
+                        className="px-2.5 py-1 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"
+                      >
+                        📥 Download JSON Template
+                      </button>
+                      <button
+                        onClick={handleCopyTemplate}
+                        className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-md transition-colors w-28"
+                      >
+                        {copied ? '✅ Copied!' : '📋 Copy JSON'}
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="p-3 bg-background border border-border rounded-lg text-xs font-mono overflow-x-auto text-muted-foreground max-h-60">
+                    {JSON.stringify(PAYSTUB_JSON_TEMPLATE, null, 2)}
+                  </pre>
+                </div>
               </div>
             )}
           </div>
