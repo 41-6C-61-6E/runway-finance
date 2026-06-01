@@ -1018,6 +1018,33 @@ export default function AccountsPage() {
     return { minVal: minValue, maxVal: maxValue };
   }, [visibleData, selectedSeriesKeys]);
 
+  // Calculate dynamic Y-axis width based on formatted label length to reduce left margin padding
+  const yAxisWidth = useMemo(() => {
+    const step = (maxVal - minVal) / 4;
+    const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+    const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+    
+    let maxLength = 0;
+    for (const v of withZero) {
+      const absV = Math.abs(v);
+      const sign = v < 0 ? '-' : '';
+      let formatted = '';
+      if (absV >= 1000000) {
+        formatted = `${sign}$${(absV / 1000000).toFixed(1)}M`;
+      } else if (absV >= 1000) {
+        formatted = `${sign}$${(absV / 1000).toFixed(0)}K`;
+      } else if (absV === 0) {
+        formatted = '$0';
+      } else {
+        formatted = `${sign}$${absV.toFixed(0)}`;
+      }
+      if (formatted.length > maxLength) {
+        maxLength = formatted.length;
+      }
+    }
+    return Math.max(35, Math.ceil(maxLength * 7.5 + 8));
+  }, [minVal, maxVal]);
+
   const xAxisTicks = useMemo(() => {
     return getChartXTicks(visibleData, timeframe, 'date');
   }, [visibleData, timeframe]);
@@ -1797,6 +1824,7 @@ export default function AccountsPage() {
                                     axisLine={{ stroke: 'var(--color-border)' }}
                                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                                     domain={[minVal, maxVal]}
+                                    width={yAxisWidth}
                                     ticks={(() => {
                                       const step = (maxVal - minVal) / 4;
                                       const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
@@ -1885,6 +1913,7 @@ export default function AccountsPage() {
                                     axisLine={{ stroke: 'var(--color-border)' }}
                                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                                     domain={[minVal, maxVal]}
+                                    width={yAxisWidth}
                                     ticks={(() => {
                                       const step = (maxVal - minVal) / 4;
                                       const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);

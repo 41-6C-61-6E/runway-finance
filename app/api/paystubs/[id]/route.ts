@@ -2,6 +2,7 @@ import { auth } from 'auth';
 import { getDb } from '@/lib/db';
 import { paystubs, paystubLineItems, transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function GET(
   _request: Request,
@@ -129,5 +130,6 @@ export async function DELETE(
   // Delete the paystub (cascade will delete line items)
   await db.delete(paystubs).where(eq(paystubs.id, id));
 
+  invalidateUserSearchCache(session.user.id);
   return Response.json({ success: true });
 }

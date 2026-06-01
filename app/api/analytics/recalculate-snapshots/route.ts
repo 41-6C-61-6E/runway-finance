@@ -10,6 +10,7 @@ import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { readApiConfig } from '@/lib/services/manual-accounts';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 const MODEL_SNAPSHOT_TYPES = [
   'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
@@ -131,6 +132,7 @@ export async function POST(request: Request) {
       // Cash flow projections are computed on-the-fly from budgets and
       // spending patterns; no stored snapshots to regenerate.
     } else if (type === 'summaries') {
+      invalidateUserSearchCache(userId);
       const monthlyResult = await updateMonthlyCashFlowSummaries(userId, dek);
       const spendingResult = await updateCategorySpendingSummaries(userId, dek);
       const incomeResult = await updateCategoryIncomeSummaries(userId, dek);

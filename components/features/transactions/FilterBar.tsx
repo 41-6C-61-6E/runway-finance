@@ -239,12 +239,52 @@ export default function FilterBar({
       .catch(() => setTags([]));
   }, []);
 
+  // Synchronize internal search state with filters.search when filters prop changes
   useEffect(() => {
-    if (datePreset === 'custom') {
-      setCustomStartDate(filters.startDate ?? '');
-      setCustomEndDate(filters.endDate ?? '');
+    setSearch(filters.search ?? '');
+  }, [filters.search]);
+
+  // Synchronize custom dates when parent filters change
+  useEffect(() => {
+    setCustomStartDate(filters.startDate ?? '');
+  }, [filters.startDate]);
+
+  useEffect(() => {
+    setCustomEndDate(filters.endDate ?? '');
+  }, [filters.endDate]);
+
+  // Sync datePreset state with parent filters
+  useEffect(() => {
+    if (!filters.startDate && !filters.endDate) {
+      setDatePreset('all');
+    } else {
+      const start = filters.startDate;
+      const end = filters.endDate;
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      const thisMonthFirst = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastMonthFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const lastMonthLast = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      const last3mFirst = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split('T')[0];
+      const last6mFirst = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
+      const thisYearFirst = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+
+      if (start === thisMonthFirst && end === today) {
+        setDatePreset('this-month');
+      } else if (start === lastMonthFirst && end === lastMonthLast) {
+        setDatePreset('last-month');
+      } else if (start === last3mFirst && end === today) {
+        setDatePreset('last-3m');
+      } else if (start === last6mFirst && end === today) {
+        setDatePreset('last-6m');
+      } else if (start === thisYearFirst && end === today) {
+        setDatePreset('this-year');
+      } else {
+        setDatePreset('custom');
+      }
     }
-  }, [datePreset]);
+  }, [filters.startDate, filters.endDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

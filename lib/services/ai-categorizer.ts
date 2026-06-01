@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 const LOG_TAG = '[ai-categorizer]';
 const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
@@ -738,4 +739,5 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
   }
 
   logger.info(`${LOG_TAG} All approved proposals applied`, { userId, count: pending.length });
+  invalidateUserSearchCache(userId);
 }

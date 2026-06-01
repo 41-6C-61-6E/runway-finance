@@ -9,6 +9,7 @@ import {
   updateCategoryIncomeSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -411,6 +412,8 @@ export async function createTransactionsFromLineItems(
       .set({ transactionId: txn.id })
       .where(eq(paystubLineItems.id, item.id));
   }
+
+  invalidateUserSearchCache(userId);
 }
 
 export async function DELETE(request: Request) {
@@ -464,6 +467,7 @@ export async function DELETE(request: Request) {
     console.warn('Could not recalculate summaries after paystub deletion:', err);
   }
 
+  invalidateUserSearchCache(userId);
   return Response.json({ success: true, deleted: ids.length });
 }
 

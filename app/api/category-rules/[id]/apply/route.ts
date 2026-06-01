@@ -7,6 +7,7 @@ import { evaluateCondition } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptField } from '@/lib/crypto';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -76,6 +77,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   logger.info('POST /api/category-rules/[id]/apply', { userId, ruleId: id, matched: matchedIds.length, total: allTxns.length });
+  if (matchedIds.length > 0) {
+    invalidateUserSearchCache(userId);
+  }
   return NextResponse.json({
     matched: matchedIds.length,
     total: allTxns.length,
