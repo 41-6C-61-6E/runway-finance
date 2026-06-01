@@ -177,7 +177,7 @@ export function DebtToAssetRatio() {
         }
       />
       {!isCollapsed && (
-        <div className="p-5">
+        <div className="p-3 sm:p-5">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-4xl font-bold text-foreground financial-value">
               {pct.toFixed(0)}%

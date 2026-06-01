@@ -115,7 +115,7 @@ export function BudgetVsActualChart() {
           title="Budget vs Actual"
         />
         {!isCollapsed && (
-          <div className="p-5">
+          <div className="p-3 sm:p-5">
             <ChartEmptyState variant="error" error={error} />
           </div>
         )}
@@ -132,7 +132,7 @@ export function BudgetVsActualChart() {
           title="Budget vs Actual"
         />
         {!isCollapsed && (
-          <div className="p-5">
+          <div className="p-3 sm:p-5">
             <ChartEmptyState variant="nodata" description="Add a budget to see the comparison" />
           </div>
         )}

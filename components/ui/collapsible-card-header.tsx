@@ -19,7 +19,7 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
       <div
         ref={ref}
         className={cn(
-          'flex sm:flex-row sm:items-center justify-between px-6 transition-all duration-200',
+          'flex sm:flex-row sm:items-center justify-between px-4 sm:px-6 transition-all duration-200',
           showActions ? 'flex-col gap-2.5 py-4' : 'flex-row gap-4 py-2.5',
           className
         )}
@@ -52,7 +52,12 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
           </button>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+        <div
+          className={cn(
+            'items-center gap-3 justify-end flex-wrap sm:flex-nowrap',
+            showActions ? 'flex w-full sm:w-auto' : 'hidden sm:flex sm:w-auto'
+          )}
+        >
           {showActions && (
             <div className="flex items-center gap-2 flex-wrap">
               {actions}

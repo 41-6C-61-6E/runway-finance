@@ -10,8 +10,9 @@ import BulkActionsToolbar from '@/components/features/transactions/BulkActionsTo
 import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
 import ContentWrapper from '@/components/content-wrapper';
 import { PageHeader } from '@/components/page-header';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
-type FilterState = {
+export type FilterState = {
   accountId: string | null;
   accountIds: string | null;
   accountTypes: string | null;
@@ -31,6 +32,13 @@ type FilterState = {
   sort: string;
   order: string;
 };
+
+export interface TransactionPreset {
+  id: string;
+  name: string;
+  filters: Partial<FilterState>;
+  isCustom?: boolean;
+}
 
 function TransactionsContent() {
   const searchParams = useSearchParams();
@@ -66,6 +74,57 @@ function TransactionsContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
+  const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('runway:transactions:customPresets', []);
+
+  const handleApplyPreset = useCallback((preset: TransactionPreset) => {
+    setFilters({
+      accountId: null,
+      accountIds: null,
+      accountTypes: null,
+      categoryId: null,
+      categoryIds: null,
+      tagId: null,
+      tagIds: null,
+      search: null,
+      type: null,
+      startDate: null,
+      endDate: null,
+      pending: null,
+      reviewed: null,
+      minAmount: null,
+      maxAmount: null,
+      categorizedByAi: null,
+      sort: 'date',
+      order: 'desc',
+      ...preset.filters
+    });
+  }, []);
+
+  const handleSavePreset = useCallback((name: string) => {
+    const filtersToSave = { ...filters };
+    delete filtersToSave.sort;
+    delete filtersToSave.order;
+    
+    // Clean up null/empty values
+    Object.keys(filtersToSave).forEach(k => {
+      const key = k as keyof FilterState;
+      if (filtersToSave[key] === null || filtersToSave[key] === '') {
+        delete filtersToSave[key];
+      }
+    });
+
+    const newPreset: TransactionPreset = {
+      id: Math.random().toString(36).substring(2, 9),
+      name,
+      filters: filtersToSave,
+      isCustom: true,
+    };
+    setCustomPresets((prev) => [...(prev || []), newPreset]);
+  }, [filters, setCustomPresets]);
+
+  const handleDeletePreset = useCallback((id: string) => {
+    setCustomPresets((prev) => (prev || []).filter((p) => p.id !== id));
+  }, [setCustomPresets]);
 
   useEffect(() => {
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
@@ -256,7 +315,15 @@ function TransactionsContent() {
         <ContentWrapper className="mt-0">
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px] overflow-visible">
 
-            <FilterBar filters={filters} onChange={updateFilter} onClearAll={clearAllFilters} />
+            <FilterBar 
+              filters={filters} 
+              onChange={updateFilter} 
+              onClearAll={clearAllFilters}
+              customPresets={customPresets}
+              onApplyPreset={handleApplyPreset}
+              onSavePreset={handleSavePreset}
+              onDeletePreset={handleDeletePreset}
+            />
 
             <div className="min-w-0">
               {(selectedIds.size > 0 || selectAllMatching) && (

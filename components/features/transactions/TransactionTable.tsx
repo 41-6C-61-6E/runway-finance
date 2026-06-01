@@ -112,13 +112,13 @@ const COLUMN_LABELS: Record<string, string> = {
 
 const COLUMN_MIN_WIDTHS: Record<string, number> = {
   select: 40,
-  date: 90,
-  postedDate: 90,
+  date: 70,
+  postedDate: 70,
   description: 80,
-  ai: 40,
+  ai: 30,
   account: 60,
-  category: 90,
-  amount: 80,
+  category: 80,
+  amount: 70,
 };
 
 function SortableHeader({
@@ -226,7 +226,9 @@ export default function TransactionTable({
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setColumnVisibility((prev) => ({
         ...prev,
+        select: false,
         account: false,
+        tags: false,
       }));
     }
   }, []);
@@ -258,14 +260,12 @@ export default function TransactionTable({
     if (clientWidth <= 0) return;
 
     const isMobileSize = clientWidth < 768;
-    const containerWidth = isMobileSize
-      ? Math.max(clientWidth, 480)
-      : clientWidth;
+    const containerWidth = clientWidth;
     setTableWidth(containerWidth);
 
     // Calculate dynamic column sizes based on actual content
     const hasPending = transactions.some((tx) => tx.pending);
-    const dateWidth = hasPending ? 110 : 95;
+    const dateWidth = isMobileSize ? 75 : (hasPending ? 110 : 95);
 
     let maxCategoryWidth = 90;
     for (const tx of transactions) {
@@ -279,7 +279,7 @@ export default function TransactionTable({
         maxCategoryWidth = estimatedWidth;
       }
     }
-    const categoryWidth = Math.min(180, maxCategoryWidth);
+    const categoryWidth = Math.min(isMobileSize ? 95 : 180, maxCategoryWidth);
 
     let maxAmountWidth = 80;
     for (const tx of transactions) {
@@ -295,7 +295,7 @@ export default function TransactionTable({
         maxAmountWidth = estimatedWidth;
       }
     }
-    const amountWidth = Math.min(150, maxAmountWidth);
+    const amountWidth = Math.min(isMobileSize ? 75 : 150, maxAmountWidth);
 
     const visibleCols = columnOrder.filter(
       (id) => columnVisibility[id] !== false,
@@ -314,7 +314,7 @@ export default function TransactionTable({
 
       // Calculate total fixed width of all other columns
       const otherFixedTotal =
-        40 +
+        (visibleCols.includes("select") ? 40 : 0) +
         dateWidth +
         (visibleCols.includes("postedDate") ? 90 : 0) +
         (visibleCols.includes("ai") ? 40 : 0) +
@@ -331,9 +331,9 @@ export default function TransactionTable({
           Math.floor(flexSpace * (1.2 / 1.8)),
         );
       } else if (hasDesc) {
-        fixedSizes.description = Math.max(80, Math.min(200, availableForFlex));
+        fixedSizes.description = Math.max(80, availableForFlex);
       } else if (hasAccount) {
-        fixedSizes.account = Math.max(60, Math.min(150, availableForFlex));
+        fixedSizes.account = Math.max(60, availableForFlex);
       }
     }
     const flexibleCols = visibleCols.filter((id) => !(id in fixedSizes));
@@ -807,7 +807,7 @@ export default function TransactionTable({
           return (
             <div className="flex items-center justify-between w-full min-w-0 pr-1 group-hover:pr-0">
               <span
-                className={`text-sm truncate min-w-0 flex-1 max-w-[10ch] sm:max-w-[15ch] md:max-w-[20ch] lg:max-w-[28ch] xl:max-w-[36ch] 2xl:max-w-none ${isPending ? "text-muted-foreground" : "text-foreground"}`}
+                className={`text-sm truncate min-w-0 flex-1 ${isPending ? "text-muted-foreground" : "text-foreground"}`}
               >
                 {tx.payee || tx.description}
               </span>
@@ -853,7 +853,7 @@ export default function TransactionTable({
           <SortableHeader column={column} title="Account" />
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground truncate block max-w-[10ch] sm:max-w-[15ch] md:max-w-[20ch] lg:max-w-[25ch] xl:max-w-[30ch] 2xl:max-w-none">
+          <span className="text-sm text-muted-foreground truncate block">
             {row.original.accountName || "—"}
           </span>
         ),
@@ -1363,7 +1363,7 @@ export default function TransactionTable({
                         return (
                           <th
                             key={header.id}
-                            className={`px-3 py-2 text-muted-foreground font-medium text-xs uppercase tracking-wider relative select-none ${
+                            className={`px-1.5 sm:px-3 py-2 text-muted-foreground font-medium text-xs uppercase tracking-wider relative select-none ${
                               colId !== "select" ? "cursor-pointer" : ""
                             } ${isDropTarget ? "border-l-2 border-l-primary" : ""} ${
                               header.column.columnDef.meta?.className ||
@@ -1430,7 +1430,7 @@ export default function TransactionTable({
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className={`px-3 py-1.5 overflow-hidden truncate ${cell.column.columnDef.meta?.className || ""}`}
+                            className={`px-1.5 sm:px-3 py-1.5 overflow-hidden truncate ${cell.column.columnDef.meta?.className || ""}`}
                             style={{
                               width:
                                 columnSizing[cell.column.id] ||

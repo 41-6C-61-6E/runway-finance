@@ -238,7 +238,7 @@ export function DebtBreakdown() {
               </div>
             </div>
           </CollapsibleFilterPanel>
-          <div className="px-5 py-4">
+          <div className="px-3 sm:px-5 py-4">
           <div className="flex gap-4 mb-5 border-b border-border">
             <button
               onClick={() => setActiveTab('assets')}
