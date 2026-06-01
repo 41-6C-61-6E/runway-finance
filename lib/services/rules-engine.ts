@@ -45,11 +45,13 @@ export async function applyRulesToTransactions(
     for (const rule of decryptedRules) {
       const match = evaluateCondition(rule, tx);
       if (match) {
-        results.set(tx.id, {
-          categoryId: rule.setCategoryId,
-          payee: rule.setPayee ?? null,
-          reviewed: rule.setReviewed ?? null,
-        });
+        if (!tx.categoryId || rule.overrideExisting) {
+          results.set(tx.id, {
+            categoryId: rule.setCategoryId,
+            payee: rule.setPayee ?? null,
+            reviewed: rule.setReviewed ?? null,
+          });
+        }
         break;
       }
     }
@@ -136,3 +138,120 @@ function getFieldValue(field: string, tx: TransactionData): string | null {
       return null;
   }
 }
+
+export type NormalizedCondition = {
+  field: string;
+  operator: string;
+  value: string;
+  caseSensitive: boolean;
+};
+
+export function normalizeConditions(rule: {
+  conditionField?: string | null;
+  conditionOperator?: string | null;
+  conditionValue?: string | null;
+  conditionCaseSensitive?: boolean | null;
+  conditions?: any;
+}): NormalizedCondition[] {
+  if (Array.isArray(rule.conditions) && rule.conditions.length > 0) {
+    return rule.conditions.map((c: any) => ({
+      field: String(c.field || '').trim(),
+      operator: String(c.operator || '').trim(),
+      value: String(c.value || '').trim(),
+      caseSensitive: !!c.caseSensitive,
+    }));
+  }
+  if (
+    rule.conditionField &&
+    rule.conditionOperator &&
+    rule.conditionValue !== undefined &&
+    rule.conditionValue !== null
+  ) {
+    return [
+      {
+        field: String(rule.conditionField).trim(),
+        operator: String(rule.conditionOperator).trim(),
+        value: String(rule.conditionValue).trim(),
+        caseSensitive: !!rule.conditionCaseSensitive,
+      },
+    ];
+  }
+  return [];
+}
+
+export function conditionsEqual(a: NormalizedCondition[], b: NormalizedCondition[]): boolean {
+  if (a.length !== b.length) return false;
+
+  const matchedIndices = new Set<number>();
+  for (const condA of a) {
+    let found = false;
+    for (let i = 0; i < b.length; i++) {
+      if (matchedIndices.has(i)) continue;
+      const condB = b[i];
+      if (
+        condA.field === condB.field &&
+        condA.operator === condB.operator &&
+        condA.caseSensitive === condB.caseSensitive
+      ) {
+        const valA = condA.caseSensitive ? condA.value : condA.value.toLowerCase();
+        const valB = condB.caseSensitive ? condB.value : condB.value.toLowerCase();
+        if (valA === valB) {
+          matchedIndices.add(i);
+          found = true;
+          break;
+        }
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
+
+export async function findDuplicateRule(
+  userId: string,
+  dek: Uint8Array,
+  newRule: {
+    conditionField?: string | null;
+    conditionOperator?: string | null;
+    conditionValue?: string | null;
+    conditionCaseSensitive?: boolean | null;
+    conditions?: any[];
+    setCategoryId: string | null;
+    setTagId?: string | null;
+    setPayee?: string | null;
+    setReviewed?: boolean | null;
+    overrideExisting?: boolean | null;
+  }
+): Promise<any | null> {
+  const dbRules = await getDb()
+    .select()
+    .from(categoryRules)
+    .where(eq(categoryRules.userId, userId));
+
+  if (dbRules.length === 0) return null;
+
+  const decryptedRules = await decryptRows('category_rules', dbRules.map(r => ({ ...r })), dek);
+  const newNorm = normalizeConditions(newRule);
+
+  if (newNorm.length === 0) return null;
+
+  for (let i = 0; i < decryptedRules.length; i++) {
+    const rule = decryptedRules[i];
+    const ruleNorm = normalizeConditions(rule);
+    if (!conditionsEqual(newNorm, ruleNorm)) continue;
+
+    // Check actions
+    const categoryMatch = (rule.setCategoryId || null) === (newRule.setCategoryId || null);
+    const tagMatch = (rule.setTagId || null) === (newRule.setTagId || null);
+    const payeeMatch = (rule.setPayee?.trim() || null) === (newRule.setPayee?.trim() || null);
+    const reviewedMatch = (rule.setReviewed ?? null) === (newRule.setReviewed ?? null);
+    const overrideMatch = !!rule.overrideExisting === !!newRule.overrideExisting;
+
+    if (categoryMatch && tagMatch && payeeMatch && reviewedMatch && overrideMatch) {
+      return dbRules[i];
+    }
+  }
+
+  return null;
+}
+
