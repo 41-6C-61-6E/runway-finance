@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getTypesByGroup } from '@/lib/constants/account-types';
 
 type FilterState = {
@@ -22,10 +22,23 @@ type FilterState = {
   categorizedByAi: string | null;
 };
 
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+
+export interface TransactionPreset {
+  id: string;
+  name: string;
+  filters: Partial<FilterState>;
+  isCustom?: boolean;
+}
+
 interface FilterBarProps {
   filters: FilterState;
   onChange: (key: keyof FilterState, value: string | null) => void;
   onClearAll: () => void;
+  customPresets: TransactionPreset[];
+  onApplyPreset: (preset: TransactionPreset) => void;
+  onSavePreset: (name: string) => void;
+  onDeletePreset: (id: string) => void;
 }
 
 type Account = {
@@ -145,7 +158,44 @@ function MultiSelectDropdown({
   );
 }
 
-export default function FilterBar({ filters, onChange, onClearAll }: FilterBarProps) {
+const DEFAULT_PRESETS: TransactionPreset[] = [
+  { id: 'all', name: 'All Transactions', filters: {} },
+  { id: 'pending', name: 'Pending', filters: { pending: 'true' } },
+  { id: 'uncategorized', name: 'Uncategorized', filters: { categoryIds: 'uncategorized' } },
+];
+
+export default function FilterBar({ 
+  filters, 
+  onChange, 
+  onClearAll,
+  customPresets = [],
+  onApplyPreset,
+  onSavePreset,
+  onDeletePreset
+}: FilterBarProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSavingView, setIsSavingView] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+
+  const allPresets = useMemo(() => {
+    return [...DEFAULT_PRESETS, ...(customPresets || [])];
+  }, [customPresets]);
+
+  const isPresetActive = useCallback((preset: TransactionPreset) => {
+    const filterKeys = [
+      'accountId', 'accountIds', 'accountTypes', 'categoryId', 'categoryIds',
+      'tagId', 'tagIds', 'search', 'type', 'startDate', 'endDate', 'pending',
+      'reviewed', 'minAmount', 'maxAmount', 'categorizedByAi'
+    ] as (keyof FilterState)[];
+    
+    for (const key of filterKeys) {
+      const currentVal = filters[key] ?? null;
+      const presetVal = preset.filters[key] ?? null;
+      if (currentVal !== presetVal) return false;
+    }
+    return true;
+  }, [filters]);
+
   const [datePreset, setDatePreset] = useState(() => {
     if (filters.startDate || filters.endDate) return 'custom';
     return 'all';
@@ -327,27 +377,164 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
 
   const groupedAccountTypes = getTypesByGroup();
 
-  return (
-    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm">
-      {/* Primary Controls Section */}
-      <div className="p-4 border-b border-border/50">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          {/* Search Input */}
-          <div className="flex-1 min-w-[200px]">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by description, payee..."
-              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-            />
-          </div>
+  const activePills = useMemo(() => {
+    const pills: string[] = [];
+    if (datePreset !== 'all') {
+      if (datePreset === 'custom') {
+        const start = filters.startDate ? new Date(filters.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        const end = filters.endDate ? new Date(filters.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        pills.push(start && end ? `${start}–${end}` : 'Custom Date');
+      } else {
+        const label = datePreset === 'this-month' ? 'This Month' :
+                      datePreset === 'last-month' ? 'Last Month' :
+                      datePreset === 'last-3m' ? 'Last 3M' :
+                      datePreset === 'last-6m' ? 'Last 6M' :
+                      datePreset === 'this-year' ? 'This Year' : datePreset;
+        pills.push(label);
+      }
+    }
+    if (selectedAccountTypes.length > 0) pills.push(`Types (${selectedAccountTypes.length})`);
+    if (selectedAccountIds.length > 0) pills.push(`Accounts (${selectedAccountIds.length})`);
+    if (selectedCategoryIds.length > 0) pills.push(`Categories (${selectedCategoryIds.length})`);
+    if (selectedTagIds.length > 0) pills.push(`Tags (${selectedTagIds.length})`);
+    if (filters.minAmount || filters.maxAmount) pills.push('Amount');
+    if (filters.pending === 'true') pills.push('Pending');
+    if (filters.type) pills.push(filters.type === 'income' ? 'Income' : 'Expense');
+    if (filters.categorizedByAi === 'true') pills.push('AI');
+    return pills;
+  }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, filters, datePreset]);
 
+  return (
+    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-hidden">
+      {/* Primary Controls Section */}
+      <div className="p-3 sm:p-4 border-b border-border/50">
+        <div className="w-full">
+          {/* Search Input */}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by description, payee..."
+            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+          />
+        </div>
+      </div>
+
+      {/* Filter Controls Section */}
+      <CollapsibleFilterPanel
+        isOpen={isOpen}
+        onToggle={() => setIsOpen(!isOpen)}
+        feedback={
+          <div className="flex flex-wrap items-center gap-1.5">
+            {activePills.map((pill) => (
+              <span
+                key={pill}
+                className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider animate-in fade-in duration-150"
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        }
+        className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
+      >
+        <div className="space-y-4">
+          {/* Quick Views Presets */}
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/20 border border-border/20 rounded-xl">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mr-1 select-none">
+              <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              Quick Views
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {allPresets.map((preset) => {
+                const active = isPresetActive(preset);
+                return (
+                  <button
+                    type="button"
+                    key={preset.id}
+                    onClick={() => onApplyPreset(preset)}
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                      active
+                        ? 'bg-primary/15 border-primary/50 text-primary shadow-sm'
+                        : 'bg-background hover:bg-muted border-border/50 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>{preset.name}</span>
+                    {preset.isCustom && (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeletePreset(preset.id);
+                        }}
+                        className="w-3.5 h-3.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center text-[10px] ml-0.5 opacity-60 group-hover:opacity-100 transition-opacity"
+                        title="Delete view"
+                      >
+                        &times;
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Save Current View Form */}
+              {isSavingView ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (newPresetName.trim()) {
+                      onSavePreset(newPresetName.trim());
+                      setNewPresetName('');
+                      setIsSavingView(false);
+                    }
+                  }}
+                  className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-200"
+                >
+                  <input
+                    type="text"
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    placeholder="Name this view..."
+                    className="px-2.5 py-1 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-32 transition-all"
+                    autoFocus
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSavingView(false);
+                      setNewPresetName('');
+                    }}
+                    className="px-2.5 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-lg hover:bg-muted/80 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSavingView(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-dashed border-primary/45 hover:border-primary text-primary hover:bg-primary/5 transition-all"
+                >
+                  <span className="text-[14px] leading-none">+</span> Save View
+                </button>
+              )}
+            </div>
+          </div>
+        {/* Dropdowns Row */}
+        <div className="flex flex-wrap gap-2 items-start">
           {/* Date Preset Selector */}
-          <div className="w-full sm:w-auto">
+          <div className="relative z-30">
             <select
               value={datePreset}
               onChange={(e) => applyDatePreset(e.target.value)}
-              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+              className="px-3 py-2 bg-muted/50 border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:bg-muted hover:border-border transition-all"
             >
               <option value="all">All Time</option>
               <option value="this-month">This Month</option>
@@ -358,42 +545,6 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
               <option value="custom">Custom Range</option>
             </select>
           </div>
-        </div>
-
-        {/* Custom Date Range */}
-        {datePreset === 'custom' && (
-          <div className="mt-3 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-            <span className="text-xs font-medium text-muted-foreground mt-1">Date range:</span>
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-            />
-            <span className="hidden sm:inline text-xs text-muted-foreground">to</span>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-            />
-            <button
-              onClick={() => {
-                onChange('startDate', customStartDate || null);
-                onChange('endDate', customEndDate || null);
-              }}
-              className="px-4 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Apply
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Filter Controls Section */}
-      <div className="p-4 space-y-3">
-        {/* Dropdowns Row */}
-        <div className="flex flex-wrap gap-2 items-start">
           {/* Account Types - Grouped */}
           <div className="relative z-30" ref={accountTypesRef}>
             <button
@@ -760,6 +911,38 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
           </div>
         </div>
 
+        {/* Custom Date Range Inline Form */}
+        {datePreset === 'custom' && (
+          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center p-3 bg-muted/20 border border-border/20 rounded-xl">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Date Range:</span>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2.5 py-1 bg-background border border-input rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-shadow"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2.5 py-1 bg-background border border-input rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-shadow"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('startDate', customStartDate || null);
+                  onChange('endDate', customEndDate || null);
+                }}
+                className="px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Status Filters Row */}
         <div className="flex flex-wrap gap-2 items-center pt-1">
           {/* Status Filter Group */}
@@ -853,6 +1036,7 @@ export default function FilterBar({ filters, onChange, onClearAll }: FilterBarPr
           )}
         </div>
       </div>
+      </CollapsibleFilterPanel>
     </div>
   );
 }
