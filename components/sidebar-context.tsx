@@ -62,15 +62,23 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
-  const [accountsCollapsed, setAccountsCollapsed] = useState(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
-    const cookieVal = getCookie('hideAccountsSidebarByDefault');
-    if (cookieVal !== undefined) {
-      return cookieVal === 'true';
-    }
-    return true;
-  });
+  const [accountsCollapsed, setAccountsCollapsed] = useState(true);
   const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth < 768) {
+        setAccountsCollapsed(true);
+      } else {
+        const cookieVal = getCookie('hideAccountsSidebarByDefault');
+        if (cookieVal !== undefined) {
+          setAccountsCollapsed(cookieVal === 'true');
+        } else {
+          setAccountsCollapsed(true);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (userSettings && !userSettings.loading && !hasInitializedCollapse) {
