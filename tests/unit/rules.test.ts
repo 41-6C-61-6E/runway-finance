@@ -215,11 +215,19 @@ describe('Rules Engine', () => {
         categoryId: 'cat_amazon',
         payee: 'Amazon Services',
         reviewed: true,
+        setTagId: null,
+        overrideExisting: false,
+        shouldUpdateTags: false,
+        shouldUpdateCategory: true,
       });
       expect(results.get('tx_2')).toEqual({
         categoryId: 'cat_entertainment',
         payee: 'Netflix Subscription',
         reviewed: null,
+        setTagId: null,
+        overrideExisting: false,
+        shouldUpdateTags: false,
+        shouldUpdateCategory: true,
       });
       expect(results.get('tx_3')).toBeUndefined();
     });
@@ -460,6 +468,10 @@ describe('Rules Engine', () => {
         categoryId: 'cat_entertainment_new',
         payee: null,
         reviewed: null,
+        setTagId: null,
+        overrideExisting: true,
+        shouldUpdateTags: false,
+        shouldUpdateCategory: true,
       });
     });
   });

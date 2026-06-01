@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
-import { categoryRules } from '@/lib/db/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { categoryRules, transactionTags } from '@/lib/db/schema';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptRows } from '@/lib/crypto';
 
@@ -15,10 +15,14 @@ type TransactionData = {
   categoryId: string | null;
 };
 
-type RuleAction = {
+export type RuleAction = {
   categoryId: string | null;
   payee: string | null;
   reviewed: boolean | null;
+  setTagId: string | null;
+  overrideExisting: boolean;
+  shouldUpdateTags: boolean;
+  shouldUpdateCategory: boolean;
 };
 
 export async function applyRulesToTransactions(
@@ -41,15 +45,33 @@ export async function applyRulesToTransactions(
 
   const results = new Map<string, RuleAction>();
 
+  // Fetch which transactions have existing tags
+  const txIds = txns.map((t) => t.id);
+  const existingTags = txIds.length > 0
+    ? await getDb()
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.transactionId, txIds))
+    : [];
+  const txsWithTags = new Set(existingTags.map((t) => t.transactionId));
+
   for (const tx of txns) {
     for (const rule of decryptedRules) {
       const match = evaluateCondition(rule, tx);
       if (match) {
-        if (!tx.categoryId || rule.overrideExisting) {
+        const hasTags = txsWithTags.has(tx.id);
+        const shouldUpdateCategory = !tx.categoryId || rule.overrideExisting;
+        const shouldUpdateTags = rule.setTagId ? (!hasTags || rule.overrideExisting) : false;
+
+        if (shouldUpdateCategory || shouldUpdateTags) {
           results.set(tx.id, {
-            categoryId: rule.setCategoryId,
-            payee: rule.setPayee ?? null,
-            reviewed: rule.setReviewed ?? null,
+            categoryId: shouldUpdateCategory ? rule.setCategoryId : tx.categoryId,
+            payee: shouldUpdateCategory ? (rule.setPayee ?? null) : tx.payee,
+            reviewed: shouldUpdateCategory ? (rule.setReviewed ?? null) : null,
+            setTagId: rule.setTagId ?? null,
+            overrideExisting: !!rule.overrideExisting,
+            shouldUpdateTags,
+            shouldUpdateCategory,
           });
         }
         break;
