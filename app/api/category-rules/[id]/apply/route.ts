@@ -48,7 +48,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const matchedIds: string[] = [];
   for (const tx of decryptedTxns) {
     if (evaluateCondition(decryptedRule, tx)) {
-      matchedIds.push(tx.id);
+      if (!tx.categoryId || decryptedRule.overrideExisting) {
+        matchedIds.push(tx.id);
+      }
     }
   }
 

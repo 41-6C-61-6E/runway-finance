@@ -219,7 +219,7 @@ export default function FilterBar({
   const accountTypesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/accounts', { credentials: 'include' })
+    fetch('/api/accounts?includeVirtual=true', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => setAccounts(Array.isArray(data) ? data : []))
       .catch(() => setAccounts([]));
@@ -445,7 +445,7 @@ export default function FilterBar({
   }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, filters, datePreset]);
 
   return (
-    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-hidden">
+    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-visible">
       {/* Primary Controls Section */}
       <div className="p-3 sm:p-4 border-b border-border/50">
         <div className="w-full">

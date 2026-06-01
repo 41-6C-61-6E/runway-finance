@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptRow } from '@/lib/crypto';
+import { findDuplicateRule } from '@/lib/services/rules-engine';
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(200),
@@ -27,6 +28,7 @@ const CreateRuleSchema = z.object({
   setTagId: z.string().uuid().nullable().optional(),
   setPayee: z.string().max(200).nullable().optional(),
   setReviewed: z.boolean().nullable().optional(),
+  overrideExisting: z.boolean().default(false),
 });
 
 export async function GET() {
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, conditions, setCategoryId, setTagId, setPayee, setReviewed } = parsed.data;
+  const { name, priority, isActive, conditionField, conditionOperator, conditionValue, conditionCaseSensitive, conditions, setCategoryId, setTagId, setPayee, setReviewed, overrideExisting } = parsed.data;
 
   // Prepare the conditions array (use provided conditions or create from single condition fields)
   const conditionsData = conditions || [{
@@ -102,6 +104,32 @@ export async function POST(request: Request) {
     value: conditionValue,
     caseSensitive: conditionCaseSensitive,
   }];
+
+  const duplicate = await findDuplicateRule(userId, dek, {
+    conditionField,
+    conditionOperator,
+    conditionValue,
+    conditionCaseSensitive,
+    conditions: conditionsData,
+    setCategoryId: setCategoryId ?? null,
+    setTagId: setTagId ?? null,
+    setPayee: setPayee ?? null,
+    setReviewed: setReviewed ?? null,
+    overrideExisting: overrideExisting ?? false,
+  });
+
+  if (duplicate) {
+    logger.info('POST /api/category-rules - duplicate rule found, skipping insert', { userId, ruleId: duplicate.id });
+    if (!duplicate.isActive) {
+      const [activated] = await getDb()
+        .update(categoryRules)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(eq(categoryRules.id, duplicate.id))
+        .returning();
+      return NextResponse.json(activated, { status: 201 });
+    }
+    return NextResponse.json(duplicate, { status: 201 });
+  }
 
   const encryptedValues = await encryptRow('category_rules', {
     userId,
@@ -117,6 +145,7 @@ export async function POST(request: Request) {
     setTagId: setTagId ?? null,
     setPayee: setPayee ?? null,
     setReviewed: setReviewed ?? null,
+    overrideExisting: overrideExisting ?? false,
   }, dek);
 
   const [rule] = await getDb()

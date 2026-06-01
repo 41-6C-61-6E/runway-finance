@@ -47,6 +47,9 @@ describe('Search Cache Service', () => {
     const catName1 = await encryptField('Food & Drink', testDek);
     const catName2 = await encryptField('Entertainment', testDek);
 
+    const accName1 = await encryptField('Chase Checking', testDek);
+    const accName2 = await encryptField('Amex Gold', testDek);
+
     mockDbResponse = [
       {
         id: 'tx_starbucks_1',
@@ -54,6 +57,7 @@ describe('Search Cache Service', () => {
         payee: payee1,
         notes: notes1,
         categoryName: catName1,
+        accountName: accName1,
       },
       {
         id: 'tx_netflix_1',
@@ -61,6 +65,7 @@ describe('Search Cache Service', () => {
         payee: payee2,
         notes: notes2,
         categoryName: catName2,
+        accountName: accName2,
       },
     ];
 
@@ -78,6 +83,11 @@ describe('Search Cache Service', () => {
     const matchesEntertainment = await getSearchMatchingTransactionIds(userId, testDek, 'entertainment');
     expect(matchesEntertainment.size).toBe(1);
     expect(matchesEntertainment.has('tx_netflix_1')).toBe(true);
+
+    // Query for "chase" (account name)
+    const matchesChase = await getSearchMatchingTransactionIds(userId, testDek, 'chase');
+    expect(matchesChase.size).toBe(1);
+    expect(matchesChase.has('tx_starbucks_1')).toBe(true);
 
     // Query for non-existent keyword
     const matchesNone = await getSearchMatchingTransactionIds(userId, testDek, 'amazon');
@@ -102,6 +112,7 @@ describe('Search Cache Service', () => {
         ignored: false,
         source: 'simplefin',
         categoryName: null,
+        accountName: null,
       },
     ];
 
@@ -112,6 +123,7 @@ describe('Search Cache Service', () => {
       payee: 'starbucks inc',
       notes: '',
       categoryName: '',
+      accountName: '',
       amount: '-5.45',
       categoryId: 'cat_coffee_123',
       accountId: 'acc_checking_123',

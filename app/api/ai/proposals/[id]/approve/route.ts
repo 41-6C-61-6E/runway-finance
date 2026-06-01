@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { findDuplicateRule } from '@/lib/services/rules-engine';
 
 export async function POST(
   request: Request,
@@ -82,6 +83,26 @@ export async function POST(
       }
 
       case 'create_rule': {
+        const duplicate = await findDuplicateRule(userId, dek, {
+          conditionField: payload.conditionField,
+          conditionOperator: payload.conditionOperator,
+          conditionValue: payload.conditionValue,
+          conditionCaseSensitive: payload.conditionCaseSensitive ?? false,
+          setCategoryId: payload.setCategoryId,
+          overrideExisting: false,
+        });
+
+        if (duplicate) {
+          logger.info('Approved create_rule proposal - duplicate rule already exists, skipping insert', { userId, proposalId: id, ruleId: duplicate.id });
+          if (!duplicate.isActive) {
+            await db
+              .update(categoryRules)
+              .set({ isActive: true, updatedAt: new Date() })
+              .where(eq(categoryRules.id, duplicate.id));
+          }
+          break;
+        }
+
         const encryptedRule = await encryptField(payload.ruleName, dek);
         await db
           .insert(categoryRules)
