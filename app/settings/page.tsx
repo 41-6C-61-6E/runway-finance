@@ -18,18 +18,8 @@ import {
   UploadCloud, 
   FileText, 
   ShieldAlert,
-  ChevronRight,
-  Menu,
   AlertCircle
 } from 'lucide-react';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
@@ -112,7 +102,6 @@ function SettingsPageBody() {
   const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -508,72 +497,6 @@ function SettingsPageBody() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8 items-start">
-            
-            {/* Mobile Navigation Dropdown-like Trigger */}
-            <div className="lg:hidden w-full mb-6">
-              <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
-                <SheetTrigger asChild>
-                  <button className="w-full flex items-center justify-between p-4 bg-card border border-border rounded-xl shadow-sm text-foreground hover:bg-muted/50 transition-all cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const currentTab = SETTINGS_TABS.find(t => t.id === activeTab) || SETTINGS_TABS[0];
-                        const TabIcon = currentTab.icon;
-                        return (
-                          <>
-                            <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                              <TabIcon className="w-4 h-4" />
-                            </div>
-                            <div className="text-left">
-                              <div className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">Settings Section</div>
-                              <div className="text-sm font-semibold">{currentTab.label}</div>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <Menu className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-3xl border-t border-border p-4 pb-8 max-h-[85vh] overflow-y-auto bg-card">
-                  <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-5" />
-                  <SheetHeader className="pb-4 border-b border-border text-left">
-                    <SheetTitle className="text-left flex items-center gap-2">
-                      <Settings className="w-5 h-5 text-primary" /> Settings Navigation
-                    </SheetTitle>
-                    <SheetDescription className="text-left">Select a section to configure your preferences.</SheetDescription>
-                  </SheetHeader>
-                  <div className="py-4 space-y-1">
-                    {SETTINGS_TABS.map((tab) => {
-                      const TabIcon = tab.icon;
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => {
-                            goToTab(tab.id);
-                            setIsMobileNavOpen(false);
-                          }}
-                          className={`w-full flex items-start gap-4 p-3.5 rounded-xl transition-all text-left border ${
-                            isActive 
-                              ? 'bg-primary/10 border-primary/20 text-foreground' 
-                              : 'bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <div className={`p-2 rounded-lg ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                            <TabIcon className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold">{tab.label}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{tab.description}</div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground/50 self-center" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
 
             {/* Desktop Navigation Sidebar */}
             <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-1 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-3 rounded-xl shadow-sm">

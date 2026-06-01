@@ -6,6 +6,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { findDuplicateRule } from '@/lib/services/rules-engine';
 
 const LOG_TAG = '[ai-categorizer]';
 const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
@@ -713,6 +714,26 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
           setCategoryId = categoryIdMap.get(payload.setCategoryName) ?? 
                           nameToId.get(payload.setCategoryName.trim().toLowerCase()) ?? 
                           null;
+        }
+
+        const duplicate = await findDuplicateRule(userId, dek, {
+          conditionField: payload.conditionField,
+          conditionOperator: payload.conditionOperator,
+          conditionValue: payload.conditionValue,
+          conditionCaseSensitive: payload.conditionCaseSensitive ?? false,
+          setCategoryId,
+          overrideExisting: false,
+        });
+
+        if (duplicate) {
+          logger.info(`${LOG_TAG} Approved create_rule proposal - duplicate rule already exists, skipping insert`, { userId, ruleId: duplicate.id });
+          if (!duplicate.isActive) {
+            await db
+              .update(categoryRules)
+              .set({ isActive: true, updatedAt: new Date() })
+              .where(eq(categoryRules.id, duplicate.id));
+          }
+          break;
         }
 
         const encryptedRule = await encryptField(payload.ruleName, dek);

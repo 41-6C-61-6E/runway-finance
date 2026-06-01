@@ -9,6 +9,7 @@ export type CachedTransaction = {
   payee: string;
   notes: string;
   categoryName: string;
+  accountName: string;
   amount: string;
   categoryId: string | null;
   accountId: string;
@@ -65,6 +66,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           ignored: transactions.ignored,
           source: transactions.source,
           categoryName: categories.name,
+          accountName: accounts.name,
         })
         .from(transactions)
         .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -92,6 +94,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           const payee = row.payee ? await decryptField(row.payee, dek) : '';
           const notes = row.notes ? await decryptField(row.notes, dek) : '';
           const categoryName = row.categoryName ? await decryptField(row.categoryName, dek) : '';
+          const accountName = row.accountName ? await decryptField(row.accountName, dek) : '';
           const amount = row.amount ? await decryptField(row.amount, dek) : '0';
 
           userCache.set(row.id, {
@@ -99,6 +102,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
             payee: String(payee).toLowerCase(),
             notes: String(notes).toLowerCase(),
             categoryName: String(categoryName).toLowerCase(),
+            accountName: String(accountName).toLowerCase(),
             amount: String(amount),
             categoryId: row.categoryId,
             accountId: row.accountId,
@@ -156,7 +160,8 @@ export async function getSearchMatchingTransactionIds(
       tx.description.includes(q) ||
       tx.payee.includes(q) ||
       tx.notes.includes(q) ||
-      tx.categoryName.includes(q)
+      tx.categoryName.includes(q) ||
+      tx.accountName.includes(q)
     ) {
       matchingIds.add(id);
     }

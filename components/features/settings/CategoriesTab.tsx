@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type CategoryType = 'standard' | 'compound' | 'transfer';
@@ -33,6 +33,7 @@ export default function CategoriesTab() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [cloning, setCloning] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -214,6 +215,8 @@ export default function CategoriesTab() {
 
   const openAdd = () => {
     setIsAdding(true);
+    setEditing(null);
+    setCloning(null);
     setFormName('');
     setFormParentId(null);
     setFormColor('#6366f1');
@@ -224,12 +227,26 @@ export default function CategoriesTab() {
 
   const openEdit = (cat: Category) => {
     setEditing(cat);
+    setCloning(null);
+    setIsAdding(false);
     setFormName(cat.name);
     setFormParentId(cat.parentId);
     setFormColor(cat.color);
     setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder);
+  };
+
+  const openClone = (cat: Category) => {
+    setCloning(cat);
+    setEditing(null);
+    setIsAdding(false);
+    setFormName(`${cat.name} (Copy)`);
+    setFormParentId(cat.parentId);
+    setFormColor(cat.color);
+    setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
+    setFormExpenseParentId(cat.expenseParentId);
+    setFormOrder(cat.displayOrder + 1);
   };
 
   const handleSave = async () => {
@@ -269,6 +286,7 @@ export default function CategoriesTab() {
 
       setIsAdding(false);
       setEditing(null);
+      setCloning(null);
       await fetchCategories();
     } finally {
       setSaving(false);
@@ -485,10 +503,13 @@ export default function CategoriesTab() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); openClone(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -537,10 +558,13 @@ export default function CategoriesTab() {
                              )}
                            </div>
                            <div className="flex items-center gap-1 flex-shrink-0">
-                             <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                             <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
                                <Pencil className="h-3 w-3" />
                              </button>
-                             <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+                             <button onClick={(e) => { e.stopPropagation(); openClone(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
+                               <Copy className="h-3 w-3" />
+                             </button>
+                             <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
                                <Trash2 className="h-3 w-3" />
                              </button>
                            </div>
@@ -565,12 +589,12 @@ export default function CategoriesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {(isAdding || editing !== null) && (
+      {(isAdding || editing !== null || cloning !== null) && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setIsAdding(false); setEditing(null); }} />
+          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setIsAdding(false); setEditing(null); setCloning(null); }} />
           <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
             <h3 className="text-lg font-semibold text-foreground mb-6">
-              {editing ? 'Edit Category' : 'Add Category'}
+              {editing ? 'Edit Category' : cloning ? 'Clone Category' : 'Add Category'}
             </h3>
 
             <div className="space-y-4">
@@ -677,7 +701,7 @@ export default function CategoriesTab() {
 
             <div className="flex gap-3 mt-8">
               <button
-                onClick={() => { setIsAdding(false); setEditing(null); }}
+                onClick={() => { setIsAdding(false); setEditing(null); setCloning(null); }}
                 className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
               >
                 Cancel
@@ -687,7 +711,7 @@ export default function CategoriesTab() {
                 disabled={saving || !formName.trim()}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
-                {saving ? 'Saving...' : editing ? 'Update' : 'Create'}
+                {saving ? 'Saving...' : editing ? 'Update' : cloning ? 'Clone' : 'Create'}
               </button>
             </div>
           </div>
