@@ -25,6 +25,10 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   const [categories, setCategories] = useState<Category[]>([]);
   const [categorySearch, setCategorySearch] = useState('');
   const categoryRef = useRef<HTMLDivElement>(null);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [tags, setTags] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [tagSearch, setTagSearch] = useState('');
+  const tagRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -41,10 +45,23 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   }, [categoryDropdownOpen]);
 
   useEffect(() => {
+    if (tagDropdownOpen) {
+      fetch('/api/tags', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => setTags(Array.isArray(data) ? data : []))
+        .catch(() => setTags([]));
+    }
+  }, [tagDropdownOpen]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
         setCategoryDropdownOpen(false);
         setCategorySearch('');
+      }
+      if (tagRef.current && !tagRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+        setTagSearch('');
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -96,6 +113,15 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
       setCategoryDropdownOpen(false);
       setCategorySearch('');
       await handleBulkPatch({ categoryId });
+    },
+    [handleBulkPatch]
+  );
+
+  const handleSetTags = useCallback(
+    async (tagIds: string[]) => {
+      setTagDropdownOpen(false);
+      setTagSearch('');
+      await handleBulkPatch({ tagIds });
     },
     [handleBulkPatch]
   );
@@ -254,6 +280,49 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="relative" ref={tagRef}>
+        <button
+          onClick={() => setTagDropdownOpen(!tagDropdownOpen)}
+          disabled={actionLoading !== null}
+          className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+        >
+          Set Tag
+        </button>
+        {tagDropdownOpen && (
+          <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-lg z-50 max-h-72 flex flex-col">
+            <div className="p-2 border-b border-border">
+              <input
+                type="text"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                placeholder="Search tags..."
+                autoFocus
+                className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 p-1">
+              <button
+                onClick={() => handleSetTags([])}
+                className="w-full text-left px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted rounded cursor-pointer"
+              >
+                None (Clear tags)
+              </button>
+              {tags
+                .filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                .map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleSetTags([tag.id])}
+                    className="w-full text-left flex items-center gap-2 px-2 py-1.5 text-xs text-foreground/80 hover:bg-muted rounded cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#6b7280' }} />
+                    {tag.name}
+                  </button>
+                ))}
             </div>
           </div>
         )}
