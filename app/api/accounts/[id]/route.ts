@@ -102,6 +102,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.type !== undefined) updateData.type = body.type;
   if (body.balance !== undefined) updateData.balance = String(body.balance);
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
+  if (body.connectionId !== undefined) updateData.connectionId = body.connectionId;
 
   if (Object.keys(updateData).length === 0) {
     logger.warn('No valid fields to update for account', { accountId: id });

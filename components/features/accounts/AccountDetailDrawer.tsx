@@ -97,9 +97,67 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [isHidden, setIsHidden] = useState(account?.isHidden ?? false);
   const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account?.isExcludedFromNetWorth ?? false);
   const [saving, setSaving] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const [mortgageMeta, setMortgageMeta] = useState<Record<string, string>>({});
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
 
+  const handleUnlink = useCallback(async () => {
+    if (!account) return;
+    if (
+      !confirm(
+        `Are you sure you want to unlink "${account.name}" from bank sync? It will become a manual/orphaned account, allowing you to re-map it to another synced account or delete it permanently.`
+      )
+    ) {
+      return;
+    }
+    setUnlinking(true);
+    try {
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ connectionId: null }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to unlink account');
+      }
+      onSuccess();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setUnlinking(false);
+    }
+  }, [account, onSuccess]);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (!account) return;
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete "${account.name}"? All transaction history and balance snapshots will be lost forever.`
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/manual-accounts/${account.id}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Confirm-Delete': 'true',
+        },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete account');
+      }
+      onSuccess();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setDeleting(false);
+    }
+  }, [account, onSuccess]);
   useEffect(() => {
     if (!account || !open) return;
     setName(account.name);
@@ -357,6 +415,40 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                 </p>
               </div>
             </div>
+
+            {account.connectionId && (
+              <div className="pt-4 border-t border-border space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Unlink Sync Connection</h4>
+                <p className="text-[11px] text-muted-foreground leading-normal">
+                  Disconnect this account from the SimpleFIN bank sync. It will become a manual account. This allows you to permanently delete it, or re-map it to another active bank sync account to preserve history.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleUnlink}
+                  disabled={unlinking}
+                  className="w-full px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {unlinking ? 'Unlinking...' : 'Unlink from Bank Sync'}
+                </button>
+              </div>
+            )}
+
+            {!account.connectionId && (
+              <div className="pt-4 border-t border-border space-y-2">
+                <h4 className="text-sm font-semibold text-destructive">Delete Account</h4>
+                <p className="text-[11px] text-muted-foreground leading-normal">
+                  Permanently delete this account and all associated transactions and snapshots. This action cannot be undone.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="w-full px-4 py-2 text-xs font-semibold text-white bg-destructive hover:bg-destructive/90 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Save button */}
