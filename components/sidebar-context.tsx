@@ -168,7 +168,9 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       const next = !prev;
       setCookie('hideAccountsSidebarByDefault', next ? 'true' : 'false');
       if (userSettings) {
-        userSettings.updateSetting('hideAccountsSidebarByDefault', next);
+        setTimeout(() => {
+          userSettings.updateSetting('hideAccountsSidebarByDefault', next);
+        }, 0);
       }
       return next;
     });

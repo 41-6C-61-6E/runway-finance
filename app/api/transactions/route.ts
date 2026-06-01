@@ -809,6 +809,7 @@ export async function PATCH(request: Request) {
   const { ids, patch, selectAllMatching, ...filterFields } = parsed.data;
   const patchedFields: string[] = [];
   if (patch.categoryId !== undefined) patchedFields.push("categoryId");
+  if (patch.tagIds !== undefined) patchedFields.push("tagIds");
   if (patch.reviewed !== undefined) patchedFields.push("reviewed");
   if (patch.ignored !== undefined) patchedFields.push("ignored");
   logger.info("Patching transactions", {
@@ -1022,6 +1023,29 @@ export async function PATCH(request: Request) {
         and(eq(transactions.userId, userId), inArray(transactions.id, ids!)),
       )
       .returning();
+  }
+
+  if (patch.tagIds !== undefined && updated && updated.length > 0) {
+    const updatedIds = updated.map((tx) => tx.id);
+    await getDb().transaction(async (tx) => {
+      // Delete existing tags for these transactions
+      await tx
+        .delete(transactionTags)
+        .where(inArray(transactionTags.transactionId, updatedIds));
+
+      // Insert new tags
+      if (patch.tagIds && patch.tagIds.length > 0) {
+        const insertValues = updatedIds.flatMap((txId) =>
+          patch.tagIds!.map((tagId) => ({
+            transactionId: txId,
+            tagId,
+          }))
+        );
+        await tx
+          .insert(transactionTags)
+          .values(insertValues);
+      }
+    });
   }
 
   invalidateUserSearchCache(userId);
