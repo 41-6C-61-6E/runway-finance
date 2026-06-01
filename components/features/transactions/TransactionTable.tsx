@@ -523,66 +523,7 @@ export default function TransactionTable({
     ],
   );
 
-  const handleCreateRule = useCallback(async () => {
-    if (!proposedRule) return;
-    await fetch("/api/category-rules", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        name: `Auto-rule: ${proposedRule.payee}`,
-        conditionField: "payee",
-        conditionOperator: "contains",
-        conditionValue: proposedRule.payee,
-        setCategoryId: proposedRule.categoryId,
-      }),
-    });
-    setProposedRule(null);
-  }, [proposedRule]);
 
-  const handleCreateAndRunRule = useCallback(async () => {
-    if (!proposedRule) return;
-    setCreatingAndRunningRule(true);
-    try {
-      // Create the rule
-      const createRes = await fetch("/api/category-rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: `Auto-rule: ${proposedRule.payee}`,
-          conditionField: "payee",
-          conditionOperator: "contains",
-          conditionValue: proposedRule.payee,
-          setCategoryId: proposedRule.categoryId,
-        }),
-      });
-
-      if (!createRes.ok) {
-        throw new Error("Failed to create rule");
-      }
-
-      const rule = await createRes.json();
-
-      // Apply the rule to all transactions
-      const applyRes = await fetch(`/api/category-rules/${rule.id}/apply`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!applyRes.ok) {
-        throw new Error("Failed to apply rule");
-      }
-
-      // Refresh the transactions table
-      setPage(0);
-      setProposedRule(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCreatingAndRunningRule(false);
-    }
-  }, [proposedRule]);
 
 
   const fetchTransactions = useCallback(async () => {
@@ -677,6 +618,71 @@ export default function TransactionTable({
       }
     }
   }, [filters, page, sorting]);
+
+  const handleCreateRule = useCallback(async () => {
+    if (!proposedRule) return;
+    await fetch("/api/category-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        name: `Auto-rule: ${proposedRule.payee}`,
+        conditionField: "payee",
+        conditionOperator: "contains",
+        conditionValue: proposedRule.payee,
+        setCategoryId: proposedRule.categoryId,
+      }),
+    });
+    setProposedRule(null);
+  }, [proposedRule]);
+
+  const handleCreateAndRunRule = useCallback(async () => {
+    if (!proposedRule) return;
+    setCreatingAndRunningRule(true);
+    try {
+      // Create the rule
+      const createRes = await fetch("/api/category-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: `Auto-rule: ${proposedRule.payee}`,
+          conditionField: "payee",
+          conditionOperator: "contains",
+          conditionValue: proposedRule.payee,
+          setCategoryId: proposedRule.categoryId,
+        }),
+      });
+
+      if (!createRes.ok) {
+        throw new Error("Failed to create rule");
+      }
+
+      const rule = await createRes.json();
+
+      // Apply the rule to all transactions
+      const applyRes = await fetch(`/api/category-rules/${rule.id}/apply`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!applyRes.ok) {
+        throw new Error("Failed to apply rule");
+      }
+
+      // Refresh the transactions table
+      if (page !== 0) {
+        setPage(0);
+      } else {
+        await fetchTransactions();
+      }
+      setProposedRule(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingAndRunningRule(false);
+    }
+  }, [proposedRule, page, fetchTransactions]);
 
   useEffect(() => {
     fetchTransactions();

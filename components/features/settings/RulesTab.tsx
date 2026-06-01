@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
 
@@ -97,6 +98,161 @@ export default function RulesTab() {
   const [systemToggling, setSystemToggling] = useState(false);
   const [aiToggling, setAiToggling] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkEditingOpen, setBulkEditingOpen] = useState(false);
+  const [bulkDeletingIds, setBulkDeletingIds] = useState<string[] | null>(null);
+  
+  const [bulkUpdateFields, setBulkUpdateFields] = useState({
+    isActive: false,
+    setCategoryId: false,
+    setTagId: false,
+    setPayee: false,
+    setReviewed: false,
+    overrideExisting: false,
+  });
+
+  const [bulkFormIsActive, setBulkFormIsActive] = useState(true);
+  const [bulkFormCategoryId, setBulkFormCategoryId] = useState<string | null>(null);
+  const [bulkFormTagId, setBulkFormTagId] = useState<string | null>(null);
+  const [bulkFormSetPayee, setBulkFormSetPayee] = useState('');
+  const [bulkFormSetReviewed, setBulkFormSetReviewed] = useState<boolean | null>(null);
+  const [bulkFormOverrideExisting, setBulkFormOverrideExisting] = useState(false);
+
+  useEffect(() => {
+    setSelectedRuleIds([]);
+  }, [activeSubTab, searchQuery]);
+
+  const openBulkEditDialog = () => {
+    setBulkUpdateFields({
+      isActive: false,
+      setCategoryId: false,
+      setTagId: false,
+      setPayee: false,
+      setReviewed: false,
+      overrideExisting: false,
+    });
+    setBulkFormIsActive(true);
+    setBulkFormCategoryId(null);
+    setBulkFormTagId(null);
+    setBulkFormSetPayee('');
+    setBulkFormSetReviewed(null);
+    setBulkFormOverrideExisting(false);
+    setBulkEditingOpen(true);
+  };
+
+  const handleBulkRun = async (ids: string[]) => {
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/category-rules/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ids, action: 'run' }),
+      });
+      if (!res.ok) throw new Error('Failed to run rules');
+      const data = await res.json();
+      showFeedback('success', `Rules applied: ${data.matched} transactions matched.`);
+      setSelectedRuleIds([]);
+      await fetchRules();
+    } catch (error) {
+      console.error('Error running bulk rules:', error);
+      showFeedback('error', 'Failed to run selected rules.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkToggleActive = async (ids: string[], active: boolean) => {
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/category-rules/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ids,
+          action: 'update',
+          updates: { isActive: active }
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to update rules');
+      showFeedback('success', `Successfully ${active ? 'enabled' : 'disabled'} ${ids.length} rules.`);
+      setSelectedRuleIds([]);
+      await fetchRules();
+    } catch (error) {
+      console.error('Error toggling rules:', error);
+      showFeedback('error', 'Failed to update selected rules.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeletingIds) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/category-rules/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ids: bulkDeletingIds,
+          action: 'delete'
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to delete rules');
+      showFeedback('success', `Successfully deleted ${bulkDeletingIds.length} rules.`);
+      setSelectedRuleIds([]);
+      setBulkDeletingIds(null);
+      await fetchRules();
+    } catch (error) {
+      console.error('Error deleting rules:', error);
+      showFeedback('error', 'Failed to delete selected rules.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    const updates: any = {};
+    if (bulkUpdateFields.isActive) updates.isActive = bulkFormIsActive;
+    if (bulkUpdateFields.setCategoryId) updates.setCategoryId = bulkFormCategoryId;
+    if (bulkUpdateFields.setTagId) updates.setTagId = bulkFormTagId;
+    if (bulkUpdateFields.setPayee) updates.setPayee = bulkFormSetPayee.trim() || null;
+    if (bulkUpdateFields.setReviewed) updates.setReviewed = bulkFormSetReviewed;
+    if (bulkUpdateFields.overrideExisting) updates.overrideExisting = bulkFormOverrideExisting;
+
+    if (Object.keys(updates).length === 0) {
+      showFeedback('error', 'Please select at least one field to update.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/category-rules/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ids: selectedRuleIds,
+          action: 'update',
+          updates
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to bulk update rules');
+      showFeedback('success', `Successfully updated ${selectedRuleIds.length} rules.`);
+      setBulkEditingOpen(false);
+      setSelectedRuleIds([]);
+      await fetchRules();
+    } catch (error) {
+      console.error('Error bulk updating rules:', error);
+      showFeedback('error', 'Failed to bulk update rules.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const getCategoryName = useCallback((id: string | null) => {
     if (!id) return null;
@@ -614,16 +770,112 @@ export default function RulesTab() {
         </div>
       )}
 
+      {filteredRules.length > 0 && (
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={filteredRules.length > 0 && filteredRules.every((r) => selectedRuleIds.includes(r.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  const newSelection = Array.from(new Set([...selectedRuleIds, ...filteredRules.map((r) => r.id)]));
+                  setSelectedRuleIds(newSelection);
+                } else {
+                  const filteredIds = filteredRules.map((r) => r.id);
+                  setSelectedRuleIds(selectedRuleIds.filter((id) => !filteredIds.includes(id)));
+                }
+              }}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
+              id="select-all-rules"
+            />
+            <label htmlFor="select-all-rules" className="text-xs text-muted-foreground cursor-pointer select-none font-medium">
+              Select All on page ({filteredRules.length})
+            </label>
+          </div>
+          {selectedRuleIds.length > 0 && (
+            <button
+              onClick={() => setSelectedRuleIds([])}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
+      )}
+
+      {selectedRuleIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-lg mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
+          <span className="text-xs font-semibold text-primary">{selectedRuleIds.length} rules selected</span>
+          <div className="h-4 w-px bg-border/60 mx-1" />
+          
+          <button
+            onClick={() => handleBulkRun(selectedRuleIds)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Play className="h-3 w-3" /> Run Selected
+          </button>
+          
+          <button
+            onClick={() => openBulkEditDialog()}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Pencil className="h-3 w-3" /> Bulk Edit
+          </button>
+
+          <button
+            onClick={() => handleBulkToggleActive(selectedRuleIds, true)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+          >
+            Enable
+          </button>
+
+          <button
+            onClick={() => handleBulkToggleActive(selectedRuleIds, false)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+          >
+            Disable
+          </button>
+
+          <button
+            onClick={() => setBulkDeletingIds(selectedRuleIds)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="h-3 w-3" /> Delete
+          </button>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {filteredRules.map((rule, idx) => {
           const cat = rule.setCategoryId ? getCategoryName(rule.setCategoryId) : null;
+          const isSelected = selectedRuleIds.includes(rule.id);
           return (
             <div
               key={rule.id}
-              className={`p-4 bg-card border border-border rounded-lg transition-colors group ${
+              className={`p-4 bg-card border border-border rounded-lg transition-colors group flex items-start gap-3 ${
                 !rule.isActive ? 'opacity-50' : ''
-              }`}
+              } ${isSelected ? 'border-primary/40 bg-primary/5' : ''}`}
             >
+              <div className="pt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedRuleIds([...selectedRuleIds, rule.id]);
+                    } else {
+                      setSelectedRuleIds(selectedRuleIds.filter((id) => id !== rule.id));
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-mono text-muted-foreground shrink-0">#{rule.priority}</span>
@@ -693,6 +945,7 @@ export default function RulesTab() {
                     onCheckedChange={() => handleToggleActive(rule)}
                   />
                 </div>
+              </div>
               </div>
             </div>
           );
@@ -951,6 +1204,225 @@ export default function RulesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={!!bulkDeletingIds} onOpenChange={(open) => !open && setBulkDeletingIds(null)}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Rules</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the <strong>{bulkDeletingIds?.length}</strong> selected rules? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {bulkLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Edit Dialog */}
+      <Dialog open={bulkEditingOpen} onOpenChange={setBulkEditingOpen}>
+        <DialogContent className="max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Bulk Edit Rules</DialogTitle>
+            <DialogDescription>
+              Select the fields you want to update for the {selectedRuleIds.length} selected rules.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 my-2">
+            {/* Active Status */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.isActive}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, isActive: e.target.checked })}
+                  id="bulk-update-active"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-active" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Active Status
+                </label>
+              </div>
+              {bulkUpdateFields.isActive && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                  <span className="text-xs text-muted-foreground">Status</span>
+                  <Switch
+                    checked={bulkFormIsActive}
+                    onCheckedChange={setBulkFormIsActive}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Set Category */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.setCategoryId}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setCategoryId: e.target.checked })}
+                  id="bulk-update-category"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-category" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Category Action
+                </label>
+              </div>
+              {bulkUpdateFields.setCategoryId && (
+                <div className="mt-2 pt-2 border-t border-border/40">
+                  <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
+                  <select
+                    value={bulkFormCategoryId || ''}
+                    onChange={(e) => setBulkFormCategoryId(e.target.value || null)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Don&apos;t set category (Clear category)</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.parentId ? '  ' : ''}{cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Set Tag */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.setTagId}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setTagId: e.target.checked })}
+                  id="bulk-update-tag"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-tag" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Tag Action
+                </label>
+              </div>
+              {bulkUpdateFields.setTagId && (
+                <div className="mt-2 pt-2 border-t border-border/40">
+                  <label className="block text-[11px] text-muted-foreground mb-1">Tag</label>
+                  <select
+                    value={bulkFormTagId || ''}
+                    onChange={(e) => setBulkFormTagId(e.target.value || null)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Don&apos;t set a tag (Clear tag)</option>
+                    {tags.map((tag) => (
+                      <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Set Payee */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.setPayee}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setPayee: e.target.checked })}
+                  id="bulk-update-payee"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-payee" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Payee Overwrite Action
+                </label>
+              </div>
+              {bulkUpdateFields.setPayee && (
+                <div className="mt-2 pt-2 border-t border-border/40">
+                  <label className="block text-[11px] text-muted-foreground mb-1">Payee Name</label>
+                  <input
+                    value={bulkFormSetPayee}
+                    onChange={(e) => setBulkFormSetPayee(e.target.value)}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Clear payee or set new payee"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Set Reviewed */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.setReviewed}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setReviewed: e.target.checked })}
+                  id="bulk-update-reviewed"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-reviewed" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Reviewed Action
+                </label>
+              </div>
+              {bulkUpdateFields.setReviewed && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                  <span className="text-xs text-muted-foreground">Mark as Reviewed</span>
+                  <Switch
+                    checked={bulkFormSetReviewed === true}
+                    onCheckedChange={(checked) => setBulkFormSetReviewed(checked ? true : null)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Override Existing */}
+            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateFields.overrideExisting}
+                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, overrideExisting: e.target.checked })}
+                  id="bulk-update-override"
+                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
+                />
+                <label htmlFor="bulk-update-override" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
+                  Update Override Existing Option
+                </label>
+              </div>
+              {bulkUpdateFields.overrideExisting && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                  <span className="text-xs text-muted-foreground">Override Existing Category</span>
+                  <Switch
+                    checked={bulkFormOverrideExisting}
+                    onCheckedChange={setBulkFormOverrideExisting}
+                  />
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <DialogFooter className="gap-2 mt-4">
+            <button
+              onClick={() => setBulkEditingOpen(false)}
+              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkUpdate}
+              disabled={saving || !Object.values(bulkUpdateFields).some(Boolean)}
+              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Updating...' : 'Apply Changes'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
