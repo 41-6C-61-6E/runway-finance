@@ -171,7 +171,7 @@ export function CashFlowForecast() {
           title="Cash Flow Forecast"
         />
         {!isCollapsed && (
-          <div className="p-5">
+          <div className="p-3 sm:p-5">
             <ChartEmptyState variant="error" error={error} />
           </div>
         )}
@@ -188,7 +188,7 @@ export function CashFlowForecast() {
           title="Cash Flow Forecast"
         />
         {!isCollapsed && (
-          <div className="p-5">
+          <div className="p-3 sm:p-5">
             <ChartEmptyState variant="nodata" description="No banking accounts available. Add accounts or link budgets to see projections." />
           </div>
         )}
@@ -365,7 +365,7 @@ export function CashFlowForecast() {
 
           {/* Chart View */}
           {viewMode === 'chart' && chartData.length > 0 && (
-            <div className="p-5 h-[300px]">
+            <div className="p-3 sm:p-5 h-[300px]">
               <ForecastChart data={chartData} showProjections={showCashFlowProjections} />
             </div>
           )}

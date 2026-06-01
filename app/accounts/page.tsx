@@ -287,7 +287,7 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
   const txs = txData?.data || [];
 
   return (
-    <div className="py-4 px-4 sm:px-6 bg-muted/10 border-t border-border/40 transition-all duration-300">
+    <div className="py-4 px-2 sm:px-6 bg-muted/10 border-t border-border/40 transition-all duration-300">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         {/* Left Side: Balance History Mini-Chart */}
         <div className="md:col-span-3 flex flex-col space-y-3">
@@ -514,7 +514,7 @@ export default function AccountsPage() {
   const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedGroups', new Set(), setOptions);
   const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTypes', new Set(), setOptions);
   const [hierarchySelectedAccounts, setHierarchySelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedAccounts', new Set(), setOptions);
-  const [hierarchyShowHidden, setHierarchyShowHidden] = usePersistentState<boolean>('runway:accounts:hierarchyShowHidden', false);
+  const hierarchyShowHidden = false;
 
   // ── Presets / Quick Views State & Handlers ──
   const [customPresets, setCustomPresets] = usePersistentState<ChartPreset[]>('runway:accounts:customPresets', []);
@@ -652,9 +652,13 @@ export default function AccountsPage() {
     enabled: !!session?.user,
   });
 
-  // Filter allAccounts to respect synthetic/estimated data toggles
+  // Filter allAccounts to respect synthetic/estimated data toggles and exclude accounts
   const filteredAllAccounts = useMemo(() => {
     return allAccounts.filter(acc => {
+      // 0. Filter out excluded accounts
+      if (acc.isExcludedFromNetWorth) {
+        return false;
+      }
       // 1. If net worth synthetic estimates are disabled, hide manual/unsynced accounts
       if (!isNetWorthEnabled && !acc.connectionId) {
         return false;
@@ -1303,7 +1307,7 @@ export default function AccountsPage() {
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
       <PageHeader title="Accounts" icon={Landmark} />
 
-      <div className="max-w-6xl mx-auto px-6 mt-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-2 sm:px-6 mt-6 space-y-6">
         <>
 
             {/* ── Graphics / Chart Card ── */}
@@ -1733,7 +1737,7 @@ export default function AccountsPage() {
                       </div>
                     </div>
                   </CollapsibleFilterPanel>
-                  <CardContent className="p-5">
+                  <CardContent className="p-2 sm:p-5">
                     <div className="h-[380px] w-full relative">
                       {historyLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-card/20 backdrop-blur-[1px]">
@@ -2025,7 +2029,7 @@ export default function AccountsPage() {
                 }
               />
               {!hierarchyCollapsed && (
-                <CardContent className="p-5">
+                <CardContent className="p-2 sm:p-5">
                 {accountsLoading ? (
                   <div className="space-y-4">
                     <Skeleton className="h-12 w-full" />
@@ -2061,19 +2065,7 @@ export default function AccountsPage() {
                       }
                       className="mb-4 border border-border/40 rounded-xl bg-muted/5"
                     >
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        {/* Left side: Show Hidden Accounts Toggle */}
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id="hierarchy-show-hidden"
-                            checked={hierarchyShowHidden}
-                            onCheckedChange={setHierarchyShowHidden}
-                          />
-                          <label htmlFor="hierarchy-show-hidden" className="text-xs font-medium text-muted-foreground cursor-pointer select-none">
-                            Show Hidden Accounts
-                          </label>
-                        </div>
-
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4">
                         {/* Right side: Dropdown Filters */}
                         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
                           {/* Group Dropdown */}
@@ -2338,7 +2330,7 @@ export default function AccountsPage() {
                           {/* ── Group Header Row ── */}
                           <div 
                             onClick={() => setExpandedGroups(prev => ({ ...prev, [group]: !isGroupExpanded }))}
-                            className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
+                            className="w-full flex items-center justify-between px-2.5 sm:px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
                           >
                             <div className="flex items-center min-w-0 flex-1">
                               <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
@@ -2392,7 +2384,7 @@ export default function AccountsPage() {
                                       {/* Subgroup Header */}
                                       <div
                                         onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
-                                        className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
                                       >
                                         <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
                                           <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
@@ -2437,7 +2429,7 @@ export default function AccountsPage() {
                                           <Fragment key={acc.id}>
                                             <div 
                                               onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                              className={`w-full flex items-center justify-between px-4 py-2 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                              className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 hover:bg-muted/10 transition-all cursor-pointer select-none ${
                                                 acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                               }`}
                                             >
@@ -2507,7 +2499,7 @@ export default function AccountsPage() {
                                   <Fragment key={acc.id}>
                                     <div 
                                       onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                      className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                      className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 hover:bg-muted/10 transition-all cursor-pointer select-none ${
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
                                     >

@@ -89,17 +89,17 @@ export function BudgetTable() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-2 flex items-center justify-between">
+        <div className="p-3 sm:p-5 pb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
         </div>
-        <div className="p-5 text-muted-foreground text-sm">Loading...</div>
+        <div className="p-3 sm:p-5 text-muted-foreground text-sm">Loading...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
+      <div className="bg-card border border-border rounded-xl shadow-sm p-3 sm:p-5">
         <h3 className="text-sm font-semibold text-foreground mb-3">Budget Items</h3>
         <ChartEmptyState variant="error" error={error} />
       </div>
@@ -112,7 +112,7 @@ export function BudgetTable() {
   return (
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-5 pb-3 flex items-center justify-between">
+        <div className="p-3 sm:p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
           <button
             onClick={() => { setEditBudget(null); setShowForm(true); }}
