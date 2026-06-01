@@ -473,7 +473,7 @@ const SankeyCustomNode = ({
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
   const rawLabel = payload.label ?? payload.name ?? '';
-  const isMobileSize = isMobile || (typeof window !== 'undefined' && window.innerWidth < 768);
+  const isMobileSize = isMobile;
   const maxLabelLen = isMobileSize ? 8 : 22;
   let label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
 

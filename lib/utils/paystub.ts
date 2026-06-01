@@ -61,3 +61,71 @@ export function getFrequencyDays(frequency: string): number {
       return 14;
   }
 }
+
+/**
+ * Normalize raw paycheck input formats.
+ */
+export function normalizeBackendInput(input: any): any[] {
+  if (!input) return [];
+
+  // Case 1: input is an array
+  if (Array.isArray(input)) {
+    // If the first element is the paycheck container, normalize it
+    if (input.length === 1 && input[0]?.paychecks && Array.isArray(input[0].paychecks)) {
+      return normalizeSinglePaycheckContainer(input[0]);
+    }
+    // Otherwise, assume it's already an array of paystubs
+    return input;
+  }
+
+  // Case 2: input is the paycheck container object directly
+  if (input.paychecks && Array.isArray(input.paychecks)) {
+    return normalizeSinglePaycheckContainer(input);
+  }
+
+  return [];
+}
+
+function normalizeSinglePaycheckContainer(json: any): any[] {
+  const employeeName = json.employee?.name || null;
+  return json.paychecks.map((paycheck: any) => {
+    let payPeriodStart = paycheck.checkDate || '';
+    let payPeriodEnd = paycheck.checkDate || '';
+    if (paycheck.earnings && paycheck.earnings.length > 0) {
+      const firstEarning = paycheck.earnings[0];
+      payPeriodStart = firstEarning.beginDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
+      payPeriodEnd = firstEarning.endDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
+    }
+
+    const grossCurrent = paycheck.totals?.earningsAmount ?? 0;
+    const taxesCurrent = paycheck.totals?.taxesAmount ?? 0;
+    const deductionsCurrent = paycheck.totals?.deductionsAmount ?? 0;
+    const netCurrent = Number(grossCurrent) - Number(taxesCurrent) - Number(deductionsCurrent);
+
+    return {
+      employeeName,
+      payPeriodStart,
+      payPeriodEnd,
+      checkDate: paycheck.checkDate,
+      adviceNumber: paycheck.checkNumber,
+      grossCurrent: String(grossCurrent),
+      taxesCurrent: String(taxesCurrent),
+      deductionsCurrent: String(deductionsCurrent),
+      netCurrent: String(netCurrent),
+      hoursAndEarnings: (paycheck.earnings || []).map((e: any) => ({
+        description: e.description,
+        hours: e.hours,
+        amount: e.amount,
+      })),
+      taxes: (paycheck.taxes || []).map((t: any) => ({
+        description: t.description,
+        amount: t.amount,
+      })),
+      beforeTaxDeductions: (paycheck.deductions || []).map((d: any) => ({
+        description: d.description,
+        amount: d.amount,
+      })),
+      afterTaxDeductions: [],
+    };
+  });
+}
