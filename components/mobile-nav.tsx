@@ -22,14 +22,14 @@ import {
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
 const mainNavItems = [
+  { href: '/', label: 'Net Worth', icon: ChartSpline },
   { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/transactions', label: 'Transactions', icon: Receipt },
   { href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp },
-  { href: '/spending', label: 'Spending', icon: DollarSign },
 ];
 
 const drawerItems = [
-  { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
+  { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },

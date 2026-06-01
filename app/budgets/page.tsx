@@ -20,7 +20,7 @@ function BudgetsContent() {
       <PageHeader title="Budgets" icon={Wallet}>
         <BudgetPeriodSelector />
       </PageHeader>
-      <div className="px-4 sm:px-6 lg:px-8 py-6">
+      <div className="px-2 sm:px-6 lg:px-8 py-6">
         <div className="mx-auto max-w-[1600px]">
 
           {isVisible('budgetSummary') && (

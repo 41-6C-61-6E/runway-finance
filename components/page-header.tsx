@@ -22,7 +22,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       style={{ 
         '--sidebar-width': `${sidebarWidth}px`
       } as React.CSSProperties}
-      className={`border-b border-border/40 sticky top-0 z-40 pr-6 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-200 pl-4 md:pl-[var(--sidebar-width)] ${
+      className={`border-b border-border/40 sticky top-0 z-40 px-4 md:pr-6 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-200 md:pl-[var(--sidebar-width)] ${
         reduceTransparency 
           ? 'bg-card' 
           : 'bg-card/10 backdrop-blur-md'

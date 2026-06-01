@@ -225,7 +225,7 @@ export function NetWorthChart() {
               <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
             </div>
           </CollapsibleFilterPanel>
-          <div className="p-5 space-y-4">
+          <div className="p-2.5 sm:p-5 space-y-4">
             <div className="h-[240px] w-full relative">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>

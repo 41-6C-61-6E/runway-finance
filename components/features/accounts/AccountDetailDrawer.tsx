@@ -353,7 +353,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-normal">
-                  Keeps the account visible on your dashboard hierarchy list (with an "Excluded" badge) but omits its balance from Net Worth charts, calculations, transactions, and goals.
+                  Removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible in the automatic accounts settings tab to allow configuration/re-inclusion.
                 </p>
               </div>
             </div>

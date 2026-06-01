@@ -499,7 +499,7 @@ function SettingsPageBody() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Settings" icon={Settings} />
-      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-6">
+      <div className="relative z-10 flex flex-col items-center px-2 sm:px-6 lg:px-8 py-6">
         <div className="max-w-6xl w-full">
 
           {/* Setup Checklist */}
@@ -1188,7 +1188,7 @@ function SettingsPageBody() {
               <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
-                <strong> Exclude</strong> keeps the account visible on your dashboard hierarchy list with an &quot;Excluded&quot; badge, but removes it from net worth charts, total calculations, transactions, and forecasts.
+                <strong> Exclude</strong> removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible here in the automatic accounts list to allow configuration.
               </p>
 
               <div className="flex items-center gap-2 mb-4">
