@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { transactions } from '@/lib/db/schema';
+import { transactions, transactionTags } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
@@ -39,17 +39,33 @@ export async function POST() {
 
   if (ruleResults.size > 0) {
     for (const [txId, action] of ruleResults) {
-      const updateData: Record<string, unknown> = { updatedAt: new Date() };
-      if (action.categoryId) updateData.categoryId = action.categoryId;
-      if (action.payee) {
-        updateData.payee = await encryptField(action.payee, dek);
+      if (action.shouldUpdateCategory) {
+        const updateData: Record<string, unknown> = { updatedAt: new Date() };
+        if (action.categoryId) updateData.categoryId = action.categoryId;
+        if (action.payee) {
+          updateData.payee = await encryptField(action.payee, dek);
+        }
+        if (action.reviewed !== null) updateData.reviewed = action.reviewed;
+        if (Object.keys(updateData).length > 1) {
+          await getDb()
+            .update(transactions)
+            .set(updateData)
+            .where(eq(transactions.id, txId));
+        }
       }
-      if (action.reviewed !== null) updateData.reviewed = action.reviewed;
-      if (Object.keys(updateData).length > 1) {
-        await getDb()
-          .update(transactions)
-          .set(updateData)
-          .where(eq(transactions.id, txId));
+
+      if (action.shouldUpdateTags) {
+        if (action.overrideExisting) {
+          await getDb()
+            .delete(transactionTags)
+            .where(eq(transactionTags.transactionId, txId));
+        }
+        if (action.setTagId) {
+          await getDb()
+            .insert(transactionTags)
+            .values({ transactionId: txId, tagId: action.setTagId })
+            .onConflictDoNothing();
+        }
       }
     }
   }
