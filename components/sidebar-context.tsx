@@ -64,7 +64,10 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [accountsWidth, setAccountsWidth] = useState(ACCOUNTS_DEFAULT_WIDTH);
   const [accountsCollapsed, setAccountsCollapsed] = useState(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
-    if (getCookie('hideAccountsSidebarByDefault') === 'true') return true;
+    const cookieVal = getCookie('hideAccountsSidebarByDefault');
+    if (cookieVal !== undefined) {
+      return cookieVal === 'true';
+    }
     return true;
   });
   const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false);
@@ -161,8 +164,15 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const toggleAccountsCollapsed = useCallback(() => {
-    setAccountsCollapsed((prev) => !prev);
-  }, []);
+    setAccountsCollapsed((prev) => {
+      const next = !prev;
+      setCookie('hideAccountsSidebarByDefault', next ? 'true' : 'false');
+      if (userSettings) {
+        userSettings.updateSetting('hideAccountsSidebarByDefault', next);
+      }
+      return next;
+    });
+  }, [userSettings]);
 
   return (
     <SidebarContext.Provider
