@@ -15,7 +15,7 @@ import {
   updateCategoryIncomeSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
-import { parseDate } from '@/lib/utils/paystub';
+import { parseDate, normalizeBackendInput } from '@/lib/utils/paystub';
 
 interface RawPaystub {
   employeeName?: string;
@@ -58,6 +58,8 @@ interface RawPaystub {
 
 
 
+
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   const dek = await getSessionDEK();
 
   let body: {
-    paystubs: RawPaystub[];
+    paystubs: any;
     mappingId: string;
     startDate?: string;
     employerName: string;
@@ -80,9 +82,10 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { paystubs: rawPaystubs, mappingId, startDate, employerName } = body;
+  const { paystubs: inputPaystubs, mappingId, startDate, employerName } = body;
+  const rawPaystubs = normalizeBackendInput(inputPaystubs);
 
-  if (!Array.isArray(rawPaystubs) || !mappingId) {
+  if (rawPaystubs.length === 0 || !mappingId) {
     return Response.json(
       { error: 'paystubs array and mappingId are required' },
       { status: 400 }
