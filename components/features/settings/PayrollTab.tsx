@@ -747,6 +747,29 @@ export default function PayrollTab() {
                 </div>
 
                 <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Target Accounts &amp; Duplicate Prevention:</h4>
+                  <div className="p-4 bg-background border border-border rounded-lg space-y-3 text-xs text-muted-foreground leading-relaxed">
+                    <p>
+                      When importing paystubs, you can map transactions to either a real account or a virtual &quot;From Paystub&quot; account to suit your tracking workflow:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                      <div className="space-y-1">
+                        <span className="font-semibold text-foreground">1. Virtual Account (From Paystub) — Recommended</span>
+                        <p>
+                          Maps transactions to a hidden account excluded from Net Worth. This records your gross earnings, taxes, and deduction line items for cash flow/spending charts, <span className="font-medium text-foreground">without double-counting</span> the net paycheck deposit already imported by your bank.
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-semibold text-foreground">2. Real Account (e.g., Checking/Savings)</span>
+                        <p>
+                          Maps transactions directly to a real bank account. Use this if you manually manage your accounts and want paystub transactions to directly update that balance. To avoid double-counting, you will need to <span className="font-medium text-foreground">ignore or exclude the bank's imported net paycheck deposit transaction</span>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Template JSON Preview:</h4>
                     <div className="flex gap-2">
@@ -1166,6 +1189,18 @@ export default function PayrollTab() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="p-3 bg-muted/40 border border-border rounded-lg text-xs space-y-1.5 leading-normal">
+              <p className="font-semibold text-foreground">💡 Target Account &amp; Duplicate Prevention Info:</p>
+              <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                <li>
+                  <strong className="text-foreground">Virtual (From Paystub):</strong> Recommended if you sync your bank feed automatically. Tracks gross income and taxes in charts without duplicating the bank's net paycheck deposit.
+                </li>
+                <li>
+                  <strong className="text-foreground">Real Bank Account:</strong> Select this if you manually track your balance. Make sure to ignore the bank's net paycheck deposit transaction to prevent double-counting.
+                </li>
+              </ul>
             </div>
 
             {/* Add new field */}
