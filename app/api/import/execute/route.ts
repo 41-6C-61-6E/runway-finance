@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 import { logger } from '@/lib/logger';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 type ImportType = 'transactions' | 'account_snapshots';
 
@@ -433,6 +434,10 @@ export async function POST(request: Request) {
       const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
       logger.error(`[import/execute] Error in post-import snapshot/summary updates`, { error: msg });
       warnings.push(`Post-import processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
+    }
+
+    if (transactionsToInsert.length > 0) {
+      invalidateUserSearchCache(userId);
     }
 
     return NextResponse.json({

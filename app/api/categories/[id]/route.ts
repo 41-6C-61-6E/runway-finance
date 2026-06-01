@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
 import { mergeDuplicateCategories } from '@/lib/db/seed-categories';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 function normalizeCategoryName(name: string) {
   return name.trim().toLowerCase();
@@ -142,6 +143,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const decrypted = merged ? await decryptRow('categories', merged, dek) : merged;
     logger.info('PATCH /api/categories/[id] - merged duplicate', { userId, id, mergedInto: duplicateTarget.id, updatedFields: Object.keys(parsed.data) });
+    invalidateUserSearchCache(userId);
     return NextResponse.json(decrypted);
   }
 
@@ -155,6 +157,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const decrypted = updated ? await decryptRow('categories', updated, dek) : updated;
   logger.info('PATCH /api/categories/[id]', { userId, id, updatedFields: Object.keys(parsed.data) });
+  invalidateUserSearchCache(userId);
   return NextResponse.json(decrypted);
 }
 
@@ -180,5 +183,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   await getDb().delete(categories).where(eq(categories.id, id));
 
   logger.info('DELETE /api/categories/[id]', { userId, id, name: existing.name });
+  invalidateUserSearchCache(userId);
   return NextResponse.json({ success: true });
 }

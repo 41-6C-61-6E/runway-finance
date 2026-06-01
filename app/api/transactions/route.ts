@@ -34,6 +34,7 @@ import {
   updateCategoryIncomeSummaries,
   updateMonthlyCashFlowSummaries,
 } from "@/lib/services/sync";
+import { getSearchMatchingTransactionIds, invalidateUserSearchCache } from "@/lib/services/search-cache";
 
 const UNCATEGORIZED_CATEGORY_IDS = new Set([
   "uncategorized",
@@ -205,6 +206,26 @@ export async function GET(request: Request) {
     eq(transactions.deleted, false),
   ];
 
+  if (filters.search) {
+    const matchingSearchIds = await getSearchMatchingTransactionIds(userId, dek, filters.search);
+    if (matchingSearchIds.size === 0) {
+      if (filters.idsOnly) {
+        return NextResponse.json({ ids: [] });
+      }
+      if (filters.totalAmountOnly) {
+        return NextResponse.json({ totalAmount: 0 });
+      }
+      return NextResponse.json({
+        data: [],
+        total: 0,
+        totalAmount: 0,
+        limit: filters.limit,
+        offset: filters.offset,
+      });
+    }
+    whereConditions.push(inArray(transactions.id, Array.from(matchingSearchIds)));
+  }
+
   if (!isImportTransactionsEnabled) {
     whereConditions.push(eq(transactions.isImported, false));
   }
@@ -283,7 +304,6 @@ export async function GET(request: Request) {
 
   if (filters.idsOnly) {
     const hasEncryptedFilters = !!(
-      filters.search ||
       filters.minAmount !== undefined ||
       filters.maxAmount !== undefined ||
       filters.type !== undefined
@@ -454,7 +474,6 @@ export async function GET(request: Request) {
   const totalBeforeFilters = totalRow?.count ?? 0;
 
   const hasEncryptedFilters = !!(
-    filters.search ||
     filters.minAmount !== undefined ||
     filters.maxAmount !== undefined ||
     filters.type !== undefined
@@ -613,10 +632,10 @@ export async function GET(request: Request) {
     const q = filters.search.toLowerCase();
     filtered = filtered.filter(
       (t: any) =>
-        (t.description?.toLowerCase().includes(q) ?? false) ||
-        (t.payee?.toLowerCase().includes(q) ?? false) ||
-        (t.notes?.toLowerCase().includes(q) ?? false) ||
-        (t.category?.name?.toLowerCase().includes(q) ?? false),
+        (String(t.description ?? "").toLowerCase().includes(q)) ||
+        (String(t.payee ?? "").toLowerCase().includes(q)) ||
+        (String(t.notes ?? "").toLowerCase().includes(q)) ||
+        (String(t.category?.name ?? "").toLowerCase().includes(q)),
     );
   }
 
@@ -650,16 +669,16 @@ export async function GET(request: Request) {
         bVal = Math.abs(parseFloat(b.amount) || 0);
         break;
       case "description":
-        aVal = (a.description ?? "").toLowerCase();
-        bVal = (b.description ?? "").toLowerCase();
+        aVal = String(a.description ?? "").toLowerCase();
+        bVal = String(b.description ?? "").toLowerCase();
         break;
       case "account":
-        aVal = (a.accountName ?? "").toLowerCase();
-        bVal = (b.accountName ?? "").toLowerCase();
+        aVal = String(a.accountName ?? "").toLowerCase();
+        bVal = String(b.accountName ?? "").toLowerCase();
         break;
       case "category":
-        aVal = (a.category?.name ?? "").toLowerCase();
-        bVal = (b.category?.name ?? "").toLowerCase();
+        aVal = String(a.category?.name ?? "").toLowerCase();
+        bVal = String(b.category?.name ?? "").toLowerCase();
         break;
       case "postedDate":
         aVal = a.postedDate ? new Date(a.postedDate).getTime() : 0;
@@ -994,6 +1013,8 @@ export async function PATCH(request: Request) {
       .returning();
   }
 
+  invalidateUserSearchCache(userId);
+
   Promise.all([
     updateCategorySpendingSummaries(userId, dek),
     updateCategoryIncomeSummaries(userId, dek),
@@ -1248,6 +1269,8 @@ export async function DELETE(request: Request) {
       )
       .returning();
   }
+
+  invalidateUserSearchCache(userId);
 
   Promise.all([
     updateCategorySpendingSummaries(userId, dek),
