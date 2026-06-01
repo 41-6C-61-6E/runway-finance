@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -175,6 +176,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  invalidateUserSearchCache(userId);
+
   // Rebuild summaries since categories/transactions changed (non-blocking background task)
   Promise.all([
     updateCategorySpendingSummaries(userId, dek),
@@ -221,6 +224,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     .set({ deleted: true, updatedAt: new Date() })
     .where(eq(transactions.id, id))
     .returning();
+
+  invalidateUserSearchCache(userId);
 
   // Rebuild summaries since categories/transactions changed (non-blocking background task)
   Promise.all([

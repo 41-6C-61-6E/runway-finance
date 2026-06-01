@@ -1,0 +1,152 @@
+import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { hydrateUserSearchCache, invalidateUserSearchCache, getSearchMatchingTransactionIds, getUserTransactionsFromCache } from '@/lib/services/search-cache';
+import { encryptField } from '@/lib/crypto';
+
+// Mock variables to control query responses
+let mockDbResponse: any[] = [];
+
+class MockDbQueryBuilder {
+  select() { return this; }
+  from() { return this; }
+  leftJoin() { return this; }
+  where() { return this; }
+  async then(onfulfilled?: (value: any) => any) {
+    return Promise.resolve(mockDbResponse).then(onfulfilled);
+  }
+}
+
+vi.mock('@/lib/db', () => {
+  return {
+    getDb: () => new MockDbQueryBuilder(),
+  };
+});
+
+describe('Search Cache Service', () => {
+  let testDek: Uint8Array;
+  const userId = 'user_test_123';
+
+  beforeAll(async () => {
+    process.env.ENCRYPTION_KEY = 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
+    testDek = new Uint8Array(32);
+    crypto.getRandomValues(testDek);
+  });
+
+  beforeEach(() => {
+    invalidateUserSearchCache(userId);
+    mockDbResponse = [];
+  });
+
+  it('hydrates cache and finds matching transaction IDs', async () => {
+    // Encrypt fields as if they were in the DB
+    const desc1 = await encryptField('Starbucks Coffee', testDek);
+    const desc2 = await encryptField('Netflix Subscription', testDek);
+    const payee1 = await encryptField('Starbucks Inc', testDek);
+    const payee2 = await encryptField('Netflix Inc', testDek);
+    const notes1 = await encryptField('morning routine', testDek);
+    const notes2 = await encryptField('monthly entertainment', testDek);
+    const catName1 = await encryptField('Food & Drink', testDek);
+    const catName2 = await encryptField('Entertainment', testDek);
+
+    mockDbResponse = [
+      {
+        id: 'tx_starbucks_1',
+        description: desc1,
+        payee: payee1,
+        notes: notes1,
+        categoryName: catName1,
+      },
+      {
+        id: 'tx_netflix_1',
+        description: desc2,
+        payee: payee2,
+        notes: notes2,
+        categoryName: catName2,
+      },
+    ];
+
+    // Query for "starbucks" - should only return the Starbucks transaction
+    const matchesStarbucks = await getSearchMatchingTransactionIds(userId, testDek, 'starbucks');
+    expect(matchesStarbucks.size).toBe(1);
+    expect(matchesStarbucks.has('tx_starbucks_1')).toBe(true);
+
+    // Query for "coffee" (partial description)
+    const matchesCoffee = await getSearchMatchingTransactionIds(userId, testDek, 'coffee');
+    expect(matchesCoffee.size).toBe(1);
+    expect(matchesCoffee.has('tx_starbucks_1')).toBe(true);
+
+    // Query for "entertainment" (category / notes keyword)
+    const matchesEntertainment = await getSearchMatchingTransactionIds(userId, testDek, 'entertainment');
+    expect(matchesEntertainment.size).toBe(1);
+    expect(matchesEntertainment.has('tx_netflix_1')).toBe(true);
+
+    // Query for non-existent keyword
+    const matchesNone = await getSearchMatchingTransactionIds(userId, testDek, 'amazon');
+    expect(matchesNone.size).toBe(0);
+  });
+
+  it('retrieves all transactions with extended cached fields', async () => {
+    const desc = await encryptField('Starbucks Coffee', testDek);
+    const payee = await encryptField('Starbucks Inc', testDek);
+    const amount = await encryptField('-5.45', testDek);
+
+    mockDbResponse = [
+      {
+        id: 'tx_starbucks_1',
+        description: desc,
+        payee: payee,
+        notes: null,
+        amount: amount,
+        categoryId: 'cat_coffee_123',
+        accountId: 'acc_checking_123',
+        date: '2026-05-29',
+        ignored: false,
+        source: 'simplefin',
+        categoryName: null,
+      },
+    ];
+
+    const txns = await getUserTransactionsFromCache(userId, testDek);
+    expect(txns.length).toBe(1);
+    expect(txns[0]).toEqual({
+      description: 'starbucks coffee',
+      payee: 'starbucks inc',
+      notes: '',
+      categoryName: '',
+      amount: '-5.45',
+      categoryId: 'cat_coffee_123',
+      accountId: 'acc_checking_123',
+      date: '2026-05-29',
+      ignored: false,
+      source: 'simplefin',
+    });
+  });
+
+  it('invalidates cache correctly', async () => {
+    const desc1 = await encryptField('Gas Station', testDek);
+    mockDbResponse = [
+      {
+        id: 'tx_gas',
+        description: desc1,
+        payee: null,
+        notes: null,
+        categoryName: null,
+      },
+    ];
+
+    // First search hydrates the cache
+    let matches = await getSearchMatchingTransactionIds(userId, testDek, 'gas');
+    expect(matches.size).toBe(1);
+    expect(matches.has('tx_gas')).toBe(true);
+
+    // Now empty DB response, but do NOT invalidate cache.
+    // Subsequent search should still hit the in-memory cache and return the result.
+    mockDbResponse = [];
+    matches = await getSearchMatchingTransactionIds(userId, testDek, 'gas');
+    expect(matches.size).toBe(1);
+
+    // Now invalidate the cache. Empty DB response should be fetched next time.
+    invalidateUserSearchCache(userId);
+    matches = await getSearchMatchingTransactionIds(userId, testDek, 'gas');
+    expect(matches.size).toBe(0);
+  });
+});

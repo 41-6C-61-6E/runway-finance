@@ -78,25 +78,24 @@ function TransactionsContent() {
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
-      accountId: null,
-      accountIds: null,
-      accountTypes: null,
-      categoryId: null,
-      categoryIds: null,
-      tagId: null,
-      tagIds: null,
-      search: null,
-      type: null,
-      startDate: null,
-      endDate: null,
-      pending: null,
-      reviewed: null,
-      minAmount: null,
-      maxAmount: null,
-      categorizedByAi: null,
-      sort: 'date',
-      order: 'desc',
-      ...preset.filters
+      accountId: preset.filters.accountId ?? null,
+      accountIds: preset.filters.accountIds ?? null,
+      accountTypes: preset.filters.accountTypes ?? null,
+      categoryId: preset.filters.categoryId ?? null,
+      categoryIds: preset.filters.categoryIds ?? null,
+      tagId: preset.filters.tagId ?? null,
+      tagIds: preset.filters.tagIds ?? null,
+      search: preset.filters.search ?? null,
+      type: preset.filters.type ?? null,
+      startDate: preset.filters.startDate ?? null,
+      endDate: preset.filters.endDate ?? null,
+      pending: preset.filters.pending ?? null,
+      reviewed: preset.filters.reviewed ?? null,
+      minAmount: preset.filters.minAmount ?? null,
+      maxAmount: preset.filters.maxAmount ?? null,
+      categorizedByAi: preset.filters.categorizedByAi ?? null,
+      sort: preset.filters.sort ?? 'date',
+      order: preset.filters.order ?? 'desc',
     });
   }, []);
 

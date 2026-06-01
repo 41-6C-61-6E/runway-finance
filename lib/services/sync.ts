@@ -4,6 +4,7 @@ import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
+import { invalidateUserSearchCache, getUserTransactionsFromCache } from '@/lib/services/search-cache';
 import { userSettings } from '@/lib/db/schema';
 import { eq, and, or, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
@@ -181,20 +182,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     catById.set(cat.id.toString(), cat);
   }
 
-  const allTransactions = await getDb()
-    .select()
-    .from(transactions)
-    .where(
-      and(
-        inArray(
-          transactions.accountId,
-          userAccounts.map((a) => a.id)
-        ),
-        eq(transactions.deleted, false)
-      )
-    );
-
-  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+  const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
     .select({ paystubEnabled: userSettings.paystubEnabled })
@@ -317,20 +305,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     catById.set(cat.id.toString(), cat);
   }
 
-  const allTransactions = await getDb()
-    .select()
-    .from(transactions)
-    .where(
-      and(
-        inArray(
-          transactions.accountId,
-          userAccounts.map((a) => a.id)
-        ),
-        eq(transactions.deleted, false)
-      )
-    );
-
-  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+  const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
     .select({ paystubEnabled: userSettings.paystubEnabled })
@@ -462,20 +437,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     catById.set(cat.id.toString(), cat);
   }
 
-  const allTransactions = await getDb()
-    .select()
-    .from(transactions)
-    .where(
-      and(
-        inArray(
-          transactions.accountId,
-          userAccounts.map((a) => a.id)
-        ),
-        eq(transactions.deleted, false)
-      )
-    );
-
-  const decryptedTxns = await decryptRows('transactions', allTransactions, dek);
+  const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
     .select({ paystubEnabled: userSettings.paystubEnabled })
@@ -972,7 +934,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           userId,
           earliestTx,
           toDateStr,
-          dek
+          dek,
+          startDate.toISOString().split('T')[0]
         );
         if (result.syntheticCount > 0) {
           logger.info(`${LOG_TAG} Backfilled synthetic snapshots`, {
@@ -990,6 +953,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     await updateCategoryIncomeSummaries(userId, dek);
 
     const totalDurationMs = Date.now() - startedAt;
+    if (transactionsNew > 0 || transactionsUpdated > 0) {
+      invalidateUserSearchCache(userId);
+    }
+
     logger.info(`${LOG_TAG} Sync completed successfully`, {
       connectionId,
       accountsSynced,

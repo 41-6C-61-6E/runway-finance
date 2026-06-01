@@ -8,6 +8,7 @@ import { encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function DELETE(
   _request: Request,
@@ -138,6 +139,7 @@ export async function DELETE(
       postWarnings.push(`Post-delete processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
     }
 
+    invalidateUserSearchCache(userId);
     return NextResponse.json({ success: true, warnings: postWarnings.length > 0 ? postWarnings : undefined });
   } catch (error) {
     return NextResponse.json(

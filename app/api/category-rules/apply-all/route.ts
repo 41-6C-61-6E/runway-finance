@@ -7,6 +7,7 @@ import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptField } from '@/lib/crypto';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function POST() {
   const session = await auth();
@@ -54,6 +55,9 @@ export async function POST() {
   }
 
   logger.info('POST /api/category-rules/apply-all', { userId, updated: ruleResults.size, total: allTxns.length });
+  if (ruleResults.size > 0) {
+    invalidateUserSearchCache(userId);
+  }
   return NextResponse.json({
     updated: ruleResults.size,
     total: allTxns.length,
