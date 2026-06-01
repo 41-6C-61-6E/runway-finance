@@ -11,7 +11,7 @@ export const GENERAL_DEFAULTS = {
   privacyMode: false,
   reduceTransparency: false,
   hideAccountSubheadings: false,
-  hideAccountsSidebarByDefault: false,
+  hideAccountsSidebarByDefault: true,
   chartSelections: {},
   cardCollapsedStates: {},
   cardStyle: 'default',
