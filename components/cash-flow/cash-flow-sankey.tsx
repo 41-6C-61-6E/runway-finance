@@ -10,6 +10,7 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { GitMerge } from 'lucide-react';
@@ -627,8 +628,8 @@ export function CashFlowSankey() {
   const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const currentMonth = getCurrentMonth();
-  const [timeframe, setTimeframe] = useState<TimeRange>('1m');
-  const [month, setMonth] = useState<string>(currentMonth);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:sankey:timeframe', '1m');
+  const [month, setMonth] = usePersistentState<string>('runway:sankey:month', currentMonth);
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1025,26 +1026,6 @@ export function CashFlowSankey() {
 
   const allAccountsExcluded = allAccounts.length > 0 && excludedAccountIds.size >= allAccounts.length;
 
-  if (!sankeyData || sankeyData.nodes.length === 0 || sankeyData.links.length === 0) {
-    return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title="Cash Flow Sankey"
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState
-              variant={allAccountsExcluded ? 'empty' : 'nodata'}
-              description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const filteredAccounts = allAccounts.filter(
     (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()),
   );
@@ -1216,7 +1197,7 @@ export function CashFlowSankey() {
           <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
             <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
               <div className="min-w-max h-full px-2 pb-2">
-                {processedData.nodes.length > 0 && processedData.links.length > 0 && (
+                {processedData.nodes.length > 0 && processedData.links.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                     <Sankey
                       data={processedData}
@@ -1231,6 +1212,13 @@ export function CashFlowSankey() {
                       {sankeyTooltip}
                     </Sankey>
                   </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center">
+                    <ChartEmptyState
+                      variant={allAccountsExcluded ? 'empty' : 'nodata'}
+                      description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
+                    />
+                  </div>
                 )}
               </div>
             </div>
