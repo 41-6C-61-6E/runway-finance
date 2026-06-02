@@ -32,7 +32,7 @@ export const GENERAL_DEFAULTS = {
 
 export const ANALYTICS_DEFAULTS = {
   chartVisibility: {},
-  chartColorScheme: 'kingston',
+  chartColorScheme: 'fauntleroy',
   forecastMode: 'hybrid',
   forecastLookbackMonths: 3,
   showSyntheticData: {
