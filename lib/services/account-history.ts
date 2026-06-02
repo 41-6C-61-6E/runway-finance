@@ -1,6 +1,6 @@
 import { getDb, getPool } from '@/lib/db';
 import { accountSnapshots, transactions, accounts, netWorthSnapshots } from '@/lib/db/schema';
-import { eq, and, lt, lte, gte, asc, desc, isNull, sql } from 'drizzle-orm';
+import { eq, and, lt, lte, gte, asc, desc, isNull, sql, inArray } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypto';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
@@ -131,6 +131,98 @@ export async function getPostedTransactions(
  * 4. Insert synthetic snapshots with `is_synthetic = true`.
  *    Real snapshots (upserted later) will overwrite synthetic ones via onConflictDoUpdate.
  */
+/**
+ * Retroactively clean up any transient zero-balance snapshots before recalculation.
+ * Deletes real snapshots that have balance of 0 if they represent a brief dropout
+ * (i.e. surrounded by non-zero balances within 5 days).
+ */
+export async function cleanupTransientZeroSnapshots(
+  accountId: string,
+  userId: string,
+  dek?: Uint8Array
+) {
+  const db = getDb();
+  
+  const realSnapshots = await db
+    .select({
+      id: accountSnapshots.id,
+      snapshotDate: accountSnapshots.snapshotDate,
+      balance: accountSnapshots.balance,
+    })
+    .from(accountSnapshots)
+    .where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, false)
+      )
+    )
+    .orderBy(asc(accountSnapshots.snapshotDate));
+
+  if (realSnapshots.length < 3) return;
+
+  const decryptedSnaps = await Promise.all(
+    realSnapshots.map(async (s) => {
+      let balanceStr = String(s.balance);
+      if (dek) {
+        try {
+          const decrypted = await decryptField(s.balance, dek);
+          if (decrypted) balanceStr = decrypted;
+        } catch (err) {
+          // Ignore
+        }
+      }
+      return { id: s.id, date: s.snapshotDate, balance: parseFloat(balanceStr) || 0 };
+    })
+  );
+
+  const idsToDelete: string[] = [];
+
+  for (let i = 0; i < decryptedSnaps.length; i++) {
+    const current = decryptedSnaps[i];
+    if (current.balance === 0) {
+      let prevIdx = i - 1;
+      while (prevIdx >= 0 && decryptedSnaps[prevIdx].balance === 0) {
+        prevIdx--;
+      }
+      
+      let nextIdx = i + 1;
+      while (nextIdx < decryptedSnaps.length && decryptedSnaps[nextIdx].balance === 0) {
+        nextIdx++;
+      }
+
+      if (prevIdx >= 0 && nextIdx < decryptedSnaps.length) {
+        const prev = decryptedSnaps[prevIdx];
+        const next = decryptedSnaps[nextIdx];
+        
+        const prevDate = new Date(prev.date + 'T00:00:00Z');
+        const nextDate = new Date(next.date + 'T00:00:00Z');
+        const diffDays = (nextDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        if (diffDays <= 5) {
+          idsToDelete.push(current.id);
+        }
+      }
+    }
+  }
+
+  if (idsToDelete.length > 0) {
+    logger.info(`${LOG_TAG} Deleting transient zero-balance snapshots for account ${accountId}`, {
+      count: idsToDelete.length,
+      dates: decryptedSnaps.filter(s => idsToDelete.includes(s.id)).map(s => s.date),
+    });
+    await db
+      .delete(accountSnapshots)
+      .where(
+        and(
+          eq(accountSnapshots.accountId, accountId),
+          eq(accountSnapshots.userId, userId),
+          inArray(accountSnapshots.id, idsToDelete)
+        )
+      );
+  }
+}
+
 export async function generateHistoricalAccountSnapshots(
   accountId: string,
   userId: string,
@@ -140,6 +232,9 @@ export async function generateHistoricalAccountSnapshots(
   watermarkDate?: string
 ): Promise<{ syntheticCount: number; skippedRealCount: number }> {
   const startedAt = Date.now();
+
+  // Retroactively clean up transient zero-balance snapshots before recalculation
+  await cleanupTransientZeroSnapshots(accountId, userId, dek);
 
   // Fetch account to see if it is a mortgage
   const [account] = await getDb()
