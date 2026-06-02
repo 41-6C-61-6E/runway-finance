@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 interface BudgetData {
   id: string;
@@ -40,6 +41,8 @@ interface Category {
 }
 
 export function BudgetTable() {
+  const settingsContext = useUserSettings();
+  const showBudgetTags = settingsContext?.settings?.accountTagVisibility?.budgets !== false;
   const { periodType, periodKey } = useBudgetPeriod();
   const [budgets, setBudgets] = useState<BudgetData[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -182,7 +185,7 @@ export function BudgetTable() {
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Landmark className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate" title={account.name}>{account.name}</span>
-                              {account.tags && account.tags.length > 0 && (
+                              {showBudgetTags && account.tags && account.tags.length > 0 && (
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                   {account.tags.map((tag) => (
                                     <span
@@ -264,7 +267,7 @@ export function BudgetTable() {
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Landmark className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate" title={account.name}>{account.name}</span>
-                              {account.tags && account.tags.length > 0 && (
+                              {showBudgetTags && account.tags && account.tags.length > 0 && (
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                   {account.tags.map((tag) => (
                                     <span

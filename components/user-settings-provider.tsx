@@ -35,7 +35,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const updateSetting = useCallback(async (key: string, value: any) => {
     // Optimistically update local state
     setSettings((prev) => {
-      if (key === 'chartSelections' || key === 'cardCollapsedStates') {
+      if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility') {
         const existingData = prev[key] || {};
         const mergedData = { ...existingData, ...value };
         return { ...prev, [key]: mergedData };
@@ -44,7 +44,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     });
 
     try {
-      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates')
+      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility')
         ? { [key]: value } // For these, value is just the delta key-value object
         : { [key]: value };
 

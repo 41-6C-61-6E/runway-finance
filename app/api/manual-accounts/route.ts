@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
-import { eq, and, isNull, asc } from 'drizzle-orm';
+import { accounts, accountTags, tags } from '@/lib/db/schema';
+import { eq, and, isNull, asc, inArray } from 'drizzle-orm';
 import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRows } from '@/lib/crypto';
+import { decryptRows, decryptField } from '@/lib/crypto';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
 export async function GET() {
@@ -31,7 +31,37 @@ export async function GET() {
 
   const decrypted = await decryptRows('accounts', result, dek);
   logger.info('GET /api/manual-accounts', { userId, count: decrypted.length });
-  return NextResponse.json(decrypted);
+
+  // Batch fetch tags for these manual accounts
+  const accountIds = decrypted.map((a: any) => a.id);
+  const tagRows = accountIds.length > 0
+    ? await getDb()
+        .select({
+          accountId: accountTags.accountId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(accountTags)
+        .leftJoin(tags, eq(accountTags.tagId, tags.id))
+        .where(inArray(accountTags.accountId, accountIds))
+    : [];
+
+  const tagsByAccountId = new Map<string, any[]>();
+  for (const row of tagRows) {
+    const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+    const tag = { id: row.tagId, name, color: row.tagColor };
+    const existing = tagsByAccountId.get(row.accountId) ?? [];
+    existing.push(tag);
+    tagsByAccountId.set(row.accountId, existing);
+  }
+
+  const decryptedWithTags = decrypted.map((acc: any) => ({
+    ...acc,
+    tags: tagsByAccountId.get(acc.id) ?? [],
+  }));
+
+  return NextResponse.json(decryptedWithTags);
 }
 
 export async function POST(request: Request) {
@@ -49,6 +79,7 @@ export async function POST(request: Request) {
     metadata?: Record<string, unknown>;
     initialValue?: number;
     currency?: string;
+    tagIds?: string[];
   };
   try {
     body = await request.json();
@@ -77,11 +108,41 @@ export async function POST(request: Request) {
     }, dek);
     logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
 
+    // Associate tags if specified
+    const tagIds = body.tagIds;
+    if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
+      await getDb().insert(accountTags).values(
+        tagIds.map(tId => ({
+          accountId: account.id,
+          tagId: tId,
+        }))
+      );
+    }
+
+    let attachedTags: any[] = [];
+    if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
+      const tagRows = await getDb()
+        .select({
+          id: tags.id,
+          name: tags.name,
+          color: tags.color,
+        })
+        .from(tags)
+        .where(inArray(tags.id, tagIds));
+      for (const row of tagRows) {
+        attachedTags.push({
+          id: row.id,
+          name: row.name ? await decryptField(row.name, dek) : '',
+          color: row.color,
+        });
+      }
+    }
+
     // Schedule auto-sync if the account has a sync frequency
     const syncFrequency = (body.metadata?.syncFrequency as string) || 'manual';
     manualAccountScheduler.schedule(account.id, userId, syncFrequency, account.balanceDate);
 
-    return NextResponse.json(account, { status: 201 });
+    return NextResponse.json({ ...account, tags: attachedTags }, { status: 201 });
   } catch (err) {
     logger.error('POST /api/manual-accounts - error', { userId, name: body.name, error: err instanceof Error ? err.message : 'Failed to create account' });
     return NextResponse.json({ error: 'internal_error', message: err instanceof Error ? err.message : 'Failed to create account' }, { status: 500 });

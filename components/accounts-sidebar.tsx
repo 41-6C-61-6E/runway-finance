@@ -52,6 +52,8 @@ const formatCurrency = (balance: string, currency: string) => {
   };
 };
 
+import { useUserSettings } from '@/components/user-settings-provider';
+
 function AccountRow({
   account,
   onOpenDrawer,
@@ -61,6 +63,8 @@ function AccountRow({
 }) {
   const router = useRouter();
   const fmt = formatCurrency(account.balance, account.currency);
+  const settingsContext = useUserSettings();
+  const showTags = settingsContext?.settings?.accountTagVisibility?.sidebar !== false;
 
   return (
     <div
@@ -69,7 +73,7 @@ function AccountRow({
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
-        {account.tags && account.tags.length > 0 && (
+        {showTags && account.tags && account.tags.length > 0 && (
           <div className="flex items-center gap-1 flex-shrink-0">
             {account.tags.map((tag) => (
               <span

@@ -59,6 +59,7 @@ export async function GET() {
       showImportedData: created?.showImportedData ?? DEFAULTS.showImportedData,
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       apiKeys: created?.apiKeys ?? {},
+      accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
     });
   }
 
@@ -98,6 +99,7 @@ export async function GET() {
     aiAnalysisTimeoutSeconds: settings[0].aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
     aiActiveProviderId: settings[0].aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys,
+    accountTagVisibility: settings[0].accountTagVisibility ?? DEFAULTS.accountTagVisibility,
   });
 }
 
@@ -135,6 +137,7 @@ export async function PATCH(request: Request) {
 	const apiKeys = body.apiKeys;
 	const showImportedData = body.showImportedData;
 	const paystubEnabled = body.paystubEnabled;
+	const accountTagVisibility = body.accountTagVisibility;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -236,6 +239,18 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid paystubEnabled value' }, { status: 400 });
 	}
 
+	if (accountTagVisibility !== undefined) {
+		if (typeof accountTagVisibility !== 'object' || accountTagVisibility === null || Array.isArray(accountTagVisibility)) {
+			return Response.json({ error: 'Invalid accountTagVisibility value' }, { status: 400 });
+		}
+		const VALID_KEYS = ['sidebar', 'transactions', 'legend', 'budgets', 'forecast', 'suggestions'];
+		for (const key of VALID_KEYS) {
+			if (key in accountTagVisibility && typeof accountTagVisibility[key] !== 'boolean') {
+				return Response.json({ error: `Invalid accountTagVisibility.${key} value` }, { status: 400 });
+			}
+		}
+	}
+
 	if (aiSystemPrompt !== undefined && aiSystemPrompt !== null && typeof aiSystemPrompt !== 'string') {
 		return Response.json({ error: 'Invalid aiSystemPrompt value' }, { status: 400 });
 	}
@@ -280,6 +295,7 @@ export async function PATCH(request: Request) {
         privacyMode,
         accentColor: accentColor ?? DEFAULTS.accentColor,
         chartColorScheme: chartColorScheme ?? DEFAULTS.chartColorScheme,
+        accountTagVisibility: accountTagVisibility ?? DEFAULTS.accountTagVisibility,
       })
       .returning();
 
@@ -302,6 +318,7 @@ export async function PATCH(request: Request) {
       cardCollapsedStates: created?.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       apiKeys: created?.apiKeys ?? {},
+      accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
     });
   }
 
@@ -340,6 +357,10 @@ export async function PATCH(request: Request) {
 	if (aiAnalysisTimeoutSeconds !== undefined) updates.aiAnalysisTimeoutSeconds = aiAnalysisTimeoutSeconds;
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
 	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
+	if (accountTagVisibility !== undefined) {
+		const existingVisibility = (settings[0].accountTagVisibility as Record<string, any>) || {};
+		updates.accountTagVisibility = { ...existingVisibility, ...accountTagVisibility };
+	}
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -393,5 +414,6 @@ export async function PATCH(request: Request) {
     aiAnalysisTimeoutSeconds: updated.aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
     aiActiveProviderId: updated.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys: updatedApiKeys,
+    accountTagVisibility: updated.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
   });
 }

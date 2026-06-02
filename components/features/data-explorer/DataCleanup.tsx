@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Trash2, GitMerge, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 type Transaction = {
   id: string;
@@ -37,6 +38,8 @@ type AccountMeta = {
 };
 
 export default function DataCleanup() {
+  const settingsContext = useUserSettings();
+  const showCleanupTags = settingsContext?.settings?.accountTagVisibility?.suggestions !== false;
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -408,7 +411,7 @@ export default function DataCleanup() {
                         <span>{group.accountName || 'Unknown Account'}</span>
                         {(() => {
                           const account = accountsList.find((a) => a.id === group.accountId);
-                          return account?.tags && account.tags.length > 0 && (
+                          return showCleanupTags && account?.tags && account.tags.length > 0 && (
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {account.tags.map((tag) => (
                                 <span
