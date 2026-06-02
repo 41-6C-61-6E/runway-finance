@@ -125,7 +125,8 @@ export async function GET() {
           }
           if (excluded) continue;
 
-          const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+          const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
+          const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
           const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
           const amount = parseFloat(await decryptField(tx.amount, dek)) || 0;
 

@@ -553,6 +553,10 @@ export async function generateAssetHistorySnapshots(
         snapshots = await estimateRealEstateHistory(purchasePrice, purchaseDate, currentValue, zipCode, apiConfig);
         snapshots = snapshots.filter(s => s.date >= purchaseDate);
 
+        if (!snapshots.some(s => s.date === purchaseDate)) {
+          snapshots.unshift({ date: purchaseDate, value: purchasePrice });
+        }
+
         // Filter out synthetic snapshots for months that are already covered by real/imported snapshots
         const realSnaps = await db
           .select({

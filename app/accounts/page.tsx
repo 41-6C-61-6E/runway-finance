@@ -40,7 +40,7 @@ import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -331,8 +331,8 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
                 <AreaChart data={visibleMiniData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.15} />
-                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.01} />
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
@@ -485,7 +485,7 @@ export default function AccountsPage() {
   const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:accounts:timeframe', '1m');
   const [chartType, setChartType] = usePersistentState<ChartType>('runway:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('runway:accounts:groupMode', 'type');
-  const [showHidden, setShowHidden] = usePersistentState<boolean>('runway:accounts:showHidden', false);
+  const showHidden = false;
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('balanceHistoryChart');
   const [hierarchyCollapsed, setHierarchyCollapsed] = useCardCollapsed('accountsHierarchy');
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
@@ -850,7 +850,7 @@ export default function AccountsPage() {
 
   // Dynamic Series mapping & Color assignment
   const seriesInfoMap = useMemo(() => {
-    const map = new Map<string, { label: string; color: string; isAsset: boolean }>();
+    const map = new Map<string, { label: string; color: string; isAsset: boolean; tags?: { id: string; name: string; color: string }[] }>();
     
     // Sort keys: assets first, then liabilities
     const sortedKeys = [...uniqueSeriesKeys].sort((a, b) => {
@@ -867,12 +867,14 @@ export default function AccountsPage() {
       const isAsset = isAssetSeries(key);
       const index = isAsset ? assetIndex++ : liabilityIndex++;
       let label = key;
+      let tags: { id: string; name: string; color: string }[] | undefined;
       if (groupMode === 'account') {
         const acc = reportableAccounts.find(a => a.id === key);
         label = acc ? acc.name : key;
+        tags = acc?.tags;
       }
       const color = getSeriesColor(key, groupMode, index, isAsset);
-      map.set(key, { label, color, isAsset });
+      map.set(key, { label, color, isAsset, tags });
     });
 
     return map;
@@ -1537,7 +1539,7 @@ export default function AccountsPage() {
 
                       {/* Chart Controls / Groupings & Contextual Filters */}
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
-                        {/* Mode Pill Selector & Show Hidden Toggle */}
+                        {/* Mode Pill Selector */}
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Group By</span>
@@ -1556,17 +1558,6 @@ export default function AccountsPage() {
                                 </button>
                               ))}
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 sm:border-l sm:border-border/30 sm:pl-4">
-                            <Switch
-                              id="chart-show-hidden"
-                              checked={showHidden}
-                              onCheckedChange={setShowHidden}
-                            />
-                            <label htmlFor="chart-show-hidden" className="text-xs font-medium text-muted-foreground cursor-pointer">
-                              Show Hidden
-                            </label>
                           </div>
                         </div>
 
@@ -2027,8 +2018,8 @@ export default function AccountsPage() {
                                       const id = `gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')}`;
                                       return (
                                         <linearGradient key={key} id={id} x1="0" y1="0" x2="0" y2="1">
-                                          <stop offset="5%" stopColor={color} stopOpacity={0.25} />
-                                          <stop offset="95%" stopColor={color} stopOpacity={0.03} />
+                                          <stop offset="5%" stopColor={color} stopOpacity={0.45} />
+                                          <stop offset="95%" stopColor={color} stopOpacity={0.08} />
                                         </linearGradient>
                                       );
                                     })}
@@ -2150,6 +2141,18 @@ export default function AccountsPage() {
                                         <span className="truncate" title={info?.label || key}>
                                           {info?.label || key}
                                         </span>
+                                        {info?.tags && info.tags.length > 0 && (
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            {info.tags.map((tag) => (
+                                              <span
+                                                key={tag.id}
+                                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: tag.color }}
+                                                title={tag.name}
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -2174,6 +2177,18 @@ export default function AccountsPage() {
                                         <span className="truncate" title={info?.label || key}>
                                           {info?.label || key}
                                         </span>
+                                        {info?.tags && info.tags.length > 0 && (
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            {info.tags.map((tag) => (
+                                              <span
+                                                key={tag.id}
+                                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: tag.color }}
+                                                title={tag.name}
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })}

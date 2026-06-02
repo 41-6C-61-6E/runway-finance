@@ -528,19 +528,19 @@ export function EquityOverTimeChart() {
                 >
                   <defs>
                     <linearGradient id="colorHomeValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.12}/>
-                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.01}/>
+                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.30}/>
+                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.05}/>
                     </linearGradient>
                     <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03}/>
+                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45}/>
+                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.08}/>
                     </linearGradient>
                     {activeMortgageKeys.map((key, index) => {
                       const color = mortgageColors[index % mortgageColors.length];
                       return (
                         <linearGradient key={key} id={`color_${key}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={color} stopOpacity={0.12}/>
-                          <stop offset="95%" stopColor={color} stopOpacity={0.01}/>
+                          <stop offset="5%" stopColor={color} stopOpacity={0.30}/>
+                          <stop offset="95%" stopColor={color} stopOpacity={0.05}/>
                         </linearGradient>
                       );
                     })}
