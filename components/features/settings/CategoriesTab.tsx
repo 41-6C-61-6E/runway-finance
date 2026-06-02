@@ -497,7 +497,7 @@ export default function CategoriesTab() {
                   <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
                     parent.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
                     parent.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                    parent.isIncome ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                    parent.isIncome ? 'bg-chart-1/15 text-chart-1' : 'bg-chart-5/15 text-chart-5'
                   }`}>
                     {parent.categoryType === 'compound' ? 'Compound' : parent.categoryType === 'transfer' ? 'Transfer' : parent.isIncome ? 'Income' : 'Expense'}
                   </span>
@@ -552,7 +552,7 @@ export default function CategoriesTab() {
                              <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
                                child.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
                                child.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                               child.isIncome ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                                child.isIncome ? 'bg-chart-1/15 text-chart-1' : 'bg-chart-5/15 text-chart-5'
                              }`}>
                                {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
                              </span>
