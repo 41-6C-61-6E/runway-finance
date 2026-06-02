@@ -34,6 +34,7 @@ interface ForecastAccount {
   name: string;
   balance: number;
   type: string;
+  tags?: { id: string; name: string; color: string }[];
 }
 
 interface ChartSeries {
@@ -387,7 +388,21 @@ export function CashFlowForecast() {
                   {allAccounts.filter((acc) => accountFilter === 'all' || selectedAccountIds.has(acc.id)).map((acct) => (
                     <tr key={acct.id} className="hover:bg-muted/10 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{acct.name}</div>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-medium text-foreground">{acct.name}</span>
+                          {acct.tags && acct.tags.length > 0 && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {acct.tags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: tag.color }}
+                                  title={tag.name}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <div className="text-[10px] text-muted-foreground capitalize">
                           {acct.type}
                         </div>

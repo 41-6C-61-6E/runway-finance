@@ -33,6 +33,7 @@ type DuplicateGroup = {
 type AccountMeta = {
   id: string;
   name: string;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 export default function DataCleanup() {
@@ -403,8 +404,23 @@ export default function DataCleanup() {
                       <span className="px-2 py-0.5 text-xs font-semibold text-amber-500 bg-amber-500/10 rounded-full">
                         Duplicate Group
                       </span>
-                      <span className="text-sm text-muted-foreground font-medium">
-                        {group.accountName || 'Unknown Account'}
+                      <span className="text-sm text-muted-foreground font-medium flex items-center gap-1.5 min-w-0">
+                        <span>{group.accountName || 'Unknown Account'}</span>
+                        {(() => {
+                          const account = accountsList.find((a) => a.id === group.accountId);
+                          return account?.tags && account.tags.length > 0 && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {account.tags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: tag.color }}
+                                  title={tag.name}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </span>
                     </div>
                     <div className="text-base font-bold font-mono text-foreground">
