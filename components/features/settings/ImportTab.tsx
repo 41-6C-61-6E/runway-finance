@@ -87,6 +87,7 @@ export default function ImportTab() {
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [snapshotDayOfMonth, setSnapshotDayOfMonth] = useState<number | 'end'>('end');
 
   // History state
   const [logs, setLogs] = useState<ImportLog[]>([]);
@@ -181,6 +182,7 @@ export default function ImportTab() {
           csvText: csvRawText,
           importType,
           columnMapping,
+          snapshotDayOfMonth: importType === 'account_snapshots' ? snapshotDayOfMonth : undefined,
           accountMapping: Object.keys(accountMapping).length > 0 ? accountMapping : undefined,
           categoryMapping: Object.keys(categoryMapping).length > 0 ? categoryMapping : undefined,
         }),
@@ -298,6 +300,7 @@ export default function ImportTab() {
       columnMapping,
       accountMapping,
       categoryMapping,
+      snapshotDayOfMonth: importType === 'account_snapshots' ? snapshotDayOfMonth : undefined,
       newAccounts: Object.keys(newAccounts).length > 0 ? newAccounts : undefined,
       newCategories: Object.keys(newCategories).length > 0 ? newCategories : undefined,
       fileName: csvPreview?.fileName || 'unknown.csv',
@@ -344,6 +347,7 @@ export default function ImportTab() {
     setError(null);
     setStartDate('');
     setEndDate('');
+    setSnapshotDayOfMonth('end');
   };
 
   const getImportableRecordsCount = useCallback(() => {
@@ -356,7 +360,7 @@ export default function ImportTab() {
       let count = 0;
       for (const row of parsed.allRows) {
         if (dateCol && row[dateCol]) {
-          const parsedRowDate = parseDateField(row[dateCol], importType === 'account_snapshots');
+          const parsedRowDate = parseDateField(row[dateCol], importType === 'account_snapshots' ? snapshotDayOfMonth : undefined);
           if (startDate && parsedRowDate < startDate) continue;
           if (endDate && parsedRowDate > endDate) continue;
         }
@@ -545,6 +549,47 @@ export default function ImportTab() {
                 </div>
               ))}
             </div>
+
+            {importType === 'account_snapshots' && (
+              <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-2">
+                <p className="text-xs font-medium text-foreground">
+                  For month-only dates (e.g. &quot;April 2026&quot;), use day:
+                </p>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="snapshotDay"
+                      checked={snapshotDayOfMonth === 'end'}
+                      onChange={() => setSnapshotDayOfMonth('end')}
+                      className="text-primary"
+                    />
+                    Last day of month
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="snapshotDay"
+                      checked={typeof snapshotDayOfMonth === 'number'}
+                      onChange={() => setSnapshotDayOfMonth(1)}
+                      className="text-primary"
+                    />
+                    Specific day:
+                  </label>
+                  {typeof snapshotDayOfMonth === 'number' && (
+                    <select
+                      value={snapshotDayOfMonth}
+                      onChange={(e) => setSnapshotDayOfMonth(parseInt(e.target.value, 10))}
+                      className="h-7 w-16 rounded-lg border border-input bg-background px-1.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            )}
 
             {columnMapping.type && (
               <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 text-xs text-foreground space-y-1">

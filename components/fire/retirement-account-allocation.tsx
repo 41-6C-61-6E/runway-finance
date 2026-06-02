@@ -23,7 +23,7 @@ const SUBGROUP_COLORS: Record<string, string> = {
   'Other Investments': 'var(--color-chart-3)',
   'Retirement': 'var(--color-chart-4)',
   '529 Account': 'var(--color-chart-5)',
-  'HSA Account': '#22c55e',
+  'HSA Account': 'var(--color-chart-1)',
 };
 
 function getSubGroup(type: string): string {

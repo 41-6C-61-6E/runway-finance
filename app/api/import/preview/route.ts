@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { csvText, importType, columnMapping, accountMapping, categoryMapping } = body;
+    const { csvText, importType, columnMapping, accountMapping, categoryMapping, snapshotDayOfMonth } = body;
 
     if (!csvText || !importType || !columnMapping) {
       return NextResponse.json({ error: 'Missing required fields: csvText, importType, columnMapping' }, { status: 400 });
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
       // Normalize date field
       if (mapped.date) {
-        mapped.parsedDate = parseDateField(mapped.date, importType === 'account_snapshots');
+        mapped.parsedDate = parseDateField(mapped.date, importType === 'account_snapshots' ? snapshotDayOfMonth : undefined);
       }
 
       // Resolve account reference
