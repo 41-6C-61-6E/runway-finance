@@ -10,6 +10,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 import { NetWorthChart } from '@/components/net-worth/net-worth-chart';
 
 function NetWorthContent() {
@@ -23,77 +24,73 @@ function NetWorthContent() {
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
       <PageHeader title="Net Worth" icon={ChartSpline} />
-      <div className="px-2 sm:px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-[1600px]">
-          
-          {showChart && (
-            <div className="mb-5">
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <div className="space-y-5">
-                  <NetWorthChart />
-                  <MathDescription chartId="netWorthChart" />
+      <PageContent>
+        {showChart && (
+          <div className="mb-5">
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <div className="space-y-5">
+                <NetWorthChart />
+                <MathDescription chartId="netWorthChart" />
+              </div>
+            </Suspense>
+          </div>
+        )}
+
+        {showSummary && showRatio && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2">
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
+                <div className="h-full space-y-5">
+                  <NetWorthSummary />
+                  <MathDescription chartId="netWorthSummary" />
                 </div>
               </Suspense>
             </div>
-          )}
-
-          {showSummary && showRatio && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className="lg:col-span-2">
-                <Suspense fallback={<LoadingSpinner category="summary" />}>
-                  <div className="h-full space-y-5">
-                    <NetWorthSummary />
-                    <MathDescription chartId="netWorthSummary" />
-                  </div>
-                </Suspense>
-              </div>
-              <div className="h-full">
-                <Suspense fallback={<LoadingSpinner category="chart" />}>
-                  <div className="h-full space-y-5">
-                    <DebtToAssetRatio />
-                    <MathDescription chartId="debtToAssetRatio" />
-                  </div>
-                </Suspense>
-              </div>
-            </div>
-          )}
-
-          {showSummary && !showRatio && (
-            <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-              <div className="space-y-5">
-                <NetWorthSummary />
-                <MathDescription chartId="netWorthSummary" />
-              </div>
-            </Suspense>
-          )}
-
-          {!showSummary && showRatio && (
-            <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
-              <div className="space-y-5">
-                <DebtToAssetRatio />
-                <MathDescription chartId="debtToAssetRatio" />
-              </div>
-            </Suspense>
-          )}
-
-          {showSummary && (
-            <div className="mt-5">
+            <div className="h-full">
               <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <AssetAllocation />
+                <div className="h-full space-y-5">
+                  <DebtToAssetRatio />
+                  <MathDescription chartId="debtToAssetRatio" />
+                </div>
               </Suspense>
             </div>
-          )}
+          </div>
+        )}
 
-          {showRatio && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <DebtBreakdown />
-              </Suspense>
+        {showSummary && !showRatio && (
+          <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
+            <div className="space-y-5">
+              <NetWorthSummary />
+              <MathDescription chartId="netWorthSummary" />
             </div>
-          )}
-          
-        </div>
-      </div>
+          </Suspense>
+        )}
+
+        {!showSummary && showRatio && (
+          <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
+            <div className="space-y-5">
+              <DebtToAssetRatio />
+              <MathDescription chartId="debtToAssetRatio" />
+            </div>
+          </Suspense>
+        )}
+
+        {showSummary && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <AssetAllocation />
+            </Suspense>
+          </div>
+        )}
+
+        {showRatio && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <DebtBreakdown />
+            </Suspense>
+          </div>
+        )}
+      </PageContent>
     </div>
   );
 }

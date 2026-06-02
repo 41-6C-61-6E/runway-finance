@@ -65,7 +65,7 @@ export function getGoalTypeInfo(type: string): { icon: string; label: string; co
 export function getProgressColorClass(progress: number): string {
   if (progress >= 75) return 'text-chart-1';
   if (progress >= 50) return 'text-chart-3';
-  if (progress >= 25) return 'text-yellow-500';
+  if (progress >= 25) return 'text-status-warning';
   return 'text-destructive';
 }
 
@@ -75,7 +75,7 @@ export function getProgressColorClass(progress: number): string {
 export function getProgressBgClass(progress: number): string {
   if (progress >= 75) return 'bg-chart-1';
   if (progress >= 50) return 'bg-chart-3';
-  if (progress >= 25) return 'bg-yellow-500';
+  if (progress >= 25) return 'bg-status-warning';
   return 'bg-destructive';
 }
 
@@ -83,10 +83,10 @@ export function getProgressBgClass(progress: number): string {
  * Get progress ring stroke color based on percentage
  */
 export function getProgressStrokeColor(progress: number): string {
-  if (progress >= 75) return '#10b981';
-  if (progress >= 50) return '#f59e0b';
-  if (progress >= 25) return '#f97316';
-  return '#ef4444';
+  if (progress >= 75) return 'var(--color-chart-1)';
+  if (progress >= 50) return 'var(--color-chart-3)';
+  if (progress >= 25) return 'var(--color-status-warning)';
+  return 'var(--color-destructive)';
 }
 
 /**

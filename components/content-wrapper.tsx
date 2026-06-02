@@ -5,7 +5,7 @@ interface ContentWrapperProps {
   className?: string;
 }
 
-export default function ContentWrapper({ children, className = 'mt-6' }: ContentWrapperProps) {
+export default function ContentWrapper({ children, className = '' }: ContentWrapperProps) {
   return (
     <div className={`relative z-10 px-0 sm:px-1 lg:px-4 max-w-[1920px] overflow-visible ${className}`}>
       {children}

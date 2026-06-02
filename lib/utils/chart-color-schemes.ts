@@ -1,4 +1,4 @@
-export type ChartColorSchemeId = 'forest' | 'nord' | 'earth' | 'pastel' | 'skittles' | 'fauntleroy' | 'tahoma' | 'evergreen' | 'kabosu';
+export type ChartColorSchemeId = 'emerald' | 'monarch' | 'nord' | 'sunset';
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -8,112 +8,52 @@ export interface ChartColorScheme {
 }
 
 export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> = {
-  forest: {
-    id: 'forest',
-    name: 'Forest',
-    description: 'Sage green, fern green, blackberry, spruce, wild blueberry',
+  emerald: {
+    id: 'emerald',
+    name: 'Emerald',
+    description: 'Fresh greens, soft gold, and deep forest - representing growth & wealth',
     colors: [
-      'oklch(0.68 0.22 140)',
-      'oklch(0.76 0.18 110)',
-      'oklch(0.62 0.22 315)',
-      'oklch(0.65 0.18 190)',
-      'oklch(0.60 0.18 270)',
+      'oklch(0.68 0.18 142)',
+      'oklch(0.78 0.13 165)',
+      'oklch(0.76 0.13 85)',
+      'oklch(0.65 0.15 250)',
+      'oklch(0.65 0.18 25)',
+    ],
+  },
+  monarch: {
+    id: 'monarch',
+    name: 'Monarch',
+    description: 'Deep navy-indigo, mint green, warm bronze-gold, and coral rose',
+    colors: [
+      'oklch(0.55 0.18 275)',
+      'oklch(0.78 0.15 155)',
+      'oklch(0.72 0.15 70)',
+      'oklch(0.65 0.17 25)',
+      'oklch(0.68 0.08 290)',
     ],
   },
   nord: {
     id: 'nord',
     name: 'Nord',
-    description: 'Nordic scandinavian frost and aurora tones',
+    description: 'High-contrast frosty cyan, polar purple, and sunset orange',
     colors: [
-      'oklch(0.66 0.12 225)',
-      'oklch(0.75 0.14 135)',
-      'oklch(0.76 0.12 205)',
-      'oklch(0.65 0.13 315)',
-      'oklch(0.74 0.08 180)',
+      'oklch(0.68 0.14 200)',
+      'oklch(0.72 0.14 140)',
+      'oklch(0.64 0.12 300)',
+      'oklch(0.68 0.15 45)',
+      'oklch(0.76 0.08 220)',
     ],
   },
-  earth: {
-    id: 'earth',
-    name: 'Earth',
-    description: 'Clay ochre, sage leaf, raw gold, copper patina, cocoa bark',
+  sunset: {
+    id: 'sunset',
+    name: 'Sunset',
+    description: 'Warm and vibrant sunset tones, violet, peach, gold, and cyan',
     colors: [
-      'oklch(0.64 0.13 36)',
-      'oklch(0.68 0.10 125)',
-      'oklch(0.74 0.13 82)',
-      'oklch(0.58 0.09 195)',
-      'oklch(0.58 0.11 345)',
-    ],
-  },
-  pastel: {
-    id: 'pastel',
-    name: 'Pastel',
-    description: 'Soft sage, blush rose, periwinkle, soft apricot, lavender mist',
-    colors: [
-      'oklch(0.78 0.08 150)',
-      'oklch(0.75 0.10 18)',
-      'oklch(0.76 0.09 255)',
-      'oklch(0.79 0.10 65)',
-      'oklch(0.74 0.08 300)',
-    ],
-  },
-  skittles: {
-    id: 'skittles',
-    name: 'Skittles',
-    description: 'Candy red, mango slice, lemon-lime, electric cyan, grape violet',
-    colors: [
-      'oklch(0.66 0.22 28)',
-      'oklch(0.74 0.21 62)',
-      'oklch(0.80 0.19 115)',
-      'oklch(0.72 0.19 198)',
-      'oklch(0.64 0.21 315)',
-    ],
-  },
-  fauntleroy: {
-    id: 'fauntleroy',
-    name: 'Fauntleroy',
-    description: 'Ferry evergreen, cabin teal, sound deep blue, Seattle lavender slate, coho salmon',
-    colors: [
-      'oklch(0.62 0.20 160)',
-      'oklch(0.72 0.16 195)',
-      'oklch(0.58 0.18 240)',
-      'oklch(0.66 0.10 290)',
-      'oklch(0.74 0.15 30)',
-    ],
-  },
-  tahoma: {
-    id: 'tahoma',
-    name: 'Tahoma',
-    description: 'Glacier snow, pure snow white, glacial water, basalt rock, lupine violet',
-    colors: [
-      'oklch(0.80 0.06 220)',
-      'oklch(0.92 0.02 210)',
-      'oklch(0.70 0.15 210)',
-      'oklch(0.48 0.03 240)',
-      'oklch(0.63 0.18 285)',
-    ],
-  },
-  evergreen: {
-    id: 'evergreen',
-    name: 'Evergreen',
-    description: 'Old growth pine, bright fern, moss lichen, red cedar, huckleberry',
-    colors: [
-      'oklch(0.52 0.12 145)',
-      'oklch(0.68 0.14 130)',
-      'oklch(0.75 0.12 105)',
-      'oklch(0.58 0.09 50)',
-      'oklch(0.55 0.08 280)',
-    ],
-  },
-  kabosu: {
-    id: 'kabosu',
-    name: 'Kabosu',
-    description: 'Bitcoin orange, Shiba gold, Kabosu lime, dark sesame, blockchain silver',
-    colors: [
-      'oklch(0.68 0.18 45)',
-      'oklch(0.75 0.14 70)',
-      'oklch(0.77 0.15 115)',
-      'oklch(0.52 0.04 65)',
-      'oklch(0.68 0.05 220)',
+      'oklch(0.58 0.18 290)',
+      'oklch(0.62 0.19 330)',
+      'oklch(0.74 0.15 50)',
+      'oklch(0.78 0.15 80)',
+      'oklch(0.70 0.15 200)',
     ],
   },
 };
@@ -121,10 +61,10 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
 export const CHART_SCHEME_NAMES = Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[];
 
 export function applyChartColorScheme(id: ChartColorSchemeId) {
-  const scheme = CHART_COLOR_SCHEMES[id];
+  const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['monarch'];
   if (!scheme) return;
   const r = document.documentElement;
-  r.setAttribute('data-chart-scheme', id);
+  r.setAttribute('data-chart-scheme', scheme.id);
   scheme.colors.forEach((color, i) => {
     r.style.setProperty(`--chart-${i + 1}`, color);
   });

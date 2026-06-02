@@ -10,6 +10,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Wallet } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 
 function BudgetsContent() {
   const { isVisible } = useChartVisibility();
@@ -20,41 +21,38 @@ function BudgetsContent() {
       <PageHeader title="Budgets" icon={Wallet}>
         <BudgetPeriodSelector />
       </PageHeader>
-      <div className="px-2 sm:px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-[1600px]">
+      <PageContent>
+        {isVisible('budgetSummary') && (
+          <Suspense fallback={<LoadingSpinner category="summary" />}>
+            <div>
+              <BudgetSummary />
+              <MathDescription chartId="budgetSummary" />
+            </div>
+          </Suspense>
+        )}
 
-          {isVisible('budgetSummary') && (
-            <Suspense fallback={<LoadingSpinner category="summary" />}>
+        {isVisible('budgetVsActualChart') && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
-                <BudgetSummary />
-                <MathDescription chartId="budgetSummary" />
+                <BudgetVsActualChart />
+                <MathDescription chartId="budgetVsActualChart" />
               </div>
             </Suspense>
-          )}
+          </div>
+        )}
 
-          {isVisible('budgetVsActualChart') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <div>
-                  <BudgetVsActualChart />
-                  <MathDescription chartId="budgetVsActualChart" />
-                </div>
-              </Suspense>
-            </div>
-          )}
-
-          {isVisible('budgetTable') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <div>
-                  <BudgetTable />
-                  <MathDescription chartId="budgetTable" />
-                </div>
-              </Suspense>
-            </div>
-          )}
-        </div>
-      </div>
+        {isVisible('budgetTable') && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="summary" />}>
+              <div>
+                <BudgetTable />
+                <MathDescription chartId="budgetTable" />
+              </div>
+            </Suspense>
+          </div>
+        )}
+      </PageContent>
     </div>
   );
 }

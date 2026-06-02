@@ -217,7 +217,7 @@ export function GoalsSummary() {
                   className={`h-full rounded-full transition-all duration-700 ${
                     data.overallProgress >= 75 ? 'bg-chart-1' :
                     data.overallProgress >= 50 ? 'bg-chart-3' :
-                    data.overallProgress >= 25 ? 'bg-yellow-500' : 'bg-destructive'
+                    data.overallProgress >= 25 ? 'bg-status-warning' : 'bg-destructive'
                   }`}
                   style={{ width: `${data.overallProgress}%` }}
                 />
@@ -257,7 +257,7 @@ export function GoalsSummary() {
                           className={`h-full rounded-full transition-all duration-500 ${
                             data.progress >= 75 ? 'bg-chart-1' :
                             data.progress >= 50 ? 'bg-chart-3' :
-                            data.progress >= 25 ? 'bg-yellow-500' : 'bg-destructive'
+                            data.progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
                           }`}
                           style={{ width: `${data.progress}%` }}
                         />

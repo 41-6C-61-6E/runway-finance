@@ -5,21 +5,17 @@ import { Check, Plus } from 'lucide-react';
 import { ACCENT_NAMES, applyAccent } from '@/lib/utils/apply-accent';
 
 const SWATCH_COLORS: Record<string, string> = {
-  indigo: '#6366f1',
   violet: '#8b5cf6',
   teal: '#14b8a6',
-  amber: '#f59e0b',
-  rose: '#f43f5e',
-  slate: '#64748b',
+  rose: '#e11d48',
+  sapphire: '#2563eb',
 };
 
 const SWATCH_LABELS: Record<string, string> = {
-  indigo: 'Indigo',
   violet: 'Violet',
   teal: 'Teal',
-  amber: 'Amber',
   rose: 'Rose',
-  slate: 'Slate',
+  sapphire: 'Sapphire',
 };
 
 const isHexColor = (value: string): boolean => /^#[0-9A-Fa-f]{6}$/.test(value);

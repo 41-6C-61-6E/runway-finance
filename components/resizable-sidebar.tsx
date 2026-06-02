@@ -6,6 +6,7 @@ import { ChartSpline, Receipt, TrendingUp, Flame, Home, Wallet, Database, Target
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
@@ -23,18 +24,6 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
 ]
-
-function SimpleTooltip({ children, label, show }: { children: React.ReactNode; label: string; show: boolean }) {
-  if (!show) return <>{children}</>
-  return (
-    <div className="relative group/tooltip">
-      {children}
-      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-foreground/10 backdrop-blur-md text-foreground text-xs font-medium rounded-md border border-border whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-150 z-50 pointer-events-none shadow-lg">
-        {label}
-      </div>
-    </div>
-  )
-}
 
 export default function ResizableSidebar() {
   const pathname = usePathname()
@@ -106,21 +95,19 @@ export default function ResizableSidebar() {
           }).map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
-            return (
-              <SimpleTooltip key={item.href} label={item.label} show={isCollapsed}>
-                <a
-                  href={item.href}
-                  className={`flex items-center rounded-lg transition-all duration-150 ${
-                    isCollapsed
-                      ? 'justify-center py-2'
-                      : 'px-3 py-2 gap-3'
-                  } ${
-                    active
-                      ? 'bg-primary/15 text-primary font-medium'
-                      : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
-                  }`}
-                  title={isCollapsed ? item.label : undefined}
-                >
+            const link = (
+              <a
+                href={item.href}
+                className={`flex items-center rounded-lg transition-all duration-150 ${
+                  isCollapsed
+                    ? 'justify-center py-2'
+                    : 'px-3 py-2 gap-3'
+                } ${
+                  active
+                    ? 'bg-primary/15 text-primary font-medium'
+                    : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                }`}
+              >
                   <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
                   {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
                   {item.href === '/ai-suggestions' && pendingAiCount > 0 && (
@@ -133,7 +120,14 @@ export default function ResizableSidebar() {
                     )
                   )}
                 </a>
-              </SimpleTooltip>
+            )
+            return isCollapsed ? (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <div key={item.href}>{link}</div>
             )
           })}
         </nav>
