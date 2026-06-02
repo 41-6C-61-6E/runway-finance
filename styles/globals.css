@@ -296,3 +296,10 @@ body,
   }
 }
 
+/* Ensure Recharts tooltips disappear when the mouse leaves the chart area */
+.recharts-wrapper:not(:hover) .recharts-tooltip-wrapper {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+

@@ -28,6 +28,7 @@ interface BudgetData {
 interface Account {
   id: string;
   name: string;
+  tags?: { id: string; name: string; color: string }[];
 }
 
 interface Category {
@@ -175,12 +176,32 @@ export function BudgetTable() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {b.fundingAccountId ? (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Landmark className="w-3 h-3" />
-                            {getAccountName(b.fundingAccountId)}
-                          </div>
-                        ) : (
+                        {b.fundingAccountId ? (() => {
+                          const account = accounts.find((a) => a.id === b.fundingAccountId);
+                          return account ? (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Landmark className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate" title={account.name}>{account.name}</span>
+                              {account.tags && account.tags.length > 0 && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {account.tags.map((tag) => (
+                                    <span
+                                      key={tag.id}
+                                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: tag.color }}
+                                      title={tag.name}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Landmark className="w-3 h-3" />
+                              {getAccountName(b.fundingAccountId)}
+                            </div>
+                          );
+                        })() : (
                           <span className="text-xs text-muted-foreground/50">&mdash;</span>
                         )}
                       </td>
@@ -237,12 +258,32 @@ export function BudgetTable() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {b.fundingAccountId ? (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Landmark className="w-3 h-3" />
-                            {getAccountName(b.fundingAccountId)}
-                          </div>
-                        ) : (
+                        {b.fundingAccountId ? (() => {
+                          const account = accounts.find((a) => a.id === b.fundingAccountId);
+                          return account ? (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Landmark className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate" title={account.name}>{account.name}</span>
+                              {account.tags && account.tags.length > 0 && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {account.tags.map((tag) => (
+                                    <span
+                                      key={tag.id}
+                                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: tag.color }}
+                                      title={tag.name}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Landmark className="w-3 h-3" />
+                              {getAccountName(b.fundingAccountId)}
+                            </div>
+                          );
+                        })() : (
                           <span className="text-xs text-muted-foreground/50">&mdash;</span>
                         )}
                       </td>

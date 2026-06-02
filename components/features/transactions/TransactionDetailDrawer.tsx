@@ -17,6 +17,7 @@ type Transaction = {
   categoryName: string | null;
   categoryColor: string | null;
   accountName: string | null;
+  accountTags?: { id: string; name: string; color: string }[];
   notes: string | null;
   reviewed: boolean | null;
   ignored: boolean | null;
@@ -240,7 +241,26 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Account</div>
-              <div className="text-sm text-foreground mt-0.5">{transaction.accountName || '—'}</div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                <span className="text-sm text-foreground">{transaction.accountName || '—'}</span>
+                {transaction.accountTags && transaction.accountTags.length > 0 && (
+                  <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                    {transaction.accountTags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                        style={{
+                          backgroundColor: `${tag.color}15`,
+                          color: tag.color,
+                          borderColor: `${tag.color}30`
+                        }}
+                      >
+                        #{tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Description</div>

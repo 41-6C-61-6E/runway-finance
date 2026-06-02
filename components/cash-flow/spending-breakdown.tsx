@@ -382,6 +382,7 @@ export function SpendingBreakdown() {
                             <XAxis type="number" tickFormatter={(v) => `$${v}`} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
                             <YAxis dataKey="label" type="category" width={dynamicLeft - 10} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
                             <Tooltip
+                              cursor={false}
                               content={({ active, payload }) => {
                                 if (!active || !payload || !payload.length) return null;
                                 const data = payload[0].payload;
@@ -413,8 +414,8 @@ export function SpendingBreakdown() {
                           data={pieData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={isMobile ? 55 : 75}
-                          outerRadius={isMobile ? 80 : 105}
+                          innerRadius={isMobile ? '60%' : '68%'}
+                          outerRadius={isMobile ? '85%' : '92%'}
                           paddingAngle={0.5}
                           cornerRadius={3}
                           stroke="none"

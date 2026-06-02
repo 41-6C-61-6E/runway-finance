@@ -38,8 +38,8 @@ export function Sparkline({ data, width = 120, height = 30, isPositive }: Sparkl
     <svg width={width} height={height} className="overflow-visible">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.02" />
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.08" />
         </linearGradient>
       </defs>
       <path d={areaD} fill={`url(#${gradientId})`} />

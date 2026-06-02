@@ -8,6 +8,10 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { List } from 'lucide-react';
 
 interface CategoryData {
   categoryId: string;
@@ -120,6 +124,8 @@ export function CategorySummaries() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:category-summaries:timeframe', '1m');
+  const [isCollapsed, setIsCollapsed] = useCardCollapsed('categorySummaries');
+  const [showFilters, setShowFilters] = useState(false);
 
   const queryParams = useMemo(() => {
     const range = getMonthRange(timeframe);
@@ -193,36 +199,59 @@ export function CategorySummaries() {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <div className="p-5 pb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
-          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-        </div>
-        <LoadingSpinner category="chart" className="h-[350px]" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <List className="w-4 h-4 text-primary" /> Category Breakdown
+            </h3>
+          }
+        />
+        {!isCollapsed && <LoadingSpinner category="chart" className="h-[350px] m-5" />}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <div className="p-5 pb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
-          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-        </div>
-        <ChartEmptyState variant="error" error={error} />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <List className="w-4 h-4 text-primary" /> Category Breakdown
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        )}
       </div>
     );
   }
 
   if (income.length === 0 && expenses.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-5">
-        <div className="p-5 pb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
-          <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-        </div>
-        <ChartEmptyState variant="nodata" description="No category data for this period" />
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <List className="w-4 h-4 text-primary" /> Category Breakdown
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" description="No category data for this period" />
+          </div>
+        )}
       </div>
     );
   }
@@ -313,17 +342,46 @@ export function CategorySummaries() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="p-5 pb-2 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Category Breakdown</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
-          </p>
-        </div>
-        <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-      </div>
-      {income.length > 0 && renderSection(income, true)}
-      {expenses.length > 0 && renderSection(expenses, false)}
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={
+          <div className="flex flex-col">
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <List className="w-4 h-4 text-primary" /> Category Breakdown
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5 font-normal">
+              Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
+            </p>
+          </div>
+        }
+      />
+      {!isCollapsed && (
+        <>
+          <CollapsibleFilterPanel
+            isOpen={showFilters}
+            onToggle={() => setShowFilters(!showFilters)}
+            feedback={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeframe.toUpperCase()}
+                </span>
+              </div>
+            }
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+          <div className="pb-4">
+            {income.length > 0 && renderSection(income, true)}
+            {expenses.length > 0 && renderSection(expenses, false)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
