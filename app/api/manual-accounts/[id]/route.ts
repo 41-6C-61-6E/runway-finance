@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { accounts, accountTags, tags } from '@/lib/db/schema';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { deleteManualAccount, readApiConfig } from '@/lib/services/manual-accounts';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRow, encryptRow } from '@/lib/crypto';
+import { decryptRow, encryptRow, decryptField } from '@/lib/crypto';
 import {
   createAccountSnapshots,
   createNetWorthSnapshot,
@@ -40,7 +40,30 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const decrypted = await decryptRow('accounts', account, dek);
   logger.info('GET /api/manual-accounts/[id]', { userId, id, type: decrypted.type, name: decrypted.name });
-  return NextResponse.json(decrypted);
+
+  // Fetch account tags
+  const tagRows = await getDb()
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+    })
+    .from(accountTags)
+    .leftJoin(tags, eq(accountTags.tagId, tags.id))
+    .where(eq(accountTags.accountId, id));
+
+  const attachedTags: any[] = [];
+  for (const row of tagRows) {
+    if (row.id) {
+      attachedTags.push({
+        id: row.id,
+        name: row.name ? await decryptField(row.name, dek) : '',
+        color: row.color,
+      });
+    }
+  }
+
+  return NextResponse.json({ ...decrypted, tags: attachedTags });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -80,16 +103,61 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     updateData.metadata = body.metadata;
   }
 
-  if (Object.keys(updateData).length === 0) {
+  const tagIds = body.tagIds as string[] | undefined;
+
+  if (Object.keys(updateData).length === 0 && tagIds === undefined) {
     return NextResponse.json({ error: 'validation_error', message: 'No valid fields to update' }, { status: 400 });
   }
 
-  updateData = await encryptRow('accounts', updateData, dek);
-  const [updated] = await getDb()
-    .update(accounts)
-    .set({ ...updateData, updatedAt: new Date() })
-    .where(eq(accounts.id, id))
-    .returning();
+  let updated = account;
+  if (Object.keys(updateData).length > 0) {
+    const encryptedUpdate = await encryptRow('accounts', updateData, dek);
+    const [result] = await getDb()
+      .update(accounts)
+      .set({ ...encryptedUpdate, updatedAt: new Date() })
+      .where(eq(accounts.id, id))
+      .returning();
+    updated = result;
+  }
+
+  if (tagIds !== undefined) {
+    await getDb()
+      .delete(accountTags)
+      .where(eq(accountTags.accountId, id));
+
+    if (tagIds.length > 0) {
+      await getDb()
+        .insert(accountTags)
+        .values(
+          tagIds.map(tId => ({
+            accountId: id,
+            tagId: tId,
+          }))
+        );
+    }
+  }
+
+  // Fetch updated tags
+  const tagRows = await getDb()
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+    })
+    .from(accountTags)
+    .leftJoin(tags, eq(accountTags.tagId, tags.id))
+    .where(eq(accountTags.accountId, id));
+
+  const attachedTags: any[] = [];
+  for (const row of tagRows) {
+    if (row.id) {
+      attachedTags.push({
+        id: row.id,
+        name: row.name ? await decryptField(row.name, dek) : '',
+        color: row.color,
+      });
+    }
+  }
 
   // Reschedule sync timer when metadata (which contains syncFrequency) changes
   if (body.metadata !== undefined && updated) {
@@ -142,8 +210,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
   }
 
-  logger.info('PATCH /api/manual-accounts/[id]', { userId, id, fieldsChanged: Object.keys(updateData) });
-  return NextResponse.json(updated ? await decryptRow('accounts', updated, dek) : updated);
+  logger.info('PATCH /api/manual-accounts/[id]', { userId, id, fieldsChanged: Object.keys(updateData), tagIdsUpdated: tagIds !== undefined });
+  const decryptedResult = updated ? await decryptRow('accounts', updated, dek) : updated;
+  return NextResponse.json({ ...decryptedResult, tags: attachedTags });
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

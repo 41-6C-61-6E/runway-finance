@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, Pencil, Trash2, Tag, Search, Hash } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 type Tag = {
   id: string;
@@ -81,6 +83,27 @@ export default function TagsTab() {
   const [formName, setFormName] = useState('');
   const [formColor, setFormColor] = useState('#6366f1');
   const [formDescription, setFormDescription] = useState('');
+
+  const settingsContext = useUserSettings();
+  const settings = settingsContext?.settings;
+  const updateSetting = settingsContext?.updateSetting;
+
+  const visibilitySettings = settings?.accountTagVisibility || {
+    sidebar: true,
+    transactions: true,
+    legend: true,
+    budgets: true,
+    forecast: true,
+    suggestions: true,
+  };
+
+  const toggleVisibility = async (field: string) => {
+    if (!updateSetting) return;
+    const currentVal = visibilitySettings[field] !== false;
+    await updateSetting('accountTagVisibility', {
+      [field]: !currentVal
+    });
+  };
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -245,7 +268,8 @@ export default function TagsTab() {
         {filtered.map((tag) => (
           <div
             key={tag.id}
-            className="flex items-center justify-between p-4 bg-card border border-border rounded-lg group hover:border-foreground/20 transition-colors"
+            onClick={() => openEdit(tag)}
+            className="flex items-center justify-between p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-muted/50 hover:border-foreground/20 transition-colors"
           >
             <div className="flex items-center gap-3 min-w-0">
               {/* Color swatch */}
@@ -269,17 +293,17 @@ export default function TagsTab() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
-                onClick={() => openEdit(tag)}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+                onClick={(e) => { e.stopPropagation(); openEdit(tag); }}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded"
                 title="Edit tag"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setDeleting(tag)}
-                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded"
+                onClick={(e) => { e.stopPropagation(); setDeleting(tag); }}
+                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded"
                 title="Delete tag"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -287,6 +311,82 @@ export default function TagsTab() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Account Tag Display Settings */}
+      <div className="mt-8 pt-6 border-t border-border">
+        <h3 className="text-sm font-semibold text-foreground mb-1">Account Tag Display Settings</h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Control where account tags and color indicators are shown in the interface.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/20 border border-border rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Accounts Sidebar</label>
+              <p className="text-[10px] text-muted-foreground">Display color dots next to account names in the sidebar</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.sidebar !== false}
+              onCheckedChange={() => toggleVisibility('sidebar')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Transaction Register</label>
+              <p className="text-[10px] text-muted-foreground">Display indicators in transactions list and detail drawer</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.transactions !== false}
+              onCheckedChange={() => toggleVisibility('transactions')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Chart Legends</label>
+              <p className="text-[10px] text-muted-foreground">Display indicators in the Balance History chart legend</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.legend !== false}
+              onCheckedChange={() => toggleVisibility('legend')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Budget Table</label>
+              <p className="text-[10px] text-muted-foreground">Display indicators next to accounts in budget item details</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.budgets !== false}
+              onCheckedChange={() => toggleVisibility('budgets')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Cash Flow Forecast</label>
+              <p className="text-[10px] text-muted-foreground">Display indicators in the Cash Flow Projection tables</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.forecast !== false}
+              onCheckedChange={() => toggleVisibility('forecast')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in AI Suggestions &amp; Cleanup</label>
+              <p className="text-[10px] text-muted-foreground">Display indicators in recommendations and cleanup tools</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.suggestions !== false}
+              onCheckedChange={() => toggleVisibility('suggestions')}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Add/Edit Drawer */}

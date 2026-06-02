@@ -33,6 +33,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -478,6 +479,8 @@ const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] =>
 // ── Main Accounts Dashboard Page ─────────────────────────────────────────────
 export default function AccountsPage() {
   const { data: session } = useSession();
+  const settingsContext = useUserSettings();
+  const showLegendTags = settingsContext?.settings?.accountTagVisibility?.legend !== false;
   const { isEnabled } = useSyntheticData();
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
@@ -2141,7 +2144,7 @@ export default function AccountsPage() {
                                         <span className="truncate" title={info?.label || key}>
                                           {info?.label || key}
                                         </span>
-                                        {info?.tags && info.tags.length > 0 && (
+                                        {showLegendTags && info?.tags && info.tags.length > 0 && (
                                           <div className="flex items-center gap-1 flex-shrink-0">
                                             {info.tags.map((tag) => (
                                               <span
@@ -2177,7 +2180,7 @@ export default function AccountsPage() {
                                         <span className="truncate" title={info?.label || key}>
                                           {info?.label || key}
                                         </span>
-                                        {info?.tags && info.tags.length > 0 && (
+                                        {showLegendTags && info?.tags && info.tags.length > 0 && (
                                           <div className="flex items-center gap-1 flex-shrink-0">
                                             {info.tags.map((tag) => (
                                               <span

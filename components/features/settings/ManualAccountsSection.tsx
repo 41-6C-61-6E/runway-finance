@@ -180,19 +180,29 @@ export default function ManualAccountsSection() {
   const [editMeta, setEditMeta] = useState<Record<string, string>>({});
   const [editLoading, setEditLoading] = useState(false);
 
+  // Tags state
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<any[]>([]);
+  const [tagSearch, setTagSearch] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [showEditTagDropdown, setShowEditTagDropdown] = useState(false);
+
   const fetchAccounts = useCallback(async () => {
     try {
-      const [res, reRes, mRes] = await Promise.all([
+      const [res, reRes, mRes, tRes] = await Promise.all([
         fetch('/api/manual-accounts', { credentials: 'include' }),
         fetch('/api/accounts?type=realestate', { credentials: 'include' }),
         fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
+        fetch('/api/tags', { credentials: 'include' }),
       ]);
       const manualData = await res.json();
       const mortgageData = mRes.ok ? await mRes.json() : [];
+      const tagsData = tRes.ok ? await tRes.json() : [];
       
       setAccounts(Array.isArray(manualData) ? manualData : []);
       if (reRes.ok) setRealEstateAccounts(await reRes.json());
       if (mRes.ok) setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
+      setAllTags(Array.isArray(tagsData) ? tagsData : []);
     } catch {
       setAccounts([]);
     } finally {
@@ -278,6 +288,7 @@ export default function ManualAccountsSection() {
           initialValue: (createType === 'mortgage' && ['paid_off', 'refinanced'].includes(createMeta.mortgageStatus))
             ? 0
             : (parseFloat(createInitialValue) || 0),
+          tagIds,
         }),
       });
 
@@ -397,6 +408,9 @@ export default function ManualAccountsSection() {
   const openEdit = (account: ManualAccount) => {
     setEditAccount(account);
     setEditName(account.name);
+    setTagIds(account.tags?.map((t) => t.id) ?? []);
+    setTagSearch('');
+    setShowEditTagDropdown(false);
     const meta = account.metadata ?? {};
     const flat: Record<string, string> = {};
     Object.entries(meta).forEach(([k, v]) => {
@@ -484,7 +498,8 @@ export default function ManualAccountsSection() {
           metadata,
           balance: (editAccount.type === 'mortgage' && ['paid_off', 'refinanced'].includes(editMeta.mortgageStatus)) 
             ? '0' 
-            : undefined
+            : undefined,
+          tagIds,
         }),
       });
 
@@ -936,7 +951,7 @@ export default function ManualAccountsSection() {
       )}
 
       {/* Create Drawer */}
-      <Sheet open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); }}>
+      <Sheet open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); if (open) { setTagIds([]); setTagSearch(''); setShowTagDropdown(false); } }}>
         <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Add Manual Account</SheetTitle>
@@ -970,6 +985,86 @@ export default function ManualAccountsSection() {
               />
             </div>
             {typeSpecificFields()}
+            {/* Tags Picker for Create */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+              <div className="relative">
+                <div 
+                  className="min-h-[38px] w-full flex flex-wrap gap-1 px-3 py-1.5 bg-background border border-input rounded-lg cursor-pointer" 
+                  onClick={() => setShowTagDropdown(!showTagDropdown)}
+                >
+                  {tagIds.length === 0 && (
+                    <span className="text-sm text-muted-foreground self-center">No tags selected</span>
+                  )}
+                  {tagIds.map((tagId) => {
+                    const tag = allTags.find((t) => t.id === tagId);
+                    if (!tag) return null;
+                    return (
+                      <span
+                        key={tagId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                      >
+                        #{tag.name}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setTagIds(tagIds.filter((id) => id !== tagId)); }}
+                          className="ml-0.5 text-current opacity-60 hover:opacity-100"
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                  <span className="ml-auto self-center text-muted-foreground text-xs">▼</span>
+                </div>
+
+                {showTagDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                    <div className="absolute z-50 bottom-full mb-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
+                      <div className="relative p-2 border-b border-border">
+                        <input
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          placeholder="Search tags..."
+                          className="w-full px-3 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        {allTags.length === 0 && (
+                          <div className="px-3 py-4 text-xs text-muted-foreground text-center">No tags — create them in Settings → Tags</div>
+                        )}
+                        {allTags
+                          .filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                          .map((tag) => (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (tagIds.includes(tag.id)) {
+                                  setTagIds(tagIds.filter((id) => id !== tag.id));
+                                } else {
+                                  setTagIds([...tagIds, tag.id]);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
+                                tagIds.includes(tag.id) ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted'
+                              }`}
+                            >
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                              {tag.name}
+                              {tagIds.includes(tag.id) && <span className="ml-auto text-xs">✓</span>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 {createType === 'mortgage' ? 'Outstanding Balance (positive)' : 'Initial Value (optional)'}
@@ -1245,6 +1340,86 @@ export default function ManualAccountsSection() {
                 />
               </div>
             )}
+
+            {/* Tags Picker for Edit */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+              <div className="relative">
+                <div 
+                  className="min-h-[38px] w-full flex flex-wrap gap-1 px-3 py-1.5 bg-background border border-input rounded-lg cursor-pointer" 
+                  onClick={() => setShowEditTagDropdown(!showEditTagDropdown)}
+                >
+                  {tagIds.length === 0 && (
+                    <span className="text-sm text-muted-foreground self-center">No tags selected</span>
+                  )}
+                  {tagIds.map((tagId) => {
+                    const tag = allTags.find((t) => t.id === tagId);
+                    if (!tag) return null;
+                    return (
+                      <span
+                        key={tagId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                      >
+                        #{tag.name}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setTagIds(tagIds.filter((id) => id !== tagId)); }}
+                          className="ml-0.5 text-current opacity-60 hover:opacity-100"
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                  <span className="ml-auto self-center text-muted-foreground text-xs">▼</span>
+                </div>
+
+                {showEditTagDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowEditTagDropdown(false); setTagSearch(''); }} />
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
+                      <div className="relative p-2 border-b border-border">
+                        <input
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          placeholder="Search tags..."
+                          className="w-full px-3 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        {allTags.length === 0 && (
+                          <div className="px-3 py-4 text-xs text-muted-foreground text-center">No tags — create them in Settings → Tags</div>
+                        )}
+                        {allTags
+                          .filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                          .map((tag) => (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (tagIds.includes(tag.id)) {
+                                  setTagIds(tagIds.filter((id) => id !== tag.id));
+                                } else {
+                                  setTagIds([...tagIds, tag.id]);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
+                                tagIds.includes(tag.id) ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted'
+                              }`}
+                            >
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                              {tag.name}
+                              {tagIds.includes(tag.id) && <span className="ml-auto text-xs">✓</span>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">

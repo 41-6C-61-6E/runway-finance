@@ -47,7 +47,12 @@ interface TransactionDetailDrawerProps {
   onSuccess: () => void;
 }
 
+import { useUserSettings } from '@/components/user-settings-provider';
+
 export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess }: TransactionDetailDrawerProps) {
+  const settingsContext = useUserSettings();
+  const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
+
   const [payee, setPayee] = useState(transaction.payee ?? '');
   const [memo, setMemo] = useState(transaction.memo ?? '');
   const [notes, setNotes] = useState(transaction.notes ?? '');
@@ -243,7 +248,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
               <div className="text-xs text-muted-foreground">Account</div>
               <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                 <span className="text-sm text-foreground">{transaction.accountName || '—'}</span>
-                {transaction.accountTags && transaction.accountTags.length > 0 && (
+                {showAccountTags && transaction.accountTags && transaction.accountTags.length > 0 && (
                   <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                     {transaction.accountTags.map((tag) => (
                       <span
