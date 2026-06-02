@@ -50,14 +50,24 @@ describe('CSV Parser', () => {
     expect(parseDateField('October 2025')).toBe('2025-10-01');
     expect(parseDateField('Oct 2025')).toBe('2025-10-01');
 
-    // Test endOfMonth = true for various formats
-    expect(parseDateField('October 2025', true)).toBe('2025-10-31');
-    expect(parseDateField('Oct 2025', true)).toBe('2025-10-31');
-    expect(parseDateField('2025-10', true)).toBe('2025-10-31');
-    expect(parseDateField('10/2025', true)).toBe('2025-10-31');
-    expect(parseDateField('February 2024', true)).toBe('2024-02-29'); // Leap year
-    expect(parseDateField('Feb 2025', true)).toBe('2025-02-28'); // Non-leap year
-    expect(parseDateField('Oct-25', true)).toBe('2025-10-31'); // 2-digit year
+    // Test dayOfMonth = 'end' for various formats
+    expect(parseDateField('October 2025', 'end')).toBe('2025-10-31');
+    expect(parseDateField('Oct 2025', 'end')).toBe('2025-10-31');
+    expect(parseDateField('2025-10', 'end')).toBe('2025-10-31');
+    expect(parseDateField('10/2025', 'end')).toBe('2025-10-31');
+    expect(parseDateField('February 2024', 'end')).toBe('2024-02-29'); // Leap year
+    expect(parseDateField('Feb 2025', 'end')).toBe('2025-02-28'); // Non-leap year
+    expect(parseDateField('Oct-25', 'end')).toBe('2025-10-31'); // 2-digit year
+
+    // Test specific day of month
+    expect(parseDateField('April 2026', 15)).toBe('2026-04-15');
+    expect(parseDateField('2026-04', 15)).toBe('2026-04-15');
+    expect(parseDateField('4/2026', 15)).toBe('2026-04-15');
+
+    // Test clamping: day 31 in April -> 30
+    expect(parseDateField('April 2026', 31)).toBe('2026-04-30');
+    // Test clamping: day 30 in February 2025 (non-leap) -> 28
+    expect(parseDateField('February 2025', 30)).toBe('2025-02-28');
   });
 
   it('should determine transaction sign based on type indicator', () => {

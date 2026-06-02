@@ -147,14 +147,14 @@ export function getGoalTypeIcon(type: string): string {
 export function getGoalProgressColor(progress: number): string {
   if (progress >= 75) return 'text-chart-1';
   if (progress >= 50) return 'text-chart-3';
-  if (progress >= 25) return 'text-yellow-500';
+  if (progress >= 25) return 'text-status-warning';
   return 'text-destructive';
 }
 
 export function getGoalProgressBg(progress: number): string {
   if (progress >= 75) return 'bg-chart-1';
   if (progress >= 50) return 'bg-chart-3';
-  if (progress >= 25) return 'bg-yellow-500';
+  if (progress >= 25) return 'bg-status-warning';
   return 'bg-destructive';
 }
 

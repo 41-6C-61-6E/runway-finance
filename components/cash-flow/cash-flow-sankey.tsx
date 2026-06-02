@@ -105,14 +105,14 @@ function getMonthRange(timeframe: TimeRange, selectedMonth?: string): { start: s
 }
 
 const VIBRANT_COLORS = [
-  '#3b82f6',  // blue
-  '#10b981',  // green
-  '#f59e0b',  // amber
-  '#ef4444',  // red
-  '#8b5cf6',  // purple
-  '#ec4899',  // pink
-  '#06b6d4',  // cyan
-  '#f97316',  // orange
+  'var(--color-chart-2)',          // blue
+  'var(--color-chart-1)',          // green
+  'var(--color-chart-3)',          // yellow
+  'var(--color-destructive)',      // red
+  'var(--color-chart-5)',          // purple
+  'var(--color-chart-4)',          // teal
+  'var(--color-chart-synthetic)',  // light green
+  'var(--color-status-warning)',   // amber
 ];
 
 function getThemeType(): 'light' | 'dark' | 'moonlight' {

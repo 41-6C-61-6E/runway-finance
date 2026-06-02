@@ -172,7 +172,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
               className={`h-full rounded-full transition-all duration-700 ease-out ${
                 progress >= 75 ? 'bg-chart-1' :
                 progress >= 50 ? 'bg-chart-3' :
-                progress >= 25 ? 'bg-yellow-500' : 'bg-destructive'
+                progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
               }`}
               style={{ width: `${progress}%` }}
             />

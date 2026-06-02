@@ -31,7 +31,7 @@ export function Sparkline({ data, width = 120, height = 30, isPositive }: Sparkl
 
   const pathD = `M ${points.join(' L ')}`;
   const areaD = `${pathD} L ${width},${height} L 0,${height} Z`;
-  const strokeColor = isPositive ? '#10b981' : '#ef4444';
+  const strokeColor = isPositive ? 'var(--color-status-positive)' : 'var(--color-destructive)';
   const gradientId = `sparkline-gradient-${id}`;
 
   return (
