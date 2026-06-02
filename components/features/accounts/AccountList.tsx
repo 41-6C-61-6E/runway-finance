@@ -13,6 +13,7 @@ type Account = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 // ── Type hierarchy mapping ──────────────────────────────────────────────
@@ -89,6 +90,23 @@ function AccountRow({
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
         <span className="text-sm text-foreground truncate">{account.name}</span>
+        {account.tags && account.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+            {account.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="px-1.5 py-0.2 rounded-full text-[9px] font-medium border"
+                style={{
+                  backgroundColor: `${tag.color}15`,
+                  color: tag.color,
+                  borderColor: `${tag.color}30`
+                }}
+              >
+                #{tag.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="flex items-center gap-1 opacity-0 group-hover/account:opacity-100 transition-opacity">

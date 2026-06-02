@@ -57,6 +57,7 @@ type Transaction = {
   reviewed: boolean | null;
   categorizedByAi: boolean;
   tags?: { id: string; name: string; color: string }[];
+  accountTags?: { id: string; name: string; color: string }[];
 };
 
 type Category = {
@@ -885,11 +886,28 @@ export default function TransactionTable({
         header: ({ column }) => (
           <SortableHeader column={column} title="Account" />
         ),
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground truncate block">
-            {row.original.accountName || "—"}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const tx = row.original;
+          return (
+            <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+              <span className="text-sm text-muted-foreground truncate block">
+                {tx.accountName || "—"}
+              </span>
+              {tx.accountTags && tx.accountTags.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {tx.accountTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: tag.color }}
+                      title={tag.name}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         id: "category",

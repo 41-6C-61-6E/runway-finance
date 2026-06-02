@@ -17,6 +17,13 @@ type Account = {
   balanceDate: string | null;
   metadata?: Record<string, unknown> | null;
   connectionId?: string | null;
+  tags?: { id: string; name: string; color: string }[];
+};
+
+type TagItem = {
+  id: string;
+  name: string;
+  color: string;
 };
 
 const MAJOR_TYPE_OPTIONS = [
@@ -100,6 +107,10 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [unlinking, setUnlinking] = useState(false);
   const [mortgageMeta, setMortgageMeta] = useState<Record<string, string>>({});
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
+  const [tagIds, setTagIds] = useState<string[]>(account?.tags?.map((t) => t.id) ?? []);
+  const [allTags, setAllTags] = useState<TagItem[]>([]);
+  const [tagSearch, setTagSearch] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
 
   const handleUnlink = useCallback(async () => {
     if (!account) return;
@@ -129,6 +140,15 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     }
   }, [account, onSuccess]);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (open && allTags.length === 0) {
+      fetch('/api/tags', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => setAllTags(Array.isArray(data) ? data : []))
+        .catch(() => setAllTags([]));
+    }
+  }, [open, allTags.length]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (!account) return;
@@ -165,6 +185,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     setMajorType(findMajorType(account.type));
     setIsHidden(account.isHidden);
     setIsExcludedFromNetWorth(account.isExcludedFromNetWorth);
+    setTagIds(account.tags?.map((t) => t.id) ?? []);
 
     if (account.type === 'mortgage') {
       const meta = account.metadata ?? {};
@@ -195,6 +216,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         type,
         isHidden,
         isExcludedFromNetWorth,
+        tagIds,
       };
 
       if (type === 'mortgage') {
@@ -239,7 +261,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, mortgageMeta, onSuccess]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, onSuccess]);
 
   if (!account || !open) return null;
 
@@ -345,6 +367,82 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            {/* Tags Picker */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+              <div className="relative">
+                <div className="min-h-[38px] w-full flex flex-wrap gap-1 px-3 py-1.5 bg-background border border-input rounded-lg cursor-pointer" onClick={() => setShowTagDropdown(!showTagDropdown)}>
+                  {tagIds.length === 0 && (
+                    <span className="text-sm text-muted-foreground self-center">No tags selected</span>
+                  )}
+                  {tagIds.map((tagId) => {
+                    const tag = allTags.find((t) => t.id === tagId);
+                    if (!tag) return null;
+                    return (
+                      <span
+                        key={tagId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                      >
+                        #{tag.name}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setTagIds(tagIds.filter((id) => id !== tagId)); }}
+                          className="ml-0.5 text-current opacity-60 hover:opacity-100"
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                  <span className="ml-auto self-center text-muted-foreground text-xs">▼</span>
+                </div>
+
+                {showTagDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
+                      <div className="relative p-2 border-b border-border">
+                        <input
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          placeholder="Search tags..."
+                          className="w-full px-3 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        {allTags.length === 0 && (
+                          <div className="px-3 py-4 text-xs text-muted-foreground text-center">No tags — create them in Settings → Tags</div>
+                        )}
+                        {allTags
+                          .filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                          .map((tag) => (
+                            <button
+                              key={tag.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (tagIds.includes(tag.id)) {
+                                  setTagIds(tagIds.filter((id) => id !== tag.id));
+                                } else {
+                                  setTagIds([...tagIds, tag.id]);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
+                                tagIds.includes(tag.id) ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted'
+                              }`}
+                            >
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                              {tag.name}
+                              {tagIds.includes(tag.id) && <span className="ml-auto text-xs">✓</span>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

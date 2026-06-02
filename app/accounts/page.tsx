@@ -65,7 +65,14 @@ interface Account {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   connectionId?: string | null;
+  tags?: { id: string; name: string; color: string }[];
 }
+
+type TagItem = {
+  id: string;
+  name: string;
+  color: string;
+};
 
 interface ChartPreset {
   id: string;
@@ -76,6 +83,7 @@ interface ChartPreset {
   selectedGroups: string[];
   selectedTypes: string[];
   selectedAccounts: string[];
+  selectedTags?: string[];
   isCustom?: boolean;
 }
 
@@ -509,11 +517,13 @@ export default function AccountsPage() {
   const [selectedGroups, setSelectedGroups] = usePersistentState<Set<string>>('runway:accounts:selectedGroups', new Set(), setOptions);
   const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('runway:accounts:selectedTypes', new Set(), setOptions);
   const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:selectedAccounts', new Set(), setOptions);
+  const [selectedTags, setSelectedTags] = usePersistentState<Set<string>>('runway:accounts:selectedTags', new Set(), setOptions);
 
   // Dropdown filter selections for Hierarchy
   const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedGroups', new Set(), setOptions);
   const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTypes', new Set(), setOptions);
   const [hierarchySelectedAccounts, setHierarchySelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedAccounts', new Set(), setOptions);
+  const [hierarchySelectedTags, setHierarchySelectedTags] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTags', new Set(), setOptions);
   const hierarchyShowHidden = false;
 
   // ── Presets / Quick Views State & Handlers ──
@@ -532,7 +542,8 @@ export default function AccountsPage() {
     setSelectedGroups(new Set(preset.selectedGroups || []));
     setSelectedTypes(new Set(preset.selectedTypes || []));
     setSelectedAccounts(new Set(preset.selectedAccounts || []));
-  }, [setTimeframe, setChartType, setGroupMode, setSelectedGroups, setSelectedTypes, setSelectedAccounts]);
+    setSelectedTags(new Set(preset.selectedTags || []));
+  }, [setTimeframe, setChartType, setGroupMode, setSelectedGroups, setSelectedTypes, setSelectedAccounts, setSelectedTags]);
 
   const handleSaveCurrentView = useCallback((name: string) => {
     if (!name.trim()) return;
@@ -545,12 +556,13 @@ export default function AccountsPage() {
       selectedGroups: Array.from(selectedGroups),
       selectedTypes: Array.from(selectedTypes),
       selectedAccounts: Array.from(selectedAccounts),
+      selectedTags: Array.from(selectedTags),
       isCustom: true,
     };
     setCustomPresets((prev) => [...(prev || []), newPreset]);
     setIsSavingView(false);
     setNewPresetName('');
-  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts, setCustomPresets]);
+  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts, selectedTags, setCustomPresets]);
 
   const handleDeletePreset = useCallback((id: string) => {
     setCustomPresets((prev) => (prev || []).filter((p) => p.id !== id));
@@ -578,36 +590,48 @@ export default function AccountsPage() {
     for (const a of presetAccounts) {
       if (!selectedAccounts.has(a)) return false;
     }
+
+    const presetTags = preset.selectedTags || [];
+    if (presetTags.length !== selectedTags.size) return false;
+    for (const t of presetTags) {
+      if (!selectedTags.has(t)) return false;
+    }
     return true;
-  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts]);
+  }, [timeframe, chartType, groupMode, selectedGroups, selectedTypes, selectedAccounts, selectedTags]);
 
   // Dropdown open states
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
   const [accountsOpen, setAccountsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
   // Dropdown open states for Hierarchy
   const [hierarchyGroupsOpen, setHierarchyGroupsOpen] = useState(false);
   const [hierarchyTypesOpen, setHierarchyTypesOpen] = useState(false);
   const [hierarchyAccountsOpen, setHierarchyAccountsOpen] = useState(false);
+  const [hierarchyTagsOpen, setHierarchyTagsOpen] = useState(false);
 
   // Search filter states
   const [typeSearch, setTypeSearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
+  const [tagSearch, setTagSearch] = useState('');
 
   // Search filter states for Hierarchy
   const [hierarchyTypeSearch, setHierarchyTypeSearch] = useState('');
   const [hierarchyAccountSearch, setHierarchyAccountSearch] = useState('');
+  const [hierarchyTagSearch, setHierarchyTagSearch] = useState('');
 
   // Refs for closing dropdowns when clicking outside
   const groupsRef = useRef<HTMLDivElement>(null);
   const typesRef = useRef<HTMLDivElement>(null);
   const accountsRef = useRef<HTMLDivElement>(null);
+  const tagsRef = useRef<HTMLDivElement>(null);
 
   // Refs for closing dropdowns for Hierarchy
   const hierarchyGroupsRef = useRef<HTMLDivElement>(null);
   const hierarchyTypesRef = useRef<HTMLDivElement>(null);
   const hierarchyAccountsRef = useRef<HTMLDivElement>(null);
+  const hierarchyTagsRef = useRef<HTMLDivElement>(null);
 
   // Click outside listener
   useEffect(() => {
@@ -623,6 +647,10 @@ export default function AccountsPage() {
         setAccountsOpen(false);
         setAccountSearch('');
       }
+      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) {
+        setTagsOpen(false);
+        setTagSearch('');
+      }
 
       // Hierarchy Refs
       if (hierarchyGroupsRef.current && !hierarchyGroupsRef.current.contains(e.target as Node)) {
@@ -636,6 +664,10 @@ export default function AccountsPage() {
         setHierarchyAccountsOpen(false);
         setHierarchyAccountSearch('');
       }
+      if (hierarchyTagsRef.current && !hierarchyTagsRef.current.contains(e.target as Node)) {
+        setHierarchyTagsOpen(false);
+        setHierarchyTagSearch('');
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -647,6 +679,17 @@ export default function AccountsPage() {
     queryFn: async () => {
       const res = await fetch('/api/accounts?includeHidden=true', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch accounts');
+      return res.json();
+    },
+    enabled: !!session?.user,
+  });
+
+  // Fetch Tags list
+  const { data: allTags = [] } = useQuery<TagItem[]>({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const res = await fetch('/api/tags', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch tags');
       return res.json();
     },
     enabled: !!session?.user,
@@ -774,6 +817,13 @@ export default function AccountsPage() {
       // Filter by Account ID
       if (selectedAccounts.size > 0 && !selectedAccounts.has(acc.id)) continue;
 
+      // Filter by Tags
+      if (selectedTags.size > 0) {
+        const accTags = acc.tags || [];
+        const hasMatchingTag = accTags.some((t: any) => selectedTags.has(t.id));
+        if (!hasMatchingTag) continue;
+      }
+
       if (groupMode === 'group') {
         keys.add(hierarchy.group);
       } else if (groupMode === 'type') {
@@ -783,7 +833,7 @@ export default function AccountsPage() {
       }
     }
     return keys;
-  }, [reportableAccounts, selectedGroups, selectedTypes, selectedAccounts, groupMode]);
+  }, [reportableAccounts, selectedGroups, selectedTypes, selectedAccounts, selectedTags, groupMode]);
 
   const isAssetSeries = useCallback((key: string) => {
     if (groupMode === 'account') {
@@ -1234,6 +1284,13 @@ export default function AccountsPage() {
         continue;
       }
 
+      // Filter by Tags
+      if (hierarchySelectedTags.size > 0) {
+        const accTags = acc.tags || [];
+        const hasMatchingTag = accTags.some((t: any) => hierarchySelectedTags.has(t.id));
+        if (!hasMatchingTag) continue;
+      }
+
       if (!map.has(group)) map.set(group, new Map());
       const subMap = map.get(group)!;
       if (!subMap.has(subGroup)) subMap.set(subGroup, []);
@@ -1241,7 +1298,7 @@ export default function AccountsPage() {
     }
 
     return map;
-  }, [filteredAllAccounts, hierarchyShowHidden, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts]);
+  }, [filteredAllAccounts, hierarchyShowHidden, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags]);
 
   const sortedGroups = useMemo(() => {
     return Array.from(treeHierarchy.keys()).sort((a, b) => {
@@ -1747,13 +1804,99 @@ export default function AccountsPage() {
                             </div>
                           )}
 
+                          {/* Tags Filter */}
+                          <div className="relative z-30" ref={tagsRef}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTagsOpen(!tagsOpen);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                selectedTags.size > 0
+                                  ? 'bg-primary/15 border border-primary text-primary'
+                                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              <span>Tags</span>
+                              {selectedTags.size > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                  {selectedTags.size}
+                                </span>
+                              )}
+                              <svg className={`h-3 w-3 transition-transform ${tagsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {tagsOpen && (
+                              <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                <div className="p-2 border-b border-border/50">
+                                  <input
+                                    type="text"
+                                    value={tagSearch}
+                                    onChange={(e) => setTagSearch(e.target.value)}
+                                    placeholder="Search tags..."
+                                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                                  />
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-1">
+                                  <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedTags.size === allTags.length && allTags.length > 0}
+                                      onChange={() => {
+                                        if (selectedTags.size === allTags.length) {
+                                          setSelectedTags(new Set());
+                                        } else {
+                                          setSelectedTags(new Set(allTags.map(t => t.id)));
+                                        }
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    Select All
+                                  </label>
+                                  {allTags
+                                    .filter(t => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                                    .map((tag) => (
+                                      <label
+                                        key={tag.id}
+                                        className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedTags.has(tag.id)}
+                                          onChange={() => {
+                                            const next = new Set(selectedTags);
+                                            if (next.has(tag.id)) {
+                                              next.delete(tag.id);
+                                            } else {
+                                              next.add(tag.id);
+                                            }
+                                            setSelectedTags(next);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-2.5 h-2.5 rounded-full" 
+                                            style={{ backgroundColor: tag.color }}
+                                          />
+                                          <span className="font-medium text-foreground">{tag.name}</span>
+                                        </div>
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                           {/* Reset/Clear button inside the same row if there are selected items */}
-                          {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0) && (
+                          {(selectedGroups.size > 0 || selectedTypes.size > 0 || selectedAccounts.size > 0 || selectedTags.size > 0) && (
                             <button
                               onClick={() => {
                                 setSelectedGroups(new Set());
                                 setSelectedTypes(new Set());
                                 setSelectedAccounts(new Set());
+                                setSelectedTags(new Set());
                               }}
                               className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                             >
@@ -2320,13 +2463,97 @@ export default function AccountsPage() {
                             )}
                           </div>
 
+                          {/* Tags Dropdown for Hierarchy */}
+                          <div className="relative z-30" ref={hierarchyTagsRef}>
+                            <button
+                              type="button"
+                              onClick={() => setHierarchyTagsOpen(!hierarchyTagsOpen)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                                hierarchySelectedTags.size > 0
+                                  ? 'bg-primary/15 border border-primary text-primary'
+                                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              <span>Tags</span>
+                              {hierarchySelectedTags.size > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
+                                  {hierarchySelectedTags.size}
+                                </span>
+                              )}
+                              <svg className={`h-3 w-3 transition-transform ${hierarchyTagsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {hierarchyTagsOpen && (
+                              <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                                <div className="p-2 border-b border-border/50">
+                                  <input
+                                    type="text"
+                                    value={hierarchyTagSearch}
+                                    onChange={(e) => setHierarchyTagSearch(e.target.value)}
+                                    placeholder="Search tags..."
+                                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                                  />
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-1">
+                                  <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
+                                    <input
+                                      type="checkbox"
+                                      checked={hierarchySelectedTags.size === allTags.length && allTags.length > 0}
+                                      onChange={() => {
+                                        if (hierarchySelectedTags.size === allTags.length) {
+                                          setHierarchySelectedTags(new Set());
+                                        } else {
+                                          setHierarchySelectedTags(new Set(allTags.map(t => t.id)));
+                                        }
+                                      }}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                    />
+                                    Select All
+                                  </label>
+                                  {allTags
+                                    .filter(t => !hierarchyTagSearch || t.name.toLowerCase().includes(hierarchyTagSearch.toLowerCase()))
+                                    .map((tag) => (
+                                      <label
+                                        key={tag.id}
+                                        className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={hierarchySelectedTags.has(tag.id)}
+                                          onChange={() => {
+                                            const next = new Set(hierarchySelectedTags);
+                                            if (next.has(tag.id)) {
+                                              next.delete(tag.id);
+                                            } else {
+                                              next.add(tag.id);
+                                            }
+                                            setHierarchySelectedTags(next);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-2.5 h-2.5 rounded-full" 
+                                            style={{ backgroundColor: tag.color }}
+                                          />
+                                          <span className="font-medium text-foreground">{tag.name}</span>
+                                        </div>
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                           {/* Reset/Clear button inside the same row if there are selected items */}
-                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0) && (
+                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0 || hierarchySelectedTags.size > 0) && (
                             <button
                               onClick={() => {
                                 setHierarchySelectedGroups(new Set());
                                 setHierarchySelectedTypes(new Set());
                                 setHierarchySelectedAccounts(new Set());
+                                setHierarchySelectedTags(new Set());
                               }}
                               className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                             >
@@ -2467,13 +2694,30 @@ export default function AccountsPage() {
                                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                  <div className="flex items-center gap-1.5">
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
                                                     {acc.isHidden && (
                                                       <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
                                                     )}
                                                     {acc.isExcludedFromNetWorth && (
                                                       <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                                    )}
+                                                    {acc.tags && acc.tags.length > 0 && (
+                                                      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                                        {acc.tags.map((tag) => (
+                                                          <span
+                                                            key={tag.id}
+                                                            className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                                            style={{
+                                                              backgroundColor: `${tag.color}15`,
+                                                              color: tag.color,
+                                                              borderColor: `${tag.color}30`
+                                                            }}
+                                                          >
+                                                            #{tag.name}
+                                                          </span>
+                                                        ))}
+                                                      </div>
                                                     )}
                                                   </div>
                                                   <span className="text-[10px] text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
@@ -2537,13 +2781,30 @@ export default function AccountsPage() {
                                           <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
                                             {acc.isHidden && (
                                               <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
                                             )}
                                             {acc.isExcludedFromNetWorth && (
                                               <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                            )}
+                                            {acc.tags && acc.tags.length > 0 && (
+                                              <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                                {acc.tags.map((tag) => (
+                                                  <span
+                                                    key={tag.id}
+                                                    className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                                    style={{
+                                                      backgroundColor: `${tag.color}15`,
+                                                      color: tag.color,
+                                                      borderColor: `${tag.color}30`
+                                                    }}
+                                                  >
+                                                    #{tag.name}
+                                                  </span>
+                                                ))}
+                                              </div>
                                             )}
                                           </div>
                                           <span className="text-[10px] text-muted-foreground truncate block">

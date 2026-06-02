@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
-import { eq, and, asc, or, like } from 'drizzle-orm';
+import { accounts, accountTags, tags } from '@/lib/db/schema';
+import { eq, and, asc, or, like, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRows } from '@/lib/crypto';
+import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isReportableAccount } from '@/lib/utils/account-scope';
 
 export async function GET(request: Request) {
@@ -60,6 +60,36 @@ export async function GET(request: Request) {
           isReportableAccount(acc) ||
           (includeVirtual && (acc.type === 'paystub' || acc.externalId?.startsWith('virtual-')))
       );
-  logger.info('Accounts fetched', { count: scoped.length });
-  return NextResponse.json(scoped);
+
+  // Batch fetch tags for these accounts
+  const accountIds = scoped.map((a: any) => a.id);
+  const tagRows = accountIds.length > 0
+    ? await getDb()
+        .select({
+          accountId: accountTags.accountId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(accountTags)
+        .leftJoin(tags, eq(accountTags.tagId, tags.id))
+        .where(inArray(accountTags.accountId, accountIds))
+    : [];
+
+  const tagsByAccountId = new Map<string, any[]>();
+  for (const row of tagRows) {
+    const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+    const tag = { id: row.tagId, name, color: row.tagColor };
+    const existing = tagsByAccountId.get(row.accountId) ?? [];
+    existing.push(tag);
+    tagsByAccountId.set(row.accountId, existing);
+  }
+
+  const scopedWithTags = scoped.map((acc: any) => ({
+    ...acc,
+    tags: tagsByAccountId.get(acc.id) ?? [],
+  }));
+
+  logger.info('Accounts fetched', { count: scopedWithTags.length });
+  return NextResponse.json(scopedWithTags);
 }

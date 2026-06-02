@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
 
@@ -454,6 +455,11 @@ export default function RulesTab() {
     setFormSetReviewed(rule.setReviewed);
     setFormOverrideExisting(!!rule.overrideExisting);
     setDrawerOpen(true);
+  };
+
+  const handleClose = () => {
+    setDrawerOpen(false);
+    setEditingRule(null);
   };
 
   const handleSave = async () => {
@@ -953,214 +959,213 @@ export default function RulesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-foreground/15" onClick={() => setDrawerOpen(false)} />
-          <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-foreground mb-6">
+      <Sheet open={drawerOpen} onOpenChange={(open) => !open && handleClose()}>
+        <SheetContent side="right" className="w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>
               {editingRule ? 'Edit Rule' : 'Add Rule'}
-            </h3>
+            </SheetTitle>
+          </SheetHeader>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Rule Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                  placeholder="e.g., Amazon Purchases"
-                />
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Rule Name</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                placeholder="e.g., Amazon Purchases"
+              />
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-foreground">Conditions (all must match)</h4>
+                <button
+                  onClick={() => {
+                    setFormConditions([...formConditions, {
+                      id: Math.random().toString(),
+                      field: 'description',
+                      operator: 'contains',
+                      value: '',
+                      caseSensitive: false,
+                    }]);
+                  }}
+                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Condition
+                </button>
               </div>
-
-              <div className="border-t border-border pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-foreground">Conditions (all must match)</h4>
-                  <button
-                    onClick={() => {
-                      setFormConditions([...formConditions, {
-                        id: Math.random().toString(),
-                        field: 'description',
-                        operator: 'contains',
-                        value: '',
-                        caseSensitive: false,
-                      }]);
-                    }}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Condition
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  {formConditions.map((condition, idx) => (
-                    <div key={condition.id} className="p-3 bg-muted/30 border border-border rounded-lg">
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs text-muted-foreground mb-1">Field</label>
-                          <select
-                            value={condition.field}
-                            onChange={(e) => {
-                              const updated = [...formConditions];
-                              updated[idx] = { ...updated[idx], field: e.target.value };
-                              setFormConditions(updated);
-                            }}
-                            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          >
-                            {FIELD_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-muted-foreground mb-1">Operator</label>
-                          <select
-                            value={condition.operator}
-                            onChange={(e) => {
-                              const updated = [...formConditions];
-                              updated[idx] = { ...updated[idx], operator: e.target.value };
-                              setFormConditions(updated);
-                            }}
-                            className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          >
-                            {OPERATOR_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="mb-3">
-                        <label className="block text-xs text-muted-foreground mb-1">Value</label>
-                        <input
-                          value={condition.value}
+              
+              <div className="space-y-3">
+                {formConditions.map((condition, idx) => (
+                  <div key={condition.id} className="p-3 bg-muted/30 border border-border rounded-lg">
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Field</label>
+                        <select
+                          value={condition.field}
                           onChange={(e) => {
                             const updated = [...formConditions];
-                            updated[idx] = { ...updated[idx], value: e.target.value };
+                            updated[idx] = { ...updated[idx], field: e.target.value };
                             setFormConditions(updated);
                           }}
                           className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          placeholder="e.g., AMAZON"
-                        />
+                        >
+                          {FIELD_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
                       </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={condition.caseSensitive}
-                            onChange={(e) => {
-                              const updated = [...formConditions];
-                              updated[idx] = { ...updated[idx], caseSensitive: e.target.checked };
-                              setFormConditions(updated);
-                            }}
-                            className="rounded border-border text-primary focus:ring-ring"
-                            id={`case-${condition.id}`}
-                          />
-                          <label htmlFor={`case-${condition.id}`} className="text-xs text-foreground/80 cursor-pointer">Case Sensitive</label>
-                        </div>
-                        {formConditions.length > 1 && (
-                          <button
-                            onClick={() => {
-                              setFormConditions(formConditions.filter((_, i) => i !== idx));
-                            }}
-                            className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                            title="Remove condition"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Operator</label>
+                        <select
+                          value={condition.operator}
+                          onChange={(e) => {
+                            const updated = [...formConditions];
+                            updated[idx] = { ...updated[idx], operator: e.target.value };
+                            setFormConditions(updated);
+                          }}
+                          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                          {OPERATOR_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="border-t border-border pt-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">Action</h4>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Set Category</label>
-                  <select
-                    value={formCategoryId || ''}
-                    onChange={(e) => setFormCategoryId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">Don't change category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.parentId ? '  ' : ''}{cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    <div className="mb-3">
+                      <label className="block text-xs text-muted-foreground mb-1">Value</label>
+                      <input
+                        value={condition.value}
+                        onChange={(e) => {
+                          const updated = [...formConditions];
+                          updated[idx] = { ...updated[idx], value: e.target.value };
+                          setFormConditions(updated);
+                        }}
+                        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="e.g., AMAZON"
+                      />
+                    </div>
 
-                <div className="mt-3">
-                  <label className="block text-xs text-muted-foreground mb-1">Set Payee (optional)</label>
-                  <input
-                    value={formSetPayee}
-                    onChange={(e) => setFormSetPayee(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Override payee name"
-                  />
-                </div>
-
-                <div className="mt-3">
-                  <label className="block text-xs text-muted-foreground mb-1">Set Tag (optional)</label>
-                  <select
-                    value={formTagId || ''}
-                    onChange={(e) => setFormTagId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">Don&apos;t set a tag</option>
-                    {tags.map((tag) => (
-                      <option key={tag.id} value={tag.id}>{tag.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-foreground/80">Mark as Reviewed</span>
-                  <Switch
-                    checked={formSetReviewed === true}
-                    onCheckedChange={(checked) => setFormSetReviewed(checked ? true : null)}
-                  />
-                </div>
-
-                <div className="mt-4 border-t border-border pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-foreground/80 font-medium">Override Existing Category</span>
-                    <Switch
-                      checked={formOverrideExisting}
-                      onCheckedChange={(checked) => setFormOverrideExisting(checked)}
-                    />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={condition.caseSensitive}
+                          onChange={(e) => {
+                            const updated = [...formConditions];
+                            updated[idx] = { ...updated[idx], caseSensitive: e.target.checked };
+                            setFormConditions(updated);
+                          }}
+                          className="rounded border-border text-primary focus:ring-ring"
+                          id={`case-${condition.id}`}
+                        />
+                        <label htmlFor={`case-${condition.id}`} className="text-xs text-foreground/80 cursor-pointer">Case Sensitive</label>
+                      </div>
+                      {formConditions.length > 1 && (
+                        <button
+                          onClick={() => {
+                            setFormConditions(formConditions.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Remove condition"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {formOverrideExisting && (
-                    <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 font-normal">
-                      ⚠️ Warning: Enabling this option will cause this rule to overwrite existing category assignments on matching transactions.
-                    </p>
-                  )}
-                </div>
+                ))}
               </div>
             </div>
 
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => { setDrawerOpen(false); setEditingRule(null); }}
-                className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-              >
-                {saving ? 'Saving...' : editingRule ? 'Update' : 'Create'}
-              </button>
+            <div className="border-t border-border pt-4">
+              <h4 className="text-sm font-medium text-foreground mb-3">Action</h4>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Set Category</label>
+                <select
+                  value={formCategoryId || ''}
+                  onChange={(e) => setFormCategoryId(e.target.value || null)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Don't change category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.parentId ? '  ' : ''}{cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-xs text-muted-foreground mb-1">Set Payee (optional)</label>
+                <input
+                  value={formSetPayee}
+                  onChange={(e) => setFormSetPayee(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Override payee name"
+                />
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-xs text-muted-foreground mb-1">Set Tag (optional)</label>
+                <select
+                  value={formTagId || ''}
+                  onChange={(e) => setFormTagId(e.target.value || null)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Don&apos;t set a tag</option>
+                  {tags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs text-foreground/80">Mark as Reviewed</span>
+                <Switch
+                  checked={formSetReviewed === true}
+                  onCheckedChange={(checked) => setFormSetReviewed(checked ? true : null)}
+                />
+              </div>
+
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-foreground/80 font-medium">Override Existing Category</span>
+                  <Switch
+                    checked={formOverrideExisting}
+                    onCheckedChange={(checked) => setFormOverrideExisting(checked)}
+                  />
+                </div>
+                {formOverrideExisting && (
+                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 font-normal">
+                    ⚠️ Warning: Enabling this option will cause this rule to overwrite existing category assignments on matching transactions.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex gap-3 mt-8">
+            <button
+              onClick={() => { setDrawerOpen(false); setEditingRule(null); }}
+              className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Saving...' : editingRule ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>

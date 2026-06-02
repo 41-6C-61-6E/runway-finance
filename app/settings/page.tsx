@@ -57,6 +57,7 @@ type Connection = {
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
+  hourly: 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
   monthly: 30 * 24 * 60 * 60 * 1000,
@@ -82,6 +83,7 @@ type Account = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 const SETTINGS_TABS = [
@@ -902,6 +904,7 @@ function SettingsPageBody() {
                             className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                           >
                             <option value="manual">Manual</option>
+                            <option value="hourly">Hourly</option>
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
                             <option value="monthly">Monthly</option>
@@ -1192,7 +1195,26 @@ function SettingsPageBody() {
                                   <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
                                 )}
                               </div>
-                              <div className="text-foreground font-medium mt-1 text-sm truncate">{account.name}</div>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-foreground font-medium text-sm truncate max-w-[200px] sm:max-w-xs">{account.name}</span>
+                                {account.tags && account.tags.length > 0 && (
+                                  <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                    {account.tags.map((tag) => (
+                                      <span
+                                        key={tag.id}
+                                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                        style={{
+                                          backgroundColor: `${tag.color}15`,
+                                          color: tag.color,
+                                          borderColor: `${tag.color}30`
+                                        }}
+                                      >
+                                        #{tag.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                               {account.institution && (
                                 <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
                               )}

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
+import { accounts, accountTags, tags } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRow, encryptRow } from '@/lib/crypto';
+import { decryptRow, encryptRow, decryptField } from '@/lib/crypto';
 import {
   createAccountSnapshots,
   createNetWorthSnapshot,
@@ -48,7 +48,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const decrypted = await decryptRow('accounts', account, dek);
-  return NextResponse.json(decrypted);
+
+  // Fetch tags for this account
+  const tagRows = await getDb()
+    .select({ tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+    .from(accountTags)
+    .leftJoin(tags, eq(accountTags.tagId, tags.id))
+    .where(eq(accountTags.accountId, id));
+
+  const acctTags = await Promise.all(
+    tagRows.map(async (r) => ({
+      id: r.tagId,
+      name: r.tagName ? await decryptField(r.tagName, dek) : '',
+      color: r.tagColor,
+    }))
+  );
+
+  return NextResponse.json({ ...decrypted, tags: acctTags });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -104,7 +120,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
   if (body.connectionId !== undefined) updateData.connectionId = body.connectionId;
 
-  if (Object.keys(updateData).length === 0) {
+  const hasTagUpdate = body.tagIds !== undefined;
+
+  if (Object.keys(updateData).length === 0 && !hasTagUpdate) {
     logger.warn('No valid fields to update for account', { accountId: id });
     return NextResponse.json(
       { error: 'validation_error', message: 'No valid fields to update' },
@@ -112,24 +130,57 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  updateData = await encryptRow('accounts', updateData, dek);
-  const changedFields = Object.keys(updateData);
-  logger.info('Updating account', { accountId: id, changedFields });
+  let updated = account;
+  if (Object.keys(updateData).length > 0) {
+    updateData = await encryptRow('accounts', updateData, dek);
+    const changedFields = Object.keys(updateData);
+    logger.info('Updating account fields', { accountId: id, changedFields });
 
-  const [updated] = await getDb()
-    .update(accounts)
-    .set(updateData)
-    .where(eq(accounts.id, id))
-    .returning();
+    const [updatedRow] = await getDb()
+      .update(accounts)
+      .set(updateData)
+      .where(eq(accounts.id, id))
+      .returning();
 
-  if (!updated) {
-    return NextResponse.json(
-      { error: 'not_found', message: 'Account not found after update' },
-      { status: 404 }
-    );
+    if (!updatedRow) {
+      return NextResponse.json(
+        { error: 'not_found', message: 'Account not found after update' },
+        { status: 404 }
+      );
+    }
+    updated = updatedRow;
+  }
+
+  // Replace tags if provided
+  if (hasTagUpdate) {
+    const tagIds = body.tagIds as string[];
+    logger.info('Updating account tags', { accountId: id, tagIds });
+    await getDb().delete(accountTags).where(eq(accountTags.accountId, id));
+    if (tagIds.length > 0) {
+      await getDb().insert(accountTags).values(
+        tagIds.map((tagId) => ({ accountId: id, tagId }))
+      );
+    }
   }
 
   const decrypted = await decryptRow('accounts', updated, dek);
+
+  // Fetch updated tags to return
+  const tagRows = await getDb()
+    .select({ tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+    .from(accountTags)
+    .leftJoin(tags, eq(accountTags.tagId, tags.id))
+    .where(eq(accountTags.accountId, id));
+
+  const acctTags = await Promise.all(
+    tagRows.map(async (r) => ({
+      id: r.tagId,
+      name: r.tagName ? await decryptField(r.tagName, dek) : '',
+      color: r.tagColor,
+    }))
+  );
+
+  const decryptedWithTags = { ...decrypted, tags: acctTags };
 
   if (body.metadata !== undefined && updated) {
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
@@ -179,5 +230,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
   }
 
-  return NextResponse.json(decrypted);
+  return NextResponse.json(decryptedWithTags);
 }
