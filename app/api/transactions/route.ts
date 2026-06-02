@@ -8,6 +8,7 @@ import {
   userSettings,
   transactionTags,
   tags,
+  accountTags,
 } from "@/lib/db/schema";
 import {
   eq,
@@ -127,6 +128,7 @@ export async function GET(request: Request) {
     categoryIds: searchParams.get("categoryIds") ?? undefined,
     tagId: searchParams.get("tagId") ?? undefined,
     tagIds: searchParams.get("tagIds") ?? undefined,
+    accountTagIds: searchParams.get("accountTagIds") ?? undefined,
     search: searchParams.get("search") ?? undefined,
     type: searchParams.get("type") ?? undefined,
     pending: searchParams.get("pending") ?? undefined,
@@ -294,6 +296,23 @@ export async function GET(request: Request) {
       whereConditions.push(inArray(transactions.id, txIds));
     } else {
       whereConditions.push(sql`false`);
+    }
+  }
+
+  // Handle account tag filter — resolve to matching account IDs via join
+  if (filters.accountTagIds) {
+    const tagIdList = filters.accountTagIds.split(',').map((id) => id.trim()).filter(Boolean);
+    if (tagIdList.length > 0) {
+      const taggedAcctIds = await getDb()
+        .select({ accountId: accountTags.accountId })
+        .from(accountTags)
+        .where(inArray(accountTags.tagId, tagIdList));
+      const acctIds = taggedAcctIds.map((r) => r.accountId);
+      if (acctIds.length > 0) {
+        whereConditions.push(inArray(transactions.accountId, acctIds));
+      } else {
+        whereConditions.push(sql`false`);
+      }
     }
   }
 
@@ -580,9 +599,34 @@ export async function GET(request: Request) {
       tagsByTxId.set(row.transactionId, existing);
     }
 
+    // Batch fetch account tags for the accounts involved in these transactions
+    const accountIds = Array.from(new Set(decryptedTxns.map((t: any) => t.accountId).filter(Boolean)));
+    const accountTagRows = accountIds.length > 0
+      ? await getDb()
+          .select({
+            accountId: accountTags.accountId,
+            tagId: tags.id,
+            tagName: tags.name,
+            tagColor: tags.color,
+          })
+          .from(accountTags)
+          .leftJoin(tags, eq(accountTags.tagId, tags.id))
+          .where(inArray(accountTags.accountId, accountIds))
+      : [];
+
+    const accountTagsByAcctId = new Map<string, any[]>();
+    for (const row of accountTagRows) {
+      const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+      const tag = { id: row.tagId, name, color: row.tagColor };
+      const existing = accountTagsByAcctId.get(row.accountId) ?? [];
+      existing.push(tag);
+      accountTagsByAcctId.set(row.accountId, existing);
+    }
+
     const txnsWithTags = decryptedTxns.map((tx: any) => ({
       ...tx,
       tags: tagsByTxId.get(tx.id) ?? [],
+      accountTags: accountTagsByAcctId.get(tx.accountId) ?? [],
     }));
 
     logger.info("Transactions fetched (SQL Paginated)", {
@@ -750,9 +794,34 @@ export async function GET(request: Request) {
     sliceTagsByTxId.set(row.transactionId, existing);
   }
 
+  // Batch fetch account tags for the accounts involved in these transactions
+  const sliceAccountIds = Array.from(new Set(sliced.map((t: any) => t.accountId).filter(Boolean)));
+  const sliceAccountTagRows = sliceAccountIds.length > 0
+    ? await getDb()
+        .select({
+          accountId: accountTags.accountId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(accountTags)
+        .leftJoin(tags, eq(accountTags.tagId, tags.id))
+        .where(inArray(accountTags.accountId, sliceAccountIds))
+    : [];
+
+  const sliceAccountTagsByAcctId = new Map<string, any[]>();
+  for (const row of sliceAccountTagRows) {
+    const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+    const tag = { id: row.tagId, name, color: row.tagColor };
+    const existing = sliceAccountTagsByAcctId.get(row.accountId) ?? [];
+    existing.push(tag);
+    sliceAccountTagsByAcctId.set(row.accountId, existing);
+  }
+
   const slicedWithTags = sliced.map((tx: any) => ({
     ...tx,
     tags: sliceTagsByTxId.get(tx.id) ?? [],
+    accountTags: sliceAccountTagsByAcctId.get(tx.accountId) ?? [],
   }));
 
   logger.info("Transactions fetched (In-Memory Fallback)", {

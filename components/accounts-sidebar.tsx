@@ -20,6 +20,7 @@ type Account = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 
@@ -68,6 +69,18 @@ function AccountRow({
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
+        {account.tags && account.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {account.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: tag.color }}
+                title={tag.name}
+              />
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button

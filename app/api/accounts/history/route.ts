@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte, lt, desc, or } from 'drizzle-orm';
+import { accounts, accountSnapshots, userSettings, accountTags, tags } from '@/lib/db/schema';
+import { eq, and, gte, lte, lt, desc, or, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -144,6 +144,34 @@ export async function GET(request: Request) {
     }
 
     const accountIds = filteredAccounts.map(acc => acc.id);
+
+    // Batch fetch tags for these accounts
+    const tagRows = accountIds.length > 0
+      ? await getDb()
+          .select({
+            accountId: accountTags.accountId,
+            tagId: tags.id,
+            tagName: tags.name,
+            tagColor: tags.color,
+          })
+          .from(accountTags)
+          .leftJoin(tags, eq(accountTags.tagId, tags.id))
+          .where(inArray(accountTags.accountId, accountIds))
+      : [];
+
+    const tagsByAccountId = new Map<string, any[]>();
+    for (const row of tagRows) {
+      const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+      const tag = { id: row.tagId, name, color: row.tagColor };
+      const existing = tagsByAccountId.get(row.accountId) ?? [];
+      existing.push(tag);
+      tagsByAccountId.set(row.accountId, existing);
+    }
+
+    const accountsWithTags = filteredAccounts.map((acc: any) => ({
+      ...acc,
+      tags: tagsByAccountId.get(acc.id) ?? [],
+    }));
 
     if (accountIds.length === 0) {
       return NextResponse.json({
@@ -325,7 +353,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       data: aggregated,
-      accounts: filteredAccounts.map(acc => ({
+      accounts: accountsWithTags.map(acc => ({
         id: acc.id,
         name: acc.name,
         type: acc.type,
@@ -335,6 +363,7 @@ export async function GET(request: Request) {
         isHidden: acc.isHidden,
         isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
         connectionId: acc.connectionId,
+        tags: acc.tags,
       })),
     });
   } catch (error) {
