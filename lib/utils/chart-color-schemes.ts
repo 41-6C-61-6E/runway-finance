@@ -61,7 +61,7 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
 export const CHART_SCHEME_NAMES = Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[];
 
 export function applyChartColorScheme(id: ChartColorSchemeId) {
-  const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['kingston'];
+  const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['fauntleroy'];
   if (!scheme) return;
   const r = document.documentElement;
   r.setAttribute('data-chart-scheme', scheme.id);
