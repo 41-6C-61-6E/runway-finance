@@ -206,16 +206,16 @@ body,
 }
 
 /* ── Chart Color Schemes ──────────────────────────────────────────────────── */
-[data-chart-scheme="emerald"] {
-  --chart-1: oklch(0.68 0.18 142);
-  --chart-2: oklch(0.78 0.13 165);
-  --chart-3: oklch(0.76 0.13 85);
-  --chart-4: oklch(0.65 0.15 250);
-  --chart-5: oklch(0.65 0.18 25);
-  --chart-synthetic: oklch(0.85 0.08 142);
+[data-chart-scheme="fauntleroy"] {
+  --chart-1: oklch(0.97 0.01 85);
+  --chart-2: oklch(0.374 0.059 259.9);
+  --chart-3: oklch(0.475 0.089 172.7);
+  --chart-4: oklch(0.549 0.05 249.8);
+  --chart-5: oklch(0.6 0.14 25);
+  --chart-synthetic: oklch(0.475 0.089 172.7);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
-[data-chart-scheme="monarch"] {
+[data-chart-scheme="kingston"] {
   --chart-1: oklch(0.55 0.18 275);
   --chart-2: oklch(0.78 0.15 155);
   --chart-3: oklch(0.72 0.15 70);
@@ -224,7 +224,7 @@ body,
   --chart-synthetic: oklch(0.75 0.09 275);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
-[data-chart-scheme="nord"] {
+[data-chart-scheme="lopez"] {
   --chart-1: oklch(0.68 0.14 200);
   --chart-2: oklch(0.72 0.14 140);
   --chart-3: oklch(0.64 0.12 300);
@@ -233,7 +233,7 @@ body,
   --chart-synthetic: oklch(0.82 0.07 200);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
-[data-chart-scheme="sunset"] {
+[data-chart-scheme="vashon"] {
   --chart-1: oklch(0.58 0.18 290);
   --chart-2: oklch(0.62 0.19 330);
   --chart-3: oklch(0.74 0.15 50);
