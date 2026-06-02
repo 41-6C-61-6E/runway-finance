@@ -10,19 +10,19 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Percent } from 'lucide-react';
 
 const RATING_THRESHOLDS = [
-  { max: 0.35, label: 'Excellent', hue: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  { max: 0.35, label: 'Excellent', hue: 'bg-chart-1/15 text-chart-1 border-chart-1/30' },
   { max: 0.45, label: 'Good', hue: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
   { max: 0.55, label: 'Fair', hue: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
   { max: 0.75, label: 'Poor', hue: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
-  { max: Infinity, label: 'Critical', hue: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  { max: Infinity, label: 'Critical', hue: 'bg-chart-5/15 text-chart-5 border-chart-5/30' },
 ];
 
 const RATING_PROGRESS_COLORS: Record<string, string> = {
-  Excellent: 'bg-emerald-500',
+  Excellent: 'bg-chart-1',
   Good: 'bg-blue-500',
   Fair: 'bg-yellow-500',
   Poor: 'bg-orange-500',
-  Critical: 'bg-red-500',
+  Critical: 'bg-chart-5',
 };
 
 

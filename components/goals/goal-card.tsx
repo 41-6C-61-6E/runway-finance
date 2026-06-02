@@ -36,7 +36,7 @@ interface GoalCardProps {
 function getPriorityBadge(priority: number) {
   switch (priority) {
     case 2:
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 uppercase">High</span>;
+      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-chart-5/20 text-chart-5 uppercase">High</span>;
     case 1:
       return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-400 uppercase">Med</span>;
     default:
