@@ -1,4 +1,4 @@
-export type ChartColorSchemeId = 'emerald' | 'monarch' | 'nord' | 'sunset';
+export type ChartColorSchemeId = 'fauntleroy' | 'kingston' | 'lopez' | 'vashon';
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -8,21 +8,21 @@ export interface ChartColorScheme {
 }
 
 export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> = {
-  emerald: {
-    id: 'emerald',
-    name: 'Emerald',
-    description: 'Fresh greens, soft gold, and deep forest - representing growth & wealth',
+  fauntleroy: {
+    id: 'fauntleroy',
+    name: 'Fauntleroy',
+    description: 'Cream, navy, teal, sky blue, and coral rose',
     colors: [
-      'oklch(0.68 0.18 142)',
-      'oklch(0.78 0.13 165)',
-      'oklch(0.76 0.13 85)',
-      'oklch(0.65 0.15 250)',
-      'oklch(0.65 0.18 25)',
+      'oklch(0.97 0.01 85)',
+      'oklch(0.374 0.059 259.9)',
+      'oklch(0.475 0.089 172.7)',
+      'oklch(0.549 0.05 249.8)',
+      'oklch(0.6 0.14 25)',
     ],
   },
-  monarch: {
-    id: 'monarch',
-    name: 'Monarch',
+  kingston: {
+    id: 'kingston',
+    name: 'Kingston',
     description: 'Deep navy-indigo, mint green, warm bronze-gold, and coral rose',
     colors: [
       'oklch(0.55 0.18 275)',
@@ -32,9 +32,9 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.68 0.08 290)',
     ],
   },
-  nord: {
-    id: 'nord',
-    name: 'Nord',
+  lopez: {
+    id: 'lopez',
+    name: 'Lopez',
     description: 'High-contrast frosty cyan, polar purple, and sunset orange',
     colors: [
       'oklch(0.68 0.14 200)',
@@ -44,9 +44,9 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       'oklch(0.76 0.08 220)',
     ],
   },
-  sunset: {
-    id: 'sunset',
-    name: 'Sunset',
+  vashon: {
+    id: 'vashon',
+    name: 'Vashon',
     description: 'Warm and vibrant sunset tones, violet, peach, gold, and cyan',
     colors: [
       'oklch(0.58 0.18 290)',
@@ -61,7 +61,7 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
 export const CHART_SCHEME_NAMES = Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[];
 
 export function applyChartColorScheme(id: ChartColorSchemeId) {
-  const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['monarch'];
+  const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['kingston'];
   if (!scheme) return;
   const r = document.documentElement;
   r.setAttribute('data-chart-scheme', scheme.id);
