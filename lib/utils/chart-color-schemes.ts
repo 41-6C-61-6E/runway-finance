@@ -1,4 +1,4 @@
-export type ChartColorSchemeId = 'fauntleroy' | 'kingston' | 'lopez' | 'vashon';
+export type ChartColorSchemeId = 'fauntleroy' | 'kingston' | 'seattle' | 'vashon';
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -13,9 +13,9 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
     name: 'Fauntleroy',
     description: 'Cream, navy, teal, sky blue, and coral rose',
     colors: [
-      'oklch(0.97 0.01 85)',
-      'oklch(0.374 0.059 259.9)',
       'oklch(0.475 0.089 172.7)',
+      'oklch(0.374 0.059 259.9)',
+      'oklch(0.94 0.015 75)',
       'oklch(0.549 0.05 249.8)',
       'oklch(0.6 0.14 25)',
     ],
@@ -23,37 +23,37 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
   kingston: {
     id: 'kingston',
     name: 'Kingston',
-    description: 'Deep navy-indigo, mint green, warm bronze-gold, and coral rose',
+    description: 'Mint green, deep navy-indigo, warm bronze-gold, light purple, and coral rose',
     colors: [
-      'oklch(0.55 0.18 275)',
       'oklch(0.78 0.15 155)',
+      'oklch(0.55 0.18 275)',
       'oklch(0.72 0.15 70)',
-      'oklch(0.65 0.17 25)',
       'oklch(0.68 0.08 290)',
+      'oklch(0.65 0.17 25)',
     ],
   },
-  lopez: {
-    id: 'lopez',
-    name: 'Lopez',
-    description: 'High-contrast frosty cyan, polar purple, and sunset orange',
+  seattle: {
+    id: 'seattle',
+    name: 'Seattle',
+    description: 'Teal, indigo, cream, sage, and sunset orange',
     colors: [
-      'oklch(0.68 0.14 200)',
-      'oklch(0.72 0.14 140)',
-      'oklch(0.64 0.12 300)',
-      'oklch(0.68 0.15 45)',
-      'oklch(0.76 0.08 220)',
+      'oklch(0.726 0.093 216.6)',
+      'oklch(0.450 0.092 275.2)',
+      'oklch(0.947 0.038 72.4)',
+      'oklch(0.785 0.023 145.4)',
+      'oklch(0.788 0.167 67.5)',
     ],
   },
   vashon: {
     id: 'vashon',
     name: 'Vashon',
-    description: 'Warm and vibrant sunset tones, violet, peach, gold, and cyan',
+    description: 'Warm and vibrant lime, violet, gold, cyan, and peach',
     colors: [
-      'oklch(0.58 0.18 290)',
-      'oklch(0.62 0.19 330)',
-      'oklch(0.74 0.15 50)',
       'oklch(0.78 0.15 80)',
+      'oklch(0.58 0.18 290)',
+      'oklch(0.74 0.15 50)',
       'oklch(0.70 0.15 200)',
+      'oklch(0.62 0.19 330)',
     ],
   },
 };

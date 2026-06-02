@@ -207,39 +207,39 @@ body,
 
 /* ── Chart Color Schemes ──────────────────────────────────────────────────── */
 [data-chart-scheme="fauntleroy"] {
-  --chart-1: oklch(0.97 0.01 85);
+  --chart-1: oklch(0.475 0.089 172.7);
   --chart-2: oklch(0.374 0.059 259.9);
-  --chart-3: oklch(0.475 0.089 172.7);
+  --chart-3: oklch(0.94 0.015 75);
   --chart-4: oklch(0.549 0.05 249.8);
   --chart-5: oklch(0.6 0.14 25);
-  --chart-synthetic: oklch(0.475 0.089 172.7);
+  --chart-synthetic: oklch(0.625 0.045 173);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 [data-chart-scheme="kingston"] {
-  --chart-1: oklch(0.55 0.18 275);
-  --chart-2: oklch(0.78 0.15 155);
+  --chart-1: oklch(0.78 0.15 155);
+  --chart-2: oklch(0.55 0.18 275);
   --chart-3: oklch(0.72 0.15 70);
-  --chart-4: oklch(0.65 0.17 25);
-  --chart-5: oklch(0.68 0.08 290);
-  --chart-synthetic: oklch(0.75 0.09 275);
+  --chart-4: oklch(0.68 0.08 290);
+  --chart-5: oklch(0.65 0.17 25);
+  --chart-synthetic: oklch(0.75 0.09 155);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
-[data-chart-scheme="lopez"] {
-  --chart-1: oklch(0.68 0.14 200);
-  --chart-2: oklch(0.72 0.14 140);
-  --chart-3: oklch(0.64 0.12 300);
-  --chart-4: oklch(0.68 0.15 45);
-  --chart-5: oklch(0.76 0.08 220);
-  --chart-synthetic: oklch(0.82 0.07 200);
+[data-chart-scheme="seattle"] {
+  --chart-1: oklch(0.726 0.093 216.6);
+  --chart-2: oklch(0.450 0.092 275.2);
+  --chart-3: oklch(0.947 0.038 72.4);
+  --chart-4: oklch(0.785 0.023 145.4);
+  --chart-5: oklch(0.788 0.167 67.5);
+  --chart-synthetic: oklch(0.876 0.050 217);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 [data-chart-scheme="vashon"] {
-  --chart-1: oklch(0.58 0.18 290);
-  --chart-2: oklch(0.62 0.19 330);
+  --chart-1: oklch(0.78 0.15 80);
+  --chart-2: oklch(0.58 0.18 290);
   --chart-3: oklch(0.74 0.15 50);
-  --chart-4: oklch(0.78 0.15 80);
-  --chart-5: oklch(0.70 0.15 200);
-  --chart-synthetic: oklch(0.78 0.09 290);
+  --chart-4: oklch(0.70 0.15 200);
+  --chart-5: oklch(0.62 0.19 330);
+  --chart-synthetic: oklch(0.78 0.09 80);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 

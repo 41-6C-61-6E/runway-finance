@@ -6,8 +6,8 @@ interface GoalTypeIconProps {
 }
 
 const typeConfig: Record<string, { icon: string; label: string; color: string }> = {
-  savings: { icon: '💰', label: 'Savings', color: 'bg-emerald-500/10 text-emerald-400' },
-  payoff: { icon: '💳', label: 'Payoff', color: 'bg-red-500/10 text-red-400' },
+  savings: { icon: '💰', label: 'Savings', color: 'bg-chart-1/10 text-chart-1' },
+  payoff: { icon: '💳', label: 'Payoff', color: 'bg-chart-5/10 text-chart-5' },
   investment: { icon: '📈', label: 'Investment', color: 'bg-blue-500/10 text-blue-400' },
   other: { icon: '🎯', label: 'Other', color: 'bg-purple-500/10 text-purple-400' },
 };
