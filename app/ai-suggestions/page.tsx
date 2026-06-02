@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { PageHeader } from '@/components/page-header';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { CategoryCombobox } from '@/components/budgets/category-combobox';
@@ -70,6 +71,9 @@ function ProposalCard({
   const confidence = parseInt(proposal.confidence ?? '0');
   const payload = proposal.payload;
   const isEditing = editingId === proposal.id;
+
+  const settingsContext = useUserSettings();
+  const showSuggestionsTags = settingsContext?.settings?.accountTagVisibility?.suggestions !== false;
 
   if (isEditing) {
     const renderField = (label: string, field: string, type: 'text' | 'select' | 'checkbox', options?: string[]) => (
@@ -322,7 +326,7 @@ function ProposalCard({
             <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Account</span>
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-foreground text-xs">{proposal.transactionDetails.accountName || '—'}</span>
-              {proposal.transactionDetails.accountTags && proposal.transactionDetails.accountTags.length > 0 && (
+              {showSuggestionsTags && proposal.transactionDetails.accountTags && proposal.transactionDetails.accountTags.length > 0 && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {proposal.transactionDetails.accountTags.map((tag) => (
                     <span

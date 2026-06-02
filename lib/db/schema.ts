@@ -121,6 +121,14 @@ export const userSettings = pgTable('user_settings', {
   aiAnalysisTimeoutSeconds: integer('ai_analysis_timeout_seconds').notNull().default(3600),
   aiActiveProviderId: uuid('ai_active_provider_id'),
   apiKeys: text('api_keys'),
+  accountTagVisibility: jsonb('account_tag_visibility').default({
+    sidebar: true,
+    transactions: true,
+    legend: true,
+    budgets: true,
+    forecast: true,
+    suggestions: true,
+  }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
