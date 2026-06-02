@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, Pencil, Trash2, Tag, Search, Hash } from 'lucide-react';
 
 type Tag = {
@@ -116,6 +117,11 @@ export default function TagsTab() {
     setFormColor(tag.color);
     setFormDescription(tag.description ?? '');
     setDrawerOpen(true);
+  };
+
+  const handleClose = () => {
+    setDrawerOpen(false);
+    setEditingTag(null);
   };
 
   const handleSave = async () => {
@@ -284,74 +290,73 @@ export default function TagsTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setDrawerOpen(false); setEditingTag(null); }} />
-          <div className="relative w-full max-w-sm bg-card border-l border-border p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-foreground mb-6">
+      <Sheet open={drawerOpen} onOpenChange={(open) => !open && handleClose()}>
+        <SheetContent side="right" className="w-full max-w-sm bg-card border-l border-border p-6 overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>
               {editingTag ? 'Edit Tag' : 'New Tag'}
-            </h3>
+            </SheetTitle>
+          </SheetHeader>
 
-            <div className="space-y-5">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Tag Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                  placeholder="e.g., Home Remodel, Side Income"
-                  autoFocus
-                />
-              </div>
-
-              {/* Color */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Color</label>
-                <ColorPicker value={formColor} onChange={setFormColor} />
-              </div>
-
-              {/* Preview */}
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">Preview</label>
-                {formName ? (
-                  <TagBadge tag={{ name: formName, color: formColor }} />
-                ) : (
-                  <span className="text-xs text-muted-foreground italic">Enter a name to preview</span>
-                )}
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <textarea
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground resize-none"
-                  placeholder="What is this tag for?"
-                  rows={3}
-                />
-              </div>
+          <div className="space-y-5">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Tag Name</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                placeholder="e.g., Home Remodel, Side Income"
+                autoFocus
+              />
             </div>
 
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => { setDrawerOpen(false); setEditingTag(null); }}
-                className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !formName.trim()}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-              >
-                {saving ? 'Saving...' : editingTag ? 'Update' : 'Create'}
-              </button>
+            {/* Color */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Color</label>
+              <ColorPicker value={formColor} onChange={setFormColor} />
+            </div>
+
+            {/* Preview */}
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">Preview</label>
+              {formName ? (
+                <TagBadge tag={{ name: formName, color: formColor }} />
+              ) : (
+                <span className="text-xs text-muted-foreground italic">Enter a name to preview</span>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <textarea
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground resize-none"
+                placeholder="What is this tag for?"
+                rows={3}
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex gap-3 mt-8">
+            <button
+              onClick={() => { setDrawerOpen(false); setEditingTag(null); }}
+              className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !formName.trim()}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Saving...' : editingTag ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>

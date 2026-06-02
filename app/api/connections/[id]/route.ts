@@ -60,7 +60,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if ('syncFrequency' in body && body.syncFrequency !== undefined) {
-    const validFrequencies = ['manual', 'daily', 'weekly', 'monthly'];
+    const validFrequencies = ['manual', 'hourly', 'daily', 'weekly', 'monthly'];
     if (!validFrequencies.includes(body.syncFrequency)) {
       return NextResponse.json(
         { error: 'validation_error', message: 'Invalid sync frequency' },

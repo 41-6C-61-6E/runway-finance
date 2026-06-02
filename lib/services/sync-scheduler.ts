@@ -9,6 +9,7 @@ const LOG_TAG = '[sync-scheduler]';
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
+  hourly: 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
   monthly: 30 * 24 * 60 * 60 * 1000,

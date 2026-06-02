@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 type CategoryType = 'standard' | 'compound' | 'transfer';
 type FormCategoryType = 'expense' | 'income' | 'compound' | 'transfer';
@@ -247,6 +248,12 @@ export default function CategoriesTab() {
     setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder + 1);
+  };
+
+  const handleClose = () => {
+    setIsAdding(false);
+    setEditing(null);
+    setCloning(null);
   };
 
   const handleSave = async () => {
@@ -589,134 +596,133 @@ export default function CategoriesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      {(isAdding || editing !== null || cloning !== null) && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-foreground/15" onClick={() => { setIsAdding(false); setEditing(null); setCloning(null); }} />
-          <div className="relative w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-foreground mb-6">
+      <Sheet open={isAdding || editing !== null || cloning !== null} onOpenChange={(open) => !open && handleClose()}>
+        <SheetContent side="right" className="w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>
               {editing ? 'Edit Category' : cloning ? 'Clone Category' : 'Add Category'}
-            </h3>
+            </SheetTitle>
+          </SheetHeader>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                  placeholder="Category name"
-                />
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                placeholder="Category name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {formCategoryType === 'compound' ? 'Uses Income Category' : 'Parent Group'}
+              </label>
+              <select
+                value={formParentId || ''}
+                onChange={(e) => setFormParentId(e.target.value || null)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">
+                  {formCategoryType === 'compound' ? 'Select income category...' : 'None (top-level group)'}
+                </option>
+                {parents.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {COLOR_OPTIONS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setFormColor(c)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${
+                      formColor === c ? 'border-foreground scale-110' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
               </div>
+            </div>
 
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Category Type</label>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(['expense', 'income', 'compound', 'transfer'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setFormCategoryType(type);
+                      if (type === 'compound') {
+                        setFormExpenseParentId((prev) => prev || inferCompoundExpenseParentId(formName));
+                      } else {
+                        setFormExpenseParentId(null);
+                      }
+                    }}
+                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                      formCategoryType === type
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {type === 'expense' ? 'Expense' : type === 'income' ? 'Income' : type === 'compound' ? 'Compound' : 'Transfer'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {formCategoryType === 'compound' && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  {formCategoryType === 'compound' ? 'Uses Income Category' : 'Parent Group'}
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1">Uses Expense Category</label>
                 <select
-                  value={formParentId || ''}
-                  onChange={(e) => setFormParentId(e.target.value || null)}
+                  value={formExpenseParentId || ''}
+                  onChange={(e) => setFormExpenseParentId(e.target.value || null)}
                   className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="">
-                    {formCategoryType === 'compound' ? 'Select income category...' : 'None (top-level group)'}
-                  </option>
-                  {parents.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  <option value="">Select expense category...</option>
+                  {compoundExpenseOptions
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.path}</option>
+                    ))}
                 </select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
+                </p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Color</label>
-                <div className="flex flex-wrap gap-2">
-                  {COLOR_OPTIONS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setFormColor(c)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all ${
-                        formColor === c ? 'border-foreground scale-110' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Category Type</label>
-                <div className="flex rounded-lg border border-border overflow-hidden">
-                  {(['expense', 'income', 'compound', 'transfer'] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => {
-                        setFormCategoryType(type);
-                        if (type === 'compound') {
-                          setFormExpenseParentId((prev) => prev || inferCompoundExpenseParentId(formName));
-                        } else {
-                          setFormExpenseParentId(null);
-                        }
-                      }}
-                      className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                        formCategoryType === type
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {type === 'expense' ? 'Expense' : type === 'income' ? 'Income' : type === 'compound' ? 'Compound' : 'Transfer'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {formCategoryType === 'compound' && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Uses Expense Category</label>
-                  <select
-                    value={formExpenseParentId || ''}
-                    onChange={(e) => setFormExpenseParentId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">Select expense category...</option>
-                    {compoundExpenseOptions
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>{p.path}</option>
-                      ))}
-                  </select>
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Display Order</label>
-                <input
-                  type="number"
-                  value={formOrder}
-                  onChange={(e) => setFormOrder(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => { setIsAdding(false); setEditing(null); setCloning(null); }}
-                className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !formName.trim()}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-              >
-                {saving ? 'Saving...' : editing ? 'Update' : cloning ? 'Clone' : 'Create'}
-              </button>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Display Order</label>
+              <input
+                type="number"
+                value={formOrder}
+                onChange={(e) => setFormOrder(parseInt(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex gap-3 mt-8">
+            <button
+              onClick={() => { setIsAdding(false); setEditing(null); setCloning(null); }}
+              className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !formName.trim()}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Saving...' : editing ? 'Update' : cloning ? 'Clone' : 'Create'}
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
