@@ -163,12 +163,17 @@ function SortableHeader({
   );
 }
 
+import { useUserSettings } from "@/components/user-settings-provider";
+
 export default function TransactionTable({
   filters,
   onSelectAll,
   onTransactionClick,
   onTotalChange,
 }: TransactionTableProps) {
+  const settingsContext = useUserSettings();
+  const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState<number | null>(null);
@@ -893,7 +898,7 @@ export default function TransactionTable({
               <span className="text-sm text-muted-foreground truncate block">
                 {tx.accountName || "—"}
               </span>
-              {tx.accountTags && tx.accountTags.length > 0 && (
+              {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {tx.accountTags.map((tag) => (
                     <span

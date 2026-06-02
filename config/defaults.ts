@@ -18,6 +18,14 @@ export const GENERAL_DEFAULTS = {
   hiddenPages: {},
   showMathEnabled: false,
   paystubEnabled: false,
+  accountTagVisibility: {
+    sidebar: true,
+    transactions: true,
+    legend: true,
+    budgets: true,
+    forecast: true,
+    suggestions: true,
+  },
 } as const;
 
 // ── Analytics / Chart Settings ───────────────────────────────────────────────
@@ -168,6 +176,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'compactMode', label: 'Compact Mode', description: 'Compact UI mode with reduced spacing', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.compactMode },
   { key: 'hiddenPages', label: 'Hidden Pages', description: 'Pages hidden from navigation sidebar (JSON object of page key → boolean)', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.hiddenPages },
   { key: 'showMathEnabled', label: 'Show Math Explanations', description: 'Display math/logic descriptions on analytics cards', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.showMathEnabled },
+  { key: 'accountTagVisibility', label: 'Account Tag Visibility', description: 'Control visibility of account tag indicators (JSON object: {sidebar, transactions, legend, budgets, forecast, suggestions})', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.accountTagVisibility },
 
   // ── Analytics ──
   { key: 'chartColorScheme', label: 'Chart Color Scheme', description: 'Color palette for all charts and graphs', type: 'string', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.chartColorScheme },

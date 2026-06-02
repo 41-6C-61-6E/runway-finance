@@ -11,6 +11,7 @@ import { EstimatePill } from '@/components/ui/estimate-pill';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 type ForecastMode = 'historical' | 'budget' | 'hybrid';
 
@@ -68,6 +69,8 @@ const MODE_DESCRIPTIONS: Record<ForecastMode, string> = {
 };
 
 export function CashFlowForecast() {
+  const settingsContext = useUserSettings();
+  const showForecastTags = settingsContext?.settings?.accountTagVisibility?.forecast !== false;
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashFlowForecast');
   const [showFilters, setShowFilters] = useState(false);
   const { isEnabled } = useSyntheticData();
@@ -390,7 +393,7 @@ export function CashFlowForecast() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-medium text-foreground">{acct.name}</span>
-                          {acct.tags && acct.tags.length > 0 && (
+                          {showForecastTags && acct.tags && acct.tags.length > 0 && (
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {acct.tags.map((tag) => (
                                 <span
