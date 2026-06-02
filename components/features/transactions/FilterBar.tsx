@@ -1082,7 +1082,7 @@ export default function FilterBar({
               onClick={() => onChange('type', filters.type === 'income' ? null : 'income')}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                 filters.type === 'income'
-                  ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-500 shadow-sm dark:border-emerald-400 dark:bg-emerald-400/20 dark:text-emerald-400'
+                  ? 'border border-chart-1 bg-chart-1/20 text-chart-1 shadow-sm'
                   : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
@@ -1092,7 +1092,7 @@ export default function FilterBar({
               onClick={() => onChange('type', filters.type === 'expense' ? null : 'expense')}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                 filters.type === 'expense'
-                  ? 'border border-rose-500 bg-rose-500/20 text-rose-500 shadow-sm dark:border-rose-400 dark:bg-rose-400/20 dark:text-rose-400'
+                  ? 'border border-chart-5 bg-chart-5/20 text-chart-5 shadow-sm'
                   : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >

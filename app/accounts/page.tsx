@@ -420,7 +420,7 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
                           )}
                         </div>
                       </div>
-                      <span className={`font-mono text-[11px] font-semibold ${isExpense ? 'text-destructive' : 'text-emerald-500'}`}>
+                      <span className={`font-mono text-[11px] font-semibold ${isExpense ? 'text-chart-5' : 'text-chart-1'}`}>
                         {text}
                       </span>
                     </div>
@@ -2633,7 +2633,7 @@ export default function AccountsPage() {
                                 {formatCurrency(groupStats.current)}
                               </p>
                               <span className={`text-[10px] font-semibold flex items-center gap-0.5 justify-end ${
-                                groupChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                groupChange.isPositive ? 'text-chart-1' : 'text-chart-5'
                               }`}>
                                 {groupChange.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
                                 {groupChange.text}
@@ -2687,7 +2687,7 @@ export default function AccountsPage() {
                                             {formatCurrency(subStats.current)}
                                           </p>
                                           <span className={`text-[9px] font-medium ${
-                                            subChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                            subChange.isPositive ? 'text-chart-1' : 'text-chart-5'
                                           }`}>
                                             {subChange.text}
                                           </span>
@@ -2758,7 +2758,7 @@ export default function AccountsPage() {
                                                 </p>
                                                 {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
                                                   <span className={`text-[9px] ${
-                                                    accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                                    accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
                                                   }`}>
                                                     {accChange.text}
                                                   </span>
@@ -2848,7 +2848,7 @@ export default function AccountsPage() {
                                         </p>
                                         {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
                                           <span className={`text-[9px] ${
-                                            accChange.isPositive ? 'text-emerald-500' : 'text-destructive'
+                                            accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
                                           }`}>
                                             {accChange.text}
                                           </span>
