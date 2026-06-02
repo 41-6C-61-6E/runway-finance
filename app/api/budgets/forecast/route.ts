@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, budgets, categories, transactions, userSettings, accountSnapshots } from '@/lib/db/schema';
+import { accounts, budgets, categories, transactions, userSettings, accountSnapshots, accountTags, tags } from '@/lib/db/schema';
 import { eq, and, sql, inArray, desc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -382,6 +382,36 @@ export async function GET(request: Request) {
       }
     }
 
+    // Batch fetch tags for these accounts
+    const accountIds = fundingAccounts.map((a: any) => a.id);
+    const tagRows = accountIds.length > 0
+      ? await db
+          .select({
+            accountId: accountTags.accountId,
+            tagId: tags.id,
+            tagName: tags.name,
+            tagColor: tags.color,
+          })
+          .from(accountTags)
+          .leftJoin(tags, eq(accountTags.tagId, tags.id))
+          .where(inArray(accountTags.accountId, accountIds))
+      : [];
+
+    const tagsByAccountId = new Map<string, any[]>();
+    if (dek) {
+      for (const row of tagRows) {
+        try {
+          const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+          const tag = { id: row.tagId, name, color: row.tagColor };
+          const existing = tagsByAccountId.get(row.accountId) ?? [];
+          existing.push(tag);
+          tagsByAccountId.set(row.accountId, existing);
+        } catch (err) {
+          logger.error('Failed to decrypt tag in budgets forecast route', { tagId: row.tagId, error: err });
+        }
+      }
+    }
+
     return NextResponse.json({
       forecast: forecastMonths,
       accounts: fundingAccounts.map((a: any) => ({
@@ -389,6 +419,7 @@ export async function GET(request: Request) {
         name: a.name,
         balance: parseFloat(a.balance),
         type: a.type,
+        tags: tagsByAccountId.get(a.id) ?? [],
       })),
       historical: chartData,
       config: {

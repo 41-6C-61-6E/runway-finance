@@ -125,7 +125,7 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
         const meta = acc.metadata ? (typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata) : {};
         const status = meta.mortgageStatus;
         const endEventDateStr = status === 'paid_off' ? meta.payoffDate : (status === 'refinanced' ? meta.refinanceDate : undefined);
-        if (endEventDateStr && snapshotDate > endEventDateStr) {
+        if (endEventDateStr && snapshotDate >= endEventDateStr) {
           continue;
         }
       } catch (e) {
@@ -207,7 +207,8 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     }
     if (excluded) continue;
 
-    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
+    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const amount = parseFloat(tx.amount);
 
@@ -339,7 +340,8 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     }
     if (excluded) continue;
 
-    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
+    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
     const accountId = tx.accountId.toString();
@@ -471,7 +473,8 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     }
     if (excluded) continue;
 
-    const dateObj = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
+    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
+    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const catId = tx.categoryId.toString();
     const accountId = tx.accountId.toString();
