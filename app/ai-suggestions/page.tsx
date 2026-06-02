@@ -21,6 +21,7 @@ type AiProposal = {
     date: string;
     amount: string;
     accountName: string | null;
+    accountTags?: { id: string; name: string; color: string }[];
   };
 };
 
@@ -319,7 +320,21 @@ function ProposalCard({
           </div>
           <div>
             <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Account</span>
-            <span className="text-foreground text-xs">{proposal.transactionDetails.accountName || '—'}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-foreground text-xs">{proposal.transactionDetails.accountName || '—'}</span>
+              {proposal.transactionDetails.accountTags && proposal.transactionDetails.accountTags.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {proposal.transactionDetails.accountTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: tag.color }}
+                      title={tag.name}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Date</span>
