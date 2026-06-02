@@ -148,6 +148,7 @@ export async function cleanupTransientZeroSnapshots(
       id: accountSnapshots.id,
       snapshotDate: accountSnapshots.snapshotDate,
       balance: accountSnapshots.balance,
+      isImported: accountSnapshots.isImported,
     })
     .from(accountSnapshots)
     .where(
@@ -172,7 +173,12 @@ export async function cleanupTransientZeroSnapshots(
           // Ignore
         }
       }
-      return { id: s.id, date: s.snapshotDate, balance: parseFloat(balanceStr) || 0 };
+      return { 
+        id: s.id, 
+        date: s.snapshotDate, 
+        balance: parseFloat(balanceStr) || 0,
+        isImported: s.isImported,
+      };
     })
   );
 
@@ -180,6 +186,12 @@ export async function cleanupTransientZeroSnapshots(
 
   for (let i = 0; i < decryptedSnaps.length; i++) {
     const current = decryptedSnaps[i];
+    
+    // Explicitly preserve user-imported CSV snapshot records
+    if (current.isImported) {
+      continue;
+    }
+
     if (current.balance === 0) {
       let prevIdx = i - 1;
       while (prevIdx >= 0 && decryptedSnaps[prevIdx].balance === 0) {
@@ -199,7 +211,8 @@ export async function cleanupTransientZeroSnapshots(
         const nextDate = new Date(next.date + 'T00:00:00Z');
         const diffDays = (nextDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
-        if (diffDays <= 5) {
+        // Synced accounts (isImported = false) can be safely deleted over a wider range (up to 45 days)
+        if (diffDays <= 45) {
           idsToDelete.push(current.id);
         }
       }
