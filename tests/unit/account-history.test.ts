@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from 'vitest';
 import { accountSnapshots, transactions, accounts } from '@/lib/db/schema';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, cleanupTransientZeroSnapshots } from '@/lib/services/account-history';
 
 // Mock variables to control query responses
 let mockRealSnapshotsResponse: any[] = [];
@@ -10,6 +10,7 @@ let mockPostedTxsResponse: any[] = [];
 let mockLatestRealSnapshotResponse: any[] = [];
 let mockAccountResponse: any[] = [{ externalId: 'imported-test-account-id' }];
 let mockInsertValues: any[] = [];
+let mockDeleteWhereCalls: any[] = [];
 
 // Mock query builder to support Drizzle chained method calls without DB connection
 class MockDbQueryBuilder {
@@ -43,6 +44,9 @@ class MockDbQueryBuilder {
   }
 
   where(...args: any[]) {
+    if (this._isDelete) {
+      mockDeleteWhereCalls.push(args);
+    }
     return this;
   }
 
@@ -441,6 +445,40 @@ describe('account-history', () => {
       expect(day3.totalLiabilities).toBe('0');
       expect(day3.netWorth).toBe('5200');
       expect(day3.breakdown.mortgage).toBeUndefined();
+    });
+  });
+
+  describe('cleanupTransientZeroSnapshots', () => {
+    it('deletes transient zero balance snapshots surrounded by non-zero ones', async () => {
+      mockDeleteWhereCalls = [];
+      mockRealSnapshotsResponse = [
+        { id: 'snap_1', snapshotDate: '2026-05-24', balance: '100.00', isSynthetic: false },
+        { id: 'snap_2', snapshotDate: '2026-05-25', balance: '0.00', isSynthetic: false },
+        { id: 'snap_3', snapshotDate: '2026-05-26', balance: '0.00', isSynthetic: false },
+        { id: 'snap_4', snapshotDate: '2026-05-27', balance: '120.00', isSynthetic: false },
+      ];
+
+      await cleanupTransientZeroSnapshots('acct_123', 'user_123');
+
+      // The time gap between May 24 and May 27 is 3 days (<= 5).
+      // So the zero-balance snapshots on May 25 and May 26 should be deleted.
+      expect(mockDeleteWhereCalls).toHaveLength(1);
+      const whereCondition = mockDeleteWhereCalls[0][0];
+      expect(whereCondition).toBeDefined();
+    });
+
+    it('does not delete zero balance snapshots if the gap to next non-zero is too large', async () => {
+      mockDeleteWhereCalls = [];
+      mockRealSnapshotsResponse = [
+        { id: 'snap_1', snapshotDate: '2026-05-20', balance: '100.00', isSynthetic: false },
+        { id: 'snap_2', snapshotDate: '2026-05-21', balance: '0.00', isSynthetic: false },
+        { id: 'snap_3', snapshotDate: '2026-05-27', balance: '120.00', isSynthetic: false },
+      ];
+
+      await cleanupTransientZeroSnapshots('acct_123', 'user_123');
+
+      // May 20 to May 27 is 7 days (> 5), so it should NOT delete snap_2.
+      expect(mockDeleteWhereCalls).toHaveLength(0);
     });
   });
 });

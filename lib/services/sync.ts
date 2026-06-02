@@ -641,6 +641,77 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     for (const sfAccount of data.accounts) {
       const balanceNum = parseFloat(sfAccount.balance);
 
+      const [existingAccount] = await getDb()
+        .select({
+          id: accounts.id,
+          balance: accounts.balance,
+          balanceDate: accounts.balanceDate,
+        })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.userId, userId),
+            eq(accounts.externalId, sfAccount.id)
+          )
+        )
+        .limit(1);
+
+      let skipBalanceUpdate = false;
+      let targetBalance = sfAccount.balance;
+      let targetBalanceDate = new Date(sfAccount['balance-date'] * 1000);
+
+      if (existingAccount) {
+        const oldBalanceStr = await decryptField(existingAccount.balance, dek);
+        const oldBalanceNum = parseFloat(oldBalanceStr);
+        const newBalanceNum = parseFloat(sfAccount.balance);
+
+        if (
+          !isNaN(oldBalanceNum) &&
+          !isNaN(newBalanceNum) &&
+          newBalanceNum === 0 &&
+          Math.abs(oldBalanceNum) > 10.0
+        ) {
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          
+          const dbTxs = await getDb()
+            .select({ amount: transactions.amount })
+            .from(transactions)
+            .where(
+              and(
+                eq(transactions.accountId, existingAccount.id),
+                eq(transactions.deleted, false),
+                gte(transactions.date, sevenDaysAgo)
+              )
+            );
+
+          const decryptedDbTxs = await Promise.all(
+            dbTxs.map(async (t) => {
+              const decrypted = await decryptField(t.amount, dek);
+              return parseFloat(decrypted) || 0;
+            })
+          );
+
+          const currentSyncTxs = (sfAccount.transactions || []).map((t) => parseFloat(t.amount) || 0);
+
+          const allTxs = [...decryptedDbTxs, ...currentSyncTxs];
+          const negativeSum = allTxs.filter((amt) => amt < 0).reduce((sum, amt) => sum + amt, 0);
+
+          const expectedDrop = Math.abs(oldBalanceNum);
+          const actualDrop = Math.abs(negativeSum);
+
+          if (actualDrop < expectedDrop * 0.5) {
+            logger.warn(`${LOG_TAG} Suspected transient zero balance dropout for account ${sfAccount.name} (${sfAccount.id}). Skipping balance update to 0.`, {
+              oldBalance: oldBalanceNum,
+              newBalance: newBalanceNum,
+              negativeTxVolume: negativeSum,
+            });
+            skipBalanceUpdate = true;
+            targetBalance = existingAccount.balance;
+            targetBalanceDate = existingAccount.balanceDate || new Date();
+          }
+        }
+      }
+
       const [orphanedAccount] = await getDb()
         .select({ id: accounts.id })
         .from(accounts)
@@ -660,8 +731,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           .update(accounts)
           .set({
             connectionId,
-            balance: sfAccount.balance,
-            balanceDate: new Date(sfAccount['balance-date'] * 1000),
+            balance: targetBalance,
+            balanceDate: targetBalanceDate,
             institution: await encryptField(sfAccount.org.name, dek),
             updatedAt: now,
           })
@@ -676,8 +747,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             externalId: sfAccount.id,
             name: await encryptField(sfAccount.name, dek),
             currency: sfAccount.currency,
-            balance: sfAccount.balance,
-            balanceDate: new Date(sfAccount['balance-date'] * 1000),
+            balance: targetBalance,
+            balanceDate: targetBalanceDate,
             type: inferAccountType(sfAccount),
             institution: await encryptField(sfAccount.org.name, dek),
             isHidden: false,
@@ -687,8 +758,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           .onConflictDoUpdate({
             target: [accounts.connectionId, accounts.externalId],
             set: {
-              balance: sfAccount.balance,
-              balanceDate: new Date(sfAccount['balance-date'] * 1000),
+              balance: targetBalance,
+              balanceDate: targetBalanceDate,
               institution: await encryptField(sfAccount.org.name, dek),
               updatedAt: now,
             },
