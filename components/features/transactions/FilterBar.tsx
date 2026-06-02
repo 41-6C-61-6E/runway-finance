@@ -11,6 +11,7 @@ type FilterState = {
   categoryIds: string | null;
   tagId: string | null;
   tagIds: string | null;
+  accountTagIds: string | null;
   search: string | null;
   type: string | null;
   startDate: string | null;
@@ -184,7 +185,7 @@ export default function FilterBar({
   const isPresetActive = useCallback((preset: TransactionPreset) => {
     const filterKeys = [
       'accountId', 'accountIds', 'accountTypes', 'categoryId', 'categoryIds',
-      'tagId', 'tagIds', 'search', 'type', 'startDate', 'endDate', 'pending',
+      'tagId', 'tagIds', 'accountTagIds', 'search', 'type', 'startDate', 'endDate', 'pending',
       'reviewed', 'minAmount', 'maxAmount', 'categorizedByAi'
     ] as (keyof FilterState)[];
     
@@ -209,13 +210,16 @@ export default function FilterBar({
   const [accountIdsOpen, setAccountIdsOpen] = useState(false);
   const [categoryIdsOpen, setCategoryIdsOpen] = useState(false);
   const [tagIdsOpen, setTagIdsOpen] = useState(false);
+  const [accountTagIdsOpen, setAccountTagIdsOpen] = useState(false);
   const [accountTypesOpen, setAccountTypesOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [tagSearch, setTagSearch] = useState('');
+  const [accountTagSearch, setAccountTagSearch] = useState('');
   const accountIdsRef = useRef<HTMLDivElement>(null);
   const categoryIdsRef = useRef<HTMLDivElement>(null);
   const tagIdsRef = useRef<HTMLDivElement>(null);
+  const accountTagIdsRef = useRef<HTMLDivElement>(null);
   const accountTypesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -307,6 +311,10 @@ export default function FilterBar({
         setTagIdsOpen(false);
         setTagSearch('');
       }
+      if (accountTagIdsRef.current && !accountTagIdsRef.current.contains(e.target as Node)) {
+        setAccountTagIdsOpen(false);
+        setAccountTagSearch('');
+      }
       if (accountTypesRef.current && !accountTypesRef.current.contains(e.target as Node)) {
         setAccountTypesOpen(false);
       }
@@ -381,6 +389,7 @@ export default function FilterBar({
   const selectedCategoryIds = (filters.categoryIds ?? '').split(',').filter(Boolean);
   const selectedAccountTypes = (filters.accountTypes ?? '').split(',').filter(Boolean);
   const selectedTagIds = (filters.tagIds ?? '').split(',').filter(Boolean);
+  const selectedAccountTagIds = (filters.accountTagIds ?? '').split(',').filter(Boolean);
 
   const handleAccountIdsChange = useCallback((values: string[]) => {
     onChange('accountIds', values.length > 0 ? values.join(',') : null);
@@ -392,6 +401,10 @@ export default function FilterBar({
 
   const handleTagIdsChange = useCallback((values: string[]) => {
     onChange('tagIds', values.length > 0 ? values.join(',') : null);
+  }, [onChange]);
+
+  const handleAccountTagIdsChange = useCallback((values: string[]) => {
+    onChange('accountTagIds', values.length > 0 ? values.join(',') : null);
   }, [onChange]);
 
   const handleAccountTypesChange = useCallback((values: string[]) => {
@@ -437,12 +450,13 @@ export default function FilterBar({
     if (selectedAccountIds.length > 0) pills.push(`Accounts (${selectedAccountIds.length})`);
     if (selectedCategoryIds.length > 0) pills.push(`Categories (${selectedCategoryIds.length})`);
     if (selectedTagIds.length > 0) pills.push(`Tags (${selectedTagIds.length})`);
+    if (selectedAccountTagIds.length > 0) pills.push(`Account Tags (${selectedAccountTagIds.length})`);
     if (filters.minAmount || filters.maxAmount) pills.push('Amount');
     if (filters.pending === 'true') pills.push('Pending');
     if (filters.type) pills.push(filters.type === 'income' ? 'Income' : 'Expense');
     if (filters.categorizedByAi === 'true') pills.push('AI');
     return pills;
-  }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, filters, datePreset]);
+  }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, selectedAccountTagIds, filters, datePreset]);
 
   return (
     <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-visible">
@@ -915,6 +929,72 @@ export default function FilterBar({
                               ? selectedTagIds.filter((id) => id !== tag.id)
                               : [...selectedTagIds, tag.id];
                             handleTagIdsChange(next);
+                          }}
+                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                        />
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="text-sm">{tag.name}</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Account Tags Multi-Select */}
+          <div className="relative z-30" ref={accountTagIdsRef}>
+            <button
+              type="button"
+              onClick={() => { setAccountTagIdsOpen(!accountTagIdsOpen); if (!accountTagIdsOpen) setAccountTagSearch(''); }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                selectedAccountTagIds.length > 0
+                  ? 'bg-primary/15 border border-primary text-primary'
+                  : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className="text-xs">Account Tags</span>
+              {selectedAccountTagIds.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary/25 text-primary rounded-full min-w-[20px] text-center">
+                  {selectedAccountTagIds.length}
+                </span>
+              )}
+              <svg className={`h-3.5 w-3.5 transition-transform ${accountTagIdsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {accountTagIdsOpen && (
+              <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                <div className="p-2 border-b border-border/50">
+                  <input
+                    type="text"
+                    value={accountTagSearch}
+                    onChange={(e) => setAccountTagSearch(e.target.value)}
+                    placeholder="Search account tags..."
+                    className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
+                  />
+                </div>
+                <div className="overflow-y-auto flex-1 p-1">
+                  {tags.length === 0 && (
+                    <div className="px-3 py-4 text-xs text-muted-foreground text-center">No tags yet</div>
+                  )}
+                  {tags
+                    .filter((t) => !accountTagSearch || t.name.toLowerCase().includes(accountTagSearch.toLowerCase()))
+                    .map((tag) => (
+                      <label
+                        key={tag.id}
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedAccountTagIds.includes(tag.id)}
+                          onChange={() => {
+                            const next = selectedAccountTagIds.includes(tag.id)
+                              ? selectedAccountTagIds.filter((id) => id !== tag.id)
+                              : [...selectedAccountTagIds, tag.id];
+                            handleAccountTagIdsChange(next);
                           }}
                           className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
                         />
