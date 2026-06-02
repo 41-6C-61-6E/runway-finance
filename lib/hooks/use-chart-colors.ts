@@ -4,19 +4,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { applyChartColorScheme, resetChartColorScheme, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 
 export function useChartColorScheme() {
-  const [scheme, setScheme] = useState<ChartColorSchemeId>('monarch');
+  const [scheme, setScheme] = useState<ChartColorSchemeId>('kingston');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/user-settings', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
-        const s = (data.chartColorScheme as ChartColorSchemeId) || 'monarch';
+        const s = (data.chartColorScheme as ChartColorSchemeId) || 'kingston';
         setScheme(s);
         applyChartColorScheme(s);
       })
       .catch(() => {
-        applyChartColorScheme('monarch');
+        applyChartColorScheme('kingston');
       })
       .finally(() => setLoading(false));
   }, []);
