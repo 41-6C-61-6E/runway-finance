@@ -43,6 +43,7 @@ import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 
 type Connection = {
   id: string;
@@ -289,6 +290,15 @@ function SettingsPageBody() {
       .catch(() => setAccentColor('violet'));
   }, [fetchConnections, fetchAccounts]);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setAccentColor(detail);
+    };
+    window.addEventListener('accent-changed', handler);
+    return () => window.removeEventListener('accent-changed', handler);
+  }, []);
+
   const handleAccentColorChange = useCallback(
     async (color: string) => {
       setAccentColorLoading(true);
@@ -490,8 +500,7 @@ function SettingsPageBody() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Settings" icon={Settings} />
-      <div className="relative z-10 flex flex-col items-center px-2 sm:px-6 lg:px-8 py-6">
-        <div className="max-w-6xl w-full">
+      <PageContent className="flex flex-col items-center" maxWidth="max-w-6xl">
 
           {/* Setup Checklist */}
           <div className="mb-6">
@@ -545,7 +554,7 @@ function SettingsPageBody() {
               <div className="flex items-center justify-between pb-5 border-b border-border">
                 <div>
                   <h3 className="text-sm font-medium text-foreground">Theme</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Cycle through light, moonlight, and dark themes</p>
+                  <p className="text-xs text-muted-foreground mt-1">Select between Daylight, Moonlight, and Starlight themes</p>
                 </div>
                 <ModeToggle />
               </div>
@@ -568,7 +577,7 @@ function SettingsPageBody() {
                   <h3 className="text-sm font-medium text-foreground">Chart Color Scheme</h3>
                   <p className="text-xs text-muted-foreground mt-1">Choose a color palette for all charts and graphs</p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {(Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[]).map((id) => {
                     const scheme = CHART_COLOR_SCHEMES[id];
                     const isActive = chartScheme === id;
@@ -579,24 +588,24 @@ function SettingsPageBody() {
                         title={scheme.description}
                         aria-label={`Select ${scheme.name} chart color scheme`}
                         onClick={() => updateChartScheme(id)}
-                        className={`relative flex items-center gap-1.5 p-2 rounded-lg border transition-all ${
+                        className={`relative flex flex-col items-start gap-2 p-3 rounded-xl border transition-all ${
                           isActive
-                            ? 'border-foreground bg-muted/50'
+                            ? 'border-foreground bg-muted/50 shadow-sm'
                             : 'border-border hover:border-foreground/30 hover:bg-muted/20'
                         }`}
                       >
-                        <div className="flex -space-x-1">
+                        <div className="flex -space-x-1 mb-1">
                           {scheme.colors.map((c, i) => (
                             <div
                               key={i}
-                              className="w-4 h-4 rounded-full border border-border/30"
+                              className="w-4 h-4 rounded-full border border-background"
                               style={{ background: c }}
                             />
                           ))}
                         </div>
-                        <span className="text-xs text-foreground ml-1">{scheme.name}</span>
+                        <span className="text-xs font-semibold text-foreground">{scheme.name}</span>
                         {isActive && (
-                          <Check className="w-3 h-3 text-foreground absolute top-0.5 right-0.5" />
+                          <Check className="w-3.5 h-3.5 text-foreground absolute top-2 right-2" />
                         )}
                       </button>
                     );
@@ -1567,8 +1576,7 @@ function SettingsPageBody() {
             onClose={handleCloseAccountDrawer}
             onSuccess={handleAccountDrawerSuccess}
           />
-        </div>
-      </div>
+      </PageContent>
     </div>
   );
 }

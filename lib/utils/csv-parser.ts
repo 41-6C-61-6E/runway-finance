@@ -115,7 +115,18 @@ const MONTH_NAMES = [
   'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
 ];
 
-export function parseDateField(value: string, endOfMonth: boolean = false): string {
+function resolveDayOfMonth(dayOfMonth: number | 'end' | undefined, year: number, month: number): number {
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (dayOfMonth === 'end') {
+    return lastDay;
+  }
+  if (typeof dayOfMonth === 'number' && dayOfMonth >= 1) {
+    return Math.min(Math.floor(dayOfMonth), lastDay);
+  }
+  return 1;
+}
+
+export function parseDateField(value: string, dayOfMonth?: number | 'end'): string {
   if (!value) return '';
   const trimmed = value.trim();
 
@@ -131,9 +142,7 @@ export function parseDateField(value: string, endOfMonth: boolean = false): stri
     if (monthIndex !== -1) {
       const month = (monthIndex % 12) + 1;
       const paddedMonth = month.toString().padStart(2, '0');
-      const day = endOfMonth
-        ? new Date(Date.UTC(year, month, 0)).getUTCDate()
-        : 1;
+      const day = resolveDayOfMonth(dayOfMonth, year, month);
       const paddedDay = day.toString().padStart(2, '0');
       return `${year}-${paddedMonth}-${paddedDay}`;
     }
@@ -145,9 +154,7 @@ export function parseDateField(value: string, endOfMonth: boolean = false): stri
     const year = parseInt(yearMonthMatch[1], 10);
     const month = parseInt(yearMonthMatch[2], 10);
     const paddedMonth = month.toString().padStart(2, '0');
-    const day = endOfMonth
-      ? new Date(Date.UTC(year, month, 0)).getUTCDate()
-      : 1;
+    const day = resolveDayOfMonth(dayOfMonth, year, month);
     const paddedDay = day.toString().padStart(2, '0');
     return `${year}-${paddedMonth}-${paddedDay}`;
   }
@@ -162,9 +169,7 @@ export function parseDateField(value: string, endOfMonth: boolean = false): stri
     }
     if (month >= 1 && month <= 12) {
       const paddedMonth = month.toString().padStart(2, '0');
-      const day = endOfMonth
-        ? new Date(Date.UTC(year, month, 0)).getUTCDate()
-        : 1;
+      const day = resolveDayOfMonth(dayOfMonth, year, month);
       const paddedDay = day.toString().padStart(2, '0');
       return `${year}-${paddedMonth}-${paddedDay}`;
     }

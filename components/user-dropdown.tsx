@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Star, Key, LogOut } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { handleSignOut } from '@/components/server-actions';
@@ -54,14 +55,19 @@ export default function UserDropdown() {
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary hover:bg-primary/30 transition-colors"
-        aria-label="User menu"
-      >
-        {initial}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary hover:bg-primary/30 transition-colors"
+            aria-label="User menu"
+          >
+            {initial}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">User menu</TooltipContent>
+      </Tooltip>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
           <div className="px-3 py-2">

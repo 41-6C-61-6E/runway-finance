@@ -15,6 +15,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Flame } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 
 export interface FireScenario {
   id?: string;
@@ -85,10 +86,8 @@ function FireContent() {
           </button>
         </div>
       </PageHeader>
-      <div className="px-2 sm:px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-[1600px]">
-
-          {tab === 'forecaster' && (
+      <PageContent>
+        {tab === 'forecaster' && (
             <>
               {isVisible('fireMetrics') && (
                 <Suspense fallback={<LoadingSpinner category="analysis" />}>
@@ -158,8 +157,7 @@ function FireContent() {
           {tab === 'retirement' && (
             <RetirementPlanner />
           )}
-        </div>
-      </div>
+      </PageContent>
     </div>
   );
 }

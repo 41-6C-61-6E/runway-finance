@@ -33,6 +33,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -1396,7 +1397,7 @@ export default function AccountsPage() {
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
       <PageHeader title="Accounts" icon={Landmark} />
 
-      <div className="max-w-6xl mx-auto px-2 sm:px-6 mt-6 space-y-6">
+      <PageContent maxWidth="max-w-6xl" className="space-y-6">
         <>
 
             {/* ── Graphics / Chart Card ── */}
@@ -2878,8 +2879,7 @@ export default function AccountsPage() {
               )}
             </Card>
           </>
-      </div>
-
+      </PageContent>
 
     </div>
   );

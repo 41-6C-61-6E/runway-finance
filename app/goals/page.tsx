@@ -8,6 +8,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Target } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 
 function GoalsContent() {
   const { isVisible } = useChartVisibility();
@@ -16,30 +17,27 @@ function GoalsContent() {
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
       <PageHeader title="Financial Goals" icon={Target} />
-      <div className="px-2 sm:px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-[1600px]">
+      <PageContent>
+        {isVisible('goalsSummary') && (
+          <Suspense fallback={<LoadingSpinner category="summary" />}>
+            <div>
+              <GoalsSummary />
+              <MathDescription chartId="goalsSummary" />
+            </div>
+          </Suspense>
+        )}
 
-          {isVisible('goalsSummary') && (
+        {isVisible('goalsList') && (
+          <div className="mt-5">
             <Suspense fallback={<LoadingSpinner category="summary" />}>
               <div>
-                <GoalsSummary />
-                <MathDescription chartId="goalsSummary" />
+                <GoalsList />
+                <MathDescription chartId="goalsList" />
               </div>
             </Suspense>
-          )}
-
-          {isVisible('goalsList') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <div>
-                  <GoalsList />
-                  <MathDescription chartId="goalsList" />
-                </div>
-              </Suspense>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </PageContent>
     </div>
   );
 }

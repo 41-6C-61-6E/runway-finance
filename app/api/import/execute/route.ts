@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       newCategories,
       startDate,
       endDate,
+      snapshotDayOfMonth,
     } = body;
 
     if (!csvText || !importType || !columnMapping) {
@@ -157,7 +158,7 @@ export async function POST(request: Request) {
           }
 
           if (mapped.date) {
-            const parsedRowDate = parseDateField(mapped.date, importType === 'account_snapshots');
+            const parsedRowDate = parseDateField(mapped.date, importType === 'account_snapshots' ? snapshotDayOfMonth : undefined);
             if (startDate && parsedRowDate < startDate) {
               return { skipped: true };
             }
@@ -201,7 +202,7 @@ export async function POST(request: Request) {
                 userId,
                 accountId: resolvedAccountId,
                 externalId,
-                date: parseDateField(mapped.date, false),
+                date: parseDateField(mapped.date),
                 amount: encryptedAmount,
                 description: encryptedDescription,
                 payee: encryptedPayee ?? undefined,
@@ -222,7 +223,7 @@ export async function POST(request: Request) {
               data: {
                 userId,
                 accountId: resolvedAccountId,
-                snapshotDate: parseDateField(mapped.date, true),
+                snapshotDate: parseDateField(mapped.date, snapshotDayOfMonth ?? 'end'),
                 balance: encryptedBalance,
                 isImported: true,
                 importId,

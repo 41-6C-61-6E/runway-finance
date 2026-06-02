@@ -10,6 +10,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { TrendingUp } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
+import PageContent from '@/components/page-content';
 import { ChartErrorBoundary } from '@/components/chart-error-boundary';
 
 function CashFlowContent() {
@@ -19,49 +20,46 @@ function CashFlowContent() {
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
       <PageHeader title="Cash Flow" icon={TrendingUp} />
-      <div className="px-2 sm:px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-[1600px]">
+      <PageContent>
+        {isVisible('cashFlowSankey') && (
+          <div>
+            <Suspense fallback={<LoadingSpinner category="sankey" />}>
+              <ChartErrorBoundary name="Cash Flow Sankey">
+                <div>
+                  <CashFlowSankey />
+                  <MathDescription chartId="cashFlowSankey" />
+                </div>
+              </ChartErrorBoundary>
+            </Suspense>
+          </div>
+        )}
 
-          {isVisible('cashFlowSankey') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="sankey" />}>
-                <ChartErrorBoundary name="Cash Flow Sankey">
-                  <div>
-                    <CashFlowSankey />
-                    <MathDescription chartId="cashFlowSankey" />
-                  </div>
-                </ChartErrorBoundary>
-              </Suspense>
-            </div>
-          )}
+        {isVisible('incomeExpenseChart') && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <ChartErrorBoundary name="Income vs Expenses">
+                <div>
+                  <IncomeExpenseChart />
+                  <MathDescription chartId="incomeExpenseChart" />
+                </div>
+              </ChartErrorBoundary>
+            </Suspense>
+          </div>
+        )}
 
-          {isVisible('incomeExpenseChart') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <ChartErrorBoundary name="Income vs Expenses">
-                  <div>
-                    <IncomeExpenseChart />
-                    <MathDescription chartId="incomeExpenseChart" />
-                  </div>
-                </ChartErrorBoundary>
-              </Suspense>
-            </div>
-          )}
-
-          {isVisible('cashFlowForecast') && (
-            <div className="mt-5">
-              <Suspense fallback={<LoadingSpinner category="forecast" />}>
-                <ChartErrorBoundary name="Cash Flow Forecast">
-                  <div>
-                    <CashFlowForecast />
-                    <MathDescription chartId="cashFlowForecast" />
-                  </div>
-                </ChartErrorBoundary>
-              </Suspense>
-            </div>
-          )}
-        </div>
-      </div>
+        {isVisible('cashFlowForecast') && (
+          <div className="mt-5">
+            <Suspense fallback={<LoadingSpinner category="forecast" />}>
+              <ChartErrorBoundary name="Cash Flow Forecast">
+                <div>
+                  <CashFlowForecast />
+                  <MathDescription chartId="cashFlowForecast" />
+                </div>
+              </ChartErrorBoundary>
+            </Suspense>
+          </div>
+        )}
+      </PageContent>
     </div>
   );
 }

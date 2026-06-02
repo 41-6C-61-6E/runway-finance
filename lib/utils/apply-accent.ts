@@ -9,10 +9,6 @@ type AccentDefinition = {
 };
 
 const ACCENTS: Record<string, AccentDefinition> = {
-  indigo: {
-    primary: 'oklch(0.65 0.18 260)',
-    accent: { light: 'oklch(0.92 0.06 260)', dark: 'oklch(0.2 0.06 260)' },
-  },
   violet: {
     primary: 'oklch(0.62 0.2 280)',
     accent: { light: 'oklch(0.92 0.08 285)', dark: 'oklch(0.2 0.04 285)' },
@@ -21,17 +17,14 @@ const ACCENTS: Record<string, AccentDefinition> = {
     primary: 'oklch(0.62 0.18 170)',
     accent: { light: 'oklch(0.92 0.06 170)', dark: 'oklch(0.2 0.05 170)' },
   },
-  amber: {
-    primary: 'oklch(0.65 0.18 80)',
-    accent: { light: 'oklch(0.93 0.07 80)', dark: 'oklch(0.25 0.06 80)' },
-  },
+
   rose: {
-    primary: 'oklch(0.6 0.2 20)',
-    accent: { light: 'oklch(0.92 0.06 20)', dark: 'oklch(0.2 0.06 20)' },
+    primary: 'oklch(0.52 0.22 5)',
+    accent: { light: 'oklch(0.9 0.09 10)', dark: 'oklch(0.14 0.05 5)' },
   },
-  slate: {
-    primary: 'oklch(0.55 0.04 280)',
-    accent: { light: 'oklch(0.92 0.01 280)', dark: 'oklch(0.2 0.02 280)' },
+  sapphire: {
+    primary: 'oklch(0.52 0.15 260)',
+    accent: { light: 'oklch(0.9 0.06 260)', dark: 'oklch(0.14 0.04 260)' },
   },
 };
 
@@ -110,6 +103,14 @@ function lightenColor(hex: string, factor: number): string {
 
   return '#' + [lr, lg, lb].map((c) => c.toString(16).padStart(2, '0')).join('');
 }
+
+// ── Theme→Accent Pairing ─────────────────────────────────────────────────
+// When the user switches color schemes, auto-apply the paired accent.
+export const THEME_ACCENT_MAP: Record<string, string> = {
+  light: 'violet',
+  moonlight: 'teal',
+  dark: 'sapphire',
+};
 
 function darkenColor(hex: string, factor: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
