@@ -289,12 +289,12 @@ export function IncomeExpenseChart() {
               <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 <defs>
                   <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03} />
+                    <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.08} />
                   </linearGradient>
                   <linearGradient id="expensesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.03} />
+                    <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.08} />
                   </linearGradient>
                 </defs>
                 {sharedAxes}

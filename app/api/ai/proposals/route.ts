@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { aiProposals, transactions, accounts } from '@/lib/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { aiProposals, transactions, accounts, accountTags, tags } from '@/lib/db/schema';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptRow, decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -58,6 +58,39 @@ export async function GET(request: Request) {
     // Session DEK not available in context
   }
 
+  // Batch fetch tags for the linked accounts
+  const accountIds = Array.from(
+    new Set(rawProposals.map((row) => row.account?.id).filter(Boolean))
+  ) as string[];
+
+  const tagRows = accountIds.length > 0
+    ? await db
+        .select({
+          accountId: accountTags.accountId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(accountTags)
+        .leftJoin(tags, eq(accountTags.tagId, tags.id))
+        .where(inArray(accountTags.accountId, accountIds))
+    : [];
+
+  const tagsByAccountId = new Map<string, any[]>();
+  if (dek) {
+    for (const row of tagRows) {
+      try {
+        const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+        const tag = { id: row.tagId, name, color: row.tagColor };
+        const existing = tagsByAccountId.get(row.accountId) ?? [];
+        existing.push(tag);
+        tagsByAccountId.set(row.accountId, existing);
+      } catch (err) {
+        logger.error('Failed to decrypt tag in proposals route', { tagId: row.tagId, error: err });
+      }
+    }
+  }
+
   const proposals = await Promise.all(
     rawProposals.map(async (row) => {
       const proposal = row.proposal;
@@ -65,8 +98,10 @@ export async function GET(request: Request) {
         try {
           const decryptedTx = await decryptRow('transactions', row.transaction, dek);
           let accountName: string | null = null;
+          let accountTagsList: any[] = [];
           if (row.account?.name) {
             accountName = await decryptField(row.account.name, dek);
+            accountTagsList = tagsByAccountId.get(row.account.id) ?? [];
           }
           return {
             ...proposal,
@@ -75,6 +110,7 @@ export async function GET(request: Request) {
               date: decryptedTx.date,
               amount: decryptedTx.amount,
               accountName,
+              accountTags: accountTagsList,
             }
           };
         } catch (err) {

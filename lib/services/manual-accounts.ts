@@ -673,7 +673,7 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
         const meta = rawMeta ? JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) : {};
         const status = meta.mortgageStatus;
         const endEventDateStr = status === 'paid_off' ? meta.payoffDate : (status === 'refinanced' ? meta.refinanceDate : undefined);
-        if (endEventDateStr && today > endEventDateStr) {
+        if (endEventDateStr && today >= endEventDateStr) {
           continue;
         }
       } catch (e) {

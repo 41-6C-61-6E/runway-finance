@@ -263,7 +263,7 @@ export async function GET(request: Request) {
           }
         }
 
-        if (endEventDateStr && dateStr > endEventDateStr) {
+        if (endEventDateStr && dateStr >= endEventDateStr) {
           continue;
         }
 
