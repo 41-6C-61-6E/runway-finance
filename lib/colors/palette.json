@@ -1,7 +1,7 @@
 {
   "themes": {
     "light": {
-      "background": "oklch(0.95 0.015 33)",
+      "background": "oklch(0.96 0.01 25)",
       "foreground": "oklch(0.18 0.015 260)",
       "card": "oklch(1.0 0 0)",
       "card-foreground": "oklch(0.18 0.015 260)",

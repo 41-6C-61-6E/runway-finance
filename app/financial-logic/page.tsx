@@ -331,7 +331,7 @@ export default function FinancialLogicPage() {
   return (
     <div className="min-h-screen w-full">
       <PageHeader title="Financial Logic Explorer" icon={Calculator} />
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-8 max-w-4xl mx-auto space-y-5 sm:space-y-6">
         <p className="text-sm text-muted-foreground">
           See exactly how every financial metric is calculated — which accounts are included, what types
           are classified as assets or liabilities, and the step-by-step math behind each number.

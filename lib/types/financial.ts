@@ -16,6 +16,7 @@ export interface ChartPoint {
   totalAssets: number;
   totalLiabilities: number;
   isSynthetic?: boolean;
+  [key: string]: string | number | boolean | undefined;
 }
 
 export interface CalculationStep {

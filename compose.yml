@@ -1,22 +1,22 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: runway-db
+    container_name: finance-db
     restart: unless-stopped
     env_file:
       - .env
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: runway_finance
+      POSTGRES_DB: personal_finance
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
-  runway-app:
-    container_name: runway-app
-    image: alanracek/runway-finance:latest
+  finance-app:
+    container_name: finance-app
+    image: alanracek/personal-finance:latest
     ports:
       - "3001:3000"
     env_file:
@@ -45,7 +45,7 @@ services:
       - NEXTAUTH_TRUST_HOST=true
 
       # File logging and rotation settings
-      - LOG_FILE_PATH=/app/logs/runway.log
+      - LOG_FILE_PATH=/app/logs/finance.log
       - LOG_FILE_MAX_SIZE_MB=100
       - LOG_FILE_MAX_FILES=20
 

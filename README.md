@@ -1,6 +1,6 @@
 <div align="center">
 
-# Runway Finance
+# Personal Finance App
 
 **Self-hosted personal finance dashboard for tracking net worth, managing transactions, analyzing cash flow, and planning for financial independence.**
 
@@ -80,7 +80,7 @@
 ## 📁 Project Structure
 
 ```
-runway-finance/
+personal-finance/
 ├── app/                          # Next.js App Router pages & layouts
 │   ├── accounts/                 # Account management pages
 │   ├── ai-suggestions/           # AI-powered financial insights
@@ -181,8 +181,8 @@ runway-finance/
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/runway-finance.git
-cd runway-finance
+git clone https://github.com/<your-username>/personal-finance.git
+cd personal-finance
 
 # Install dependencies
 pnpm install
@@ -289,10 +289,10 @@ Build and deploy the full stack with Docker Compose:
 
 ```bash
 # Build the Docker image
-docker build -t runway-finance:latest .
+docker build -t personal-finance:latest .
 
 # Or pull from Docker Hub (when published)
-# docker pull alanracek/runway-finance:latest
+# docker pull alanracek/personal-finance:latest
 
 # Start the full stack (PostgreSQL + app)
 docker compose up -d
@@ -303,16 +303,16 @@ The application will be available at [http://localhost:3001](http://localhost:30
 ### Manual Docker Build
 
 ```bash
-docker build -t runway-finance .
-docker run -p 3001:3000 runway-finance
+docker build -t personal-finance .
+docker run -p 3001:3000 personal-finance
 ```
 
 ### Docker Compose Services
 
 | Service | Image | Port | Purpose |
 |---|---|---|---|
-| `runway-db` | `postgres:16-alpine` | `5432` | PostgreSQL database (persistent volume) |
-| `runway-app` | `alanracek/runway-finance:latest` | `3001` | Next.js application |
+| `finance-db` | `postgres:16-alpine` | `5432` | PostgreSQL database (persistent volume) |
+| `finance-app` | `alanracek/personal-finance:latest` | `3001` | Next.js application |
 
 ---
 

@@ -26,9 +26,9 @@ function NetWorthContent() {
       <PageHeader title="Net Worth" icon={ChartSpline} />
       <PageContent>
         {showChart && (
-          <div className="mb-5">
+          <div className="mb-5 sm:mb-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <div className="space-y-5">
+              <div className="space-y-5 sm:space-y-6">
                 <NetWorthChart />
                 <MathDescription chartId="netWorthChart" />
               </div>
@@ -37,7 +37,7 @@ function NetWorthContent() {
         )}
 
         {showSummary && showRatio && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
             <div className="lg:col-span-2">
               <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <div className="h-full space-y-5">
@@ -59,7 +59,7 @@ function NetWorthContent() {
 
         {showSummary && !showRatio && (
           <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
-            <div className="space-y-5">
+            <div className="space-y-5 sm:space-y-6">
               <NetWorthSummary />
               <MathDescription chartId="netWorthSummary" />
             </div>
@@ -68,7 +68,7 @@ function NetWorthContent() {
 
         {!showSummary && showRatio && (
           <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
-            <div className="space-y-5">
+            <div className="space-y-5 sm:space-y-6">
               <DebtToAssetRatio />
               <MathDescription chartId="debtToAssetRatio" />
             </div>
@@ -76,7 +76,7 @@ function NetWorthContent() {
         )}
 
         {showSummary && (
-          <div className="mt-5">
+          <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <AssetAllocation />
             </Suspense>
@@ -84,7 +84,7 @@ function NetWorthContent() {
         )}
 
         {showRatio && (
-          <div className="mt-5">
+          <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <DebtBreakdown />
             </Suspense>

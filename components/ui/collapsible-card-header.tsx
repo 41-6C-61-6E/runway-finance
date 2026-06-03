@@ -29,9 +29,9 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
               typeof title === 'string' ? (
-                <h3 className="font-semibold truncate text-foreground text-sm sm:text-base">{title}</h3>
+                <h3 className="font-normal truncate text-foreground text-sm sm:text-base">{title}</h3>
               ) : (
-                <div className="min-w-0 flex-1">{title}</div>
+                <div className="min-w-0 flex-1 [&_h3]:font-normal [&_span]:font-normal [&_h2]:font-normal [&_div]:font-normal [&_h1]:font-normal">{title}</div>
               )
             )}
             {children}

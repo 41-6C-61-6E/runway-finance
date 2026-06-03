@@ -143,10 +143,10 @@ export function SpendingBreakdown() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:spending-breakdown:chartType', 'pie');
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:spending-breakdown:timeframe', '1m');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:spending-breakdown:chartType', 'pie');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:spending-breakdown:timeframe', '1m');
   const [excludedCategoryIds, setExcludedCategoryIds] = usePersistentState<Set<string>>(
-    'runway:spending-breakdown:excludedCategoryIds',
+    'finance:spending-breakdown:excludedCategoryIds',
     new Set(),
     {
       serialize: (val) => JSON.stringify(Array.from(val)),
@@ -271,7 +271,7 @@ export function SpendingBreakdown() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
             </h3>
           }
@@ -288,7 +288,7 @@ export function SpendingBreakdown() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
             </h3>
           }
@@ -315,7 +315,7 @@ export function SpendingBreakdown() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
           </h3>
         }

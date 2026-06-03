@@ -35,7 +35,7 @@ function CashFlowContent() {
         )}
 
         {isVisible('incomeExpenseChart') && (
-          <div className="mt-5">
+          <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <ChartErrorBoundary name="Income vs Expenses">
                 <div>
@@ -48,7 +48,7 @@ function CashFlowContent() {
         )}
 
         {isVisible('cashFlowForecast') && (
-          <div className="mt-5">
+          <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="forecast" />}>
               <ChartErrorBoundary name="Cash Flow Forecast">
                 <div>

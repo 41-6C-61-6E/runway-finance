@@ -399,7 +399,7 @@ async function callAiApi(
     ],
     temperature: 0.1,
     response_format: { type: 'json_object' },
-    chat_id: 'runway-categorize',
+    chat_id: 'finance-categorize',
     stream: true,
   };
 

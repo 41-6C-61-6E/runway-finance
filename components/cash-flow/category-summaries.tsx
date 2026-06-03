@@ -123,7 +123,7 @@ export function CategorySummaries() {
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:category-summaries:timeframe', '1m');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:category-summaries:timeframe', '1m');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('categorySummaries');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -204,7 +204,7 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <List className="w-4 h-4 text-primary" /> Category Breakdown
             </h3>
           }
@@ -221,7 +221,7 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <List className="w-4 h-4 text-primary" /> Category Breakdown
             </h3>
           }
@@ -242,7 +242,7 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <List className="w-4 h-4 text-primary" /> Category Breakdown
             </h3>
           }
@@ -347,7 +347,7 @@ export function CategorySummaries() {
         onToggle={setIsCollapsed}
         title={
           <div className="flex flex-col">
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <List className="w-4 h-4 text-primary" /> Category Breakdown
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5 font-normal">

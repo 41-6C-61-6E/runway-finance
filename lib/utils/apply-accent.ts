@@ -32,7 +32,7 @@ export function applyAccent(name: string) {
   initThemeObserver();
 
   try {
-    localStorage.setItem('runway-accent', name);
+    localStorage.setItem('finance-accent', name);
   } catch { /* localStorage unavailable */ }
 
   const r = document.documentElement;
