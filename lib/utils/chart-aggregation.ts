@@ -148,3 +148,55 @@ export function calculateChartBounds(
     minValue: rawMin < 0 ? rawMin * (1 + paddingFactor) : 0,
   };
 }
+
+/**
+ * Computes a Simple Moving Average (SMA) over specified numeric fields in a dataset.
+ */
+export function computeMovingAverage<T extends Record<string, any>>(
+  data: T[],
+  numericFields: (keyof T & string)[],
+  windowSize = 7
+): T[] {
+  if (data.length === 0 || windowSize <= 1) return data;
+  return data.map((point, index) => {
+    const start = Math.max(0, index - windowSize + 1);
+    const subset = data.slice(start, index + 1);
+    const count = subset.length;
+
+    const smoothedPoint = { ...point };
+    for (const field of numericFields) {
+      const sum = subset.reduce((acc, p) => acc + (parseFloat(p[field]) || 0), 0);
+      (smoothedPoint as Record<string, any>)[field] = Math.round((sum / count) * 100) / 100;
+    }
+    return smoothedPoint;
+  });
+}
+
+/**
+ * Computes a Median Filter over specified numeric fields in a dataset to remove sharp outliers/spikes.
+ */
+export function computeMedianFilter<T extends Record<string, any>>(
+  data: T[],
+  numericFields: (keyof T & string)[],
+  windowSize = 7
+): T[] {
+  if (data.length === 0 || windowSize <= 1) return data;
+  const half = Math.floor(windowSize / 2);
+
+  return data.map((point, index) => {
+    const start = Math.max(0, index - half);
+    const end = Math.min(data.length - 1, index + half);
+    const subset = data.slice(start, end + 1);
+
+    const smoothedPoint = { ...point };
+    for (const field of numericFields) {
+      const values = subset.map((p) => parseFloat(p[field]) || 0).sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      const median = values.length % 2 !== 0
+        ? values[mid]
+        : (values[mid - 1] + values[mid]) / 2;
+      (smoothedPoint as Record<string, any>)[field] = Math.round(median * 100) / 100;
+    }
+    return smoothedPoint;
+  });
+}
