@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { authConfig } from "./auth.config";
 import { seedUserAiProviders } from "./db/seed-ai-providers";
+import { resolveDataUserId } from "./sharing";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -50,7 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               .where(eq(userEncryptionKeys.userId, user.username))
               .limit(1);
 
-            if (keyRow) {
+            if (keyRow && keyRow.wrappedDek !== '') {
               const salt = hexToBytes(keyRow.salt);
 
               if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
@@ -94,16 +95,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               const serverKey = getServerKey();
               const serverWrapped = await wrapKey(dek, serverKey);
 
-              await db.insert(userEncryptionKeys).values({
-                userId: user.username,
-                wrappedDek: pwdWrapped.ciphertext,
-                wrappingIv: pwdWrapped.iv,
-                wrappingTag: pwdWrapped.tag,
-                serverWrappedDek: serverWrapped.ciphertext,
-                serverWrappingIv: serverWrapped.iv,
-                serverWrappingTag: serverWrapped.tag,
-                salt: bytesToHex(salt),
-              });
+              if (keyRow) {
+                await db.update(userEncryptionKeys).set({
+                  wrappedDek: pwdWrapped.ciphertext,
+                  wrappingIv: pwdWrapped.iv,
+                  wrappingTag: pwdWrapped.tag,
+                  serverWrappedDek: serverWrapped.ciphertext,
+                  serverWrappingIv: serverWrapped.iv,
+                  serverWrappingTag: serverWrapped.tag,
+                  salt: bytesToHex(salt),
+                  updatedAt: new Date(),
+                }).where(eq(userEncryptionKeys.userId, user.username));
+              } else {
+                await db.insert(userEncryptionKeys).values({
+                  userId: user.username,
+                  wrappedDek: pwdWrapped.ciphertext,
+                  wrappingIv: pwdWrapped.iv,
+                  wrappingTag: pwdWrapped.tag,
+                  serverWrappedDek: serverWrapped.ciphertext,
+                  serverWrappingIv: serverWrapped.iv,
+                  serverWrappingTag: serverWrapped.tag,
+                  salt: bytesToHex(salt),
+                });
+              }
             }
           } catch (err) {
             logger.error('Auth: DEK unwrap failed', { error: err instanceof Error ? err.message : String(err) });
@@ -133,11 +147,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             logger.error('Auth: Failed to reschedule sync timers', { error: err instanceof Error ? err.message : String(err) });
           }
 
+          // Resolve the data user ID for share members
+          let dataUserId = user.username;
+          try {
+            dataUserId = await resolveDataUserId(user.username);
+          } catch (err) {
+            logger.warn('Auth: could not resolve dataUserId', { error: err instanceof Error ? err.message : String(err) });
+          }
+
           return {
             id: user.username,
             name: user.username,
             email: user.email,
             dek: bytesToHex(dek),
+            dataUserId,
           };
         }
         logger.warn('Auth: failed login attempt', { username })
@@ -149,8 +172,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig.callbacks,
     async session({ session, token }) {
       if (session.user) {
+        const userId = token.sub;
+        const currentDataUserId = (token as any).dataUserId ?? token.sub;
+
+        if (currentDataUserId !== userId) {
+          try {
+            const { resolveDataUserId } = await import('@/lib/sharing');
+            const dbDataUserId = await resolveDataUserId(userId);
+            if (dbDataUserId !== currentDataUserId) {
+              logger.warn('Session invalidated: user has been removed from share group', { userId });
+              return {
+                ...session,
+                user: undefined as any,
+              };
+            }
+          } catch (err) {
+            logger.error('Error verifying share group membership in session callback', { error: err });
+          }
+        }
+
         session.user.id = token.sub;
         (session.user as any).dek = token.dek;
+        (session.user as any).dataUserId = currentDataUserId;
       }
       return session;
     },
@@ -158,6 +201,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.dek = (user as any).dek;
+        (token as any).dataUserId = (user as any).dataUserId ?? user.id;
       }
       return token;
     }

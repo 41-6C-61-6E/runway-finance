@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '12', 10);
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
         .from(monthlyCashFlow)
         .where(
           and(
-            eq(monthlyCashFlow.userId, userId),
+            eq(monthlyCashFlow.userId, dataUserId),
             gte(monthlyCashFlow.yearMonth, startYearMonth)
           )
         )
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
         .select()
         .from(accounts)
         .where(and(
-          eq(accounts.userId, userId),
+          eq(accounts.userId, dataUserId),
           eq(accounts.isHidden, false),
           eq(accounts.isExcludedFromNetWorth, false)
         ));
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
         const allCategories = await db
           .select()
           .from(categories)
-          .where(eq(categories.userId, userId));
+          .where(eq(categories.userId, dataUserId));
         const catById = new Map(allCategories.map(cat => [cat.id.toString(), cat]));
 
         const conditions = [

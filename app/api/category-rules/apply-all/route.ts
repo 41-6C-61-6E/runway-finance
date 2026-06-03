@@ -16,6 +16,7 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   const allTxns = await getDb()
@@ -28,14 +29,14 @@ export async function POST() {
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
+    .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
 
   if (allTxns.length === 0) {
     return NextResponse.json({ updated: 0, total: 0 });
   }
 
   const decryptedTxns = await decryptRows('transactions', allTxns, dek);
-  const ruleResults = await applyRulesToTransactions(decryptedTxns, userId, dek);
+  const ruleResults = await applyRulesToTransactions(decryptedTxns, dataUserId, dek);
 
   if (ruleResults.size > 0) {
     for (const [txId, action] of ruleResults) {

@@ -68,6 +68,7 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: {
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
     .where(
       and(
         eq(paystubFieldMappings.id, mappingId),
-        eq(paystubFieldMappings.userId, userId)
+        eq(paystubFieldMappings.userId, dataUserId)
       )
     )
     .limit(1);
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
         .from(paystubs)
         .where(
           and(
-            eq(paystubs.userId, userId),
+            eq(paystubs.userId, dataUserId),
             eq(paystubs.adviceNumber, raw.adviceNumber)
           )
         )
@@ -238,9 +239,9 @@ export async function POST(request: Request) {
   }
 
   // Recalculate summaries to update charts
-  await updateCategorySpendingSummaries(userId, dek);
-  await updateCategoryIncomeSummaries(userId, dek);
-  await updateMonthlyCashFlowSummaries(userId, dek);
+  await updateCategorySpendingSummaries(dataUserId, dek);
+  await updateCategoryIncomeSummaries(dataUserId, dek);
+  await updateMonthlyCashFlowSummaries(dataUserId, dek);
 
   return Response.json({ imported, skipped, total });
 }

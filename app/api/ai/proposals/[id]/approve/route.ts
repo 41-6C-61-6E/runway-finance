@@ -19,6 +19,7 @@ export async function POST(
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   let body: { payload?: any } = {};
@@ -29,7 +30,7 @@ export async function POST(
   const [proposal] = await db
     .select()
     .from(aiProposals)
-    .where(and(eq(aiProposals.id, id), eq(aiProposals.userId, userId)))
+    .where(and(eq(aiProposals.id, id), eq(aiProposals.userId, dataUserId)))
     .limit(1);
 
   if (!proposal) {
@@ -68,7 +69,7 @@ export async function POST(
         const [created] = await db
           .insert(categoriesTable)
           .values({
-            userId,
+            userId: dataUserId,
             parentId: payload.parentId,
             name: encryptedName,
             color: payload.color ?? '#6366f1',
@@ -83,7 +84,7 @@ export async function POST(
       }
 
       case 'create_rule': {
-        const duplicate = await findDuplicateRule(userId, dek, {
+        const duplicate = await findDuplicateRule(dataUserId, dek, {
           conditionField: payload.conditionField,
           conditionOperator: payload.conditionOperator,
           conditionValue: payload.conditionValue,
@@ -107,7 +108,7 @@ export async function POST(
         await db
           .insert(categoryRules)
           .values({
-            userId,
+            userId: dataUserId,
             name: encryptedRule,
             priority: 999,
             isActive: true,
@@ -135,7 +136,7 @@ export async function POST(
         .select()
         .from(aiProposals)
         .where(and(
-          eq(aiProposals.userId, userId),
+          eq(aiProposals.userId, dataUserId),
           eq(aiProposals.status, 'pending'),
         ));
 
@@ -161,7 +162,7 @@ export async function POST(
       }
     }
 
-    invalidateUserSearchCache(userId);
+    invalidateUserSearchCache(dataUserId);
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

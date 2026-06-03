@@ -162,3 +162,58 @@ export async function createUserEncryptionKeys(username: string, password: strin
     salt: bytesToHex(salt),
   });
 }
+
+/**
+ * For the sharing join flow: wrap the primary user's DEK with a new member's
+ * password and store it in user_encryption_keys for the new member.
+ *
+ * The new member's row points back to the primary via `primaryUserId` so that
+ * the auth layer knows to route data queries to the primary's ID.
+ */
+export async function rewrapDekForUser(
+  newUsername: string,
+  newPassword: string,
+  primaryUsername: string
+): Promise<void> {
+  const db = getDb();
+
+  // Retrieve the primary's server-wrapped DEK
+  const [primaryKeyRow] = await db
+    .select()
+    .from(userEncryptionKeys)
+    .where(eq(userEncryptionKeys.userId, primaryUsername))
+    .limit(1);
+
+  if (!primaryKeyRow?.serverWrappedDek || !primaryKeyRow.serverWrappingIv) {
+    throw new Error('Primary user encryption key not found or missing server wrap');
+  }
+
+  // Unwrap primary's DEK using the server key
+  const serverKey = getServerKey();
+  const dek = await unwrapKey(
+    {
+      ciphertext: primaryKeyRow.serverWrappedDek,
+      iv: primaryKeyRow.serverWrappingIv,
+      tag: primaryKeyRow.serverWrappingTag ?? '',
+    },
+    serverKey
+  );
+
+  // Wrap primary's DEK with the new member's password
+  const salt = crypto.getRandomValues(new Uint8Array(32));
+  const kek = await deriveKeyFromPassword(newPassword, salt);
+  const pwdWrapped = await wrapKey(dek, kek);
+  const serverWrapped = await wrapKey(dek, serverKey);
+
+  await db.insert(userEncryptionKeys).values({
+    userId: newUsername,
+    wrappedDek: pwdWrapped.ciphertext,
+    wrappingIv: pwdWrapped.iv,
+    wrappingTag: pwdWrapped.tag,
+    serverWrappedDek: serverWrapped.ciphertext,
+    serverWrappingIv: serverWrapped.iv,
+    serverWrappingTag: serverWrapped.tag,
+    salt: bytesToHex(salt),
+    primaryUserId: primaryUsername,
+  });
+}

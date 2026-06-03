@@ -13,6 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: Record<string, unknown>;
@@ -26,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const [existing] = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
+    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -68,12 +69,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const { id } = await params;
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   const db = getDb();
   const [existing] = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
+    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {

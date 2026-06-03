@@ -24,13 +24,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
     .limit(1);
 
   if (!account) {
@@ -73,12 +74,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
     .limit(1);
 
   if (!account) {
@@ -196,11 +198,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   ) {
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(userId, dek, today),
-      createNetWorthSnapshot(userId, dek, today),
-      updateMonthlyCashFlowSummaries(userId, dek),
-      updateCategorySpendingSummaries(userId, dek),
-      updateCategoryIncomeSummaries(userId, dek),
+      createAccountSnapshots(dataUserId, dek, today),
+      createNetWorthSnapshot(dataUserId, dek, today),
+      updateMonthlyCashFlowSummaries(dataUserId, dek),
+      updateCategorySpendingSummaries(dataUserId, dek),
+      updateCategoryIncomeSummaries(dataUserId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after manual account PATCH', {
         accountId: id,
@@ -222,6 +224,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -232,7 +235,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  await deleteManualAccount(id, userId, false, dek);
+  await deleteManualAccount(id, dataUserId, false, dek);
   manualAccountScheduler.cancel(id);
 
   logger.info('DELETE /api/manual-accounts/[id]', { userId, id });

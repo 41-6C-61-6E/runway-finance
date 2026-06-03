@@ -112,6 +112,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -197,7 +198,7 @@ export async function GET(request: Request) {
   // Build where clause (excluding encrypted field filters — applied in memory).
   // Hidden and excluded accounts are global exclusions for user-facing data.
   const whereConditions = [
-    eq(transactions.userId, userId),
+    eq(transactions.userId, dataUserId),
     or(
       and(
         eq(accounts.isHidden, false),
@@ -847,6 +848,7 @@ export async function PATCH(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -921,7 +923,7 @@ export async function PATCH(request: Request) {
       importSettings.cashFlowProjections !== false;
 
     const whereConditions = [
-      eq(transactions.userId, userId),
+      eq(transactions.userId, dataUserId),
       or(
         and(
           eq(accounts.isHidden, false),
@@ -1075,7 +1077,7 @@ export async function PATCH(request: Request) {
           .set(updateData)
           .where(
             and(
-              eq(transactions.userId, userId),
+              eq(transactions.userId, dataUserId),
               inArray(transactions.id, matchingIds),
             ),
           )
@@ -1089,7 +1091,7 @@ export async function PATCH(request: Request) {
       .update(transactions)
       .set(updateData)
       .where(
-        and(eq(transactions.userId, userId), inArray(transactions.id, ids!)),
+        and(eq(transactions.userId, dataUserId), inArray(transactions.id, ids!)),
       )
       .returning();
   }
@@ -1117,12 +1119,12 @@ export async function PATCH(request: Request) {
     });
   }
 
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
 
   Promise.all([
-    updateCategorySpendingSummaries(userId, dek),
-    updateCategoryIncomeSummaries(userId, dek),
-    updateMonthlyCashFlowSummaries(userId, dek),
+    updateCategorySpendingSummaries(dataUserId, dek),
+    updateCategoryIncomeSummaries(dataUserId, dek),
+    updateMonthlyCashFlowSummaries(dataUserId, dek),
   ]).catch((err) => {
     logger.error("Background summaries rebuild failed", { userId, error: err });
   });
@@ -1141,6 +1143,7 @@ export async function DELETE(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -1201,7 +1204,7 @@ export async function DELETE(request: Request) {
       importSettings.cashFlowProjections !== false;
 
     const whereConditions = [
-      eq(transactions.userId, userId),
+      eq(transactions.userId, dataUserId),
       or(
         and(
           eq(accounts.isHidden, false),
@@ -1355,7 +1358,7 @@ export async function DELETE(request: Request) {
           .set({ deleted: true, updatedAt: new Date() })
           .where(
             and(
-              eq(transactions.userId, userId),
+              eq(transactions.userId, dataUserId),
               inArray(transactions.id, matchingIds),
             ),
           )
@@ -1369,17 +1372,17 @@ export async function DELETE(request: Request) {
       .update(transactions)
       .set({ deleted: true, updatedAt: new Date() })
       .where(
-        and(eq(transactions.userId, userId), inArray(transactions.id, ids!)),
+        and(eq(transactions.userId, dataUserId), inArray(transactions.id, ids!)),
       )
       .returning();
   }
 
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
 
   Promise.all([
-    updateCategorySpendingSummaries(userId, dek),
-    updateCategoryIncomeSummaries(userId, dek),
-    updateMonthlyCashFlowSummaries(userId, dek),
+    updateCategorySpendingSummaries(dataUserId, dek),
+    updateCategoryIncomeSummaries(dataUserId, dek),
+    updateMonthlyCashFlowSummaries(dataUserId, dek),
   ]).catch((err) => {
     logger.error("Background summaries rebuild failed after bulk DELETE", {
       userId,

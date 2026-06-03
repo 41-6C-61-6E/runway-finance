@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
@@ -18,7 +19,8 @@ import {
   UploadCloud, 
   FileText, 
   ShieldAlert,
-  AlertCircle
+  AlertCircle,
+  Users2
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
@@ -35,6 +37,7 @@ import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import ImportTab from '@/components/features/settings/ImportTab';
 import PayrollTab from '@/components/features/settings/PayrollTab';
 import TagsTab from '@/components/features/settings/TagsTab';
+import SharingTab from '@/components/features/settings/SharingTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
@@ -53,6 +56,7 @@ type Connection = {
   lastSyncStatus: string;
   lastSyncError: string | null;
   createdAt: string;
+  userId: string;
   accessUrlEncrypted?: string;
 };
 
@@ -97,11 +101,14 @@ const SETTINGS_TABS = [
   { id: 'ai' as const, label: 'AI Suggestions', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
   { id: 'import' as const, label: 'Import', description: 'Manually upload statement files (CSV/OFX)', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
+  { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
   { id: 'advanced' as const, label: 'Advanced', description: 'Backups, dev tools, and database settings', icon: ShieldAlert },
 ];
 
 function SettingsPageBody() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
@@ -116,6 +123,7 @@ function SettingsPageBody() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [sharingGroup, setSharingGroup] = useState<any>(null);
   const [syncResult, setSyncResult] = useState<{
     status: string;
     accountsSynced: number;
@@ -152,8 +160,8 @@ function SettingsPageBody() {
 
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
-  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'advanced'].includes(urlTab)
-    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'advanced')
+  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'sharing', 'advanced'].includes(urlTab)
+    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'sharing' | 'advanced')
     : 'general';
 
   const goToTab = useCallback((tab: typeof activeTab) => {
@@ -288,6 +296,13 @@ function SettingsPageBody() {
       .then((res) => res.json())
       .then((data) => setAccentColor(data.accentColor ?? 'violet'))
       .catch(() => setAccentColor('violet'));
+    fetch('/api/sharing', { credentials: 'include' })
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error();
+      })
+      .then((data) => setSharingGroup(data.group ?? null))
+      .catch(() => setSharingGroup(null));
   }, [fetchConnections, fetchAccounts]);
 
   useEffect(() => {
@@ -485,6 +500,7 @@ function SettingsPageBody() {
   };
 
   const hasConnection = connections.length > 0;
+  const hasMyConnection = connections.some((conn) => conn.userId === currentUserId);
 
   const orphanedAccounts = accounts.filter(
     (a) =>
@@ -883,12 +899,24 @@ function SettingsPageBody() {
                             </div>
                           ) : (
                             <span
-                              className="text-foreground font-medium cursor-pointer hover:text-primary transition-colors text-sm truncate"
-                              onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
+                              className={`text-foreground font-medium transition-colors text-sm truncate ${
+                                currentUserId && conn.userId === currentUserId
+                                  ? 'cursor-pointer hover:text-primary'
+                                  : 'cursor-default'
+                              }`}
+                              onClick={() => {
+                                if (currentUserId && conn.userId === currentUserId) {
+                                  setEditingId(conn.id);
+                                  setEditLabel(conn.label);
+                                }
+                              }}
                             >
                               {conn.label}
                             </span>
                           )}
+                          <span className="text-[10px] text-muted-foreground bg-muted border border-border px-1.5 py-0.5 rounded shrink-0 font-medium ml-1">
+                            {conn.userId === currentUserId ? 'You' : conn.userId}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                           <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
@@ -902,7 +930,7 @@ function SettingsPageBody() {
                           </span>
                           <button
                             onClick={() => handleSync(conn.id)}
-                            disabled={syncingId === conn.id}
+                            disabled={syncingId === conn.id || (currentUserId !== undefined && conn.userId !== currentUserId)}
                             className="px-2 py-1 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
                           >
                             {syncingId === conn.id ? 'Syncing...' : 'Sync'}
@@ -915,7 +943,8 @@ function SettingsPageBody() {
                           </button>
                           <button
                             onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
-                            className="px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                            disabled={currentUserId !== undefined && conn.userId !== currentUserId}
+                            className="px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
                           >
                             Delete
                           </button>
@@ -934,8 +963,9 @@ function SettingsPageBody() {
                           <label className="text-xs text-muted-foreground">Sync frequency:</label>
                           <select
                             value={conn.syncFrequency}
+                            disabled={currentUserId !== undefined && conn.userId !== currentUserId}
                             onChange={(e) => handleSyncFrequencyChange(conn.id, e.target.value)}
-                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                           >
                             <option value="manual">Manual</option>
                             <option value="hourly">Hourly</option>
@@ -959,6 +989,13 @@ function SettingsPageBody() {
                     </div>
                     )
                   })}
+
+                  <div className="p-3 bg-muted/45 border border-border/65 text-muted-foreground text-xs rounded-lg flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      All bank connections in this shared account are visible to all members, but a connection can only be modified, manually synced, or deleted by its respective owner.
+                    </div>
+                  </div>
 
                   {syncResult && (
                     <div className={`p-4 rounded-lg border space-y-3 ${
@@ -1067,9 +1104,20 @@ function SettingsPageBody() {
           )}
 
           {/* Add Connection Form - shown when no bridge is connected */}
-          {!hasConnection && (
+          {/* Add Connection Form - shown when no bridge is connected for this user */}
+          {!hasMyConnection && (
             <div className="p-5 bg-card border border-border rounded-xl mb-4">
               <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
+
+              {sharingGroup && (
+                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs rounded-lg font-medium flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block text-amber-700 dark:text-amber-300 font-semibold mb-0.5">Shared Visibility Warning</strong>
+                    Your SimpleFIN connection and its sync status will be visible to the primary user and other members of this shared account, but only you will be able to edit or delete it.
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
                 <h3 className="text-sm font-semibold text-primary mb-2">How to get your SimpleFIN API key / setup token:</h3>
@@ -1333,6 +1381,12 @@ function SettingsPageBody() {
       {activeTab === 'analytics' && (
         <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AnalyticsTab />
+        </div>
+      )}
+
+      {activeTab === 'sharing' && (
+        <div className="p-4 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <SharingTab />
         </div>
       )}
 

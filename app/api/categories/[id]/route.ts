@@ -32,13 +32,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(categories)
-    .where(and(eq(categories.id, id), eq(categories.userId, userId)))
+    .where(and(eq(categories.id, id), eq(categories.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -66,7 +67,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const allCategories = await getDb()
     .select()
     .from(categories)
-    .where(eq(categories.userId, userId));
+    .where(eq(categories.userId, dataUserId));
 
   const decryptedCategories = await decryptRows('categories', allCategories, dek);
   const nextName = parsed.data.name ?? decryptedExisting.name;
@@ -93,44 +94,44 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await tx
         .update(categories)
         .set(encryptedTarget)
-        .where(and(eq(categories.id, duplicateTarget.id), eq(categories.userId, userId)));
+        .where(and(eq(categories.id, duplicateTarget.id), eq(categories.userId, dataUserId)));
 
       await tx
         .update(transactions)
         .set({ categoryId: duplicateTarget.id })
-        .where(and(eq(transactions.userId, userId), eq(transactions.categoryId, id)));
+        .where(and(eq(transactions.userId, dataUserId), eq(transactions.categoryId, id)));
 
       await tx
         .update(budgets)
         .set({ categoryId: duplicateTarget.id })
-        .where(and(eq(budgets.userId, userId), eq(budgets.categoryId, id)));
+        .where(and(eq(budgets.userId, dataUserId), eq(budgets.categoryId, id)));
 
       await tx
         .update(categoryRules)
         .set({ setCategoryId: duplicateTarget.id })
-        .where(and(eq(categoryRules.userId, userId), eq(categoryRules.setCategoryId, id)));
+        .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.setCategoryId, id)));
 
       await tx
         .update(categorySpendingSummary)
         .set({ categoryId: duplicateTarget.id })
-        .where(and(eq(categorySpendingSummary.userId, userId), eq(categorySpendingSummary.categoryId, id)));
+        .where(and(eq(categorySpendingSummary.userId, dataUserId), eq(categorySpendingSummary.categoryId, id)));
 
       await tx
         .update(categoryIncomeSummary)
         .set({ categoryId: duplicateTarget.id })
-        .where(and(eq(categoryIncomeSummary.userId, userId), eq(categoryIncomeSummary.categoryId, id)));
+        .where(and(eq(categoryIncomeSummary.userId, dataUserId), eq(categoryIncomeSummary.categoryId, id)));
 
       await tx
         .update(categories)
         .set({ parentId: duplicateTarget.id })
-        .where(and(eq(categories.userId, userId), eq(categories.parentId, id)));
+        .where(and(eq(categories.userId, dataUserId), eq(categories.parentId, id)));
 
       await tx
         .update(categories)
         .set({ expenseParentId: duplicateTarget.id })
-        .where(and(eq(categories.userId, userId), eq(categories.expenseParentId, id)));
+        .where(and(eq(categories.userId, dataUserId), eq(categories.expenseParentId, id)));
 
-      await tx.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
+      await tx.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, dataUserId)));
     });
 
     await mergeDuplicateCategories(userId, dek);
@@ -138,12 +139,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const [merged] = await getDb()
       .select()
       .from(categories)
-      .where(and(eq(categories.id, duplicateTarget.id), eq(categories.userId, userId)))
+      .where(and(eq(categories.id, duplicateTarget.id), eq(categories.userId, dataUserId)))
       .limit(1);
 
     const decrypted = merged ? await decryptRow('categories', merged, dek) : merged;
     logger.info('PATCH /api/categories/[id] - merged duplicate', { userId, id, mergedInto: duplicateTarget.id, updatedFields: Object.keys(parsed.data) });
-    invalidateUserSearchCache(userId);
+    invalidateUserSearchCache(dataUserId);
     return NextResponse.json(decrypted);
   }
 
@@ -157,7 +158,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const decrypted = updated ? await decryptRow('categories', updated, dek) : updated;
   logger.info('PATCH /api/categories/[id]', { userId, id, updatedFields: Object.keys(parsed.data) });
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
   return NextResponse.json(decrypted);
 }
 
@@ -168,12 +169,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(categories)
-    .where(and(eq(categories.id, id), eq(categories.userId, userId)))
+    .where(and(eq(categories.id, id), eq(categories.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -183,6 +185,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   await getDb().delete(categories).where(eq(categories.id, id));
 
   logger.info('DELETE /api/categories/[id]', { userId, id, name: existing.name });
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
   return NextResponse.json({ success: true });
 }

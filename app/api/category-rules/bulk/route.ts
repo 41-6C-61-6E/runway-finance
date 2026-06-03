@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   if (action === 'delete') {
     const deleted = await getDb()
       .delete(categoryRules)
-      .where(and(eq(categoryRules.userId, userId), inArray(categoryRules.id, ids)))
+      .where(and(eq(categoryRules.userId, dataUserId), inArray(categoryRules.id, ids)))
       .returning();
     return NextResponse.json({ success: true, count: deleted.length });
   }
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     const updated = await getDb()
       .update(categoryRules)
       .set(encrypted)
-      .where(and(eq(categoryRules.userId, userId), inArray(categoryRules.id, ids)))
+      .where(and(eq(categoryRules.userId, dataUserId), inArray(categoryRules.id, ids)))
       .returning();
 
     return NextResponse.json({ success: true, count: updated.length });
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     const rules = await getDb()
       .select()
       .from(categoryRules)
-      .where(and(eq(categoryRules.userId, userId), inArray(categoryRules.id, ids)));
+      .where(and(eq(categoryRules.userId, dataUserId), inArray(categoryRules.id, ids)));
 
     const decryptedRules = await decryptRows('category_rules', rules, dek);
 
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
         categoryId: transactions.categoryId,
       })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
+      .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
 
     const decryptedTxns = await decryptRows('transactions', allTxns, dek);
 

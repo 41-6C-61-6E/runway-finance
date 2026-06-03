@@ -12,6 +12,8 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month');
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
   const userSettingsList = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.userId, session.user.id))
+    .where(eq(userSettings.userId, userId))
     .limit(1);
 
   const userSetting = userSettingsList[0];
@@ -106,7 +108,7 @@ export async function GET(request: Request) {
 
     async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
     const conditions = [
-      eq(transactions.userId, session.user.id),
+      eq(transactions.userId, dataUserId),
       gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
       lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
       eq(transactions.pending, false),
@@ -189,7 +191,7 @@ export async function GET(request: Request) {
         expenseParentId: categories.expenseParentId,
       })
       .from(categories)
-      .where(and(eq(categories.userId, session.user.id), inArray(categories.id, catIds)));
+      .where(and(eq(categories.userId, dataUserId), inArray(categories.id, catIds)));
 
     const decryptedCats = await decryptRows('categories', cats, dek);
     const catInfo = new Map(decryptedCats.map((c: any) => [c.id, c]));
@@ -217,7 +219,7 @@ export async function GET(request: Request) {
     incomeCount: number;
   }> {
     const conditions = [
-      eq(transactions.userId, session.user.id),
+      eq(transactions.userId, dataUserId),
       gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
       lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
       isNull(transactions.categoryId),
@@ -277,7 +279,7 @@ export async function GET(request: Request) {
       } else {
         // Use summary tables (pre-computed, but encrypted)
         const spendingConditions = [
-          eq(categorySpendingSummary.userId, session.user.id),
+          eq(categorySpendingSummary.userId, dataUserId),
           gte(categorySpendingSummary.yearMonth, startMonth!),
           lte(categorySpendingSummary.yearMonth, endMonth!),
           eq(categories.excludeFromReports, false),
@@ -289,7 +291,7 @@ export async function GET(request: Request) {
         ];
 
         const incomeConditions = [
-          eq(categoryIncomeSummary.userId, session.user.id),
+          eq(categoryIncomeSummary.userId, dataUserId),
           gte(categoryIncomeSummary.yearMonth, startMonth!),
           lte(categoryIncomeSummary.yearMonth, endMonth!),
           eq(categories.excludeFromReports, false),
@@ -460,7 +462,7 @@ export async function GET(request: Request) {
       currentIncomeRows = income;
     } else {
       const spendingConditions = [
-        eq(categorySpendingSummary.userId, session.user.id),
+        eq(categorySpendingSummary.userId, dataUserId),
         eq(categorySpendingSummary.yearMonth, resolvedMonth),
         eq(categories.excludeFromReports, false),
         // Also exclude children whose parent has excludeFromReports=true
@@ -470,7 +472,7 @@ export async function GET(request: Request) {
         ),
       ];
       const incomeConditions = [
-        eq(categoryIncomeSummary.userId, session.user.id),
+        eq(categoryIncomeSummary.userId, dataUserId),
         eq(categoryIncomeSummary.yearMonth, resolvedMonth),
         eq(categories.excludeFromReports, false),
         // Also exclude children whose parent has excludeFromReports=true
@@ -551,7 +553,7 @@ export async function GET(request: Request) {
       const map = new Map<string, number>();
       const idCol = table.categoryId;
       const conditions = [
-        eq(table.userId, session.user.id),
+        eq(table.userId, dataUserId),
         eq(table.yearMonth, previousMonth),
       ];
       if (accountIds.length > 0) {

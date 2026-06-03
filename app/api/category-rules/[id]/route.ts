@@ -37,13 +37,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(categoryRules)
-    .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, userId)))
+    .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -84,12 +85,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(categoryRules)
-    .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, userId)))
+    .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {

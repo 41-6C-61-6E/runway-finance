@@ -29,9 +29,39 @@ export const userEncryptionKeys = pgTable('user_encryption_keys', {
   serverWrappingIv: text('server_wrapping_iv'),
   serverWrappingTag: text('server_wrapping_tag'),
   salt: text('salt').notNull(),
+  // When set, this user is a share member whose DEK wraps the primary user's raw key.
+  primaryUserId: text('primary_user_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── Account Sharing Invitations ───────────────────────────────────────────────
+export const accountSharingInvitations = pgTable('account_sharing_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  inviterUserId: text('inviter_user_id').notNull(),
+  inviteeEmail: text('invitee_email').notNull(),
+  pinHash: text('pin_hash').notNull(),
+  pin: text('pin'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'revoked'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Account Share Members ─────────────────────────────────────────────────────
+export const accountShareMembers = pgTable(
+  'account_share_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    primaryUserId: text('primary_user_id').notNull(),
+    memberUserId: text('member_user_id').notNull(),
+    invitationId: uuid('invitation_id').references(() => accountSharingInvitations.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('active'), // 'active' | 'removed'
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    removedBy: text('removed_by'),
+  },
+  (t) => [unique().on(t.primaryUserId, t.memberUserId)]
+);
 
 // ── Next Auth Tables (existing) ──────────────────────────────────────────────
 // These are created by Next Auth's Drizzle adapter automatically.

@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const body = await request.json();
   const { ids, action } = body as { ids: string[]; action: 'approve' | 'reject' };
 
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   const proposals = await db
     .select()
     .from(aiProposals)
-    .where(and(eq(aiProposals.userId, userId), inArray(aiProposals.id, ids), eq(aiProposals.status, 'pending')));
+    .where(and(eq(aiProposals.userId, dataUserId), inArray(aiProposals.id, ids), eq(aiProposals.status, 'pending')));
 
   if (proposals.length === 0) {
     return NextResponse.json({ error: 'No matching pending proposals found' }, { status: 404 });

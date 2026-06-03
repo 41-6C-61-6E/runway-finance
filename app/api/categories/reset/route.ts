@@ -15,6 +15,7 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
   const dek = await getSessionDEK();
 
@@ -25,23 +26,23 @@ export async function POST() {
     db
       .select({ categoryId: transactions.categoryId })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), sql`${transactions.categoryId} IS NOT NULL`)),
+      .where(and(eq(transactions.userId, dataUserId), sql`${transactions.categoryId} IS NOT NULL`)),
     db
       .select({ categoryId: budgets.categoryId })
       .from(budgets)
-      .where(eq(budgets.userId, userId)),
+      .where(eq(budgets.userId, dataUserId)),
     db
       .select({ categoryId: categoryRules.setCategoryId })
       .from(categoryRules)
-      .where(and(eq(categoryRules.userId, userId), sql`${categoryRules.setCategoryId} IS NOT NULL`)),
+      .where(and(eq(categoryRules.userId, dataUserId), sql`${categoryRules.setCategoryId} IS NOT NULL`)),
     db
       .select({ categoryId: categorySpendingSummary.categoryId })
       .from(categorySpendingSummary)
-      .where(eq(categorySpendingSummary.userId, userId)),
+      .where(eq(categorySpendingSummary.userId, dataUserId)),
     db
       .select({ categoryId: categoryIncomeSummary.categoryId })
       .from(categoryIncomeSummary)
-      .where(eq(categoryIncomeSummary.userId, userId)),
+      .where(eq(categoryIncomeSummary.userId, dataUserId)),
   ]);
 
   const referencedIds = new Set<string>();
@@ -53,7 +54,7 @@ export async function POST() {
   const allCatsRaw = await db
     .select({ id: categories.id, parentId: categories.parentId, name: categories.name, displayOrder: categories.displayOrder })
     .from(categories)
-    .where(eq(categories.userId, userId));
+    .where(eq(categories.userId, dataUserId));
   const allCats = await decryptRows('categories', allCatsRaw, dek);
 
   const catById = new Map(allCats.map((c) => [c.id, c]));
@@ -74,19 +75,19 @@ export async function POST() {
     await db
       .update(categories)
       .set({ categoryType: 'transfer' })
-      .where(and(eq(categories.userId, userId), eq(categories.id, transferParent.id)));
+      .where(and(eq(categories.userId, dataUserId), eq(categories.id, transferParent.id)));
 
     await db
       .update(categories)
       .set({ categoryType: 'transfer' })
-      .where(and(eq(categories.userId, userId), eq(categories.parentId, transferParent.id)));
+      .where(and(eq(categories.userId, dataUserId), eq(categories.parentId, transferParent.id)));
   }
 
   // Delete unreferenced categories
   const toDelete = allCats.filter((c) => !referencedIds.has(c.id)).map((c) => c.id);
   if (toDelete.length > 0) {
     await db.delete(categories).where(
-      and(eq(categories.userId, userId), inArray(categories.id, toDelete))
+      and(eq(categories.userId, dataUserId), inArray(categories.id, toDelete))
     );
   }
 
