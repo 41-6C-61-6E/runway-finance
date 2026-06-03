@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Sparkles, Plus } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -17,12 +17,14 @@ type Transaction = {
   categoryName: string | null;
   categoryColor: string | null;
   accountName: string | null;
+  accountId?: string;
   accountTags?: { id: string; name: string; color: string }[];
   notes: string | null;
   reviewed: boolean | null;
   ignored: boolean | null;
   pending: boolean;
   categorizedByAi: boolean;
+  source?: string;
   tags?: { id: string; name: string; color: string }[];
 };
 
@@ -40,30 +42,38 @@ type Category = {
   isIncome: boolean;
 };
 
+type AccountItem = {
+  id: string;
+  name: string;
+  connectionId: string | null;
+  type: string;
+};
+
 interface TransactionDetailDrawerProps {
-  transaction: Transaction;
+  transaction?: Transaction;
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  mode: 'create' | 'edit';
 }
 
 import { useUserSettings } from '@/components/user-settings-provider';
 
-export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess }: TransactionDetailDrawerProps) {
+export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess, mode }: TransactionDetailDrawerProps) {
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
 
-  const [payee, setPayee] = useState(transaction.payee ?? '');
-  const [memo, setMemo] = useState(transaction.memo ?? '');
-  const [notes, setNotes] = useState(transaction.notes ?? '');
-  const [reviewed, setReviewed] = useState(!!transaction.reviewed);
-  const [categoryId, setCategoryId] = useState(transaction.categoryId);
+  const [payee, setPayee] = useState(transaction?.payee ?? '');
+  const [memo, setMemo] = useState(transaction?.memo ?? '');
+  const [notes, setNotes] = useState(transaction?.notes ?? '');
+  const [reviewed, setReviewed] = useState(!!transaction?.reviewed);
+  const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [tagIds, setTagIds] = useState<string[]>(transaction.tags?.map((t) => t.id) ?? []);
+  const [tagIds, setTagIds] = useState<string[]>(transaction?.tags?.map((t) => t.id) ?? []);
   const [allTags, setAllTags] = useState<TagItem[]>([]);
   const [tagSearch, setTagSearch] = useState('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
@@ -75,13 +85,31 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
   const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
 
+  // New editable fields
+  const [description, setDescription] = useState(transaction?.description ?? '');
+  const [amount, setAmount] = useState(transaction?.amount != null ? String(transaction.amount) : '');
+  const [date, setDate] = useState(transaction?.date ?? new Date().toISOString().split('T')[0]);
+  const [postedDate, setPostedDate] = useState(transaction?.postedDate ?? '');
+  const [pending, setPending] = useState(transaction?.pending ?? false);
+
+  // Create mode fields
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [accountId, setAccountId] = useState(transaction?.accountId ?? '');
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
   useEffect(() => {
-    setPayee(transaction.payee ?? '');
-    setMemo(transaction.memo ?? '');
-    setNotes(transaction.notes ?? '');
-    setReviewed(!!transaction.reviewed);
-    setCategoryId(transaction.categoryId);
-    setTagIds(transaction.tags?.map((t) => t.id) ?? []);
+    setPayee(transaction?.payee ?? '');
+    setMemo(transaction?.memo ?? '');
+    setNotes(transaction?.notes ?? '');
+    setReviewed(!!transaction?.reviewed);
+    setCategoryId(transaction?.categoryId ?? null);
+    setTagIds(transaction?.tags?.map((t) => t.id) ?? []);
+    setDescription(transaction?.description ?? '');
+    setAmount(transaction?.amount != null ? String(transaction.amount) : '');
+    setDate(transaction?.date ?? new Date().toISOString().split('T')[0]);
+    setPostedDate(transaction?.postedDate ?? '');
+    setPending(transaction?.pending ?? false);
+    setAccountId(transaction?.accountId ?? '');
     setIsCreatingCategory(false);
     setConfirmDelete(false);
   }, [transaction]);
@@ -116,6 +144,18 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         .catch(() => setAllTags([]));
     }
   }, [open, allTags.length]);
+
+  // Fetch accounts for create mode
+  useEffect(() => {
+    if (open && mode === 'create' && accounts.length === 0 && !accountsLoading) {
+      setAccountsLoading(true);
+      fetch('/api/accounts', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => setAccounts(Array.isArray(data) ? data : []))
+        .catch(() => setAccounts([]))
+        .finally(() => setAccountsLoading(false));
+    }
+  }, [open, mode, accounts.length, accountsLoading]);
 
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) return;
@@ -156,21 +196,58 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    const cleanAmount = String(amount || '').replace(/[^\d.-]/g, '');
     try {
-      const res = await fetch(`/api/transactions/${transaction.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ payee, memo, notes, categoryId, reviewed, tagIds }),
-      });
-      if (res.ok) {
-        onSuccess();
-        onClose();
+      if (mode === 'create') {
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            accountId,
+            date,
+            amount: cleanAmount,
+            description,
+            payee: payee || undefined,
+            memo: memo || undefined,
+            notes: notes || undefined,
+            categoryId: categoryId || undefined,
+            tagIds: tagIds.length > 0 ? tagIds : undefined,
+            pending,
+          }),
+        });
+        if (res.ok) {
+          onSuccess();
+          onClose();
+        }
+      } else if (transaction) {
+        const res = await fetch(`/api/transactions/${transaction.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            payee: payee || undefined,
+            memo: memo || undefined,
+            notes: notes || undefined,
+            categoryId,
+            reviewed,
+            tagIds,
+            description: description || undefined,
+            amount: cleanAmount || undefined,
+            date: date || undefined,
+            postedDate: postedDate || null,
+            pending,
+          }),
+        });
+        if (res.ok) {
+          onSuccess();
+          onClose();
+        }
       }
     } finally {
       setSaving(false);
     }
-  }, [transaction.id, payee, notes, memo, categoryId, tagIds, onSuccess, onClose]);
+  }, [mode, transaction, accountId, date, amount, description, payee, memo, notes, categoryId, tagIds, pending, reviewed, postedDate, onSuccess, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!confirmDelete) {
@@ -179,20 +256,22 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     }
     setDeleting(true);
     try {
-      const res = await fetch(`/api/transactions/${transaction.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        onSuccess();
-        onClose();
+      if (transaction) {
+        const res = await fetch(`/api/transactions/${transaction.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        if (res.ok) {
+          onSuccess();
+          onClose();
+        }
       }
     } catch (err) {
       console.error(err);
     } finally {
       setDeleting(false);
     }
-  }, [transaction.id, confirmDelete, onSuccess, onClose]);
+  }, [transaction?.id, confirmDelete, onSuccess, onClose]);
 
   const toggleReviewed = async () => {
     setReviewed(!reviewed);
@@ -209,7 +288,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     };
   };
 
-  const { text } = formatAmount(transaction.amount);
+  const { text } = transaction ? formatAmount(transaction.amount) : { text: '' };
 
   const parents = categories.filter((c) => !c.parentId);
   const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
@@ -218,59 +297,119 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 
+  const isSynced = transaction?.source === 'bank';
+  const isLinkedToSynced = mode === 'create' && accounts.find((a) => a.id === accountId)?.connectionId != null;
+
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
         <SheetHeader className="mb-6">
-          <SheetTitle>Transaction Details</SheetTitle>
+          <SheetTitle>{mode === 'create' ? 'Add Transaction' : 'Transaction Details'}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-5">
+          {/* Warning Banners */}
+          {mode === 'edit' && isSynced && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Synced Transaction</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                This transaction was synced from SimpleFIN. Changes to <strong>amount</strong>, <strong>description</strong>, <strong>posted date</strong>, or <strong>pending</strong> status will be overwritten on the next sync. Consider using payee, memo, notes, and tags for annotations instead.
+              </p>
+            </div>
+          )}
+          {mode === 'create' && isLinkedToSynced && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">SimpleFIN Account</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                This account is linked to SimpleFIN. This manual transaction won&apos;t sync to your bank and the account balance shown here may differ from your actual bank balance.
+              </p>
+            </div>
+          )}
+
+          {/* Account selector (create mode) */}
+          {mode === 'create' && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Account</label>
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select an account</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Amount */}
-          <div className="p-4 bg-card border border-border rounded-xl">
-            <div className="text-xs text-muted-foreground">Amount</div>
-            <div className={`font-mono text-2xl font-bold mt-1 text-foreground`}>{text}</div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Amount</label>
+            <input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground font-mono text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+              placeholder="0.00"
+            />
           </div>
 
           {/* Info */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="text-xs text-muted-foreground">Date</div>
-              <div className="text-sm text-foreground mt-0.5">{new Date(transaction.date).toLocaleDateString()}</div>
+              <label className="block text-xs text-muted-foreground mb-1">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-2 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Posted</div>
-              <div className="text-sm text-foreground mt-0.5">
-                {transaction.postedDate ? new Date(transaction.postedDate).toLocaleDateString() : '—'}
+              <label className="block text-xs text-muted-foreground mb-1">Posted Date</label>
+              <input
+                type="date"
+                value={postedDate}
+                onChange={(e) => setPostedDate(e.target.value)}
+                className="w-full px-2 py-1.5 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            {mode === 'edit' && transaction && (
+              <div>
+                <div className="text-xs text-muted-foreground">Account</div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <span className="text-sm text-foreground">{transaction.accountName || '—'}</span>
+                  {showAccountTags && transaction.accountTags && transaction.accountTags.length > 0 && (
+                    <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                      {transaction.accountTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                          style={{
+                            backgroundColor: `${tag.color}15`,
+                            color: tag.color,
+                            borderColor: `${tag.color}30`
+                          }}
+                        >
+                          #{tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Account</div>
-              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                <span className="text-sm text-foreground">{transaction.accountName || '—'}</span>
-                {showAccountTags && transaction.accountTags && transaction.accountTags.length > 0 && (
-                  <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                    {transaction.accountTags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
-                        style={{
-                          backgroundColor: `${tag.color}15`,
-                          color: tag.color,
-                          borderColor: `${tag.color}30`
-                        }}
-                      >
-                        #{tag.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Description</div>
-              <div className="text-sm text-foreground mt-0.5 truncate">{transaction.description}</div>
-            </div>
+            )}
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+              placeholder="Enter description"
+            />
           </div>
 
           {/* Category Selector */}
@@ -359,7 +498,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                     <>
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
                       <span>{selectedCat.name}</span>
-                      {transaction.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
+                      {mode === 'edit' && transaction?.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
                     </>
                   ) : (
                     <span className="text-muted-foreground">Uncategorized</span>
@@ -581,44 +720,64 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
           {/* Toggles */}
           <div className="space-y-4 pt-1">
+            {mode === 'edit' && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground/80">Reviewed</span>
+                <div className="text-right">
+                  <Switch
+                    checked={reviewed}
+                    onCheckedChange={toggleReviewed}
+                  />
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {reviewed ? 'Marked as reviewed' : 'Needs review'}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground/80">Reviewed</span>
+              <span className="text-sm text-foreground/80">Pending</span>
               <div className="text-right">
                 <Switch
-                  checked={reviewed}
-                  onCheckedChange={toggleReviewed}
+                  checked={pending}
+                  onCheckedChange={(v) => setPending(v)}
                 />
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {reviewed ? 'Marked as reviewed' : 'Needs review'}
+                  {pending ? 'Marked as pending' : 'Cleared'}
                 </div>
               </div>
             </div>
-            {transaction.pending && (
-              <span className="text-xs text-chart-3">Pending transaction</span>
-            )}
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-2">
             <button
               onClick={handleSave}
-              disabled={saving || deleting}
+              disabled={
+                saving ||
+                deleting ||
+                !String(amount || '').replace(/[^\d.-]/g, '') ||
+                !description.trim() ||
+                !date ||
+                (mode === 'create' && !accountId)
+              }
               className="w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : mode === 'create' ? 'Add Transaction' : 'Save Changes'}
             </button>
 
-            <button
-              onClick={handleDelete}
-              disabled={saving || deleting}
-              className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
-                confirmDelete
-                  ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
-                  : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
-              } disabled:opacity-50`}
-            >
-              {deleting ? 'Deleting...' : confirmDelete ? 'Are you sure? Click to confirm delete' : 'Delete Transaction'}
-            </button>
+            {mode === 'edit' && (
+              <button
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
+                  confirmDelete
+                    ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+                    : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
+                } disabled:opacity-50`}
+              >
+                {deleting ? 'Deleting...' : confirmDelete ? 'Are you sure? Click to confirm delete' : 'Delete Transaction'}
+              </button>
+            )}
           </div>
         </div>
       </SheetContent>

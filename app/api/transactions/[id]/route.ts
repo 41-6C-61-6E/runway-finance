@@ -137,7 +137,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const { categoryId, tagIds, payee, notes, memo, reviewed, ignored } = parsed.data;
+  const { categoryId, tagIds, payee, notes, memo, reviewed, ignored, description, amount, date, postedDate, pending } = parsed.data;
 
   const changedFields: string[] = [];
   if (categoryId !== undefined) changedFields.push('categoryId');
@@ -147,6 +147,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (memo !== undefined) changedFields.push('memo');
   if (reviewed !== undefined) changedFields.push('reviewed');
   if (ignored !== undefined) changedFields.push('ignored');
+  if (description !== undefined) changedFields.push('description');
+  if (amount !== undefined) changedFields.push('amount');
+  if (date !== undefined) changedFields.push('date');
+  if (postedDate !== undefined) changedFields.push('postedDate');
+  if (pending !== undefined) changedFields.push('pending');
   logger.info('Updating transaction', { transactionId: id, changedFields });
 
   // Sanitize and encrypt text fields
@@ -160,6 +165,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (memo !== undefined) updateData.memo = sanitizeText(memo, 500);
   if (reviewed !== undefined) updateData.reviewed = reviewed;
   if (ignored !== undefined) updateData.ignored = ignored;
+  if (description !== undefined) updateData.description = sanitizeText(description, 500);
+  if (amount !== undefined) updateData.amount = amount;
+  if (date !== undefined) updateData.date = date;
+  if (postedDate !== undefined) updateData.postedDate = postedDate;
+  if (pending !== undefined) updateData.pending = pending;
 
   const encrypted = await encryptRow('transactions', updateData, dek);
   const [updated] = await getDb()

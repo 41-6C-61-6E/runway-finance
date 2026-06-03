@@ -74,6 +74,7 @@ function TransactionsContent() {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('edit');
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('runway:transactions:customPresets', []);
@@ -289,6 +290,13 @@ function TransactionsContent() {
 
   const handleTransactionClick = useCallback((tx: any) => {
     setSelectedTransaction(tx);
+    setDrawerMode('edit');
+    setDrawerOpen(true);
+  }, []);
+
+  const handleAddTransaction = useCallback(() => {
+    setSelectedTransaction(null);
+    setDrawerMode('create');
     setDrawerOpen(true);
   }, []);
 
@@ -349,13 +357,15 @@ function TransactionsContent() {
                 onSelectAll={handleSelectAll}
                 onTransactionClick={handleTransactionClick}
                 onTotalChange={handleTotalChange}
+                onAddTransaction={handleAddTransaction}
               />
-              {selectedTransaction && (
+              {(selectedTransaction || drawerMode === 'create') && (
                 <TransactionDetailDrawer
-                  transaction={selectedTransaction}
+                  transaction={selectedTransaction || undefined}
                   open={drawerOpen}
                   onClose={handleDrawerClose}
                   onSuccess={handleDrawerSuccess}
+                  mode={drawerMode}
                 />
               )}
             </div>
