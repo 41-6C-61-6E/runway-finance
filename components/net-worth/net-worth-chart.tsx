@@ -18,6 +18,11 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate, getChartXTicks } from '@/lib/utils/date';
+import {
+  computeMovingAverage,
+  computeMedianFilter,
+  aggregateChartData,
+} from '@/lib/utils/chart-aggregation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -33,6 +38,7 @@ interface ChartPoint {
   totalLiabilities: number;
   isSynthetic: boolean;
   isImported: boolean;
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface ChartResponse {
@@ -176,9 +182,74 @@ export function NetWorthChart() {
     fetchData();
   }, [timeframe]);
 
+  const processedData = useMemo(() => {
+    if (chartData.length === 0) return [];
+
+    // Helper to get max spike duration in days based on timeframe
+    const getMaxSpikeDuration = (range: TimeRange): number => {
+      switch (range) {
+        case '1m': return 1;
+        case '3m': return 1.5;
+        case '6m': return 3;
+        case '1y': return 4;
+        case 'ytd': return 4;
+        case '5y': return 7;
+        case 'all': return 14;
+        default: return 3;
+      }
+    };
+
+    // Helper to get moving average duration in days based on timeframe for visual smoothing
+    const getMaxSmaDuration = (range: TimeRange): number => {
+      switch (range) {
+        case '1m': return 0;
+        case '3m': return 0;
+        case '6m': return 4;
+        case '1y': return 7;
+        case 'ytd': return 7;
+        case '5y': return 30;
+        case 'all': return 45;
+        default: return 7;
+      }
+    };
+
+    // Calculate average gap in days between consecutive data points
+    const first = new Date(chartData[0].date + 'T00:00:00Z').getTime();
+    const last = new Date(chartData[chartData.length - 1].date + 'T00:00:00Z').getTime();
+    const totalDays = (last - first) / (1000 * 60 * 60 * 24);
+    const gap = chartData.length > 1 ? totalDays / (chartData.length - 1) : 1;
+
+    const targetSpikeDays = getMaxSpikeDuration(timeframe);
+    
+    // A median filter of window size W filters out spikes of duration up to floor(W/2) points.
+    // So we need: floor(W/2) * gap >= targetSpikeDays  =>  floor(W/2) >= targetSpikeDays / gap.
+    const targetPoints = Math.ceil(targetSpikeDays / (gap || 1));
+    const windowSize = 2 * targetPoints + 1;
+
+    // Limit window size to at most 15% of the total dataset size to avoid over-smoothing
+    const maxAllowed = Math.floor(chartData.length * 0.15);
+    const finalWindow = Math.min(windowSize, maxAllowed % 2 === 0 ? maxAllowed + 1 : maxAllowed);
+    const medianWindow = Math.max(1, finalWindow % 2 === 0 ? finalWindow - 1 : finalWindow);
+
+    // Calculate Simple Moving Average window for visual smoothing
+    const targetSmaDays = getMaxSmaDuration(timeframe);
+    const smaTargetPoints = Math.round(targetSmaDays / (gap || 1));
+    const maxSmaAllowed = Math.floor(chartData.length * 0.15);
+    const finalSmaWindow = Math.min(smaTargetPoints, maxSmaAllowed);
+    const smaWindow = Math.max(1, finalSmaWindow);
+
+    const fields: (keyof ChartPoint & string)[] = ['netWorth', 'totalAssets', 'totalLiabilities'];
+    const medianFiltered = computeMedianFilter(chartData, fields, medianWindow);
+
+    if (smaWindow > 1) {
+      return computeMovingAverage(medianFiltered, fields, smaWindow);
+    }
+    return medianFiltered;
+  }, [chartData, timeframe]);
+
   const { barData, bucketSize } = useMemo(
-    () => computeChangeBarData(chartData),
-    [chartData]
+    () => computeChangeBarData(processedData),
+    [processedData]
   );
 
   const barYDomain = useMemo(() => {
@@ -192,7 +263,7 @@ export function NetWorthChart() {
     return [rawMin - minPad, rawMax + minPad] as [number, number];
   }, [barData]);
 
-  const areaTicks = useMemo(() => getChartXTicks(chartData, timeframe), [chartData, timeframe]);
+  const areaTicks = useMemo(() => getChartXTicks(processedData, timeframe), [processedData, timeframe]);
 
   const barTicks = useMemo(() => {
     if (barData.length <= 6) return barData.map((d) => d.date);
@@ -372,7 +443,7 @@ export function NetWorthChart() {
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <AreaChart data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
