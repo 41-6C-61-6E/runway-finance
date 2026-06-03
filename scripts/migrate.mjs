@@ -8,6 +8,70 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, '..', 'drizzle');
 const journalPath = path.join(migrationsFolder, 'meta', '_journal.json');
 
+async function runSelfHealingChecks(client) {
+  console.log('[migrate] Running database self-healing checks...');
+  try {
+    // 1. Check if primary_user_id column exists on user_encryption_keys
+    const colCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'user_encryption_keys' AND column_name = 'primary_user_id'
+    `);
+    if (colCheck.rows.length === 0) {
+      console.log('[migrate] [self-heal] Adding missing primary_user_id column to user_encryption_keys...');
+      await client.query(`
+        ALTER TABLE user_encryption_keys
+        ADD COLUMN IF NOT EXISTS primary_user_id TEXT
+      `);
+    }
+
+    // 2. Check if account_sharing_invitations table exists
+    const tableCheck1 = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'account_sharing_invitations'
+    `);
+    if (tableCheck1.rows.length === 0) {
+      console.log('[migrate] [self-heal] Creating missing account_sharing_invitations table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS account_sharing_invitations (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          inviter_user_id TEXT NOT NULL,
+          invitee_email   TEXT NOT NULL,
+          pin_hash        TEXT NOT NULL,
+          pin             TEXT,
+          status          TEXT NOT NULL DEFAULT 'pending',
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // 3. Check if account_share_members table exists
+    const tableCheck2 = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'account_share_members'
+    `);
+    if (tableCheck2.rows.length === 0) {
+      console.log('[migrate] [self-heal] Creating missing account_share_members table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS account_share_members (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          primary_user_id TEXT NOT NULL,
+          member_user_id  TEXT NOT NULL,
+          invitation_id   UUID REFERENCES account_sharing_invitations(id) ON DELETE SET NULL,
+          status          TEXT NOT NULL DEFAULT 'active',
+          joined_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          removed_at      TIMESTAMPTZ,
+          removed_by      TEXT,
+          UNIQUE (primary_user_id, member_user_id)
+        )
+      `);
+    }
+  } catch (err) {
+    console.error('[migrate] Self-healing checks failed:', err.message);
+    // Don't crash startup on self-healing check failure, but log it
+  }
+}
+
 async function ensureMigrationsTable(client) {
   await client.query('CREATE SCHEMA IF NOT EXISTS drizzle');
   await client.query(`
@@ -65,6 +129,7 @@ async function migrate() {
 
   try {
     await ensureMigrationsTable(client);
+    await runSelfHealingChecks(client);
 
     const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
     const entries = journal.entries.sort((a, b) => a.idx - b.idx);
