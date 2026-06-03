@@ -422,13 +422,13 @@ export default function ImportTab() {
   const preImportWarnings = [...unmappedCategoriesWarnings, ...excludedAccountsWarnings];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       {/* ═══════════════════════ Wizard ═══════════════════════ */}
-      <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
+        <div className="flex items-start sm:items-center justify-between gap-2 mb-4">
           <h2 className="text-lg font-semibold text-foreground">Import Data</h2>
           {step > 1 && step < 7 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground shrink-0">
               Step {step - 1} of {importType === 'transactions' ? 6 : 5}
             </span>
           )}
@@ -445,7 +445,7 @@ export default function ImportTab() {
         {step === 1 && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">What type of data would you like to import?</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => handleChooseType('transactions')}
                 className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted transition-colors text-left"
@@ -529,15 +529,15 @@ export default function ImportTab() {
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {systemFields.map((field) => (
-                <div key={field.key} className="flex items-center gap-3 p-2 rounded-lg bg-muted/20">
-                  <div className="w-32 text-sm font-medium text-foreground shrink-0">
+                <div key={field.key} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-2 rounded-lg bg-muted/20">
+                  <div className="w-full sm:w-32 text-sm font-medium text-foreground shrink-0">
                     {field.label}
                     {field.required && <span className="text-destructive ml-0.5">*</span>}
                   </div>
                   <select
                     value={columnMapping[field.key] || ''}
                     onChange={(e) => handleColumnMapChange(field.key, e.target.value)}
-                    className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full sm:flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">— Select column —</option>
                     {csvPreview.headers.map((header) => (
@@ -655,7 +655,7 @@ export default function ImportTab() {
               Only records within the selected date range will be imported. Leave blank to import all records.
             </p>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1">
                   Start Date
@@ -732,7 +732,7 @@ export default function ImportTab() {
                   )}
 
                   {accountMapping[csvRef] === 'new' && (
-                    <div className="grid grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
                       <div>
                         <label className="text-xs text-muted-foreground">Name</label>
                         <Input
@@ -983,7 +983,7 @@ export default function ImportTab() {
                   </div>
 
                   {categoryMapping[csvName] === 'new' && (
-                    <div className="grid grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
                       <div>
                         <label className="text-xs text-muted-foreground">Name</label>
                         <Input
@@ -1088,30 +1088,30 @@ export default function ImportTab() {
                 <div className="p-4 rounded-lg bg-muted/30 border border-border">
                   <h3 className="text-sm font-semibold text-foreground mb-3">Import Summary</h3>
                   <div className="text-sm space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Type</span>
-                      <span className="text-foreground">{importType === 'transactions' ? 'Transactions' : 'Account Snapshots'}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Type</span>
+                      <span className="text-foreground text-right">{importType === 'transactions' ? 'Transactions' : 'Account Snapshots'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">File</span>
-                      <span className="text-foreground">{csvPreview?.fileName}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">File</span>
+                      <span className="text-foreground text-right max-w-[60%] truncate">{csvPreview?.fileName}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Records to Import</span>
-                      <span className="text-foreground">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Records to Import</span>
+                      <span className="text-foreground text-right">
                         {getImportableRecordsCount()} {getImportableRecordsCount() !== csvPreview?.totalRows && `(filtered from ${csvPreview?.totalRows})`}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Accounts matched</span>
-                      <span className="text-foreground">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Accounts matched</span>
+                      <span className="text-foreground text-right">
                         {Object.values(accountMapping).filter((id) => id !== 'new').length} / {uniqueAccountRefs.length}
                       </span>
                     </div>
                     {uniqueCategoryNames.length > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Categories matched</span>
-                        <span className="text-foreground">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Categories matched</span>
+                        <span className="text-foreground text-right">
                           {Object.values(categoryMapping).filter((id) => id !== 'new').length} / {uniqueCategoryNames.length}
                         </span>
                       </div>
@@ -1163,7 +1163,7 @@ export default function ImportTab() {
       </div>
 
       {/* ═══════════════════════ Import History ═══════════════════════ */}
-      <div className="p-5 bg-card border border-border rounded-xl">
+      <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
         <h2 className="text-lg font-semibold text-foreground mb-4">Import History</h2>
 
         {logsLoading ? (
@@ -1179,8 +1179,8 @@ export default function ImportTab() {
                 <tr className="border-b border-border">
                   <th className="text-left p-2 text-muted-foreground font-medium">Date</th>
                   <th className="text-left p-2 text-muted-foreground font-medium">File</th>
-                  <th className="text-left p-2 text-muted-foreground font-medium">Type</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Records</th>
+                  <th className="hidden sm:table-cell text-left p-2 text-muted-foreground font-medium">Type</th>
+                  <th className="hidden sm:table-cell text-right p-2 text-muted-foreground font-medium">Records</th>
                   <th className="text-center p-2 text-muted-foreground font-medium">Status</th>
                   <th className="text-right p-2 text-muted-foreground font-medium">Actions</th>
                 </tr>
@@ -1205,8 +1205,8 @@ export default function ImportTab() {
                         <div className="text-[10px] text-muted-foreground">All dates</div>
                       )}
                     </td>
-                    <td className="p-2 text-foreground capitalize">{log.importType === 'account_snapshots' ? 'Snapshots' : 'Transactions'}</td>
-                    <td className="p-2 text-foreground text-right">{log.recordsImported}</td>
+                    <td className="hidden sm:table-cell p-2 text-foreground capitalize">{log.importType === 'account_snapshots' ? 'Snapshots' : 'Transactions'}</td>
+                    <td className="hidden sm:table-cell p-2 text-foreground text-right">{log.recordsImported}</td>
                     <td className="p-2 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
                         log.status === 'completed'

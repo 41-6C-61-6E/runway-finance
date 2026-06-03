@@ -668,8 +668,8 @@ export default function PayrollTab() {
     <div className="space-y-6">
       {/* Feature Toggle */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-foreground">Paystub Integration</h2>
             <p className="text-xs text-muted-foreground mt-1">
               {paystubEnabled
@@ -810,7 +810,7 @@ export default function PayrollTab() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Employer Name</label>
                 <Input
@@ -1139,7 +1139,7 @@ export default function PayrollTab() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Template Name</label>
                 <Input
@@ -1158,7 +1158,7 @@ export default function PayrollTab() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Target Account</label>
                 <select
@@ -1470,7 +1470,7 @@ export default function PayrollTab() {
           {viewingPaystub && (
             <div className="space-y-4">
               {/* Summary */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 bg-muted/30 rounded-lg">
                   <div className="text-xs text-muted-foreground">Gross</div>
                   <div className="text-sm font-medium text-foreground blur-number">{formatCurrency(viewingPaystub.grossCurrent)}</div>

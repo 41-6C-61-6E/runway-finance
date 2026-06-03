@@ -5,10 +5,10 @@ import { Check, Plus } from 'lucide-react';
 import { ACCENT_NAMES, applyAccent } from '@/lib/utils/apply-accent';
 
 const SWATCH_COLORS: Record<string, string> = {
-  violet: '#8b5cf6',
-  teal: '#14b8a6',
-  rose: '#e11d48',
-  sapphire: '#2563eb',
+  violet: '#6f73b4',
+  teal: '#398b72',
+  rose: '#96455b',
+  sapphire: '#486491',
 };
 
 const SWATCH_LABELS: Record<string, string> = {
@@ -28,7 +28,7 @@ export default function AccentPicker({
   onChange: (color: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [tempColor, setTempColor] = useState('#8b5cf6');
+  const [tempColor, setTempColor] = useState('#6f73b4');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function AccentPicker({
       if (isHexColor(value)) {
         setTempColor(value);
       } else {
-        setTempColor(SWATCH_COLORS[value] || '#8b5cf6');
+        setTempColor(SWATCH_COLORS[value] || '#6f73b4');
       }
     }
   }, [pickerOpen, value]);

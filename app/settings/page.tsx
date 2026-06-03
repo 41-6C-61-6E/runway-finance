@@ -301,6 +301,7 @@ function SettingsPageBody() {
 
   const handleAccentColorChange = useCallback(
     async (color: string) => {
+      setAccentColor(color);
       setAccentColorLoading(true);
       try {
         await fetch('/api/user-settings', {
@@ -507,7 +508,31 @@ function SettingsPageBody() {
             <OnboardingChecklist />
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Mobile Tab Navigation */}
+          <div className="lg:hidden mb-4">
+            <div className="flex flex-wrap gap-1.5">
+              {SETTINGS_TABS.map((tab) => {
+                const TabIcon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => goToTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20 border-transparent'
+                        : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+                    }`}
+                  >
+                    <TabIcon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
 
             {/* Desktop Navigation Sidebar */}
             <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-1 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-3 rounded-xl shadow-sm">
@@ -551,8 +576,8 @@ function SettingsPageBody() {
           <div className="p-5 bg-card border border-border rounded-xl">
             <div className="space-y-5">
               {/* Theme */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Theme</h3>
                   <p className="text-xs text-muted-foreground mt-1">Select between Daylight, Moonlight, and Starlight themes</p>
                 </div>
@@ -560,8 +585,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Accent Color */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Accent Color</h3>
                   <p className="text-xs text-muted-foreground mt-1">Choose the accent color used throughout the app</p>
                 </div>
@@ -649,8 +674,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Privacy Mode */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Privacy Mode</h3>
                   <p className="text-xs text-muted-foreground mt-1">Blur financial data when showing the app to others</p>
                 </div>
@@ -662,8 +687,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Reduce Transparency */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Reduce Transparency</h3>
                   <p className="text-xs text-muted-foreground mt-1">Use solid backgrounds for the sidebar instead of glass/transparent</p>
                 </div>
@@ -674,8 +699,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Hide Account Subheadings */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Hide Account Subheadings</h3>
                   <p className="text-xs text-muted-foreground mt-1">Group accounts by major category only (e.g. Banking, Credit)</p>
                 </div>
@@ -686,8 +711,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Hide Accounts Sidebar by Default */}
-              <div className="flex items-center justify-between pb-5 border-b border-border">
-                <div>
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Hide Accounts Sidebar by Default</h3>
                   <p className="text-xs text-muted-foreground mt-1">Start with the accounts sidebar collapsed on all pages</p>
                 </div>
@@ -698,8 +723,8 @@ function SettingsPageBody() {
               </div>
 
               {/* Dev Mode */}
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Developer Mode</h3>
                   <p className="text-xs text-muted-foreground mt-1">Enable developer tools such as the Financial Logic and Data Explorer pages</p>
                 </div>
@@ -778,10 +803,10 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex rounded-lg bg-card border border-border overflow-hidden">
+          <div className="flex flex-wrap rounded-lg bg-card border border-border">
             <button
               onClick={() => setAccountSubTab('automatic')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors ${
                 accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -789,7 +814,7 @@ function SettingsPageBody() {
             </button>
             <button
               onClick={() => setAccountSubTab('manual')}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors ${
                 accountSubTab === 'manual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -800,10 +825,10 @@ function SettingsPageBody() {
           {accountSubTab === 'automatic' && (
         <>
           {orphanedAccounts.length > 0 && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-4 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <div>
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-4 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
+                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     You have {orphanedAccounts.length} automatic account{orphanedAccounts.length !== 1 ? 's' : ''} no longer linked to a bank connection. Re-map {orphanedAccounts.length === 1 ? 'it' : 'them'} to a currently active synced account to preserve its full history.
@@ -838,8 +863,8 @@ function SettingsPageBody() {
                       key={conn.id}
                       className="p-4 bg-muted/30 border border-border rounded-lg space-y-2"
                     >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
                           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                             conn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
                             conn.lastSyncStatus === 'error' ? 'bg-destructive' :
@@ -865,7 +890,7 @@ function SettingsPageBody() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                           <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                             conn.lastSyncStatus === 'ok'
                               ? 'bg-chart-1/20 text-chart-1'
@@ -878,19 +903,19 @@ function SettingsPageBody() {
                           <button
                             onClick={() => handleSync(conn.id)}
                             disabled={syncingId === conn.id}
-                            className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                            className="px-2 py-1 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
                           >
                             {syncingId === conn.id ? 'Syncing...' : 'Sync'}
                           </button>
                           <button
                             onClick={() => openDetails(conn)}
-                            className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                            className="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
                           >
                             Details
                           </button>
                           <button
                             onClick={() => { setDeleteKeepData(false); setDeleteConn(conn); }}
-                            className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                            className="px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
                           >
                             Delete
                           </button>
@@ -1012,7 +1037,7 @@ function SettingsPageBody() {
                                   </span>
                                 )}
                               </div>
-                              <div className={`text-[10px] whitespace-nowrap ${
+                              <div className={`text-[10px] ${
                                 syncResult.status === 'success' ? 'text-chart-1/70' : ''
                               }`}>
                                 {acct.transactionsNew > 0 && (
@@ -1127,12 +1152,12 @@ function SettingsPageBody() {
               </p>
 
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex rounded-lg bg-muted border border-border overflow-hidden">
+                <div className="flex rounded-lg bg-muted border border-border">
                   {(['all', 'hidden', 'excluded'] as const).map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setAccountFilter(filter)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors shrink-0 ${
                         accountFilter === filter
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground'
@@ -1179,14 +1204,14 @@ function SettingsPageBody() {
                         return (
                           <div
                             key={account.id}
-                            className={`p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4 cursor-pointer group hover:bg-muted/50 transition-colors ${
+                            className={`p-4 bg-muted/30 border border-border rounded-lg flex flex-col sm:flex-row items-start gap-3 cursor-pointer group hover:bg-muted/50 transition-colors ${
                               account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
                             }`}
                             onClick={() => handleOpenAccountDrawer(account)}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                            <div className="flex-1 min-w-0 w-full sm:w-auto">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
                                   account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
                                   account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
                                   account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
@@ -1198,20 +1223,20 @@ function SettingsPageBody() {
                                   {account.type}
                                 </span>
                                 {account.isHidden && (
-                                  <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
+                                  <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
                                 )}
                                 {account.isExcludedFromNetWorth && (
-                                  <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
+                                  <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-foreground font-medium text-sm truncate max-w-[200px] sm:max-w-xs">{account.name}</span>
+                                <span className="text-foreground font-medium text-sm truncate max-w-[160px] sm:max-w-xs">{account.name}</span>
                                 {account.tags && account.tags.length > 0 && (
-                                  <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                  <div className="flex items-center gap-1 flex-wrap">
                                     {account.tags.map((tag) => (
                                       <span
                                         key={tag.id}
-                                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
                                         style={{
                                           backgroundColor: `${tag.color}15`,
                                           color: tag.color,
@@ -1228,54 +1253,52 @@ function SettingsPageBody() {
                                 <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
                               )}
                             </div>
-                            <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="flex items-center gap-3 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                               <div className="text-right">
                                 <div className={`font-mono text-sm text-muted-foreground blur-number`}>
                                   {formatted}
                                 </div>
                                 <div className="text-xs text-muted-foreground/60">{account.currency}</div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <div className="flex flex-col gap-1.5 font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={handleToggleAccount(account.id, 'isHidden')}
-                                      className={`relative w-10 h-5 rounded-full transition-colors ${
-                                        account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleToggleAccount(account.id, 'isHidden')}
+                                    className={`relative w-9 h-4 rounded-full transition-colors ${
+                                      account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                    title={account.isHidden ? 'Show account' : 'Hide account'}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
+                                        account.isHidden ? 'translate-x-5' : 'translate-x-0'
                                       }`}
-                                      title={account.isHidden ? 'Show account' : 'Hide account'}
-                                    >
-                                      <span
-                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                          account.isHidden ? 'translate-x-5' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
-                                    <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isHidden ? 'Show' : 'Hide'}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                      className={`relative w-10 h-5 rounded-full transition-colors ${
+                                    />
+                                  </button>
+                                  <span className="text-[10px] text-muted-foreground">{account.isHidden ? 'Show' : 'Hide'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                    className={`relative w-9 h-4 rounded-full transition-colors ${
                                         account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                    title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
+                                        account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
                                       }`}
-                                      title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                                    >
-                                      <span
-                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-background rounded-full shadow transition-transform ${
-                                          account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
-                                    <span className="text-xs text-muted-foreground whitespace-nowrap">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
-                                  </div>
+                                    />
+                                  </button>
+                                  <span className="text-[10px] text-muted-foreground">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
                                 </div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenAccountDrawer(account);
                                   }}
-                                  className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                                  className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
                                 >
                                   Edit
                                 </button>
@@ -1302,7 +1325,7 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'rules' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <RulesTab />
         </div>
       )}
@@ -1314,7 +1337,7 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'advanced' && (
-        <div className="min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AdvancedTab />
         </div>
       )}

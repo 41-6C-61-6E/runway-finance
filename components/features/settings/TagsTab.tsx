@@ -204,22 +204,22 @@ export default function TagsTab() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div className="flex-1 min-w-0">
           <h2 className="text-lg font-semibold text-foreground">Tags</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Create tags to organize transactions, accounts, budgets, and goals across categories.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           {feedback && (
-            <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+            <span className={`text-xs px-2 py-1 rounded-lg shrink-0 ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
               {feedback.message}
             </span>
           )}
           <button
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
             New Tag

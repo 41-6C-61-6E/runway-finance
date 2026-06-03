@@ -10,21 +10,21 @@ type AccentDefinition = {
 
 const ACCENTS: Record<string, AccentDefinition> = {
   violet: {
-    primary: 'oklch(0.62 0.2 280)',
-    accent: { light: 'oklch(0.92 0.08 285)', dark: 'oklch(0.2 0.04 285)' },
+    primary: 'oklch(0.58 0.10 280)',
+    accent: { light: 'oklch(0.90 0.05 285)', dark: 'oklch(0.22 0.03 285)' },
   },
   teal: {
-    primary: 'oklch(0.62 0.18 170)',
-    accent: { light: 'oklch(0.92 0.06 170)', dark: 'oklch(0.2 0.05 170)' },
+    primary: 'oklch(0.58 0.09 170)',
+    accent: { light: 'oklch(0.90 0.04 170)', dark: 'oklch(0.22 0.03 170)' },
   },
 
   rose: {
-    primary: 'oklch(0.52 0.22 5)',
-    accent: { light: 'oklch(0.9 0.09 10)', dark: 'oklch(0.14 0.05 5)' },
+    primary: 'oklch(0.50 0.11 5)',
+    accent: { light: 'oklch(0.89 0.06 10)', dark: 'oklch(0.18 0.03 5)' },
   },
   sapphire: {
-    primary: 'oklch(0.52 0.15 260)',
-    accent: { light: 'oklch(0.9 0.06 260)', dark: 'oklch(0.14 0.04 260)' },
+    primary: 'oklch(0.50 0.08 260)',
+    accent: { light: 'oklch(0.89 0.04 260)', dark: 'oklch(0.18 0.03 260)' },
   },
 };
 

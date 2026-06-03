@@ -47,12 +47,12 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
   vashon: {
     id: 'vashon',
     name: 'Vashon',
-    description: 'Warm and vibrant lime, violet, gold, cyan, and peach',
+    description: 'Warm and vibrant cyan, violet, gold, lime, and peach',
     colors: [
-      'oklch(0.78 0.15 80)',
+      'oklch(0.70 0.15 200)',
       'oklch(0.58 0.18 290)',
       'oklch(0.74 0.15 50)',
-      'oklch(0.70 0.15 200)',
+      'oklch(0.78 0.15 80)',
       'oklch(0.62 0.19 330)',
     ],
   },

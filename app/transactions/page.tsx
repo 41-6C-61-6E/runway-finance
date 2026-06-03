@@ -319,7 +319,7 @@ function TransactionsContent() {
         }
       />
       <div className="relative z-10">
-        <ContentWrapper className="mt-0">
+        <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px] overflow-visible">
 
             <FilterBar 
