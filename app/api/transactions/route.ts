@@ -26,10 +26,12 @@ import {
   TransactionFilterSchema,
   BulkPatchTransactionSchema,
   BulkDeleteTransactionSchema,
+  CreateTransactionSchema,
 } from "@/lib/validations/transaction";
 import { logger } from "@/lib/logger";
 import { getSessionDEK } from "@/lib/crypto-context";
-import { decryptField, decryptRow, decryptRows } from "@/lib/crypto";
+import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from "@/lib/crypto";
+import { sanitizeText } from "@/lib/utils/sanitize";
 import {
   updateCategorySpendingSummaries,
   updateCategoryIncomeSummaries,
@@ -1131,6 +1133,101 @@ export async function PATCH(request: Request) {
 
   logger.info("Transactions patched", { updatedCount: updated.length });
   return NextResponse.json({ updated: updated.length });
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "unauthenticated", message: "Authentication required" },
+      { status: 401 },
+    );
+  }
+
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const dek = await getSessionDEK();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "validation_error", message: "Invalid request body" },
+      { status: 400 },
+    );
+  }
+
+  const parsed = CreateTransactionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "validation_error", message: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  const { accountId, date, amount, description, payee, memo, notes, categoryId, tagIds, pending } = parsed.data;
+
+  logger.info("Creating transaction", { userId, accountId, date });
+
+  // Verify the account belongs to this user
+  const [account] = await getDb()
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.id, accountId), eq(accounts.userId, dataUserId)))
+    .limit(1);
+
+  if (!account) {
+    return NextResponse.json(
+      { error: "not_found", message: "Account not found" },
+      { status: 404 },
+    );
+  }
+
+  const externalId = crypto.randomUUID();
+
+  const txData = {
+    userId: dataUserId,
+    accountId,
+    externalId,
+    date,
+    amount,
+    description: sanitizeText(description, 500),
+    payee: payee ? sanitizeText(payee, 200) : null,
+    memo: memo ? sanitizeText(memo, 500) : null,
+    pending: pending ?? false,
+    categoryId: categoryId ?? null,
+    notes: notes ? sanitizeText(notes, 2000) : null,
+    reviewed: false,
+    source: 'manual',
+    isImported: false,
+  };
+
+  const encrypted = await encryptRow('transactions', txData, dek);
+
+  const [created] = await getDb()
+    .insert(transactions)
+    .values(encrypted)
+    .returning();
+
+  // Handle tags
+  if (tagIds && tagIds.length > 0) {
+    await getDb().insert(transactionTags).values(
+      tagIds.map((tagId) => ({ transactionId: created.id, tagId }))
+    );
+  }
+
+  invalidateUserSearchCache(dataUserId);
+
+  Promise.all([
+    updateCategorySpendingSummaries(dataUserId, dek),
+    updateCategoryIncomeSummaries(dataUserId, dek),
+    updateMonthlyCashFlowSummaries(dataUserId, dek),
+  ]).catch((err) => {
+    logger.error("Background summaries rebuild failed after create", { userId, error: err });
+  });
+
+  return NextResponse.json(created, { status: 201 });
 }
 
 export async function DELETE(request: Request) {
