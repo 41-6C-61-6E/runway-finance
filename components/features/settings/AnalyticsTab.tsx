@@ -241,7 +241,7 @@ export default function AnalyticsTab() {
       {activeSubTab === 'data' && (
         <div className="space-y-8">
           {/* ── Automatic Data Refresh ────────────────────────────────────── */}
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="p-4 bg-info border border-info-border rounded-lg">
             <h2 className="text-sm font-semibold text-foreground mb-2">
               Automatic Data Refresh
             </h2>

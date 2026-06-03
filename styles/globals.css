@@ -54,6 +54,8 @@ body,
   --color-destructive-synthetic: var(--destructive-synthetic);
   --color-status-positive: var(--status-positive);
   --color-status-warning: var(--status-warning);
+  --color-info: var(--info);
+  --color-info-border: var(--info-border);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
