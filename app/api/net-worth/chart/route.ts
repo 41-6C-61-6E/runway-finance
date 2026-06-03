@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, or, gte, lte, lt, desc, sql } from 'drizzle-orm';
+import { accounts, netWorthSnapshots } from '@/lib/db/schema';
+import { eq, and, gte, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptField, decryptRows } from '@/lib/crypto';
+import { decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
@@ -97,51 +97,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
 
-  // Fetch user settings to respect imported data toggles
-  const userSettingsList = await getDb()
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
-
-  const userSetting = userSettingsList[0];
-  const rawShowImported = userSetting?.showImportedData;
-  const importSettings = {
-    global: true,
-    netWorth: true,
-    realEstate: true,
-    cashFlowProjections: true,
-    ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
-  } as Record<string, boolean>;
-
-  const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
-
-  const rawShowSynthetic = userSetting?.showSyntheticData;
-  const synthSettings = {
-    global: true,
-    netWorth: true,
-    realEstate: true,
-    cashFlowProjections: true,
-    ...(typeof rawShowSynthetic === 'object' && rawShowSynthetic !== null ? rawShowSynthetic : {}),
-  } as Record<string, boolean>;
-
-  const isNetWorthEnabled = synthSettings.global !== false && synthSettings.netWorth !== false;
-
   let [startDate, endDate] = getDateRange(timeframe);
   if (timeframe === 'all') {
-    const earliestSnapConditions = [eq(accountSnapshots.userId, userId)];
-    if (!isImportNetWorthEnabled) {
-      earliestSnapConditions.push(eq(accountSnapshots.isImported, false));
-    }
-    if (!isNetWorthEnabled) {
-      earliestSnapConditions.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
-    }
-
     const earliestSnap = await getDb()
-      .select({ snapshotDate: accountSnapshots.snapshotDate })
-      .from(accountSnapshots)
-      .where(and(...earliestSnapConditions))
-      .orderBy(accountSnapshots.snapshotDate)
+      .select({ snapshotDate: netWorthSnapshots.snapshotDate })
+      .from(netWorthSnapshots)
+      .where(eq(netWorthSnapshots.userId, userId))
+      .orderBy(netWorthSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
       startDate = new Date(earliestSnap[0].snapshotDate + 'T00:00:00Z');
@@ -152,171 +114,38 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Get all user accounts with balance data
-    const userAccounts = await getDb()
-      .select()
-      .from(accounts)
-      .where(eq(accounts.userId, userId));
-
-    // Decrypt account balances and other encrypted fields
-    const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
-    const reportableAccounts = filterReportableAccounts(decryptedAccounts);
-
-    // Primary path: aggregate from account_snapshots (includes both real and synthetic)
-    const snapshotsConditionsInRange = [
-      eq(accountSnapshots.userId, userId),
-      gte(accountSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
-      lte(accountSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
-    ];
-    if (!isImportNetWorthEnabled) {
-      snapshotsConditionsInRange.push(eq(accountSnapshots.isImported, false));
-    }
-    if (!isNetWorthEnabled) {
-      snapshotsConditionsInRange.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
-    }
-
-    const accountSnapshotsInRange = await getDb()
+    // Query pre-computed net worth snapshots (single row per day, already aggregated)
+    const snapshots = await getDb()
       .select({
-        snapshotDate: accountSnapshots.snapshotDate,
-        accountId: accountSnapshots.accountId,
-        balance: accountSnapshots.balance,
-        isSynthetic: accountSnapshots.isSynthetic,
-        isImported: accountSnapshots.isImported,
+        snapshotDate: netWorthSnapshots.snapshotDate,
+        totalAssets: netWorthSnapshots.totalAssets,
+        totalLiabilities: netWorthSnapshots.totalLiabilities,
+        netWorth: netWorthSnapshots.netWorth,
       })
-      .from(accountSnapshots)
-      .where(and(...snapshotsConditionsInRange))
-      .orderBy(accountSnapshots.snapshotDate);
+      .from(netWorthSnapshots)
+      .where(
+        and(
+          eq(netWorthSnapshots.userId, userId),
+          gte(netWorthSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
+          lte(netWorthSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
+        )
+      )
+      .orderBy(netWorthSnapshots.snapshotDate);
 
-    // Decrypt snapshot balances with error handling
-    const decryptedSnapshots = await Promise.all(accountSnapshotsInRange.map(async (snap) => {
-      let balance = 0;
-      try {
-        // Handle both plaintext numbers and encrypted strings
-        const decrypted = await decryptField(snap.balance, dek);
-        balance = parseFloat(decrypted);
-        if (isNaN(balance)) {
-          logger.warn('Invalid balance value after decryption', { accountId: snap.accountId, decrypted, originalBalance: snap.balance });
-          balance = 0;
-        }
-      } catch (error) {
-        logger.error('Failed to decrypt snapshot balance', { 
-          accountId: snap.accountId, 
-          date: snap.snapshotDate,
-          originalBalance: snap.balance,
-          error: error instanceof Error ? error.message : String(error) 
-        });
-        balance = 0;
-      }
-      return { ...snap, balance };
-    }));
-
-    // Group snapshots by date for forward-fill
-    const snapshotsByDate = new Map<string, Array<{ accountId: string; balance: number; isSynthetic: boolean; isImported: boolean }>>();
-    for (const snap of decryptedSnapshots) {
-      const dateStr = String(snap.snapshotDate);
-      if (!snapshotsByDate.has(dateStr)) {
-        snapshotsByDate.set(dateStr, []);
-      }
-      snapshotsByDate.get(dateStr)!.push({
-        accountId: snap.accountId,
-        balance: snap.balance,
-        isSynthetic: snap.isSynthetic,
-        isImported: snap.isImported,
-      });
-    }
-
-    // Forward-fill: carry forward latest known balance per account,
-    // so sparse accounts (e.g. mortgage only snapshotted on the 7th)
-    // still contribute to totals on intervening dates.
-    const latestByAccount = new Map<string, { balance: number; isSynthetic: boolean; isImported: boolean }>();
-    const balancesByDate = new Map<string, { assets: number; liabilities: number; isSynthetic: boolean; isImported: boolean; breakdown: Record<string, number> }>();
-
-    const sortedDates = Array.from(snapshotsByDate.keys()).sort((a, b) => a.localeCompare(b));
-    const allBreakdownCategories = new Set<string>();
-
-    for (const dateStr of sortedDates) {
-      for (const snap of snapshotsByDate.get(dateStr)!) {
-        latestByAccount.set(snap.accountId, { balance: snap.balance, isSynthetic: snap.isSynthetic, isImported: snap.isImported });
-      }
-
-      let assets = 0;
-      let liabilities = 0;
-      let allSynthetic = true;
-      let anyImported = false;
-      const breakdown: Record<string, number> = {};
-
-      for (const account of reportableAccounts) {
-        const latest = latestByAccount.get(account.id);
-        if (!latest) continue;
-
-        const accountType = account.type.toLowerCase();
-        let endEventDateStr: string | undefined = undefined;
-        if (accountType === 'mortgage' && account.metadata) {
-          try {
-            const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
-            if (meta) {
-              const status = meta.mortgageStatus as string | undefined;
-              endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
-            }
-          } catch (err) {
-            // Ignore parse errors
-          }
-        }
-
-        if (endEventDateStr && dateStr >= endEventDateStr) {
-          continue;
-        }
-
-        let categoryName = 'Other';
-
-        if (isAssetAccount(accountType)) {
-          categoryName = assetCategoryMap[accountType] || 'Other Investments';
-          breakdown[categoryName] = (breakdown[categoryName] || 0) + latest.balance;
-          assets += latest.balance;
-          allBreakdownCategories.add(categoryName);
-        } else if (isLiabilityAccount(accountType)) {
-          categoryName = liabilityCategoryMap[accountType] || 'Other Debt';
-          breakdown[categoryName] = (breakdown[categoryName] || 0) + Math.abs(latest.balance);
-          liabilities += Math.abs(latest.balance);
-          allBreakdownCategories.add(categoryName);
-        }
-
-        if (!latest.isSynthetic) {
-          allSynthetic = false;
-        }
-        if (latest.isImported) {
-          anyImported = true;
-        }
-      }
-
-      balancesByDate.set(dateStr, { assets, liabilities, isSynthetic: allSynthetic, isImported: anyImported, breakdown });
-    }
-
-    // Build formatted data
-    const formattedData: AggregatablePoint[] = Array.from(balancesByDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, { assets, liabilities, isSynthetic, isImported, breakdown }]) => {
-        const point: AggregatablePoint = {
-          date,
-          netWorth: assets - liabilities,
-          totalAssets: assets,
-          totalLiabilities: liabilities,
-          isSynthetic,
-          isImported,
-        };
-        for (const cat of allBreakdownCategories) {
-          if (cat in breakdown) {
-            point[cat] = breakdown[cat];
-          }
-        }
-        return point;
-      });
-
-    if (formattedData.length === 0) {
+    if (snapshots.length === 0) {
       // Fallback: use current account balances
+      const userAccounts = await getDb()
+        .select()
+        .from(accounts)
+        .where(eq(accounts.userId, userId));
+
+      const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
+      const reportableAccounts = filterReportableAccounts(decryptedAccounts);
+
       let totalAssets = 0;
       let totalLiabilities = 0;
       const breakdown: Record<string, number> = {};
+      const allBreakdownCategories = new Set<string>();
 
       for (const acc of reportableAccounts) {
         const balance = parseFloat(acc.balance);
@@ -362,6 +191,18 @@ export async function GET(request: Request) {
       });
     }
 
+    // Decrypt encrypted fields (totalAssets, totalLiabilities, netWorth)
+    const decrypted = await decryptRows('net_worth_snapshots', snapshots, dek);
+
+    const formattedData: AggregatablePoint[] = decrypted.map((s) => ({
+      date: s.snapshotDate,
+      netWorth: parseFloat(s.netWorth) || 0,
+      totalAssets: parseFloat(s.totalAssets) || 0,
+      totalLiabilities: parseFloat(s.totalLiabilities) || 0,
+      isSynthetic: false,
+      isImported: false,
+    }));
+
     // Calculate summary stats from aggregated data
     const current = formattedData[formattedData.length - 1];
     const previous = formattedData.length > 1 ? formattedData[0] : current;
@@ -370,19 +211,19 @@ export async function GET(request: Request) {
     const change = currentNetWorth - previousNetWorth;
     const percentChange = previousNetWorth !== 0 ? (change / previousNetWorth) * 100 : 0;
 
-    const numericFields = ['netWorth', 'totalAssets', 'totalLiabilities', ...Array.from(allBreakdownCategories)];
+    const numericFields = ['netWorth', 'totalAssets', 'totalLiabilities'];
     const aggregated = aggregateChartData(formattedData, numericFields as any);
 
     return NextResponse.json({
       data: aggregated,
-      categories: Array.from(allBreakdownCategories),
+      categories: [],
       summary: {
         current: currentNetWorth,
         previous: previousNetWorth,
         change,
         percentChange,
-        includedAccounts: reportableAccounts.length,
-        totalAccounts: decryptedAccounts.length,
+        includedAccounts: 0,
+        totalAccounts: 0,
       },
     });
   } catch (error) {
