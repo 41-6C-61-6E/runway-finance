@@ -551,8 +551,8 @@ function SettingsPageBody() {
           <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
 
             {/* Desktop Navigation Sidebar */}
-            <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-1 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-3 rounded-xl shadow-sm">
-              <div className="px-2 pb-2 mb-1.5 border-b border-border/60">
+            <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
+              <div className="px-2 pb-1.5 border-b border-border/60">
                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Settings Navigation</h3>
               </div>
               <nav className="space-y-0.5">
@@ -563,7 +563,7 @@ function SettingsPageBody() {
                     <button
                       key={tab.id}
                       onClick={() => goToTab(tab.id)}
-                      className={`w-full flex items-start gap-2.5 py-2 px-3 rounded-lg transition-all text-left group relative border ${
+                      className={`w-full flex items-start gap-2 py-1.5 px-2.5 rounded-lg transition-all text-left group relative border ${
                         isActive
                           ? 'bg-primary border-primary/10 text-primary-foreground shadow-sm shadow-primary/15'
                           : 'bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/75'
@@ -571,8 +571,8 @@ function SettingsPageBody() {
                     >
                       <TabIcon className={`w-4 h-4 mt-0.5 shrink-0 transition-transform group-hover:scale-110 duration-200 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold leading-none">{tab.label}</div>
-                        <div className={`text-[11px] mt-1 line-clamp-2 leading-snug ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70 group-hover:text-muted-foreground'}`}>
+                        <div className="text-sm font-semibold leading-tight">{tab.label}</div>
+                        <div className={`text-[10px] leading-tight ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70 group-hover:text-muted-foreground'}`}>
                           {tab.description}
                         </div>
                       </div>
