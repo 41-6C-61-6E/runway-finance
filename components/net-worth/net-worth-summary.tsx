@@ -12,6 +12,7 @@ import { EstimatePill } from '@/components/ui/estimate-pill';
 import { Sparkline } from '@/components/ui/sparkline';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import type { AccountData, ChartPoint, CalculationTrace } from '@/lib/types/financial';
+import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
 import { DollarSign } from 'lucide-react';
 
 interface ChartResponse {
@@ -83,9 +84,46 @@ export function NetWorthSummary() {
 
   const traces = useMemo(() => showMath ? buildNetWorthTraces(accounts) : [], [accounts, showMath]);
 
-  const assetHistory = useMemo(() => chartData.map((d) => d.totalAssets), [chartData]);
-  const liabilityHistory = useMemo(() => chartData.map((d) => d.totalLiabilities), [chartData]);
-  const netWorthHistory = useMemo(() => chartData.map((d) => d.netWorth), [chartData]);
+  const processedData = useMemo(() => {
+    if (chartData.length === 0) return [];
+
+    // timeframe is hardcoded as '1y' for summary card
+    const targetSpikeDays = 4;
+    const targetSmaDays = 7;
+
+    // Calculate average gap in days between consecutive data points
+    const first = new Date(chartData[0].date + 'T00:00:00Z').getTime();
+    const last = new Date(chartData[chartData.length - 1].date + 'T00:00:00Z').getTime();
+    const totalDays = (last - first) / (1000 * 60 * 60 * 24);
+    const gap = chartData.length > 1 ? totalDays / (chartData.length - 1) : 1;
+    
+    // A median filter of window size W filters out spikes of duration up to floor(W/2) points.
+    const targetPoints = Math.ceil(targetSpikeDays / (gap || 1));
+    const windowSize = 2 * targetPoints + 1;
+
+    // Limit window size to at most 15% of the total dataset size to avoid over-smoothing
+    const maxAllowed = Math.floor(chartData.length * 0.15);
+    const finalWindow = Math.min(windowSize, maxAllowed % 2 === 0 ? maxAllowed + 1 : maxAllowed);
+    const medianWindow = Math.max(1, finalWindow % 2 === 0 ? finalWindow - 1 : finalWindow);
+
+    // Calculate Simple Moving Average window for visual smoothing
+    const smaTargetPoints = Math.round(targetSmaDays / (gap || 1));
+    const maxSmaAllowed = Math.floor(chartData.length * 0.15);
+    const finalSmaWindow = Math.min(smaTargetPoints, maxSmaAllowed);
+    const smaWindow = Math.max(1, finalSmaWindow);
+
+    const fields: (keyof ChartPoint & string)[] = ['netWorth', 'totalAssets', 'totalLiabilities'];
+    const medianFiltered = computeMedianFilter(chartData, fields, medianWindow);
+
+    if (smaWindow > 1) {
+      return computeMovingAverage(medianFiltered, fields, smaWindow);
+    }
+    return medianFiltered;
+  }, [chartData]);
+
+  const assetHistory = useMemo(() => processedData.map((d) => d.totalAssets), [processedData]);
+  const liabilityHistory = useMemo(() => processedData.map((d) => d.totalLiabilities), [processedData]);
+  const netWorthHistory = useMemo(() => processedData.map((d) => d.netWorth), [processedData]);
 
   const assetTrendPositive = useMemo(
     () => assetHistory.length >= 2 && assetHistory[assetHistory.length - 1] >= assetHistory[0],
@@ -101,9 +139,9 @@ export function NetWorthSummary() {
   );
 
   const deltas = useMemo(() => {
-    if (chartData.length < 2) return { assets: 0, liabilities: 0, netWorth: 0, pctAssets: 0, pctLiabilities: 0, pctNetWorth: 0 };
-    const cur = chartData[chartData.length - 1];
-    const prev = chartData[0];
+    if (processedData.length < 2) return { assets: 0, liabilities: 0, netWorth: 0, pctAssets: 0, pctLiabilities: 0, pctNetWorth: 0 };
+    const cur = processedData[processedData.length - 1];
+    const prev = processedData[0];
     const dAssets = cur.totalAssets - prev.totalAssets;
     const dLiabilities = cur.totalLiabilities - prev.totalLiabilities;
     const dNetWorth = cur.netWorth - prev.netWorth;
@@ -115,7 +153,7 @@ export function NetWorthSummary() {
       pctLiabilities: prev.totalLiabilities !== 0 ? (dLiabilities / prev.totalLiabilities) * 100 : 0,
       pctNetWorth: prev.netWorth !== 0 ? (dNetWorth / prev.netWorth) * 100 : 0,
     };
-  }, [chartData]);
+  }, [processedData]);
 
   const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean, trace?: CalculationTrace) => (
     <div className="p-5">
@@ -141,7 +179,7 @@ export function NetWorthSummary() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
             </h3>
           }
@@ -170,7 +208,7 @@ export function NetWorthSummary() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
             </h3>
           }
@@ -190,7 +228,7 @@ export function NetWorthSummary() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
           </h3>
         }

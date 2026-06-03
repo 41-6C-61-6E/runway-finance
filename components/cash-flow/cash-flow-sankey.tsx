@@ -628,8 +628,8 @@ export function CashFlowSankey() {
   const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const currentMonth = getCurrentMonth();
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:sankey:timeframe', '1m');
-  const [month, setMonth] = usePersistentState<string>('runway:sankey:month', currentMonth);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:sankey:timeframe', '1m');
+  const [month, setMonth] = usePersistentState<string>('finance:sankey:month', currentMonth);
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

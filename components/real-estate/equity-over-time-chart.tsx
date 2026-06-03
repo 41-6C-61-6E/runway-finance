@@ -62,7 +62,7 @@ export function EquityOverTimeChart() {
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('runway:real-estate:timeRange', 'all');
+  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('finance:real-estate:timeRange', 'all');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -366,7 +366,7 @@ export function EquityOverTimeChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
             </h3>
           }
@@ -383,7 +383,7 @@ export function EquityOverTimeChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
             </h3>
           }
@@ -404,7 +404,7 @@ export function EquityOverTimeChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
             </h3>
           }
@@ -471,7 +471,7 @@ export function EquityOverTimeChart() {
         onToggle={setIsCollapsed}
         title={
           <div className="flex items-center gap-2">
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
             </h3>
             {!isCollapsed && hasEstimated && <EstimatePill />}

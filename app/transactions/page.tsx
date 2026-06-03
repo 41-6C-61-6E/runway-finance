@@ -77,7 +77,7 @@ function TransactionsContent() {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('edit');
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
-  const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('runway:transactions:customPresets', []);
+  const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({

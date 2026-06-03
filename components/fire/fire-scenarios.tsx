@@ -92,7 +92,7 @@ export function FireScenarios({ onLoad }: { onLoad: (s: FireScenario) => void })
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <Bookmark className="w-4 h-4 text-primary" /> Saved Scenarios
             </h3>
           }
@@ -115,7 +115,7 @@ export function FireScenarios({ onLoad }: { onLoad: (s: FireScenario) => void })
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <Bookmark className="w-4 h-4 text-primary" /> Saved Scenarios
             </h3>
           }
@@ -135,7 +135,7 @@ export function FireScenarios({ onLoad }: { onLoad: (s: FireScenario) => void })
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <Bookmark className="w-4 h-4 text-primary" /> Saved Scenarios
           </h3>
         }

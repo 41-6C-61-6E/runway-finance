@@ -20,7 +20,7 @@ export function RetirementInputs({
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <Sliders className="w-4 h-4 text-primary" /> Retirement Assumptions
           </h3>
         }

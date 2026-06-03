@@ -20,7 +20,7 @@ function RealEstateContent() {
       <PageHeader title="Real Estate" icon={Home} />
       <PageContent>
         {isVisible('equityOverTimeChart') && (
-          <div className="mb-5">
+          <div className="mb-5 sm:mb-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
                 <EquityOverTimeChart />
@@ -31,7 +31,7 @@ function RealEstateContent() {
         )}
 
         {(isVisible('propertyCards') || isVisible('portfolioAllocationChart')) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
             {isVisible('propertyCards') && (
               <div className="lg:col-span-2">
                 <Suspense fallback={<LoadingSpinner category="chart" />}>

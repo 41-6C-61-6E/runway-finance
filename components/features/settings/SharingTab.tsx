@@ -539,7 +539,7 @@ export default function SharingTab() {
             <AlertDialogDescription>
               <strong>{confirmRemove?.memberUserId}</strong> will be removed from your shared account.
               They will no longer be able to access your financial data.
-              Their personal settings (theme, etc.) will be preserved, but they will start with an empty account if they continue using Runway.
+              Their personal settings (theme, etc.) will be preserved, but they will start with an empty account if they continue using the app.
               <br /><br />
               <strong>This action cannot be undone.</strong>
             </AlertDialogDescription>

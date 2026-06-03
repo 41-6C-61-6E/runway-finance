@@ -83,7 +83,7 @@ export async function GET() {
   };
 
   const json = JSON.stringify(backup, null, 2);
-  const filename = `runway-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
+  const filename = `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
 
   return new NextResponse(json, {
     headers: {

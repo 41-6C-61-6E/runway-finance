@@ -107,25 +107,23 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
-          {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-primary" />
-            </div>
-            <span className="text-lg font-semibold text-foreground">Runway</span>
-          </div>
+
 
           <div className="text-center">
-            <h1 className="text-xl font-bold text-foreground">
-              {isLogin ? 'Welcome back' : isSharingJoin ? 'Join a shared account' : 'Create account'}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isLogin
-                ? 'Sign in to your account'
-                : isSharingJoin
-                ? 'You have been invited to share a Runway account'
-                : 'Start managing your finances'}
-            </p>
+            {isLogin ? (
+              <h1 className="text-xl font-bold text-foreground">Sign In</h1>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold text-foreground">
+                  {isSharingJoin ? 'Join a shared account' : 'Create account'}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isSharingJoin
+                    ? 'You have been invited to share a financial account'
+                    : 'Start managing your finances'}
+                </p>
+              </>
+            )}
           </div>
 
           {error && (
