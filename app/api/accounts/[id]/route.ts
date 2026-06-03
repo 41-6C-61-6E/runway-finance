@@ -24,6 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -77,6 +78,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [account] = await getDb()
@@ -216,11 +218,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   ) {
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(userId, dek, today),
-      createNetWorthSnapshot(userId, dek, today),
-      updateMonthlyCashFlowSummaries(userId, dek),
-      updateCategorySpendingSummaries(userId, dek),
-      updateCategoryIncomeSummaries(userId, dek),
+      createAccountSnapshots(dataUserId, dek, today),
+      createNetWorthSnapshot(dataUserId, dek, today),
+      updateMonthlyCashFlowSummaries(dataUserId, dek),
+      updateCategorySpendingSummaries(dataUserId, dek),
+      updateCategoryIncomeSummaries(dataUserId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after account PATCH', {
         accountId: id,

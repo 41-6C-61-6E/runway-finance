@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -19,7 +20,7 @@ export async function GET(
   const [paystub] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, session.user.id)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
     .limit(1);
 
   if (!paystub) {
@@ -39,6 +40,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -50,7 +52,7 @@ export async function PATCH(
   const [existing] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, session.user.id)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -102,6 +104,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -113,7 +116,7 @@ export async function DELETE(
   const [existing] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, session.user.id)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -124,7 +127,7 @@ export async function DELETE(
   await db
     .delete(transactions)
     .where(
-      and(eq(transactions.paystubId, id), eq(transactions.userId, session.user.id))
+      and(eq(transactions.paystubId, id), eq(transactions.userId, dataUserId))
     );
 
   // Delete the paystub (cascade will delete line items)

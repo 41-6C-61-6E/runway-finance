@@ -21,6 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -39,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (result.length === 0) {
@@ -100,13 +101,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (!existing) {
@@ -176,13 +178,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
 
   // Rebuild summaries since categories/transactions changed (non-blocking background task)
   Promise.all([
-    updateCategorySpendingSummaries(userId, dek),
-    updateCategoryIncomeSummaries(userId, dek),
-    updateMonthlyCashFlowSummaries(userId, dek),
+    updateCategorySpendingSummaries(dataUserId, dek),
+    updateCategoryIncomeSummaries(dataUserId, dek),
+    updateMonthlyCashFlowSummaries(dataUserId, dek),
   ]).catch((err) => {
     logger.error('Background summaries rebuild failed', { userId, error: err });
   });
@@ -200,6 +202,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -208,7 +211,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (!existing) {
@@ -225,13 +228,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     .where(eq(transactions.id, id))
     .returning();
 
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
 
   // Rebuild summaries since categories/transactions changed (non-blocking background task)
   Promise.all([
-    updateCategorySpendingSummaries(userId, dek),
-    updateCategoryIncomeSummaries(userId, dek),
-    updateMonthlyCashFlowSummaries(userId, dek),
+    updateCategorySpendingSummaries(dataUserId, dek),
+    updateCategoryIncomeSummaries(dataUserId, dek),
+    updateMonthlyCashFlowSummaries(dataUserId, dek),
   ]).catch((err) => {
     logger.error('Background summaries rebuild failed after DELETE', { userId, error: err });
   });

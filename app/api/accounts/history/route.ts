@@ -54,6 +54,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
     const earliestSnap = await getDb()
       .select({ snapshotDate: accountSnapshots.snapshotDate })
       .from(accountSnapshots)
-      .where(eq(accountSnapshots.userId, userId))
+      .where(eq(accountSnapshots.userId, dataUserId))
       .orderBy(accountSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -81,7 +82,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, userId));
+      .where(eq(accounts.userId, dataUserId));
 
     // Decrypt account balances and other encrypted fields
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
@@ -182,7 +183,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch snapshots before the range to establish the baseline balances
     const snapshotsConditionsBefore = [
-      eq(accountSnapshots.userId, userId),
+      eq(accountSnapshots.userId, dataUserId),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
     if (!isNetWorthEnabled) {
@@ -205,7 +206,7 @@ export async function GET(request: Request) {
 
     // 3. Fetch snapshots in range
     const snapshotsConditionsInRange = [
-      eq(accountSnapshots.userId, userId),
+      eq(accountSnapshots.userId, dataUserId),
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),
     ];

@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   let body: Record<string, any>;
   try {
@@ -106,6 +107,7 @@ export async function PATCH() {
 
   const db = getDb();
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const today = new Date().toISOString().split('T')[0];
   const dek = await getSessionDEK();
 
@@ -130,7 +132,7 @@ export async function PATCH() {
       .select()
       .from(paystubs)
       .where(
-        and(eq(paystubs.id, setting.basePaystubId), eq(paystubs.userId, userId))
+        and(eq(paystubs.id, setting.basePaystubId), eq(paystubs.userId, dataUserId))
       )
       .limit(1);
 
@@ -255,9 +257,9 @@ export async function PATCH() {
   }
 
   // Recalculate summaries to update charts
-  await updateCategorySpendingSummaries(userId, dek);
-  await updateCategoryIncomeSummaries(userId, dek);
-  await updateMonthlyCashFlowSummaries(userId, dek);
+  await updateCategorySpendingSummaries(dataUserId, dek);
+  await updateCategoryIncomeSummaries(dataUserId, dek);
+  await updateMonthlyCashFlowSummaries(dataUserId, dek);
 
   return Response.json({ generated });
 }

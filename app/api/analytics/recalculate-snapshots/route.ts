@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const dek = await getSessionDEK();
     const db = getDb();
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     const userAccounts = await db
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, userId));
+      .where(eq(accounts.userId, dataUserId));
 
     const decrypted = await decryptRows('accounts', userAccounts, dek);
 

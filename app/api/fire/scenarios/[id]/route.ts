@@ -10,6 +10,7 @@ import { decryptRow, encryptRow } from '@/lib/crypto';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -24,6 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -52,6 +54,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const [deleted] = await getDb().delete(fireScenarios).where(eq(fireScenarios.id, id)).returning();
@@ -60,7 +63,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const [nextDefault] = await getDb()
       .select()
       .from(fireScenarios)
-      .where(eq(fireScenarios.userId, session.user.id))
+      .where(eq(fireScenarios.userId, dataUserId))
       .orderBy(desc(fireScenarios.createdAt))
       .limit(1);
     if (nextDefault) {

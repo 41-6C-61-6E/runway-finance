@@ -21,6 +21,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   try {
@@ -404,7 +405,7 @@ export async function POST(request: Request) {
             .where(
               and(
                 eq(accountSnapshots.accountId, acctId),
-                eq(accountSnapshots.userId, userId)
+                eq(accountSnapshots.userId, dataUserId)
               )
             )
             .orderBy(desc(accountSnapshots.snapshotDate))
@@ -427,9 +428,9 @@ export async function POST(request: Request) {
       await recalculateNetWorthSnapshots(userId, dek);
 
       // Update cash flow, category spending, and category income summaries for charts
-      await updateMonthlyCashFlowSummaries(userId, dek);
-      await updateCategorySpendingSummaries(userId, dek);
-      await updateCategoryIncomeSummaries(userId, dek);
+      await updateMonthlyCashFlowSummaries(dataUserId, dek);
+      await updateCategorySpendingSummaries(dataUserId, dek);
+      await updateCategoryIncomeSummaries(dataUserId, dek);
       logger.info(`[import/execute] Successfully updated summaries, regenerated snapshots, and updated account balances.`);
     } catch (postImportError) {
       const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
@@ -438,7 +439,7 @@ export async function POST(request: Request) {
     }
 
     if (transactionsToInsert.length > 0) {
-      invalidateUserSearchCache(userId);
+      invalidateUserSearchCache(dataUserId);
     }
 
     return NextResponse.json({

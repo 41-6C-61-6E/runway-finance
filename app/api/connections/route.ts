@@ -3,9 +3,10 @@ import { auth } from '../../../lib/auth';
 import { requireDeleteConfirmation } from '../../../lib/utils/require-auth';
 import { getDb } from '../../../lib/db';
 import { simplifinConnections } from '../../../lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { logger } from '../../../lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
+import { getShareGroup } from '@/lib/sharing';
 
 export async function GET() {
   const session = await auth();
@@ -14,6 +15,8 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const group = await getShareGroup(userId);
+  const userIds = group ? group.allUserIds : [userId];
 
   const connections = await getDb()
     .select({
@@ -24,9 +27,10 @@ export async function GET() {
       lastSyncStatus: simplifinConnections.lastSyncStatus,
       lastSyncError: simplifinConnections.lastSyncError,
       createdAt: simplifinConnections.createdAt,
+      userId: simplifinConnections.userId,
     })
     .from(simplifinConnections)
-    .where(eq(simplifinConnections.userId, userId))
+    .where(inArray(simplifinConnections.userId, userIds))
     .orderBy(simplifinConnections.createdAt);
 
   logger.info('Connections fetched', { count: connections.length });

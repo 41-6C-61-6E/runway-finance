@@ -10,6 +10,7 @@ import { decryptField, decryptRow, encryptRow } from '@/lib/crypto';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, goalId),
-        eq(financialGoals.userId, session.user.id)
+        eq(financialGoals.userId, dataUserId)
       ))
       .limit(1);
 
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
         .from(accounts)
         .where(and(
           eq(accounts.id, goal[0].linkedAccountId),
-          eq(accounts.userId, session.user.id),
+          eq(accounts.userId, dataUserId),
           eq(accounts.isHidden, false),
           eq(accounts.isExcludedFromNetWorth, false)
         ))
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -93,7 +95,7 @@ export async function GET(req: NextRequest) {
     .from(financialGoals)
     .where(and(
       eq(financialGoals.id, goalId),
-      eq(financialGoals.userId, session.user.id)
+      eq(financialGoals.userId, dataUserId)
     ))
     .limit(1);
 
@@ -110,7 +112,7 @@ export async function GET(req: NextRequest) {
       .from(accounts)
       .where(and(
         eq(accounts.id, goal[0].linkedAccountId),
-        eq(accounts.userId, session.user.id),
+        eq(accounts.userId, dataUserId),
         eq(accounts.isHidden, false),
         eq(accounts.isExcludedFromNetWorth, false)
       ))

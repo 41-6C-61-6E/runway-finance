@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   try {
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     const rawAccounts = await getDb()
       .select({ id: accounts.id, name: accounts.name, type: accounts.type })
       .from(accounts)
-      .where(eq(accounts.userId, userId));
+      .where(eq(accounts.userId, dataUserId));
 
     const userAccounts = await Promise.all(rawAccounts.map(async (a) => ({
       id: a.id,
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         isIncome: categories.isIncome,
       })
       .from(categories)
-      .where(eq(categories.userId, userId));
+      .where(eq(categories.userId, dataUserId));
 
     const userCategories = await Promise.all(rawCategories.map(async (c) => ({
       id: c.id,

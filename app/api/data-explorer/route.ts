@@ -326,6 +326,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -538,6 +539,7 @@ export async function DELETE(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const tableKey = searchParams.get('table');
   const id = searchParams.get('id');

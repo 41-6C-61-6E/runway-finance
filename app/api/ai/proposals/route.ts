@@ -14,11 +14,12 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status'); // optional filter
   const type = searchParams.get('type'); // optional filter
 
-  const whereConditions = [eq(aiProposals.userId, userId)];
+  const whereConditions = [eq(aiProposals.userId, dataUserId)];
   if (status) {
     whereConditions.push(eq(aiProposals.status, status));
   }
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     .leftJoin(
       transactions,
       and(
-        eq(transactions.userId, userId),
+        eq(transactions.userId, dataUserId),
         eq(
           transactions.id,
           sql<string>`(${aiProposals.payload}->>'transactionId')::uuid`

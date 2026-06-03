@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const includeHidden = searchParams.get('includeHidden') === 'true';
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
 
   logger.info('Fetching accounts', { includeHidden, includeVirtual, type: typeFilter });
 
-  const whereConditions = [eq(accounts.userId, userId)];
+  const whereConditions = [eq(accounts.userId, dataUserId)];
 
   if (!includeHidden) {
     if (includeVirtual) {

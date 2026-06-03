@@ -12,6 +12,9 @@ export async function GET(
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
   const db = getDb();
   const { id } = await params;
 
@@ -21,7 +24,7 @@ export async function GET(
     .where(
       and(
         eq(paystubFieldMappings.id, id),
-        eq(paystubFieldMappings.userId, session.user.id)
+        eq(paystubFieldMappings.userId, dataUserId)
       )
     )
     .limit(1);
@@ -44,6 +47,7 @@ export async function PATCH(
 
   const db = getDb();
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   // Verify ownership
@@ -53,7 +57,7 @@ export async function PATCH(
     .where(
       and(
         eq(paystubFieldMappings.id, id),
-        eq(paystubFieldMappings.userId, userId)
+        eq(paystubFieldMappings.userId, dataUserId)
       )
     )
     .limit(1);
@@ -84,7 +88,7 @@ export async function PATCH(
       .set({ isDefault: false, updatedAt: new Date() })
       .where(
         and(
-          eq(paystubFieldMappings.userId, userId),
+          eq(paystubFieldMappings.userId, dataUserId),
           eq(paystubFieldMappings.isDefault, true)
         )
       );
@@ -114,6 +118,9 @@ export async function DELETE(
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
   const db = getDb();
   const { id } = await params;
 
@@ -124,7 +131,7 @@ export async function DELETE(
     .where(
       and(
         eq(paystubFieldMappings.id, id),
-        eq(paystubFieldMappings.userId, session.user.id)
+        eq(paystubFieldMappings.userId, dataUserId)
       )
     )
     .limit(1);

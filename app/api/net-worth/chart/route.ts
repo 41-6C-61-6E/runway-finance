@@ -93,6 +93,7 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -102,7 +103,7 @@ export async function GET(request: Request) {
     const earliestSnap = await getDb()
       .select({ snapshotDate: netWorthSnapshots.snapshotDate })
       .from(netWorthSnapshots)
-      .where(eq(netWorthSnapshots.userId, userId))
+      .where(eq(netWorthSnapshots.userId, dataUserId))
       .orderBy(netWorthSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -125,7 +126,7 @@ export async function GET(request: Request) {
       .from(netWorthSnapshots)
       .where(
         and(
-          eq(netWorthSnapshots.userId, userId),
+          eq(netWorthSnapshots.userId, dataUserId),
           gte(netWorthSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
           lte(netWorthSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
         )
@@ -137,7 +138,7 @@ export async function GET(request: Request) {
       const userAccounts = await getDb()
         .select()
         .from(accounts)
-        .where(eq(accounts.userId, userId));
+        .where(eq(accounts.userId, dataUserId));
 
       const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
       const reportableAccounts = filterReportableAccounts(decryptedAccounts);

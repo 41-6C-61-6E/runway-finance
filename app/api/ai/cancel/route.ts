@@ -9,6 +9,7 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const existing = activeAnalysisSessions.get(userId);
 
   if (existing) {

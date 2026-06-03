@@ -8,10 +8,11 @@ import { logger } from '@/lib/logger';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
-  const plan = await fetchRetirementPlan(session.user.id, id, dek);
+  const plan = await fetchRetirementPlan(dataUserId, id, dek);
   if (!plan) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
   const projection = calculateDecumulation(plan);

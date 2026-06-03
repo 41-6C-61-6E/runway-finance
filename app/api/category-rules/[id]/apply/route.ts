@@ -16,13 +16,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [rule] = await getDb()
     .select()
     .from(categoryRules)
-    .where(and(eq(categoryRules.userId, userId), eq(categoryRules.id, id)))
+    .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.id, id)))
     .limit(1);
 
   if (!rule) {
@@ -41,7 +42,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
+    .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
 
   const decryptedTxns = await decryptRows('transactions', allTxns, dek);
 

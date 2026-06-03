@@ -18,13 +18,14 @@ export async function GET(
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [tag] = await getDb()
     .select()
     .from(tags)
-    .where(and(eq(tags.id, id), eq(tags.userId, userId)))
+    .where(and(eq(tags.id, id), eq(tags.userId, dataUserId)))
     .limit(1);
 
   if (!tag) {
@@ -45,13 +46,14 @@ export async function PATCH(
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(tags)
-    .where(and(eq(tags.id, id), eq(tags.userId, userId)))
+    .where(and(eq(tags.id, id), eq(tags.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -100,12 +102,13 @@ export async function DELETE(
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [existing] = await getDb()
     .select()
     .from(tags)
-    .where(and(eq(tags.id, id), eq(tags.userId, userId)))
+    .where(and(eq(tags.id, id), eq(tags.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
