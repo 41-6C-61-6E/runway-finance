@@ -3,7 +3,8 @@
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import { Sun, Moon, Star } from "lucide-react";
-import { applyAccent, THEME_ACCENT_MAP } from "@/lib/utils/apply-accent";
+import { applyAccent } from "@/lib/utils/apply-accent";
+import { THEME_ACCENT_MAP } from "@/lib/colors/palette";
 
 export default function ModeToggle() {
   const { theme, setTheme } = useTheme();

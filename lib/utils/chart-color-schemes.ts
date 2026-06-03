@@ -1,4 +1,13 @@
-export type ChartColorSchemeId = 'fauntleroy' | 'kingston' | 'seattle' | 'vashon';
+import { CHART_COLOR_SCHEMES as PALETTE_SCHEMES } from '@/lib/colors/palette';
+
+export type ChartColorSchemeId = keyof typeof PALETTE_SCHEMES;
+
+const SCHEME_META: Record<ChartColorSchemeId, { name: string; description: string }> = {
+  fauntleroy: { name: 'Fauntleroy', description: 'Cream, navy, teal, sky blue, and coral rose' },
+  kingston: { name: 'Kingston', description: 'Mint green, deep navy-indigo, warm bronze-gold, light purple, and coral rose' },
+  seattle: { name: 'Seattle', description: 'Teal, indigo, cream, sage, and sunset orange' },
+  vashon: { name: 'Vashon', description: 'Warm and vibrant cyan, violet, gold, lime, and peach' },
+};
 
 export interface ChartColorScheme {
   id: ChartColorSchemeId;
@@ -7,56 +16,25 @@ export interface ChartColorScheme {
   colors: [string, string, string, string, string];
 }
 
-export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> = {
-  fauntleroy: {
-    id: 'fauntleroy',
-    name: 'Fauntleroy',
-    description: 'Cream, navy, teal, sky blue, and coral rose',
-    colors: [
-      'oklch(0.475 0.089 172.7)',
-      'oklch(0.374 0.059 259.9)',
-      'oklch(0.94 0.015 75)',
-      'oklch(0.549 0.05 249.8)',
-      'oklch(0.6 0.14 25)',
-    ],
-  },
-  kingston: {
-    id: 'kingston',
-    name: 'Kingston',
-    description: 'Mint green, deep navy-indigo, warm bronze-gold, light purple, and coral rose',
-    colors: [
-      'oklch(0.78 0.15 155)',
-      'oklch(0.55 0.18 275)',
-      'oklch(0.72 0.15 70)',
-      'oklch(0.68 0.08 290)',
-      'oklch(0.65 0.17 25)',
-    ],
-  },
-  seattle: {
-    id: 'seattle',
-    name: 'Seattle',
-    description: 'Teal, indigo, cream, sage, and sunset orange',
-    colors: [
-      'oklch(0.726 0.093 216.6)',
-      'oklch(0.450 0.092 275.2)',
-      'oklch(0.947 0.038 72.4)',
-      'oklch(0.785 0.023 145.4)',
-      'oklch(0.788 0.167 67.5)',
-    ],
-  },
-  vashon: {
-    id: 'vashon',
-    name: 'Vashon',
-    description: 'Warm and vibrant cyan, violet, gold, lime, and peach',
-    colors: [
-      'oklch(0.70 0.15 200)',
-      'oklch(0.58 0.18 290)',
-      'oklch(0.74 0.15 50)',
-      'oklch(0.78 0.15 80)',
-      'oklch(0.62 0.19 330)',
-    ],
-  },
-};
+export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> = Object.fromEntries(
+  (Object.keys(PALETTE_SCHEMES) as ChartColorSchemeId[]).map((id) => {
+    const schemeColors = PALETTE_SCHEMES[id];
+    return [
+      id,
+      {
+        id,
+        ...SCHEME_META[id],
+        colors: [
+          schemeColors['chart-1'],
+          schemeColors['chart-2'],
+          schemeColors['chart-3'],
+          schemeColors['chart-4'],
+          schemeColors['chart-5'],
+        ] as [string, string, string, string, string],
+      },
+    ];
+  }),
+) as Record<ChartColorSchemeId, ChartColorScheme>;
 
 export const CHART_SCHEME_NAMES = Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[];
 

@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Check, Plus } from 'lucide-react';
+import { ACCENTS } from '@/lib/colors/palette';
 import { ACCENT_NAMES, applyAccent } from '@/lib/utils/apply-accent';
 
 const SWATCH_COLORS: Record<string, string> = {
-  violet: '#6f73b4',
-  teal: '#398b72',
-  rose: '#96455b',
-  sapphire: '#486491',
+  violet: ACCENTS.violet.swatch,
+  teal: ACCENTS.teal.swatch,
+  rose: ACCENTS.rose.swatch,
+  sapphire: ACCENTS.sapphire.swatch,
 };
 
 const SWATCH_LABELS: Record<string, string> = {

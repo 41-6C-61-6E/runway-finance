@@ -1,0 +1,285 @@
+{
+  "themes": {
+    "light": {
+      "background": "oklch(0.95 0.015 33)",
+      "foreground": "oklch(0.18 0.015 260)",
+      "card": "oklch(1.0 0 0)",
+      "card-foreground": "oklch(0.18 0.015 260)",
+      "popover": "oklch(1.0 0 0)",
+      "popover-foreground": "oklch(0.18 0.015 260)",
+      "primary": "oklch(0.55 0.18 260)",
+      "primary-foreground": "oklch(0.99 0 0)",
+      "secondary": "oklch(0.7 0.15 50)",
+      "secondary-foreground": "oklch(0.2 0.01 285)",
+      "muted": "oklch(0.96 0.005 260)",
+      "muted-foreground": "oklch(0.50 0.015 260)",
+      "accent": "oklch(0.96 0.01 260)",
+      "accent-foreground": "oklch(0.3 0.15 260)",
+      "destructive": "oklch(0.55 0.2 25)",
+      "border": "oklch(0.92 0.005 260)",
+      "input": "oklch(0.92 0.005 260)",
+      "ring": "oklch(0.55 0.18 260)",
+      "chart-1": "oklch(0.68 0.18 142)",
+      "chart-2": "oklch(0.55 0.18 275)",
+      "chart-3": "oklch(0.72 0.15 70)",
+      "chart-4": "oklch(0.68 0.14 200)",
+      "chart-5": "oklch(0.58 0.18 290)",
+      "chart-synthetic": "oklch(0.85 0.08 142)",
+      "destructive-synthetic": "oklch(0.65 0.1 25)",
+      "status-positive": "oklch(0.6 0.18 150)",
+      "status-warning": "oklch(0.65 0.15 50)",
+      "sidebar": "oklch(0.99 0.002 70)",
+      "sidebar-foreground": "oklch(0.18 0.015 260)",
+      "sidebar-primary": "oklch(0.55 0.18 260)",
+      "sidebar-primary-foreground": "oklch(0.99 0 0)",
+      "sidebar-accent": "oklch(0.96 0.01 260)",
+      "sidebar-accent-foreground": "oklch(0.2 0.15 260)",
+      "sidebar-border": "oklch(0.92 0.005 260)",
+      "sidebar-ring": "oklch(0.55 0.18 260)"
+    },
+    "dark": {
+      "background": "oklch(0.10 0.005 270)",
+      "foreground": "oklch(0.97 0.003 270)",
+      "card": "oklch(0.14 0.007 270)",
+      "card-foreground": "oklch(0.97 0.003 270)",
+      "popover": "oklch(0.14 0.007 270)",
+      "popover-foreground": "oklch(0.97 0.003 270)",
+      "primary": "oklch(0.65 0.15 270)",
+      "primary-foreground": "oklch(0.99 0 0)",
+      "secondary": "oklch(0.35 0.06 50)",
+      "secondary-foreground": "oklch(0.9 0.003 270)",
+      "muted": "oklch(0.18 0.008 270)",
+      "muted-foreground": "oklch(0.60 0.005 270)",
+      "accent": "oklch(0.16 0.008 270)",
+      "accent-foreground": "oklch(0.97 0.003 270)",
+      "destructive": "oklch(0.65 0.18 25)",
+      "border": "oklch(0.2 0.008 270)",
+      "input": "oklch(0.16 0.008 270)",
+      "ring": "oklch(0.65 0.15 270)",
+      "chart-1": "oklch(0.68 0.18 142)",
+      "chart-2": "oklch(0.55 0.18 275)",
+      "chart-3": "oklch(0.72 0.15 70)",
+      "chart-4": "oklch(0.68 0.14 200)",
+      "chart-5": "oklch(0.58 0.18 290)",
+      "chart-synthetic": "oklch(0.55 0.1 142)",
+      "destructive-synthetic": "oklch(0.5 0.12 25)",
+      "status-positive": "oklch(0.7 0.18 150)",
+      "status-warning": "oklch(0.7 0.15 50)",
+      "sidebar": "oklch(0.11 0.005 270)",
+      "sidebar-foreground": "oklch(0.97 0.003 270)",
+      "sidebar-primary": "oklch(0.65 0.15 270)",
+      "sidebar-primary-foreground": "oklch(0.99 0 0)",
+      "sidebar-accent": "oklch(0.15 0.006 270)",
+      "sidebar-accent-foreground": "oklch(0.97 0.003 270)",
+      "sidebar-border": "oklch(0.15 0.006 270)",
+      "sidebar-ring": "oklch(0.65 0.15 270)"
+    },
+    "moonlight": {
+      "background": "oklch(0.16 0.015 250)",
+      "foreground": "oklch(0.92 0.01 250)",
+      "card": "oklch(0.20 0.015 250)",
+      "card-foreground": "oklch(0.92 0.01 250)",
+      "popover": "oklch(0.20 0.015 250)",
+      "popover-foreground": "oklch(0.92 0.01 250)",
+      "primary": "oklch(0.65 0.15 250)",
+      "primary-foreground": "oklch(0.99 0 0)",
+      "secondary": "oklch(0.4 0.06 50)",
+      "secondary-foreground": "oklch(0.8 0.003 250)",
+      "muted": "oklch(0.23 0.015 250)",
+      "muted-foreground": "oklch(0.65 0.01 250)",
+      "accent": "oklch(0.23 0.02 250)",
+      "accent-foreground": "oklch(0.92 0.01 250)",
+      "destructive": "oklch(0.6 0.18 25)",
+      "border": "oklch(0.25 0.015 250)",
+      "input": "oklch(0.22 0.015 250)",
+      "ring": "oklch(0.65 0.15 250)",
+      "chart-1": "oklch(0.68 0.18 142)",
+      "chart-2": "oklch(0.55 0.18 275)",
+      "chart-3": "oklch(0.72 0.15 70)",
+      "chart-4": "oklch(0.68 0.14 200)",
+      "chart-5": "oklch(0.58 0.18 290)",
+      "chart-synthetic": "oklch(0.55 0.1 142)",
+      "destructive-synthetic": "oklch(0.5 0.12 25)",
+      "status-positive": "oklch(0.7 0.18 150)",
+      "status-warning": "oklch(0.7 0.15 50)",
+      "sidebar": "oklch(0.18 0.015 250)",
+      "sidebar-foreground": "oklch(0.92 0.01 250)",
+      "sidebar-primary": "oklch(0.65 0.15 250)",
+      "sidebar-primary-foreground": "oklch(0.99 0 0)",
+      "sidebar-accent": "oklch(0.23 0.02 250)",
+      "sidebar-accent-foreground": "oklch(0.92 0.01 250)",
+      "sidebar-border": "oklch(0.22 0.015 250)",
+      "sidebar-ring": "oklch(0.65 0.15 250)"
+    }
+  },
+  "chartSchemes": {
+    "fauntleroy": {
+      "chart-1": "oklch(0.475 0.089 172.7)",
+      "chart-2": "oklch(0.41 0.103 275)",
+      "chart-3": "oklch(0.56 0.121 218)",
+      "chart-4": "oklch(0.785 0.023 145.4)",
+      "chart-5": "oklch(0.6 0.14 25)",
+      "chart-synthetic": "oklch(0.625 0.045 173)",
+      "destructive-synthetic": "oklch(0.65 0.1 25)"
+    },
+    "kingston": {
+      "chart-1": "oklch(0.6435 0.1053 154.44)",
+      "chart-2": "oklch(0.6475 0.1011 234.84)",
+      "chart-3": "oklch(0.6133 0.1765 342.77)",
+      "chart-4": "oklch(0.8568 0.1382 84.46)",
+      "chart-5": "oklch(0.6891 0.1652 41.55)",
+      "chart-synthetic": "oklch(0.75 0.09 155)",
+      "destructive-synthetic": "oklch(0.65 0.1 25)"
+    },
+    "seattle": {
+      "chart-1": "oklch(0.449 0.081 219.9)",
+      "chart-2": "oklch(0.299 0.139 288)",
+      "chart-3": "oklch(0.28 0.031 212.7)",
+      "chart-4": "oklch(0.514 0.1 63.2)",
+      "chart-5": "oklch(0.54 0.174 29)",
+      "chart-synthetic": "oklch(0.876 0.050 217)",
+      "destructive-synthetic": "oklch(0.65 0.1 25)"
+    },
+    "vashon": {
+      "chart-1": "oklch(0.662 0.064 124.7)",
+      "chart-2": "oklch(0.5 0.085 333)",
+      "chart-3": "oklch(0.799 0.098 188.8)",
+      "chart-4": "oklch(0.891 0.1 92.7)",
+      "chart-5": "oklch(0.84 0.083 23)",
+      "chart-synthetic": "oklch(0.80 0.08 200)",
+      "destructive-synthetic": "oklch(0.65 0.1 25)"
+    }
+  },
+  "accents": {
+    "violet": {
+      "primary": "oklch(0.58 0.10 280)",
+      "accent": {
+        "light": "oklch(0.90 0.05 285)",
+        "dark": "oklch(0.22 0.03 285)"
+      },
+      "swatch": "#6f73b4"
+    },
+    "teal": {
+      "primary": "oklch(0.58 0.09 170)",
+      "accent": {
+        "light": "oklch(0.90 0.04 170)",
+        "dark": "oklch(0.22 0.03 170)"
+      },
+      "swatch": "#398b72"
+    },
+    "rose": {
+      "primary": "oklch(0.50 0.11 5)",
+      "accent": {
+        "light": "oklch(0.89 0.06 10)",
+        "dark": "oklch(0.18 0.03 5)"
+      },
+      "swatch": "#96455b"
+    },
+    "sapphire": {
+      "primary": "oklch(0.50 0.08 260)",
+      "accent": {
+        "light": "oklch(0.89 0.04 260)",
+        "dark": "oklch(0.18 0.03 260)"
+      },
+      "swatch": "#486491"
+    }
+  },
+  "themeAccentMap": {
+    "light": "violet",
+    "moonlight": "teal",
+    "dark": "sapphire"
+  },
+  "semantic": {
+    "viewportThemeColor": "#10b981",
+    "status": {
+      "success": {
+        "dot": "#10b981",
+        "glow": "#10b981"
+      },
+      "warning": {
+        "dot": "#f59e0b",
+        "glow": "#f59e0b"
+      },
+      "info": {
+        "dot": "#3b82f6",
+        "glow": "#3b82f6"
+      }
+    },
+    "buildStatus": {
+      "production": {
+        "dot": "bg-emerald-500",
+        "glow": "#10b981"
+      },
+      "development": {
+        "dot": "bg-amber-500",
+        "glow": "#f59e0b"
+      },
+      "local": {
+        "dot": "bg-blue-500",
+        "glow": "#3b82f6"
+      }
+    },
+    "fallbacks": {
+      "otherCategory": "#94a3b8",
+      "defaultTag": "#6b7280",
+      "defaultCategory": "#6366f1"
+    }
+  },
+  "categories": {
+    "palette": [
+      "#ef4444",
+      "#f97316",
+      "#eab308",
+      "#84cc16",
+      "#22c55e",
+      "#06b6d4",
+      "#0ea5e9",
+      "#6366f1",
+      "#8b5cf6",
+      "#a855f7",
+      "#ec4899",
+      "#f43f5e",
+      "#64748b",
+      "#78716c"
+    ],
+    "parentPalette": {
+      "Income": "#22c55e",
+      "Housing": "#ef4444",
+      "Utilities": "#f97316",
+      "Transportation": "#eab308",
+      "Food & Dining": "#84cc16",
+      "Health & Medical": "#06b6d4",
+      "Shopping": "#8b5cf6",
+      "Entertainment": "#ec4899",
+      "Travel": "#14b8a6",
+      "Financial": "#64748b",
+      "Retirement": "#4f46e5",
+      "Education": "#0ea5e9",
+      "Bills & Subscriptions": "#a855f7",
+      "Personal": "#f43f5e",
+      "Taxes": "#78716c",
+      "Transfers & Adjustments": "#6b7280",
+      "Paycheck Deductions": "#8b5cf6",
+      "Employer Contributions": "#4f46e5"
+    }
+  },
+  "tags": {
+    "presets": [
+      "#6366f1",
+      "#8b5cf6",
+      "#a855f7",
+      "#ec4899",
+      "#ef4444",
+      "#f97316",
+      "#f59e0b",
+      "#eab308",
+      "#84cc16",
+      "#22c55e",
+      "#10b981",
+      "#14b8a6",
+      "#06b6d4",
+      "#3b82f6",
+      "#64748b"
+    ]
+  }
+}

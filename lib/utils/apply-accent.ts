@@ -1,32 +1,6 @@
-// ── Accent Color Palette ──────────────────────────────────────────────────────
-// Six preset accent colors. Each provides a bold "primary" value and a pair of
-// muted "accent" values for light and dark themes, so that hover backgrounds
-// and subtle surfaces maintain proper contrast in either mode.
+import { ACCENTS, THEME_ACCENT_MAP } from '@/lib/colors/palette';
 
-type AccentDefinition = {
-  primary: string;
-  accent: { light: string; dark: string };
-};
-
-const ACCENTS: Record<string, AccentDefinition> = {
-  violet: {
-    primary: 'oklch(0.58 0.10 280)',
-    accent: { light: 'oklch(0.90 0.05 285)', dark: 'oklch(0.22 0.03 285)' },
-  },
-  teal: {
-    primary: 'oklch(0.58 0.09 170)',
-    accent: { light: 'oklch(0.90 0.04 170)', dark: 'oklch(0.22 0.03 170)' },
-  },
-
-  rose: {
-    primary: 'oklch(0.50 0.11 5)',
-    accent: { light: 'oklch(0.89 0.06 10)', dark: 'oklch(0.18 0.03 5)' },
-  },
-  sapphire: {
-    primary: 'oklch(0.50 0.08 260)',
-    accent: { light: 'oklch(0.89 0.04 260)', dark: 'oklch(0.18 0.03 260)' },
-  },
-};
+export { THEME_ACCENT_MAP };
 
 export const ACCENT_NAMES = Object.keys(ACCENTS) as Array<keyof typeof ACCENTS>;
 
@@ -103,14 +77,6 @@ function lightenColor(hex: string, factor: number): string {
 
   return '#' + [lr, lg, lb].map((c) => c.toString(16).padStart(2, '0')).join('');
 }
-
-// ── Theme→Accent Pairing ─────────────────────────────────────────────────
-// When the user switches color schemes, auto-apply the paired accent.
-export const THEME_ACCENT_MAP: Record<string, string> = {
-  light: 'violet',
-  moonlight: 'teal',
-  dark: 'sapphire',
-};
 
 function darkenColor(hex: string, factor: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
