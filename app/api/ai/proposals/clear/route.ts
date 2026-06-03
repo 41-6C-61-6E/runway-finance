@@ -12,12 +12,13 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   const result = await getDb()
     .delete(aiProposals)
     .where(
       and(
-        eq(aiProposals.userId, userId),
+        eq(aiProposals.userId, dataUserId),
         eq(aiProposals.status, 'approved'),
       )
     );
@@ -26,7 +27,7 @@ export async function POST() {
     .delete(aiProposals)
     .where(
       and(
-        eq(aiProposals.userId, userId),
+        eq(aiProposals.userId, dataUserId),
         eq(aiProposals.status, 'rejected'),
       )
     );

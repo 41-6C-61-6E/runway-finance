@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '6', 10);
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
       .select()
       .from(accounts)
       .where(and(
-        eq(accounts.userId, userId),
+        eq(accounts.userId, dataUserId),
         eq(accounts.isHidden, false),
         eq(accounts.isExcludedFromNetWorth, false)
       ));
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(
         and(
-          eq(budgets.userId, userId),
+          eq(budgets.userId, dataUserId),
           sql`${budgets.fundingAccountId} IS NOT NULL`,
           eq(budgets.isRecurring, true),
           eq(categories.excludeFromReports, false),
@@ -116,11 +117,11 @@ export async function GET(request: Request) {
     const allCategories = await db
       .select()
       .from(categories)
-      .where(eq(categories.userId, userId));
+      .where(eq(categories.userId, dataUserId));
     const catById = new Map(allCategories.map((cat) => [cat.id.toString(), cat]));
 
     const txConditions = [
-      eq(transactions.userId, userId),
+      eq(transactions.userId, dataUserId),
       sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
       inArray(transactions.accountId, fundingAccountIds),
       eq(transactions.pending, false),
@@ -301,7 +302,7 @@ export async function GET(request: Request) {
     const snapshotStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const snapshotStartStr = snapshotStart.toISOString().split('T')[0];
     const snapshotConditions = [
-      eq(accountSnapshots.userId, userId),
+      eq(accountSnapshots.userId, dataUserId),
       sql`${accountSnapshots.snapshotDate} >= ${snapshotStartStr}`,
       inArray(accountSnapshots.accountId, fundingAccountIds),
     ];

@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, Upload, FileArchive, Loader2 } from 'lucide-react';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
+import { handleSignOut } from '@/components/server-actions';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type SettingsState = Record<string, unknown>;
 type DirtyMap = Record<string, true>;
@@ -56,6 +66,15 @@ export default function AdvancedTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Danger zone & sharing status states
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [sharingGroup, setSharingGroup] = useState<any>(null);
+  const [loadingSharing, setLoadingSharing] = useState(true);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const loadSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/user-settings', { credentials: 'include' });
@@ -71,9 +90,49 @@ export default function AdvancedTab() {
     }
   }, []);
 
+  const loadSharingStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sharing', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setSharingGroup(data.group ?? null);
+      }
+      const sessRes = await fetch('/api/auth/session', { credentials: 'include' });
+      if (sessRes.ok) {
+        const sess = await sessRes.json();
+        setCurrentUser(sess?.user?.id ?? null);
+      }
+    } catch (err) {
+      console.error('Failed to load sharing status/session:', err);
+    } finally {
+      setLoadingSharing(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    loadSharingStatus();
+  }, [loadSettings, loadSharingStatus]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
+      }
+      await handleSignOut();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete account');
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  }, []);
 
   const updateValue = useCallback(
     (key: string, value: unknown) => {
@@ -306,6 +365,36 @@ export default function AdvancedTab() {
         </div>
       </div>
 
+      {/* Danger Zone */}
+      <div className="p-4 bg-card border border-destructive/20 rounded-lg space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-destructive">Danger Zone</h2>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Permanently delete your account, login credentials, and all settings.
+          </p>
+        </div>
+
+        {deleteError && (
+          <div className="p-2 bg-destructive/20 border border-destructive/30 rounded-lg">
+            <p className="text-xs text-destructive">{deleteError}</p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmText('');
+              setConfirmDeleteOpen(true);
+            }}
+            disabled={loadingSharing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Delete Account
+          </button>
+        </div>
+      </div>
+
       {/* Warning Banner */}
       <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
         <div className="flex items-start gap-2">
@@ -460,6 +549,79 @@ export default function AdvancedTab() {
           </button>
         </div>
       </div>
+
+      {/* Deletion Dialog */}
+      {(() => {
+        const isOwner = sharingGroup && sharingGroup.primaryUserId === currentUser;
+        const isMember = sharingGroup && sharingGroup.primaryUserId !== currentUser;
+
+        let warningTitle = 'Delete Your Account?';
+        let warningDescription = 'This will permanently delete your user account, login credentials, and all settings. All financial data (connections, manual accounts, transactions, budgets, category rules) and encryption keys will be deleted forever. This action is irreversible.';
+        const requiredConfirmText = currentUser || '';
+
+        if (isOwner) {
+          warningTitle = 'Delete Account & Dismantle Share Group?';
+          warningDescription = 'This will permanently delete your user account and dismantle your share group. Group members will be immediately disconnected, their access to the shared financial data will be revoked, and their encryption keys will be reset (giving them empty standalone accounts). All shared financial data (connections, manual accounts, transactions, budgets, category rules) will be deleted forever. This action is irreversible.';
+        } else if (isMember) {
+          warningTitle = 'Delete Account & Leave Share Group?';
+          warningDescription = 'This will permanently delete your user account and remove you from the shared group. Your personal settings and sync connections will be deleted. You will lose access to the shared financial data. Note: The financial data owned by the primary user (including transactions and accounts they own) will remain with the primary user. This action is irreversible.';
+        }
+
+        const isConfirmDisabled = confirmText !== requiredConfirmText || deleting;
+
+        return (
+          <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive">{warningTitle}</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs leading-relaxed text-foreground/80">
+                  {warningDescription}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              
+              <div className="space-y-3 py-2 text-foreground/80">
+                <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-[11px] text-destructive leading-relaxed font-medium">
+                    WARNING: This action is permanent, destructive, and cannot be undone.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground block">
+                    To confirm, type your username <strong>{requiredConfirmText}</strong> below:
+                  </label>
+                  <input
+                    type="text"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder={requiredConfirmText}
+                    className="w-full px-2.5 py-1.5 bg-background border border-input rounded text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                    disabled={deleting}
+                  />
+                </div>
+              </div>
+              
+              <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel disabled={deleting} className="text-xs">Cancel</AlertDialogCancel>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={isConfirmDisabled}
+                  className="px-3 py-2 text-xs font-semibold text-destructive-foreground bg-destructive rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 justify-center min-w-[120px]"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Permanently Delete'
+                  )}
+                </button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })()}
     </div>
   );
 }

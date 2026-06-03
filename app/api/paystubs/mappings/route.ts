@@ -9,11 +9,14 @@ export async function GET() {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
   const db = getDb();
   const result = await db
     .select()
     .from(paystubFieldMappings)
-    .where(eq(paystubFieldMappings.userId, session.user.id));
+    .where(eq(paystubFieldMappings.userId, dataUserId));
 
   return Response.json(result);
 }
@@ -26,6 +29,7 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   let body: Record<string, any>;
   try {
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
       .set({ isDefault: false, updatedAt: new Date() })
       .where(
         and(
-          eq(paystubFieldMappings.userId, userId),
+          eq(paystubFieldMappings.userId, dataUserId),
           eq(paystubFieldMappings.isDefault, true)
         )
       );
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(paystubFieldMappings)
     .values({
-      userId,
+      userId: dataUserId,
       name,
       employerName: employerName || '',
       isDefault: isDefault || false,

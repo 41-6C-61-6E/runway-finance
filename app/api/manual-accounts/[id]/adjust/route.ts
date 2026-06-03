@@ -14,13 +14,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
     .limit(1);
 
   if (!account) {
@@ -37,12 +38,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const apiConfig = await readApiConfig(userId);
   let result;
   if (account.type === 'metals' && body.amountOz !== undefined) {
-    result = await adjustManualAccountValue(id, userId, 0, body.note, body.amountOz, apiConfig, dek);
+    result = await adjustManualAccountValue(id, dataUserId, 0, body.note, body.amountOz, apiConfig, dek);
   } else {
     if (body.value === undefined || body.value === null) {
       return NextResponse.json({ error: 'validation_error', message: 'value is required for this account type' }, { status: 400 });
     }
-    result = await adjustManualAccountValue(id, userId, body.value, body.note, undefined, apiConfig, dek);
+    result = await adjustManualAccountValue(id, dataUserId, body.value, body.note, undefined, apiConfig, dek);
   }
 
   logger.info('POST /api/manual-accounts/[id]/adjust', { userId, id, value: body.value, amountOz: body.amountOz, note: body.note, status: result.status });

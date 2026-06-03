@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   let body: { sourceAccountId?: string; targetAccountId?: string };
   try {
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
       const [sourceAccount] = await tx
         .select()
         .from(accounts)
-        .where(and(eq(accounts.id, sourceAccountId), eq(accounts.userId, userId)))
+        .where(and(eq(accounts.id, sourceAccountId), eq(accounts.userId, dataUserId)))
         .limit(1);
 
       if (!sourceAccount) {
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       const [targetAccount] = await tx
         .select()
         .from(accounts)
-        .where(and(eq(accounts.id, targetAccountId), eq(accounts.userId, userId)))
+        .where(and(eq(accounts.id, targetAccountId), eq(accounts.userId, dataUserId)))
         .limit(1);
 
       if (!targetAccount) {
@@ -174,11 +175,11 @@ export async function POST(request: Request) {
     // 9. Recompute cache and snapshots in background
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(userId, dek, today),
-      createNetWorthSnapshot(userId, dek, today),
-      updateMonthlyCashFlowSummaries(userId, dek),
-      updateCategorySpendingSummaries(userId, dek),
-      updateCategoryIncomeSummaries(userId, dek),
+      createAccountSnapshots(dataUserId, dek, today),
+      createNetWorthSnapshot(dataUserId, dek, today),
+      updateMonthlyCashFlowSummaries(dataUserId, dek),
+      updateCategorySpendingSummaries(dataUserId, dek),
+      updateCategoryIncomeSummaries(dataUserId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after account remap', {
         userId,
@@ -186,7 +187,7 @@ export async function POST(request: Request) {
       });
     });
 
-    invalidateUserSearchCache(userId);
+    invalidateUserSearchCache(dataUserId);
     return NextResponse.json({ success: true, message: 'Account remapped successfully' });
   } catch (error) {
     logger.error('Failed to remap accounts', {

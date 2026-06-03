@@ -31,17 +31,18 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   // Ensure compound categories exist (idempotent — safe to call on every page load)
-  await ensureCompoundCategories(userId, dek);
-  await ensureEmployerContributions(userId, dek);
+  await ensureCompoundCategories(dataUserId, dek);
+  await ensureEmployerContributions(dataUserId, dek);
 
   const [cats, txCounts] = await Promise.all([
     getDb()
       .select()
       .from(categories)
-      .where(eq(categories.userId, userId))
+      .where(eq(categories.userId, dataUserId))
       .orderBy(asc(categories.displayOrder)),
     getDb()
       .select({
@@ -49,7 +50,7 @@ export async function GET() {
         count: sql<number>`cast(count(*) as int)`,
       })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), sql`${transactions.categoryId} IS NOT NULL`))
+      .where(and(eq(transactions.userId, dataUserId), sql`${transactions.categoryId} IS NOT NULL`))
       .groupBy(transactions.categoryId),
   ]);
 
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   let body: unknown;
   try {
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
     await getDb()
       .select()
       .from(categories)
-      .where(eq(categories.userId, userId)),
+      .where(eq(categories.userId, dataUserId)),
     dek
   );
   const matchingExisting = existingCategories.find((cat) =>

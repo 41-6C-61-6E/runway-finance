@@ -16,6 +16,7 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   const result = await getDb()
@@ -23,7 +24,7 @@ export async function GET() {
     .from(accounts)
     .where(
       and(
-        eq(accounts.userId, userId),
+        eq(accounts.userId, dataUserId),
         isNull(accounts.connectionId),
       )
     )
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: {
