@@ -198,7 +198,7 @@ export function NetWorthSummary() {
       {!isCollapsed && (
         <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
         {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
-        {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, liabilityTrendPositive, traces[1])}
+        {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, !liabilityTrendPositive, traces[1])}
         {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
       </div>
       )}
