@@ -128,7 +128,7 @@ export default function AnalyticsTab() {
   return (
     <div>
       {/* Sub-Tabs */}
-      <div className="flex rounded-lg bg-card border border-border overflow-hidden mb-6">
+      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-6">
         {([
           { key: 'general' as const, label: 'General' },
           { key: 'data' as const, label: 'Data Sources' },
@@ -137,7 +137,7 @@ export default function AnalyticsTab() {
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors ${
               activeSubTab === tab.key
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -158,10 +158,10 @@ export default function AnalyticsTab() {
               When enabled, displays a description of the logic and math used to calculate
               each analytics card&rsquo;s values below the card.
             </p>
-            <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-muted-foreground" />
-                <div>
+            <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 border border-border rounded-lg">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Calculator className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-foreground">Show math explanations on cards</span>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Explains the formulas and data sources behind each chart and summary card.

@@ -662,25 +662,25 @@ export default function RulesTab() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-semibold text-foreground">Categorization Rules</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {feedback && (
-            <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+            <span className={`text-xs px-2 py-1 rounded-lg shrink-0 ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
               {feedback.message}
             </span>
           )}
           <button
             onClick={() => setShowResetConfirm(true)}
             disabled={resetting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             Reset to Defaults
           </button>
            <button
             onClick={handleRunAll}
             disabled={runningAll || filteredRules.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-all disabled:opacity-50 shrink-0"
           >
             <Play className="h-3.5 w-3.5" />
             {runningAll ? 'Running...' : 'Run All'}
@@ -696,7 +696,7 @@ export default function RulesTab() {
       </div>
 
       {/* Sub-Tabs */}
-      <div className="flex rounded-lg bg-card border border-border overflow-hidden mb-3">
+      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-3">
         {([
           { key: 'my' as const, label: 'My Rules', count: rules.filter((r) => !r.isSystem && !r.createdByAi).length },
           { key: 'system' as const, label: 'System Rules', count: systemRules.length },
@@ -705,7 +705,7 @@ export default function RulesTab() {
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors ${
               activeSubTab === tab.key
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -754,7 +754,7 @@ export default function RulesTab() {
 
         {(activeSubTab === 'system' || activeSubTab === 'ai') && (
           <div className="flex items-center gap-2 shrink-0 border-l border-border pl-3">
-            <span className="text-xs text-foreground/70 whitespace-nowrap">
+            <span className="text-xs text-foreground/70">
               {activeSubTab === 'system' ? 'Enable All' : 'Enable All'}
             </span>
             <Switch
@@ -810,7 +810,7 @@ export default function RulesTab() {
       )}
 
       {selectedRuleIds.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-lg mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-lg mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
           <span className="text-xs font-semibold text-primary">{selectedRuleIds.length} rules selected</span>
           <div className="h-4 w-px bg-border/60 mx-1" />
           
@@ -863,7 +863,7 @@ export default function RulesTab() {
           return (
             <div
               key={rule.id}
-              className={`p-4 bg-card border border-border rounded-lg transition-colors group flex items-start gap-3 ${
+              className={`p-3 sm:p-4 bg-card border border-border rounded-lg transition-colors group flex items-start gap-3 ${
                 !rule.isActive ? 'opacity-50' : ''
               } ${isSelected ? 'border-primary/40 bg-primary/5' : ''}`}
             >
@@ -882,8 +882,7 @@ export default function RulesTab() {
                 />
               </div>
               <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-start gap-2 mb-2">
                   <span className="text-xs font-mono text-muted-foreground shrink-0">#{rule.priority}</span>
                   <span className="text-foreground text-sm font-medium truncate">{rule.name}</span>
                   {rule.isSystem && (
@@ -893,7 +892,33 @@ export default function RulesTab() {
                     <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                   )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="text-xs text-muted-foreground font-mono">
+                  {formatCondition(rule)}
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70 min-w-0">
+                    <span className="truncate">{formatAction(rule)}</span>
+                    {cat && (
+                      <span
+                        className="px-1.5 py-0.5 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: `${cat.color}33`,
+                          color: cat.color,
+                        }}
+                      >
+                        {cat.name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground/60">Active</span>
+                    <Switch
+                      checked={rule.isActive}
+                      onCheckedChange={() => handleToggleActive(rule)}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1 mt-2">
                   <button
                     onClick={() => handleRunNow(rule.id)}
                     disabled={runningRuleId === rule.id}
@@ -925,33 +950,6 @@ export default function RulesTab() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              </div>
-              <div className="text-xs text-muted-foreground font-mono">
-                {formatCondition(rule)}
-              </div>
-              <div className="mt-1.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground/70 min-w-0">
-                  <span className="truncate">{formatAction(rule)}</span>
-                  {cat && (
-                    <span
-                      className="px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: `${cat.color}33`,
-                        color: cat.color,
-                      }}
-                    >
-                      {cat.name}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-muted-foreground/60">Active</span>
-                  <Switch
-                    checked={rule.isActive}
-                    onCheckedChange={() => handleToggleActive(rule)}
-                  />
-                </div>
-              </div>
               </div>
             </div>
           );
@@ -1001,7 +999,7 @@ export default function RulesTab() {
               <div className="space-y-3">
                 {formConditions.map((condition, idx) => (
                   <div key={condition.id} className="p-3 bg-muted/30 border border-border rounded-lg">
-                    <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">Field</label>
                         <select
