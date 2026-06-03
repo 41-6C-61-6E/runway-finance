@@ -22,11 +22,9 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
-import type { ChartType } from '@/components/charts/chart-type-selector';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { Activity } from 'lucide-react';
+import { Activity, TrendingUp, BarChart3 } from 'lucide-react';
 
 interface ChartPoint {
   date: string;
@@ -155,7 +153,6 @@ function computeChangeBarData(data: ChartPoint[]): { barData: BarDataPoint[]; bu
 export function NetWorthChart() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:net-worth-chart:timeframe', '1y');
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:net-worth-chart:chartType', 'line');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -180,59 +177,36 @@ export function NetWorthChart() {
   }, [timeframe]);
 
   const { barData, bucketSize } = useMemo(
-    () => chartType === 'bar' ? computeChangeBarData(chartData) : { barData: [] as BarDataPoint[], bucketSize: 'daily' as BucketSize },
-    [chartData, chartType]
+    () => computeChangeBarData(chartData),
+    [chartData]
   );
-
-  const { minVal, maxVal } = useMemo(() => {
-    if (chartData.length === 0) return { minVal: 0, maxVal: 1000 };
-    const netWorthValues = chartData.map((d) => d.netWorth);
-    const rawMax = Math.max(...netWorthValues, 1000);
-    const rawMin = Math.min(...netWorthValues, 0);
-    const range = rawMax - rawMin;
-    const padding = range === 0 ? 100 : range * 0.05;
-    return { minVal: rawMin - padding, maxVal: rawMax + padding };
-  }, [chartData]);
 
   const barYDomain = useMemo(() => {
     if (barData.length === 0) return [-1000, 1000] as [number, number];
-    const maxAbs = Math.max(...barData.map((d) => Math.abs(d.change)), 0);
-    const padded = maxAbs + Math.max(maxAbs * 0.05, 500);
-    return [-(padded), padded] as [number, number];
+    const values = barData.map((d) => d.change);
+    const rawMax = Math.max(...values, 0);
+    const rawMin = Math.min(...values, 0);
+    const range = rawMax - rawMin;
+    const pad = range === 0 ? 500 : range * 0.05;
+    const minPad = Math.max(pad, 500);
+    return [rawMin - minPad, rawMax + minPad] as [number, number];
   }, [barData]);
 
-  const xAxisTicks = useMemo(() => {
-    if (chartType === 'bar') {
-      if (barData.length <= 6) return barData.map((d) => d.date);
-      const ticks: string[] = [];
-      const step = (barData.length - 1) / 5;
-      for (let i = 0; i < 6; i++) {
-        const idx = Math.round(step * i);
-        if (idx < barData.length) ticks.push(barData[idx].date);
-      }
-      return ticks;
-    }
-    return getChartXTicks(chartData, timeframe);
-  }, [chartType, barData, chartData, timeframe]);
+  const areaTicks = useMemo(() => getChartXTicks(chartData, timeframe), [chartData, timeframe]);
 
-  const formatXTick = useCallback((d: string) => {
-    if (!d) return '';
-    if (chartType === 'bar') {
-      if (bucketSize === 'daily' || bucketSize === 'weekly' || bucketSize === 'biweekly') {
-        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-      }
-      if (bucketSize === 'monthly') {
-        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-      }
-      if (bucketSize === 'quarterly') {
-        const month = parseInt(d.slice(5, 7), 10);
-        const q = Math.ceil(month / 3);
-        return `Q${q} ${d.slice(2, 4)}`;
-      }
-      if (bucketSize === 'yearly') {
-        return d.slice(0, 4);
-      }
+  const barTicks = useMemo(() => {
+    if (barData.length <= 6) return barData.map((d) => d.date);
+    const ticks: string[] = [];
+    const step = (barData.length - 1) / 5;
+    for (let i = 0; i < 6; i++) {
+      const idx = Math.round(step * i);
+      if (idx < barData.length) ticks.push(barData[idx].date);
     }
+    return ticks;
+  }, [barData]);
+
+  const formatAreaXTick = useCallback((d: string) => {
+    if (!d) return '';
     if (timeframe === '1m') {
       return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
     }
@@ -240,7 +214,26 @@ export function NetWorthChart() {
       return formatSafeUTCDate(d, { year: 'numeric' });
     }
     return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-  }, [chartType, bucketSize, timeframe]);
+  }, [timeframe]);
+
+  const formatBarXTick = useCallback((d: string) => {
+    if (!d) return '';
+    if (bucketSize === 'daily' || bucketSize === 'weekly' || bucketSize === 'biweekly') {
+      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+    }
+    if (bucketSize === 'monthly') {
+      return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+    }
+    if (bucketSize === 'quarterly') {
+      const month = parseInt(d.slice(5, 7), 10);
+      const q = Math.ceil(month / 3);
+      return `Q${q} ${d.slice(2, 4)}`;
+    }
+    if (bucketSize === 'yearly') {
+      return d.slice(0, 4);
+    }
+    return d;
+  }, [bucketSize]);
 
   const formatYTick = useCallback((v: number) => {
     const absV = Math.abs(v);
@@ -362,32 +355,70 @@ export function NetWorthChart() {
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
               <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {chartType === 'line' ? 'AREA' : 'BAR'} &middot; {timeframe.toUpperCase()}
+                {timeframe.toUpperCase()}
               </span>
             }
           >
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
-                <ChartTypeSelector
-                  value={chartType}
-                  options={[
-                    { value: 'line', label: 'Area' },
-                    { value: 'bar', label: 'Bar' },
-                  ]}
-                  onChange={(t) => setChartType(t as ChartType)}
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
+              <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
             </div>
           </CollapsibleFilterPanel>
-          <div className="p-2.5 sm:p-5 space-y-4">
-            <div className="h-[240px] w-full relative">
-              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                {chartType === 'bar' ? (
+          <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
+            <div className="flex-1 min-w-0 p-2.5 sm:p-5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="w-3.5 h-3.5 text-chart-1" />
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Net Worth</span>
+              </div>
+              <div className="h-[180px] sm:h-[220px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={{ stroke: 'var(--color-border)' }}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                      ticks={areaTicks}
+                      tickFormatter={formatAreaXTick}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={{ stroke: 'var(--color-border)' }}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                      domain={['auto', 'auto']}
+                      tickFormatter={formatYTick}
+                    />
+                    <RechartsTooltip
+                      content={<AreaTooltip />}
+                      cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="netWorth"
+                      stroke="var(--color-chart-1)"
+                      strokeWidth={2}
+                      fill="url(#netWorthGrad)"
+                      dot={false}
+                      activeDot={{ r: 4, stroke: 'var(--color-chart-1)', strokeWidth: 1 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 p-2.5 sm:p-5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <BarChart3 className="w-3.5 h-3.5 text-chart-1" />
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
+              </div>
+              <div className="h-[180px] sm:h-[220px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
                     data={barData}
                     margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
@@ -399,8 +430,8 @@ export function NetWorthChart() {
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      ticks={xAxisTicks}
-                      tickFormatter={formatXTick}
+                      ticks={barTicks}
+                      tickFormatter={formatBarXTick}
                     />
                     <YAxis
                       tickLine={false}
@@ -423,46 +454,8 @@ export function NetWorthChart() {
                       ))}
                     </Bar>
                   </BarChart>
-                ) : (
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
-                    <XAxis
-                      dataKey="date"
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      ticks={xAxisTicks}
-                      tickFormatter={formatXTick}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={[minVal, maxVal]}
-                      tickFormatter={formatYTick}
-                    />
-                    <RechartsTooltip
-                      content={<AreaTooltip />}
-                      cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="netWorth"
-                      stroke="var(--color-chart-1)"
-                      strokeWidth={2}
-                      fill="url(#netWorthGrad)"
-                      dot={false}
-                      activeDot={{ r: 4, stroke: 'var(--color-chart-1)', strokeWidth: 1 }}
-                    />
-                  </AreaChart>
-                )}
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </>
