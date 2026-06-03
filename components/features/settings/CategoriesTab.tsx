@@ -342,9 +342,9 @@ export default function CategoriesTab() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <h2 className="text-lg font-semibold text-foreground">Categories</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative group/tooltip overflow-visible">
             <button
               onClick={() => setShowResetConfirm(true)}
@@ -412,12 +412,12 @@ export default function CategoriesTab() {
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          <div className="flex flex-wrap rounded-lg border border-border">
             {(['all', 'income', 'expense', 'compound', 'transfer'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`shrink-0 px-3 py-1.5 text-xs font-medium transition-colors ${
                   filterType === type
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -484,16 +484,31 @@ export default function CategoriesTab() {
             <div key={parent.id}>
               <div
                 onClick={() => openEdit(parent)}
-                className="flex items-center justify-between p-3 bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                className="p-3 bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
               >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {childList.length > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); toggleExpanded(parent.id); }} className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {childList.length > 0 && (
+                      <button onClick={(e) => { e.stopPropagation(); toggleExpanded(parent.id); }} className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                    )}
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                    <span className="text-foreground text-sm font-medium truncate">{parent.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
-                  )}
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                  <span className="text-foreground text-sm font-medium truncate">{parent.name}</span>
+                    <button onClick={(e) => { e.stopPropagation(); openClone(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                   <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
                     parent.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
                     parent.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
@@ -508,17 +523,6 @@ export default function CategoriesTab() {
                   {parent.createdByAi && (
                     <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                   )}
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); openClone(parent); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleting(parent); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
                 </div>
               </div>
               {parent.categoryType === 'compound' && (parent.parentId || parent.expenseParentId) && (
@@ -542,40 +546,44 @@ export default function CategoriesTab() {
                    <div className="ml-6 mt-1 space-y-1">
                      {filteredChildren.map((child) => (
                        <div key={child.id}>
-                         <div
-                           onClick={() => openEdit(child)}
-                           className="flex items-center justify-between p-2.5 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                         >
-                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                             <span className="text-foreground/80 text-sm truncate">{child.name}</span>
-                             <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
-                               child.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
-                               child.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                                child.isIncome ? 'bg-chart-1/15 text-chart-1' : 'bg-chart-5/15 text-chart-5'
-                             }`}>
-                               {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
-                             </span>
-                             <span className="text-[11px] tabular-nums text-muted-foreground/60">{child.transactionCount}</span>
-                             {child.isSystem && (
-                               <span className="text-[10px] text-muted-foreground">System</span>
-                             )}
-                             {child.createdByAi && (
-                               <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
-                             )}
-                           </div>
-                           <div className="flex items-center gap-1 flex-shrink-0">
-                             <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
-                               <Pencil className="h-3 w-3" />
-                             </button>
-                             <button onClick={(e) => { e.stopPropagation(); openClone(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
-                               <Copy className="h-3 w-3" />
-                             </button>
-                             <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
-                               <Trash2 className="h-3 w-3" />
-                             </button>
-                           </div>
-                         </div>
+                          <div
+                            onClick={() => openEdit(child)}
+                            className="p-2.5 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                <span className="text-foreground/80 text-sm truncate">{child.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                <button onClick={(e) => { e.stopPropagation(); openEdit(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Edit category">
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); openClone(child); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clone category">
+                                  <Copy className="h-3 w-3" />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setDeleting(child); }} className="p-1 text-muted-foreground hover:text-destructive transition-colors" title="Delete category">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
+                                child.categoryType === 'compound' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' :
+                                child.categoryType === 'transfer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                 child.isIncome ? 'bg-chart-1/15 text-chart-1' : 'bg-chart-5/15 text-chart-5'
+                              }`}>
+                                {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
+                              </span>
+                              <span className="text-[11px] tabular-nums text-muted-foreground/60">{child.transactionCount}</span>
+                              {child.isSystem && (
+                                <span className="text-[10px] text-muted-foreground">System</span>
+                              )}
+                              {child.createdByAi && (
+                                <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
+                              )}
+                            </div>
+                          </div>
                          {child.categoryType === 'compound' && (child.parentId || child.expenseParentId) && (
                            <div className="px-2.5 pb-1 text-[10px] text-muted-foreground">
                              <span className="font-medium text-muted-foreground/80">Uses income category:</span>{' '}
