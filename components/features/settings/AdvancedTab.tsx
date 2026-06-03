@@ -234,7 +234,7 @@ export default function AdvancedTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full min-w-0">
       {/* Backup & Restore */}
       <div className="p-4 bg-card border border-border rounded-lg space-y-3">
         <div>
@@ -437,7 +437,7 @@ export default function AdvancedTab() {
       ))}
 
       {/* Apply / Discard bar */}
-      <div className={`sticky bottom-0 p-2 bg-card border border-border rounded-lg flex items-center justify-between gap-3 transition-opacity ${
+      <div className={`sticky bottom-0 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card border border-border rounded-lg flex items-center justify-between gap-3 transition-opacity ${
         totalDirty > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}>
         <span className="text-[10px] text-muted-foreground">

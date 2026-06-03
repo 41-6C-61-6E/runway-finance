@@ -616,7 +616,7 @@ export default function ManualAccountsSection() {
                 placeholder="e.g., 446533"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
                 <Input
@@ -678,7 +678,7 @@ export default function ManualAccountsSection() {
                 placeholder="e.g., Camry"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
                 <Input
@@ -772,11 +772,11 @@ export default function ManualAccountsSection() {
 
   return (
     <div className="p-5 bg-card border border-border rounded-xl">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <h2 className="text-base font-semibold text-foreground">Manual Assets & Mortgages</h2>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+          className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all shrink-0"
         >
           + Add
         </button>
@@ -952,7 +952,7 @@ export default function ManualAccountsSection() {
 
       {/* Create Drawer */}
       <Sheet open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); if (open) { setTagIds([]); setTagSearch(''); setShowTagDropdown(false); } }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+        <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Add Manual Account</SheetTitle>
             <SheetDescription>Track assets or mortgages that aren't connected through SimpleFIN.</SheetDescription>
@@ -1151,7 +1151,7 @@ export default function ManualAccountsSection() {
 
       {/* Edit Drawer */}
       <Sheet open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null); setError(''); }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+        <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Account</SheetTitle>
             <SheetDescription>Update the details for {editAccount?.name}.</SheetDescription>
@@ -1190,7 +1190,7 @@ export default function ManualAccountsSection() {
                     placeholder="e.g., 446533"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
                     <Input
@@ -1270,7 +1270,7 @@ export default function ManualAccountsSection() {
                     placeholder="e.g., 2024"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
                     <Input

@@ -328,8 +328,8 @@ export default function AiTab() {
     <div className="space-y-4">
       {/* AI Providers */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+          <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-foreground">AI Providers</h2>
             <p className="text-xs text-muted-foreground">
               Configure OpenAI-compatible API endpoints. Compatible with Ollama, Open WebUI, and any OpenAI-compatible provider.
@@ -337,7 +337,7 @@ export default function AiTab() {
           </div>
           <button
             onClick={openAddForm}
-            className="px-2 py-1.5 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
+            className="px-2 py-1.5 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all shrink-0"
           >
             + Add Provider
           </button>
@@ -365,7 +365,7 @@ export default function AiTab() {
                     <div>API key: {p.apiKey ? '••••••••' : '(none)'}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                   {!p.isActive && (
                     <button
                       onClick={() => handleSetActive(p.id)}
@@ -497,7 +497,7 @@ export default function AiTab() {
               />
               <span className="text-xs text-foreground">Set as active provider</span>
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleFormTest}
                 disabled={formTesting || !formEndpoint.trim()}
@@ -530,8 +530,8 @@ export default function AiTab() {
 
       {/* System Prompt Editor */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex items-start justify-between mb-1">
-          <div>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-foreground">System Prompt</h2>
             <p className="text-xs text-muted-foreground">
               Customize the AI system prompt. Changes take effect on the next analysis run.
@@ -539,7 +539,7 @@ export default function AiTab() {
           </div>
           <button
             onClick={() => setPromptExpanded(!promptExpanded)}
-            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-accent rounded-lg transition-colors shrink-0"
           >
             {promptExpanded ? 'Collapse' : 'Edit'}
           </button>
@@ -559,13 +559,13 @@ export default function AiTab() {
               className="w-full h-80 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-y"
               placeholder="Enter custom system prompt..."
             />
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground flex-1 min-w-0">
                 {automation.aiSystemPrompt ? 'Custom prompt active' : 'Using default prompt'}
               </span>
               <button
                 onClick={handleResetPrompt}
-                className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
+                className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors shrink-0"
               >
                 Reset to Default
               </button>
@@ -576,8 +576,8 @@ export default function AiTab() {
 
       {/* Test Prompt Editor */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex items-start justify-between mb-1">
-          <div>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-foreground">Test Prompt</h2>
             <p className="text-xs text-muted-foreground">
               Customize the message sent when testing a provider connection. A short prompt speeds up the test.
@@ -585,7 +585,7 @@ export default function AiTab() {
           </div>
           <button
             onClick={() => setTestPromptExpanded(!testPromptExpanded)}
-            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-accent rounded-lg transition-colors shrink-0"
           >
             {testPromptExpanded ? 'Collapse' : 'Edit'}
           </button>
@@ -602,8 +602,8 @@ export default function AiTab() {
               className="w-full h-20 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-y"
               placeholder={DEFAULT_TEST_PROMPT}
             />
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground flex-1 min-w-0">
                 {testPrompt ? 'Custom test prompt active' : 'Using default test prompt'}
               </span>
               <button
@@ -611,7 +611,7 @@ export default function AiTab() {
                   setTestPrompt('');
                   try { localStorage.removeItem(TEST_PROMPT_STORAGE_KEY); } catch { /* ignore */ }
                 }}
-                className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
+                className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors shrink-0"
               >
                 Reset to Default
               </button>
@@ -627,8 +627,8 @@ export default function AiTab() {
         </p>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <span className="text-sm text-foreground">Auto-analyze after sync</span>
               <p className="text-xs text-muted-foreground">Run AI analysis automatically after each SimpleFIN sync</p>
             </div>
@@ -647,8 +647,8 @@ export default function AiTab() {
             </label>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <span className="text-sm text-foreground">Auto-approve suggestions</span>
               <p className="text-xs text-muted-foreground">Automatically approve suggestions above the confidence threshold</p>
             </div>
