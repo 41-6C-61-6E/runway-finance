@@ -15,6 +15,7 @@ export async function GET(
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id: connectionId } = await params;
 
   // Verify this connection belongs to the user
@@ -24,7 +25,7 @@ export async function GET(
     .where(
       and(
         eq(simplifinConnections.id, connectionId),
-        eq(simplifinConnections.userId, userId)
+        eq(simplifinConnections.userId, dataUserId)
       )
     )
     .limit(1);

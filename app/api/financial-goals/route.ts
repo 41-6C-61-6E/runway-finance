@@ -15,8 +15,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
   const type = searchParams.get('type');
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
-  const conditions = [eq(financialGoals.userId, session.user.id)];
+  const conditions = [eq(financialGoals.userId, dataUserId)];
   if (status) conditions.push(eq(financialGoals.status, status));
   if (type) conditions.push(eq(financialGoals.type, type));
 
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const dek = await getSessionDEK();
     const body = await req.json();
+    const userId = session.user.id;
     const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve } = body;
 
     if (!name || !type || !targetAmount) {
@@ -80,6 +83,8 @@ export async function PATCH(req: NextRequest) {
   try {
     const dek = await getSessionDEK();
     const body = await req.json();
+    const userId = session.user.id;
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const { id, ...updates } = body;
 
     const goalId = id || searchParams.get('id');
@@ -93,7 +98,7 @@ export async function PATCH(req: NextRequest) {
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, goalId),
-        eq(financialGoals.userId, session.user.id)
+        eq(financialGoals.userId, dataUserId)
       ))
       .limit(1);
 
@@ -143,12 +148,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
+    const userId = session.user.id;
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const existing = await getDb()
       .select()
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, id),
-        eq(financialGoals.userId, session.user.id)
+        eq(financialGoals.userId, dataUserId)
       ))
       .limit(1);
 

@@ -1395,7 +1395,14 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
-      <PageHeader title="Accounts" icon={Landmark} />
+      <PageHeader title="Accounts" icon={Landmark}>
+        <Link
+          href="/settings?tab=accounts"
+          className="px-3.5 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" /> Manage Bank Sync
+        </Link>
+      </PageHeader>
 
       <PageContent maxWidth="max-w-6xl" className="space-y-6">
         <>

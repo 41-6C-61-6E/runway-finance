@@ -60,6 +60,7 @@ function getPeriodBounds(periodType: string, periodKey: string | null, now: Date
 
 export async function GET(request: Request) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(
         and(
-          eq(budgets.userId, session.user.id),
+          eq(budgets.userId, dataUserId),
           or(
             eq(budgets.yearMonth, bounds.yearMonth),
             and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
         isIncome: categories.isIncome 
       })
       .from(categories)
-      .where(eq(categories.userId, session.user.id));
+      .where(eq(categories.userId, dataUserId));
 
     // Helper to find all descendant IDs for a given category (recursive)
     const getDescendantIds = (catId: string): string[] => {
@@ -168,7 +169,7 @@ export async function GET(request: Request) {
       const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
       const txConditions = [
-        eq(transactions.userId, session.user.id),
+        eq(transactions.userId, dataUserId),
         inArray(transactions.categoryId, allSearchIds),
         gte(transactions.date, bounds.startDate),
         lt(transactions.date, bounds.endDate),
@@ -269,6 +270,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -282,7 +284,7 @@ export async function POST(request: Request) {
   const db = getDb();
   try {
     const encryptedValues = await encryptRow('budgets', {
-      userId: session.user.id,
+      userId: dataUserId,
       categoryId: body.categoryId as string,
       periodType: (body.periodType as string) || 'monthly',
       yearMonth: body.periodKey as string ?? null,

@@ -13,11 +13,12 @@ export async function POST() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
 
   await db
     .delete(categoryRules)
-    .where(eq(categoryRules.userId, userId));
+    .where(eq(categoryRules.userId, dataUserId));
 
   await seedUserDefaultRules(userId);
 

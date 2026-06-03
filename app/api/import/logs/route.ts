@@ -11,6 +11,7 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   try {
     const logs = await getDb()

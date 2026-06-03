@@ -15,12 +15,13 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   const rows = await getDb()
     .select()
     .from(tags)
-    .where(eq(tags.userId, userId))
+    .where(eq(tags.userId, dataUserId))
     .orderBy(tags.name);
 
   const decrypted = await decryptRows('tags', rows, dek);
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;

@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
+import { resolveDataUserId } from '@/lib/sharing';
 
 const LOG_TAG = '[sync]';
 
@@ -546,6 +547,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
   const startedAt = Date.now();
 
   logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
+  const dataUserId = await resolveDataUserId(userId);
 
   // Get DEK — either from override (cron) or from session (user request)
   let dek: Uint8Array;
@@ -565,7 +567,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
   const [log] = await getDb()
     .insert(syncLogs)
     .values({
-      userId,
+      userId: dataUserId,
       connectionId,
       status: 'running',
       accountsSynced: String(0),
@@ -592,8 +594,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     );
 
     // Ensure compound categories exist for this user
-    await ensureCompoundCategories(userId, dek);
-    await ensureEmployerContributions(userId, dek);
+    await ensureCompoundCategories(dataUserId, dek);
+    await ensureEmployerContributions(dataUserId, dek);
 
     const now = new Date();
     const startDate = connection.lastSyncAt
@@ -653,7 +655,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         .from(accounts)
         .where(
           and(
-            eq(accounts.userId, userId),
+            eq(accounts.userId, dataUserId),
             eq(accounts.externalId, sfAccount.id)
           )
         )
@@ -720,7 +722,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         .from(accounts)
         .where(
           and(
-            eq(accounts.userId, userId),
+            eq(accounts.userId, dataUserId),
             eq(accounts.externalId, sfAccount.id),
             isNull(accounts.connectionId)
           )
@@ -745,7 +747,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         [upserted] = await getDb()
           .insert(accounts)
           .values({
-            userId,
+            userId: dataUserId,
             connectionId,
             externalId: sfAccount.id,
             name: await encryptField(sfAccount.name, dek),
@@ -801,7 +803,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
           // Encrypt sensitive fields before storing
           const txData = {
-            userId,
+            userId: dataUserId,
             accountId,
             externalId: sfTx.id,
             date: txDate,
@@ -829,7 +831,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .from(transactions)
             .where(
               and(
-                eq(transactions.userId, userId),
+                eq(transactions.userId, dataUserId),
                 eq(transactions.accountId, accountId),
                 eq(transactions.externalId, sfTx.id)
               )
@@ -905,7 +907,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
       if (syncedWithPlaintext.length > 0) {
-        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, userId, dek);
+        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, dataUserId, dek);
         logger.info(`${LOG_TAG} Categorization rules applied`, {
           connectionId,
           transactionsEvaluated: syncedWithPlaintext.length,
@@ -1001,10 +1003,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(syncLogs.id, log.id));
 
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(userId, dek, today);
+    await createNetWorthSnapshot(dataUserId, dek, today);
     logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
-    await createAccountSnapshots(userId, dek, today);
+    await createAccountSnapshots(dataUserId, dek, today);
     logger.debug(`${LOG_TAG} Account snapshots created`, { userId, date: today, durationMs: ms(startedAt) });
 
     for (const sfAccount of data.accounts) {
@@ -1021,7 +1023,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       if (earliestTx < toDateStr) {
         const result = await generateHistoricalAccountSnapshots(
           accountId,
-          userId,
+          dataUserId,
           earliestTx,
           toDateStr,
           dek,
@@ -1038,13 +1040,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       }
     }
 
-    await updateMonthlyCashFlowSummaries(userId, dek);
-    await updateCategorySpendingSummaries(userId, dek);
-    await updateCategoryIncomeSummaries(userId, dek);
+    await updateMonthlyCashFlowSummaries(dataUserId, dek);
+    await updateCategorySpendingSummaries(dataUserId, dek);
+    await updateCategoryIncomeSummaries(dataUserId, dek);
 
     const totalDurationMs = Date.now() - startedAt;
     if (transactionsNew > 0 || transactionsUpdated > 0) {
-      invalidateUserSearchCache(userId);
+      invalidateUserSearchCache(dataUserId);
     }
 
     logger.info(`${LOG_TAG} Sync completed successfully`, {

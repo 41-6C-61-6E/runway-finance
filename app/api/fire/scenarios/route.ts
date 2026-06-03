@@ -9,13 +9,14 @@ import { decryptRows, encryptRow } from '@/lib/crypto';
 
 export async function GET() {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
   const scenarios = await getDb()
     .select()
     .from(fireScenarios)
-    .where(eq(fireScenarios.userId, session.user.id))
+    .where(eq(fireScenarios.userId, dataUserId))
     .orderBy(desc(fireScenarios.isDefault), desc(fireScenarios.createdAt));
 
   const decrypted = await decryptRows('fire_scenarios', scenarios, dek);
@@ -25,6 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -32,11 +34,11 @@ export async function POST(request: Request) {
   const existing = await getDb()
     .select()
     .from(fireScenarios)
-    .where(eq(fireScenarios.userId, session.user.id))
+    .where(eq(fireScenarios.userId, dataUserId))
     .limit(1);
 
   const encryptedValues = await encryptRow('fire_scenarios', {
-    userId: session.user.id,
+    userId: dataUserId,
     name: body.name || 'Primary Scenario',
     isDefault: existing.length === 0,
     currentAge: body.currentAge || 30,
