@@ -120,7 +120,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               }
             }
           } catch (err) {
-            logger.error('Auth: DEK unwrap failed', { error: err instanceof Error ? err.message : String(err) });
+            logger.error('Auth: DEK unwrap failed', {
+              error: err instanceof Error ? err.message : String(err),
+              cause: err instanceof Error && 'cause' in err ? (err as any).cause : undefined,
+              stack: err instanceof Error ? err.stack : undefined
+            });
             return null;
           }
 
