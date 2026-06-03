@@ -69,6 +69,24 @@ export const PatchTransactionSchema = z.object({
   memo: z.string().max(500).optional(),
   reviewed: z.boolean().optional(),
   ignored: z.boolean().optional(),
+  description: z.string().max(500).optional(),
+  amount: z.string().optional(),
+  date: z.string().optional(),
+  postedDate: z.string().nullable().optional(),
+  pending: z.boolean().optional(),
+});
+
+export const CreateTransactionSchema = z.object({
+  accountId: z.string().uuid(),
+  date: z.string().min(1),
+  amount: z.string().min(1),
+  description: z.string().max(500).min(1),
+  payee: z.string().max(200).optional(),
+  memo: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional(),
+  categoryId: z.string().uuid().nullable().optional(),
+  tagIds: z.array(z.string().uuid()).optional(),
+  pending: z.boolean().optional(),
 });
 
 export const BulkPatchTransactionSchema = z.object({

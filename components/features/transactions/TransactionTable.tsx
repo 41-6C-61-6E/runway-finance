@@ -39,6 +39,7 @@ import {
   GripVertical,
   Search,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
@@ -56,6 +57,7 @@ type Transaction = {
   accountName: string | null;
   reviewed: boolean | null;
   categorizedByAi: boolean;
+  source?: string;
   tags?: { id: string; name: string; color: string }[];
   accountTags?: { id: string; name: string; color: string }[];
 };
@@ -85,6 +87,7 @@ interface TransactionTableProps {
   onSelectAll: (ids: string[]) => void;
   onTransactionClick?: (tx: Transaction) => void;
   onTotalChange?: (total: number) => void;
+  onAddTransaction?: () => void;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -170,6 +173,7 @@ export default function TransactionTable({
   onSelectAll,
   onTransactionClick,
   onTotalChange,
+  onAddTransaction,
 }: TransactionTableProps) {
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
@@ -1337,62 +1341,79 @@ export default function TransactionTable({
       >
         {loading ? (
           <LoadingSpinner category="transactions" className="p-12" />
-        ) : transactions.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-muted-foreground text-base mb-4">
-              No transactions found.
-            </p>
-            <a
-              href="/settings?tab=accounts"
-              className="inline-block px-5 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Connect a Financial Institution
-            </a>
-          </div>
         ) : (
           <>
-            {/* Column config toolbar */}
-            <div className="flex items-center justify-end px-3 py-1.5 border-b border-border">
-              <div className="relative">
-                <button
-                  onClick={() => setShowColumnMenu(!showColumnMenu)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  Columns
-                </button>
-                {showColumnMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
-                    <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">
-                      Toggle columns
-                    </div>
-                    {ALL_COLUMNS.map((colId) => {
-                      const col = table.getColumn(colId);
-                      const isVisible = col?.getIsVisible() ?? true;
-                      return (
-                        <button
-                          key={colId}
-                          onClick={() => {
-                            const col = table.getColumn(colId);
-                            if (col) col.toggleVisibility(!col.getIsVisible());
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-                        >
-                          {isVisible ? (
-                            <EyeOff className="h-3 w-3 text-muted-foreground" />
-                          ) : (
-                            <Eye className="h-3 w-3 text-muted-foreground/50" />
-                          )}
-                          <span className={isVisible ? "" : "opacity-50"}>
-                            {COLUMN_LABELS[colId]}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+            {/* Column config and Action toolbar */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/10">
+              <div>
+                {onAddTransaction && (
+                  <button
+                    onClick={onAddTransaction}
+                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/20"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Transaction
+                  </button>
                 )}
               </div>
+
+              {transactions.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowColumnMenu(!showColumnMenu)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    Columns
+                  </button>
+                  {showColumnMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+                      <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">
+                        Toggle columns
+                      </div>
+                      {ALL_COLUMNS.map((colId) => {
+                        const col = table.getColumn(colId);
+                        const isVisible = col?.getIsVisible() ?? true;
+                        return (
+                          <button
+                            key={colId}
+                            onClick={() => {
+                              const col = table.getColumn(colId);
+                              if (col) col.toggleVisibility(!col.getIsVisible());
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
+                          >
+                            {isVisible ? (
+                              <EyeOff className="h-3 w-3 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-3 w-3 text-muted-foreground/50" />
+                            )}
+                            <span className={isVisible ? "" : "opacity-50"}>
+                              {COLUMN_LABELS[colId]}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {transactions.length === 0 ? (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground text-base mb-4">
+                  No transactions found.
+                </p>
+                <a
+                  href="/settings?tab=accounts"
+                  className="inline-block px-5 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Connect a Financial Institution
+                </a>
+              </div>
+            ) : (
+              <>
 
             {/* Table */}
             <div className="overflow-x-auto no-scrollbar">
@@ -1551,7 +1572,9 @@ export default function TransactionTable({
             </div>
           </>
         )}
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Proposed Rule Dialog */}
       <AlertDialog
