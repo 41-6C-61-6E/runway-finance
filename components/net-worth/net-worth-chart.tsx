@@ -158,7 +158,7 @@ function computeChangeBarData(data: ChartPoint[]): { barData: BarDataPoint[]; bu
 
 export function NetWorthChart() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:net-worth-chart:timeframe', '1y');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:net-worth-chart:timeframe', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);

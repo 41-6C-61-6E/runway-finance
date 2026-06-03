@@ -41,7 +41,7 @@ const typeOptions = [
 ];
 
 export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:fire-projection:chartType', 'line');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:fire-projection:chartType', 'line');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('fireProjectionChart');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -94,7 +94,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <LineIcon className="w-4 h-4 text-primary" /> Portfolio Projection
             </h3>
           }
@@ -118,7 +118,7 @@ export function FireProjectionChart({ scenario }: { scenario: FireScenario }) {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <LineIcon className="w-4 h-4 text-primary" /> Portfolio Projection
           </h3>
         }

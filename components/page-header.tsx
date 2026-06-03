@@ -22,16 +22,24 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       style={{ 
         '--sidebar-width': `${sidebarWidth}px`
       } as React.CSSProperties}
-      className={`border-b border-border/40 sticky top-0 z-40 px-4 md:pr-6 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-200 md:pl-[var(--sidebar-width)] ${
-        reduceTransparency 
-          ? 'bg-card' 
-          : 'bg-card/10 backdrop-blur-md'
-      }`}
+      className="relative sticky top-0 z-40 px-4 md:pr-6 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-200 md:pl-[var(--sidebar-width)]"
     >
+      {/* Gradient-masked glassmorphic background panel */}
+      <div 
+        className={`absolute inset-0 -z-10 transition-all duration-200 border-b border-border/30 ${
+          reduceTransparency 
+            ? 'bg-card' 
+            : 'bg-card/15 backdrop-blur-md'
+        }`}
+        style={!reduceTransparency ? {
+          WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+        } : {}}
+      />
       <div className="flex items-center justify-between w-full md:w-auto">
         <div className="flex items-center gap-3">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />
-          <h1 className="text-xl font-bold tracking-tight text-foreground truncate">{title}</h1>
+          <h1 className="text-xl font-normal tracking-tight text-foreground truncate">{title}</h1>
           {leftExtra}
         </div>
         <div className="flex md:hidden items-center gap-1">

@@ -7,7 +7,7 @@ import { AuthenticatedLayout } from "@/components/authenticated-layout";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Runway Finance",
+  title: "Personal Finance",
   description: "Self-hosted personal finance tracking and planning.",
   icons: {
     icon: "/favicon.svg",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Runway",
+    title: "Finance",
   },
 };
 

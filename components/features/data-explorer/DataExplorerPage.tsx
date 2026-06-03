@@ -262,7 +262,7 @@ export default function DataExplorerPage() {
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
             {/* Tabs */}
-            <div className="flex border-b border-border mb-6">
+            <div className="flex border-b border-border mb-5 sm:mb-6">
               <button
                 onClick={() => setActiveTab('explore')}
                 className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
@@ -292,7 +292,7 @@ export default function DataExplorerPage() {
             )}
 
             {activeTab === 'explore' ? (
-              <div className="space-y-3">
+              <div className="space-y-5 sm:space-y-6">
                 <DataToolbar
                   key={`${table}-${filterKey}-${searchKey}`}
                   columns={columns}

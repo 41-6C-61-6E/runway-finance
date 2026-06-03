@@ -7,7 +7,7 @@ import { applyAccent } from '@/lib/utils/apply-accent';
 // so there is no flash of the default violet on page navigation.
 if (typeof window !== 'undefined') {
   try {
-    const saved = localStorage.getItem('runway-accent');
+    const saved = localStorage.getItem('finance-accent');
     if (saved) {
       applyAccent(saved);
     }

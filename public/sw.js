@@ -1,4 +1,4 @@
-const CACHE_NAME = "runway-finance-v1";
+const CACHE_NAME = "personal-finance-v1";
 const STATIC_ASSETS = [
   "/",
   "/offline",

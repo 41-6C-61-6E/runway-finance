@@ -64,13 +64,17 @@ export default function ResizableSidebar() {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed left-0 top-0 z-45 h-screen border-r flex flex-col justify-between transition-all duration-200 border-sidebar-border hidden md:flex ${
-          reduceTransparency
-            ? 'bg-sidebar'
-            : 'backdrop-blur-md bg-sidebar/40 dark:bg-sidebar/40'
-        }`}
+        className="fixed left-0 top-0 z-45 h-screen flex flex-col justify-between transition-all duration-200 hidden md:flex"
         style={{ width: `${sidebarWidth}px` }}
       >
+        {/* Dynamic Sidebar Background Panel */}
+        <div 
+          className={`absolute inset-0 -z-10 transition-all duration-200 border-r border-sidebar-border ${
+            reduceTransparency
+              ? 'bg-sidebar'
+              : 'backdrop-blur-md bg-sidebar/40 dark:bg-sidebar/40'
+          }`}
+        />
         {/* Logo / Brand */}
         <div className={isCollapsed ? 'flex justify-center pt-4 pb-2' : 'px-4 pt-4 pb-3'}>
           {isCollapsed ? (
@@ -134,26 +138,7 @@ export default function ResizableSidebar() {
 
       </aside>
 
-      {/* Resize Handle */}
-      {!isCollapsed && (
-        <div
-          className="fixed top-0 z-46 cursor-col-resize hidden md:block"
-          style={{
-            left: `${sidebarWidth}px`,
-            width: '6px',
-            height: '100vh',
-            marginLeft: '-3px',
-            background: isResizing ? 'var(--color-ring)' : 'transparent',
-          }}
-          onMouseDown={(e) => {
-            setIsResizing(true);
-            handleNavResizeDown(e);
-          }}
-          onMouseUp={() => setIsResizing(false)}
-        >
-          <div className="w-1 h-full mx-auto bg-sidebar-border hover:bg-ring/50 transition-colors" />
-        </div>
-      )}
+
 
     </>
   )

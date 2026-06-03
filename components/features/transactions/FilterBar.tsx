@@ -459,7 +459,7 @@ export default function FilterBar({
   }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, selectedAccountTagIds, filters, datePreset]);
 
   return (
-    <div className="mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-visible">
+    <div className="mb-5 sm:mb-6 bg-gradient-to-br from-card to-card/95 border border-border rounded-xl shadow-sm overflow-visible">
       {/* Primary Controls Section */}
       <div className="p-3 sm:p-4 border-b border-border/50">
         <div className="w-full">

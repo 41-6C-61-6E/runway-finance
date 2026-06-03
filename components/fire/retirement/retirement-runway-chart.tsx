@@ -36,7 +36,7 @@ export function RetirementRunwayChart({
   projection: ProjectionResult;
   monteCarlo?: MonteCarloResult;
 }) {
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:retirement-runway:chartType', 'line');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:retirement-runway:chartType', 'line');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('retirementRunwayChart');
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -83,7 +83,7 @@ export function RetirementRunwayChart({
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Retirement Runway
             </h3>
           }
@@ -107,7 +107,7 @@ export function RetirementRunwayChart({
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-primary" /> Retirement Runway
           </h3>
         }

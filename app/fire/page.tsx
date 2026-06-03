@@ -99,7 +99,7 @@ function FireContent() {
               )}
 
               {(isVisible('fireProjectionChart') || isVisible('fireProgressRing')) && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 mt-5 sm:mt-6">
                   {isVisible('fireProjectionChart') && (
                     <div className="lg:col-span-2">
                       <Suspense fallback={<LoadingSpinner category="forecast" />}>
@@ -124,7 +124,7 @@ function FireContent() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 mt-5 sm:mt-6">
                 <FireCalculator scenario={scenario} onUpdate={handleScenarioUpdate} />
                 {isVisible('whatIfAnalysis') && (
                   <Suspense fallback={<LoadingSpinner category="analysis" />}>
@@ -136,7 +136,7 @@ function FireContent() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 mt-5 sm:mt-6">
                 <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <RetirementAccountAllocation />
                 </Suspense>
@@ -144,7 +144,7 @@ function FireContent() {
               </div>
 
               {isVisible('fireScenarios') && (
-                <div className="mt-5">
+                <div className="mt-5 sm:mt-6">
                   <div>
                     <FireScenarios onLoad={handleLoadScenario} />
                     <MathDescription chartId="fireScenarios" />

@@ -723,7 +723,7 @@ export default function PayrollTab() {
                   <h3 className="font-semibold text-foreground">Getting Started Guide</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     To import your payroll history, prepare a JSON file formatted as an array of paystub objects.
-                    Runway Finance maps your payroll descriptions (like "Regular Pay", "Fed Withholding") to account categories using field mappings.
+                    The application maps your payroll descriptions (like "Regular Pay", "Fed Withholding") to account categories using field mappings.
                   </p>
                 </div>
 

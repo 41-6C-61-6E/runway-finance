@@ -520,12 +520,12 @@ function SettingsPageBody() {
       <PageContent className="flex flex-col items-center" maxWidth="max-w-6xl">
 
           {/* Setup Checklist */}
-          <div className="mb-6">
+          <div className="mb-5 sm:mb-6">
             <OnboardingChecklist />
           </div>
 
           {/* Mobile Tab Navigation */}
-          <div className="lg:hidden mb-4">
+          <div className="lg:hidden mb-5 sm:mb-6">
             <div className="flex flex-wrap gap-1.5">
               {SETTINGS_TABS.map((tab) => {
                 const TabIcon = tab.icon;
@@ -548,7 +548,7 @@ function SettingsPageBody() {
             </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
+          <div className="flex flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full">
 
             {/* Desktop Navigation Sidebar */}
             <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
@@ -583,14 +583,14 @@ function SettingsPageBody() {
             </aside>
 
             {/* Settings Tab Content */}
-            <main className="flex-1 w-full min-w-0 max-w-3xl space-y-6">
+            <main className="flex-1 w-full min-w-0 max-w-3xl space-y-5 sm:space-y-6">
 
           {activeTab === 'general' && (
           <>
 
           {/* Combined Settings */}
           <div className="p-5 bg-card border border-border rounded-xl">
-            <div className="space-y-5">
+            <div className="space-y-5 sm:space-y-6">
               {/* Theme */}
               <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
                 <div className="flex-1 min-w-0">
@@ -761,7 +761,7 @@ function SettingsPageBody() {
 
           {/* Navigation Visibility */}
           <div className="p-5 bg-card border border-border rounded-xl">
-            <div className="space-y-5">
+            <div className="space-y-5 sm:space-y-6">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Navigation</h2>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -841,7 +841,7 @@ function SettingsPageBody() {
           {accountSubTab === 'automatic' && (
         <>
           {orphanedAccounts.length > 0 && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-4 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
                 <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -865,7 +865,7 @@ function SettingsPageBody() {
           )}
           {/* Existing Connections */}
           {hasConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl mb-4">
+            <div className="p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
               <h2 className="text-base font-semibold text-foreground mb-4">SimpleFIN Bridge Connection</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
@@ -1106,7 +1106,7 @@ function SettingsPageBody() {
           {/* Add Connection Form - shown when no bridge is connected */}
           {/* Add Connection Form - shown when no bridge is connected for this user */}
           {!hasMyConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl mb-4">
+            <div className="p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
               <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
 
               {sharingGroup && (

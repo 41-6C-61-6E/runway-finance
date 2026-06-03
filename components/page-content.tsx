@@ -8,8 +8,8 @@ interface PageContentProps {
 
 export default function PageContent({ children, className = '', maxWidth = 'max-w-[1600px]' }: PageContentProps) {
   return (
-    <div className={`px-2 sm:px-6 lg:px-8 pb-8 ${className}`}>
-      <div className={`w-full mx-auto ${maxWidth}`}>
+    <div className="px-2 sm:px-6 lg:px-8 pt-5 sm:pt-6 pb-8">
+      <div className={`w-full mx-auto ${maxWidth} ${className}`}>
         {children}
       </div>
     </div>
