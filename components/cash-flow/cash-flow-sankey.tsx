@@ -468,6 +468,8 @@ const SankeyCustomNode = ({
   nodes,
   columnMetrics,
   columnOffsets,
+  margin,
+  usableHeight,
 }: any) => {
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
@@ -487,7 +489,11 @@ const SankeyCustomNode = ({
   const nodeIdx = nodes.findIndex((n: any) => n.id === payload.id);
   const colIndex = columnMetrics?.columns[nodeIdx] ?? -1;
   const offset = colIndex >= 0 ? (columnOffsets[colIndex] ?? 0) : 0;
-  const shiftedY = y + offset;
+  
+  // Clamp shiftedY to stay within usable height bounds to prevent clipping at top/bottom
+  const minY = margin.top;
+  const maxY = margin.top + usableHeight - height;
+  const shiftedY = Math.max(minY, Math.min(y + offset, maxY));
 
   // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
@@ -570,6 +576,8 @@ const SankeyCustomLink = ({
   nodes,
   columnMetrics,
   columnOffsets,
+  margin,
+  usableHeight,
 }: any) => {
   const gradId = `link-grad-${index}`;
 
@@ -583,8 +591,20 @@ const SankeyCustomLink = ({
   const sourceOffset = sourceCol >= 0 ? (columnOffsets[sourceCol] ?? 0) : 0;
   const targetOffset = targetCol >= 0 ? (columnOffsets[targetCol] ?? 0) : 0;
 
-  const shiftedSourceY = sourceY + sourceOffset;
-  const shiftedTargetY = targetY + targetOffset;
+  // Replicate clamped shiftedY calculation for source node to align link connection
+  const sourceNodeY = payload.source.y !== undefined ? payload.source.y : 0;
+  const sourceNodeHeight = payload.source.dy !== undefined ? payload.source.dy : (payload.source.height !== undefined ? payload.source.height : 0);
+  const clampedSourceNodeY = Math.max(margin.top, Math.min(sourceNodeY + sourceOffset, margin.top + usableHeight - sourceNodeHeight));
+  const sourceShift = clampedSourceNodeY - sourceNodeY;
+
+  // Replicate clamped shiftedY calculation for target node to align link connection
+  const targetNodeY = payload.target.y !== undefined ? payload.target.y : 0;
+  const targetNodeHeight = payload.target.dy !== undefined ? payload.target.dy : (payload.target.height !== undefined ? payload.target.height : 0);
+  const clampedTargetNodeY = Math.max(margin.top, Math.min(targetNodeY + targetOffset, margin.top + usableHeight - targetNodeHeight));
+  const targetShift = clampedTargetNodeY - targetNodeY;
+
+  const shiftedSourceY = sourceY + sourceShift;
+  const shiftedTargetY = targetY + targetShift;
 
   // Cubic bezier: control points at 1/2 x distance for smooth S-curve
   const midX = (sourceX + targetX) / 2;
@@ -633,11 +653,13 @@ export function CashFlowSankey() {
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
+   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
-  // showParents is permanently true (always show category groups)
-  const showParents = true;
+  const [isMobile, setIsMobile] = useState(false);
+  const [hideParents, setHideParents] = useState<boolean | null>(null);
+  const actualHideParents = hideParents ?? isMobile;
+  const showParents = !actualHideParents;
   // showPercentages is purely a display toggle — no data refetch needed.
   // It is passed directly into the node renderer and tooltip.
   const [showPercentages, setShowPercentages] = useState<boolean>(false);
@@ -646,7 +668,6 @@ export function CashFlowSankey() {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
   const accountFilterRef = useRef<HTMLDivElement>(null);
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -750,7 +771,7 @@ export function CashFlowSankey() {
     if (allCategoryInfo.length > 0 || allAccounts.length >= 0) {
       fetchData();
     }
-  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo]);
+  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
 
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
@@ -888,12 +909,24 @@ export function CashFlowSankey() {
       : { top: 20, right: 160, bottom: 20, left: 160 }
   ), [isMobile]);
 
-  const chartHeight = showParents ? 620 : 460;
-  const usableHeight = chartHeight - margin.top - margin.bottom;
-
   const nodePadding = isMobile
     ? (showParents ? 12 : 16)
     : (showParents ? 20 : 28);
+
+  const chartHeight = useMemo(() => {
+    if (!columnMetrics || columnMetrics.metrics.length === 0) {
+      return showParents ? 620 : 460;
+    }
+    const maxNodes = Math.max(...columnMetrics.metrics.map((m) => m.count));
+    const minNodeHeight = isMobile ? 14 : 18;
+    const requiredUsableHeight = maxNodes * minNodeHeight + (maxNodes - 1) * nodePadding;
+    const verticalMargin = margin.top + margin.bottom;
+    const calculatedHeight = requiredUsableHeight + verticalMargin;
+    const minHeight = showParents ? 620 : 460;
+    return Math.max(minHeight, calculatedHeight);
+  }, [columnMetrics, showParents, isMobile, nodePadding, margin]);
+
+  const usableHeight = chartHeight - margin.top - margin.bottom;
 
   const scale = useMemo(() => {
     if (!columnMetrics || columnMetrics.metrics.length === 0) return 0;
@@ -933,8 +966,10 @@ export function CashFlowSankey() {
       nodes={processedData.nodes}
       columnMetrics={columnMetrics}
       columnOffsets={columnOffsets}
+      margin={margin}
+      usableHeight={usableHeight}
     />
-  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, processedData.nodes, columnMetrics, columnOffsets]);
+  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, processedData.nodes, columnMetrics, columnOffsets, margin, usableHeight]);
 
   const sankeyLink = useMemo(() => (
     <SankeyCustomLink
@@ -943,8 +978,10 @@ export function CashFlowSankey() {
       nodes={processedData.nodes}
       columnMetrics={columnMetrics}
       columnOffsets={columnOffsets}
+      margin={margin}
+      usableHeight={usableHeight}
     />
-  ), [handleLinkClick, hoveredNode, themeVersion, processedData.nodes, columnMetrics, columnOffsets]);
+  ), [handleLinkClick, hoveredNode, themeVersion, processedData.nodes, columnMetrics, columnOffsets, margin, usableHeight]);
 
   const sankeyTooltip = useMemo(() => (
     <Tooltip
@@ -1056,6 +1093,11 @@ export function CashFlowSankey() {
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                   {showPercentages ? '%' : '$'}
                 </span>
+                {actualHideParents && (
+                  <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    GROUPS HIDDEN
+                  </span>
+                )}
                 {excludedAccountIds.size > 0 && (
                   <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                     {allAccounts.length - excludedAccountIds.size} ACCOUNTS
@@ -1121,6 +1163,26 @@ export function CashFlowSankey() {
                       <span
                         className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
                           showPercentages ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </label>
+                </div>
+
+                {/* Hide Top Categories switch */}
+                <div className="flex items-center gap-1.5 border-l border-border/30 pl-4">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Hide Top Categories</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <button
+                      onClick={() => setHideParents((v) => !(v ?? isMobile))}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                        actualHideParents ? 'bg-primary' : 'bg-muted-foreground/30'
+                      }`}
+                      type="button"
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
+                          actualHideParents ? 'translate-x-[14px]' : 'translate-x-[2px]'
                         }`}
                       />
                     </button>
@@ -1194,7 +1256,7 @@ export function CashFlowSankey() {
           </CollapsibleFilterPanel>
 
           {/* Chart */}
-          <div className={showParents ? 'h-[620px]' : 'h-[460px]'}>
+          <div style={{ height: chartHeight }} className="w-full">
             <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
               <div className="min-w-max h-full px-2 pb-2">
                 {processedData.nodes.length > 0 && processedData.links.length > 0 ? (
