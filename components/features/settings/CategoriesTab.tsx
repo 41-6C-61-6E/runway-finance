@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { CATEGORY_COLORS } from '@/lib/colors/palette';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -24,11 +25,7 @@ type Category = {
   transactionCount: number;
 };
 
-const COLOR_OPTIONS = [
-  '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#06b6d4',
-  '#0ea5e9', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e',
-  '#64748b', '#78716c',
-];
+const COLOR_OPTIONS = CATEGORY_COLORS;
 
 export default function CategoriesTab() {
   const [categories, setCategories] = useState<Category[]>([]);

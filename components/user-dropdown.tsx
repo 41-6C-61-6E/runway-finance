@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { Sun, Moon, Star, Key, LogOut } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
+import { SEMANTIC } from '@/lib/colors/palette';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { handleSignOut } from '@/components/server-actions';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
@@ -155,15 +156,17 @@ export default function UserDropdown() {
               <div className="flex items-center gap-1.5 truncate max-w-[70%]">
                 {(() => {
                   const buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || 'dev';
-                  let dotClass = 'bg-emerald-500 shadow-[0_0_4px_#10b981]';
-                  let buildLabel = 'Production Release';
+                  const bs = SEMANTIC.buildStatus;
+                  let status = bs.production;
                   if (buildNumber.endsWith('.dev')) {
-                    dotClass = 'bg-amber-500 shadow-[0_0_4px_#f59e0b]';
-                    buildLabel = 'Development';
+                    status = bs.development;
                   } else if (buildNumber.endsWith('.local')) {
-                    dotClass = 'bg-blue-500 shadow-[0_0_4px_#3b82f6]';
-                    buildLabel = 'Local Production';
+                    status = bs.local;
                   }
+                  let buildLabel = 'Production Release';
+                  if (buildNumber.endsWith('.dev')) buildLabel = 'Development';
+                  else if (buildNumber.endsWith('.local')) buildLabel = 'Local Production';
+                  const dotClass = `${status.dot} shadow-[0_0_4px_${status.glow}]`;
                   return (
                     <>
                       <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} title={buildLabel} />

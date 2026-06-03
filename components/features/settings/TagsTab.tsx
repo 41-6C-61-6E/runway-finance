@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { TAG_PRESETS } from '@/lib/colors/palette';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, Pencil, Trash2, Tag, Search, Hash } from 'lucide-react';
@@ -20,11 +21,7 @@ type Tag = {
   createdAt: string;
 };
 
-const PRESET_COLORS = [
-  '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#ef4444',
-  '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
-  '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#64748b',
-];
+const PRESET_COLORS = TAG_PRESETS;
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   const [custom, setCustom] = useState(value);
