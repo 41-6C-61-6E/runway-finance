@@ -380,12 +380,6 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
   },
 ];
 
-const CATEGORY_COLORS = [
-  '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#06b6d4',
-  '#0ea5e9', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e',
-  '#64748b', '#78716c',
-];
-
 export async function seedUserCategories(userId: string) {
   const db = getDb();
 
