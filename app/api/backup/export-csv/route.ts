@@ -95,7 +95,7 @@ export async function GET() {
   await streamPromise;
 
   const buffer = Buffer.concat(chunks);
-  const filename = `runway-finance-export-${new Date().toISOString().split('T')[0]}.zip`;
+  const filename = `personal-finance-export-${new Date().toISOString().split('T')[0]}.zip`;
 
   return new NextResponse(buffer, {
     headers: {

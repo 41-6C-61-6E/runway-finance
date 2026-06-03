@@ -122,6 +122,7 @@ const COLUMN_MIN_WIDTHS: Record<string, number> = {
   ai: 30,
   account: 60,
   category: 80,
+  tags: 50,
   amount: 70,
 };
 
@@ -362,7 +363,12 @@ export default function TransactionTable({
       .filter((id) => id in fixedSizes)
       .reduce((s, id) => s + fixedSizes[id], 0);
 
-    const remaining = Math.max(containerWidth - fixedTotal - 8, 300);
+    const minFlexibleWidth = flexibleCols.reduce(
+      (s, id) => s + (COLUMN_MIN_WIDTHS[id] || 60),
+      0
+    );
+
+    const remaining = Math.max(containerWidth - fixedTotal - 8, minFlexibleWidth);
 
     const flexRatios: Record<string, number> = {
       date: 1,
@@ -370,6 +376,7 @@ export default function TransactionTable({
       description: clientWidth < 1024 ? (clientWidth < 900 ? 1.2 : 1.6) : 2.5,
       account: clientWidth < 1024 ? (clientWidth < 900 ? 0.6 : 0.8) : 1.2,
       category: 1.5,
+      tags: clientWidth < 1024 ? (clientWidth < 900 ? 0.5 : 0.8) : 1.0,
       amount: 1,
     };
 

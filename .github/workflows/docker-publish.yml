@@ -48,5 +48,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            alanracek/runway-finance:latest
-            alanracek/runway-finance:${{ github.sha }}
+            alanracek/personal-finance:latest
+            alanracek/personal-finance:${{ github.sha }}

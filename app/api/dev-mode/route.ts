@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { logger, setDevMode } from '@/lib/logger'
 import { cookies } from 'next/headers'
 
-const DEV_MODE_COOKIE = 'runway_dev_mode'
+const DEV_MODE_COOKIE = 'finance_dev_mode'
 
 async function getDevModeFromCookie(): Promise<boolean> {
   const cookieStore = await cookies()

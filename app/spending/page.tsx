@@ -30,7 +30,7 @@ function SpendingContent() {
         )}
 
         {isVisible('categorySummaries') && (
-          <div className="mt-5">
+          <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
                 <CategorySummaries />

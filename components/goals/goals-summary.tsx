@@ -146,7 +146,7 @@ export function GoalsSummary() {
             isCollapsed={totalCollapsed}
             onToggle={setTotalCollapsed}
             title={
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
                 <Target className="w-4 h-4 text-primary" /> Total Goals
               </h3>
             }
@@ -166,7 +166,7 @@ export function GoalsSummary() {
             isCollapsed={targetCollapsed}
             onToggle={setTargetCollapsed}
             title={
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
                 <Coins className="w-4 h-4 text-primary" /> Total Target
               </h3>
             }
@@ -184,7 +184,7 @@ export function GoalsSummary() {
             isCollapsed={savedCollapsed}
             onToggle={setSavedCollapsed}
             title={
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
                 <PiggyBank className="w-4 h-4 text-primary" /> Total Saved
               </h3>
             }
@@ -204,7 +204,7 @@ export function GoalsSummary() {
             isCollapsed={progressCollapsed}
             onToggle={setProgressCollapsed}
             title={
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" /> Overall Progress
               </h3>
             }
@@ -236,7 +236,7 @@ export function GoalsSummary() {
             isCollapsed={breakdownCollapsed}
             onToggle={setBreakdownCollapsed}
             title={
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
                 <PieChart className="w-4 h-4 text-primary" /> Breakdown by Type
               </h3>
             }

@@ -210,9 +210,11 @@ interface AccountTransactionsProps {
   accountId: string;
   historyData: any[];
   isLiability: boolean;
+  timeframe: TimeRange;
+  setTimeframe: (val: TimeRange) => void;
 }
 
-function AccountTransactions({ accountId, historyData, isLiability }: AccountTransactionsProps) {
+function AccountTransactions({ accountId, historyData, isLiability, timeframe, setTimeframe }: AccountTransactionsProps) {
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId],
     queryFn: async () => {
@@ -221,8 +223,6 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
       return res.json();
     },
   });
-
-  const [miniTimeframe, setMiniTimeframe] = useState<TimeRange>('3m');
 
   const formatTransactionAmount = (amount: string) => {
     const num = parseFloat(amount);
@@ -254,9 +254,9 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
 
   const visibleMiniData = useMemo(() => {
     if (accountHistory.length === 0) return [];
-    const [startIdx, endIdx] = getTimeframeIndices(accountHistory, miniTimeframe);
+    const [startIdx, endIdx] = getTimeframeIndices(accountHistory, timeframe);
     return accountHistory.slice(startIdx, endIdx + 1);
-  }, [accountHistory, miniTimeframe]);
+  }, [accountHistory, timeframe]);
 
   const { minVal, maxVal } = useMemo(() => {
     if (visibleMiniData.length === 0) return { minVal: 0, maxVal: 1000 };
@@ -297,8 +297,12 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
   const txs = txData?.data || [];
 
   return (
-    <div className="py-4 px-2 sm:px-6 bg-muted/10 border-t border-border/40 transition-all duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+    <div className={`py-4 px-2 sm:px-6 transition-all duration-300 !border-none [&+div]:!border-t-0 ${
+      isLiability 
+        ? 'bg-destructive/10' 
+        : 'bg-primary/10'
+    }`}>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6">
         {/* Left Side: Balance History Mini-Chart */}
         <div className="md:col-span-3 flex flex-col space-y-3">
           <div className="flex items-center justify-between">
@@ -311,9 +315,9 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
                   <button
                     type="button"
                     key={r}
-                    onClick={() => setMiniTimeframe(r)}
+                    onClick={() => setTimeframe(r)}
                     className={`px-2 py-0.5 text-[9px] font-semibold rounded capitalize transition-all ${
-                      miniTimeframe === r
+                      timeframe === r
                         ? 'bg-card text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
@@ -486,9 +490,10 @@ export default function AccountsPage() {
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
 
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:accounts:timeframe', '1m');
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:accounts:chartType', 'line');
-  const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('runway:accounts:groupMode', 'type');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:accounts:timeframe', '1m');
+  const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:accounts:chartType', 'line');
+  const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('finance:accounts:groupMode', 'type');
   const showHidden = false;
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('balanceHistoryChart');
   const [hierarchyCollapsed, setHierarchyCollapsed] = useCardCollapsed('accountsHierarchy');
@@ -518,20 +523,20 @@ export default function AccountsPage() {
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
 
   // Dropdown filter selections
-  const [selectedGroups, setSelectedGroups] = usePersistentState<Set<string>>('runway:accounts:selectedGroups', new Set(), setOptions);
-  const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('runway:accounts:selectedTypes', new Set(), setOptions);
-  const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:selectedAccounts', new Set(), setOptions);
-  const [selectedTags, setSelectedTags] = usePersistentState<Set<string>>('runway:accounts:selectedTags', new Set(), setOptions);
+  const [selectedGroups, setSelectedGroups] = usePersistentState<Set<string>>('finance:accounts:selectedGroups', new Set(), setOptions);
+  const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('finance:accounts:selectedTypes', new Set(), setOptions);
+  const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('finance:accounts:selectedAccounts', new Set(), setOptions);
+  const [selectedTags, setSelectedTags] = usePersistentState<Set<string>>('finance:accounts:selectedTags', new Set(), setOptions);
 
   // Dropdown filter selections for Hierarchy
-  const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedGroups', new Set(), setOptions);
-  const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTypes', new Set(), setOptions);
-  const [hierarchySelectedAccounts, setHierarchySelectedAccounts] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedAccounts', new Set(), setOptions);
-  const [hierarchySelectedTags, setHierarchySelectedTags] = usePersistentState<Set<string>>('runway:accounts:hierarchySelectedTags', new Set(), setOptions);
+  const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedGroups', new Set(), setOptions);
+  const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedTypes', new Set(), setOptions);
+  const [hierarchySelectedAccounts, setHierarchySelectedAccounts] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedAccounts', new Set(), setOptions);
+  const [hierarchySelectedTags, setHierarchySelectedTags] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedTags', new Set(), setOptions);
   const hierarchyShowHidden = false;
 
   // ── Presets / Quick Views State & Handlers ──
-  const [customPresets, setCustomPresets] = usePersistentState<ChartPreset[]>('runway:accounts:customPresets', []);
+  const [customPresets, setCustomPresets] = usePersistentState<ChartPreset[]>('finance:accounts:customPresets', []);
   const [isSavingView, setIsSavingView] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
@@ -1215,7 +1220,7 @@ export default function AccountsPage() {
     const firstAcc = accs[0];
     const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
 
-    const [startIdx, endIdx] = getTimeframeIndices(historyData, timeframe);
+    const [startIdx, endIdx] = getTimeframeIndices(historyData, hierarchyTimeframe);
     const slicedHistory = historyData.slice(startIdx, endIdx + 1);
 
     const points = slicedHistory.map((d) => {
@@ -1251,7 +1256,7 @@ export default function AccountsPage() {
       historyPoints: points,
       isPositive,
     };
-  }, [historyData, timeframe]);
+  }, [historyData, hierarchyTimeframe]);
 
   const formatChange = (change: number, percentChange: number, isLiab: boolean) => {
     const absChange = Math.abs(change);
@@ -1395,16 +1400,9 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
-      <PageHeader title="Accounts" icon={Landmark}>
-        <Link
-          href="/settings?tab=accounts"
-          className="px-3.5 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" /> Manage Bank Sync
-        </Link>
-      </PageHeader>
+      <PageHeader title="Accounts" icon={Landmark} />
 
-      <PageContent maxWidth="max-w-6xl" className="space-y-6">
+      <PageContent maxWidth="max-w-6xl" className="space-y-5 sm:space-y-6">
         <>
 
             {/* ── Graphics / Chart Card ── */}
@@ -1413,7 +1411,7 @@ export default function AccountsPage() {
                 isCollapsed={isCollapsed}
                 onToggle={setIsCollapsed}
                 title={
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <h3 className="text-base font-normal text-foreground flex items-center gap-2">
                     <Activity className="w-4 h-4 text-primary" /> Balance History
                   </h3>
                 }
@@ -2221,8 +2219,8 @@ export default function AccountsPage() {
                 isCollapsed={hierarchyCollapsed}
                 onToggle={setHierarchyCollapsed}
                 title={
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                    <Landmark className="w-4 h-4 text-primary" /> Accounts Hierarchy
+                  <h3 className="text-base font-normal text-foreground flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-primary" /> Accounts
                   </h3>
                 }
               />
@@ -2254,7 +2252,10 @@ export default function AccountsPage() {
                           <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                             Showing {filteredAllAccounts.length} Accounts
                           </span>
-                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0) && (
+                          <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                            {hierarchyTimeframe.toUpperCase()}
+                          </span>
+                          {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0 || hierarchySelectedTags.size > 0) && (
                             <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                               FILTERED
                             </span>
@@ -2263,9 +2264,15 @@ export default function AccountsPage() {
                       }
                       className="mb-4 border border-border/40 rounded-xl bg-muted/5"
                     >
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        {/* Left side: Timeframe / Date Ranges */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Date Range</span>
+                          <TimeRangeFilter value={hierarchyTimeframe} onChange={setHierarchyTimeframe} />
+                        </div>
+
                         {/* Right side: Dropdown Filters */}
-                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap font-medium">
                           {/* Group Dropdown */}
                           <div className="relative z-30" ref={hierarchyGroupsRef}>
                             <button
@@ -2706,12 +2713,17 @@ export default function AccountsPage() {
                                         const accStats = getTrendStats([acc]);
                                         const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
                                         const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                        const isLiab = isLiabilityAccount(acc.type);
 
                                         return (
                                           <Fragment key={acc.id}>
                                             <div 
                                               onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                              className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                              className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 transition-all cursor-pointer select-none ${
+                                                isAccExpanded 
+                                                  ? `${isLiab ? 'bg-destructive/10 hover:bg-destructive/15' : 'bg-primary/10 hover:bg-primary/15'} font-medium` 
+                                                  : 'hover:bg-muted/10'
+                                              } ${
                                                 acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                               }`}
                                             >
@@ -2751,12 +2763,14 @@ export default function AccountsPage() {
                                               </div>
 
                                               <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                                {!isAccExpanded && (
                                                 <Sparkline 
                                                   data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
                                                   isPositive={accStats.isPositive} 
                                                   width={90}
                                                   height={20}
                                                 />
+                                                )}
                                               </div>
 
                                               <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
@@ -2779,6 +2793,8 @@ export default function AccountsPage() {
                                                 accountId={acc.id} 
                                                 historyData={historyData}
                                                 isLiability={isLiabilityAccount(acc.type)}
+                                                timeframe={hierarchyTimeframe}
+                                                setTimeframe={setHierarchyTimeframe}
                                               />
                                             )}
                                           </Fragment>
@@ -2793,12 +2809,17 @@ export default function AccountsPage() {
                                 const accStats = getTrendStats([acc]);
                                 const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
                                 const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                const isLiab = isLiabilityAccount(acc.type);
 
                                 return (
                                   <Fragment key={acc.id}>
                                     <div 
                                       onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
-                                      className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 hover:bg-muted/10 transition-all cursor-pointer select-none ${
+                                        className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 transition-all cursor-pointer select-none ${
+                                          isAccExpanded 
+                                            ? `${isLiab ? 'bg-destructive/10 hover:bg-destructive/15' : 'bg-primary/10 hover:bg-primary/15'} font-medium` 
+                                            : 'hover:bg-muted/10'
+                                        } ${
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
                                     >
@@ -2841,12 +2862,14 @@ export default function AccountsPage() {
 
                                       {/* Sparkline for single account */}
                                       <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                        {!isAccExpanded && (
                                         <Sparkline 
                                           data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
                                           isPositive={accStats.isPositive} 
                                           width={90}
                                           height={20}
                                         />
+                                        )}
                                       </div>
 
                                       <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
@@ -2869,6 +2892,8 @@ export default function AccountsPage() {
                                         accountId={acc.id} 
                                         historyData={historyData}
                                         isLiability={isLiabilityAccount(acc.type)}
+                                        timeframe={hierarchyTimeframe}
+                                        setTimeframe={setHierarchyTimeframe}
                                       />
                                     )}
                                   </Fragment>

@@ -1,19 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Circle, Landmark, ListChecks, Target, Wallet, X } from 'lucide-react';
+import { CheckCircle2, Circle, Landmark, Target, Wallet, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ChecklistState = {
   accounts: number;
-  transactions: number;
   budgets: number;
   goals: number;
 };
 
 const initialState: ChecklistState = {
   accounts: 0,
-  transactions: 0,
   budgets: 0,
   goals: 0,
 };
@@ -39,16 +37,14 @@ export function OnboardingChecklist() {
 
     async function load() {
       try {
-        const [accountsRes, txRes, budgetsRes, goalsRes] = await Promise.all([
+        const [accountsRes, budgetsRes, goalsRes] = await Promise.all([
           fetch('/api/accounts', { credentials: 'include' }),
-          fetch('/api/transactions?limit=1', { credentials: 'include' }),
           fetch('/api/budgets', { credentials: 'include' }),
           fetch('/api/financial-goals', { credentials: 'include' }),
         ]);
 
-        const [accounts, tx, budgets, goals] = await Promise.all([
+        const [accounts, budgets, goals] = await Promise.all([
           accountsRes.ok ? accountsRes.json() : [],
-          txRes.ok ? txRes.json() : { total: 0 },
           budgetsRes.ok ? budgetsRes.json() : { budgets: [] },
           goalsRes.ok ? goalsRes.json() : [],
         ]);
@@ -56,7 +52,6 @@ export function OnboardingChecklist() {
         if (!cancelled) {
           setState({
             accounts: Array.isArray(accounts) ? accounts.length : 0,
-            transactions: typeof tx?.total === 'number' ? tx.total : 0,
             budgets: Array.isArray(budgets?.budgets) ? budgets.budgets.length : 0,
             goals: Array.isArray(goals) ? goals.length : 0,
           });
@@ -79,13 +74,6 @@ export function OnboardingChecklist() {
       title: 'Add accounts',
       text: 'Connect SimpleFIN or create manual accounts.',
       href: '/settings?tab=accounts',
-    },
-    {
-      done: state.transactions > 0,
-      icon: ListChecks,
-      title: 'Review transactions',
-      text: 'Categorize spending and mark reviewed items.',
-      href: '/transactions?reviewed=false',
     },
     {
       done: state.budgets > 0,

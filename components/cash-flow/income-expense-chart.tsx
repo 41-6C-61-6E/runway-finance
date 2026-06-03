@@ -50,8 +50,8 @@ const typeOptions = [
 export function IncomeExpenseChart() {
   const router = useRouter();
   const [allData, setAllData] = useState<MonthlyData[]>([]);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('runway:income-expense:timeframe', '1y');
-  const [chartType, setChartType] = usePersistentState<ChartType>('runway:income-expense:chartType', 'bar');
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:income-expense:timeframe', '1y');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:income-expense:chartType', 'bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
@@ -160,7 +160,7 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
             </h3>
           }
@@ -177,7 +177,7 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
             </h3>
           }
@@ -198,7 +198,7 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
             </h3>
           }
@@ -218,7 +218,7 @@ export function IncomeExpenseChart() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
           </h3>
         }

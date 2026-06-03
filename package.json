@@ -1,5 +1,5 @@
 {
-  "name": "runway-finance",
+  "name": "personal-finance",
   "description": "Self-hosted personal finance dashboard for net worth, cash flow, budgets, goals, real estate, and FIRE planning.",
   "version": "0.1.0",
   "private": true,
@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:docker": "bash ./scripts/test-docker.sh",
-    "test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/runway_finance vitest run --config vitest.integration.config.ts",
+    "test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/personal_finance vitest run --config vitest.integration.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

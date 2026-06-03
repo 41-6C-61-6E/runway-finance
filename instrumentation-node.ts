@@ -2,7 +2,7 @@ import { logger, setDevMode } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
-const LOG_TAG = '[runway-sync]';
+const LOG_TAG = '[finance-sync]';
 
 export async function registerNodeInstrumentation(): Promise<void> {
   // Run database migrations

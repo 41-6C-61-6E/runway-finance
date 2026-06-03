@@ -69,7 +69,7 @@ export function WithdrawalRateSensitivity({ scenario }: { scenario: FireScenario
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <Percent className="w-4 h-4 text-primary" /> Withdrawal Rate Sensitivity
             </h3>
           }
@@ -89,7 +89,7 @@ export function WithdrawalRateSensitivity({ scenario }: { scenario: FireScenario
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <Percent className="w-4 h-4 text-primary" /> Withdrawal Rate Sensitivity
           </h3>
         }

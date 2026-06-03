@@ -98,7 +98,7 @@ export function RetirementAccountAllocation() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
             </h3>
           }
@@ -115,7 +115,7 @@ export function RetirementAccountAllocation() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
             </h3>
           }
@@ -136,7 +136,7 @@ export function RetirementAccountAllocation() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
             </h3>
           }
@@ -158,7 +158,7 @@ export function RetirementAccountAllocation() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
             <PieIcon className="w-4 h-4 text-primary" /> Investment Account Allocation
           </h3>
         }
