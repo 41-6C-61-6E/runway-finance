@@ -316,7 +316,7 @@ export default function TransactionTable({
         maxAmountWidth = estimatedWidth;
       }
     }
-    const amountWidth = Math.min(isMobileSize ? 75 : 150, maxAmountWidth);
+    const amountWidth = Math.min(isMobileSize ? 110 : 150, maxAmountWidth);
 
     const visibleCols = columnOrder.filter(
       (id) => columnVisibility[id] !== false,
@@ -1514,7 +1514,7 @@ export default function TransactionTable({
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className={`px-1.5 sm:px-3 py-1.5 overflow-hidden truncate ${cell.column.columnDef.meta?.className || ""}`}
+                            className={`px-1.5 sm:px-3 py-1.5 ${cell.column.id !== 'amount' ? 'overflow-hidden truncate' : 'text-nowrap'} ${cell.column.columnDef.meta?.className || ""}`}
                             style={{
                               width:
                                 columnSizing[cell.column.id] ||
