@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -16,14 +17,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: 'Invalid request body.' });
   }
 
-  const endpoint = body.endpoint?.replace(/\/$/, '');
+  const rawEndpoint = body.endpoint?.replace(/\/$/, '');
   const model = body.model || 'unknown';
   const apiKey = body.apiKey || '';
   const userPrompt = body.prompt || DEFAULT_TEST_PROMPT;
 
-  if (!endpoint) {
+  if (!rawEndpoint) {
     return NextResponse.json({ ok: false, message: 'No endpoint provided. Enter the URL and try again.' });
   }
+
+  const validated = await validateEndpointUrl(rawEndpoint);
+  if ('error' in validated) {
+    return NextResponse.json({ ok: false, message: validated.error });
+  }
+
+  const endpoint = validated.url.toString().replace(/\/$/, '');
 
   logger.info('Testing AI connection', { endpoint, model, hasKey: !!apiKey });
 

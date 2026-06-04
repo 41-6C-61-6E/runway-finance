@@ -1,5 +1,19 @@
 import type { NextAuthConfig } from "next-auth";
 
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
+
 export const authConfig = {
   pages: {
     signIn: "/signin",
@@ -8,19 +22,26 @@ export const authConfig = {
   trustHost: true,
   providers: [],
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
-      const { pathname } = nextUrl;
-      const isOnSignin = pathname === "/signin";
-      
-      // Allow access to dev-mode API without a session
-      if (pathname.startsWith("/api/dev-")) {
-        return true;
+      const { pathname } = request.nextUrl;
+
+      // Rate limit auth and registration endpoints
+      if (pathname.startsWith("/api/auth") || pathname.startsWith("/api/register")) {
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+                  ?? request.headers.get("x-real-ip")
+                  ?? "unknown";
+        if (!checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000)) {
+          return Response.json({ error: "Too many requests" }, { status: 429 });
+        }
       }
 
-      if (isOnSignin) {
+      // API routes handle their own authentication
+      if (pathname.startsWith("/api/")) return true;
+
+      if (pathname === "/signin") {
         if (isLoggedIn) {
-          return Response.redirect(new URL("/", nextUrl));
+          return Response.redirect(new URL("/", request.nextUrl));
         }
         return true;
       }
