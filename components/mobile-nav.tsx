@@ -13,11 +13,11 @@ import {
   ChartSpline,
   Wallet,
   Home,
-  Flame,
   Target,
   Calculator,
   Database,
-  Sparkles
+  Sparkles,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
@@ -32,11 +32,14 @@ const drawerItems = [
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
-  { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
   { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
+];
+
+const planningDrawerItems = [
+  { href: '/plans', label: 'Plans', icon: LayoutDashboard, pageKey: 'plans' },
 ];
 
 export function MobileNav() {
@@ -64,7 +67,6 @@ export function MobileNav() {
 
   if (!mounted) return null;
 
-  // Filter drawer items based on visibility settings and developer mode
   const visibleDrawerItems = drawerItems.filter((item) => {
     const isDevModePage = (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey);
     if (isDevModePage && devMode !== true) return false;
@@ -88,7 +90,7 @@ export function MobileNav() {
       >
         {mainNavItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.href) && !isOpen; // Don't highlight main tabs as active if menu drawer is open
+          const active = isActive(item.href) && !isOpen;
 
           return (
             <a
@@ -146,7 +148,10 @@ export function MobileNav() {
           </button>
         </div>
 
-        {/* Drawer Grid */}
+        {/* Finances Section */}
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
+          Finances
+        </div>
         <div className="grid grid-cols-4 gap-y-5 gap-x-2">
           {visibleDrawerItems.map((item) => {
             const Icon = item.icon;
@@ -172,9 +177,41 @@ export function MobileNav() {
           })}
         </div>
 
+        {/* Separator */}
+        <div className="my-6 border-t border-border/60" />
+
+        {/* Planning Section */}
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
+          Planning
+        </div>
+        <div className="grid grid-cols-4 gap-y-5 gap-x-2">
+          {planningDrawerItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                  active ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <div className={`p-3 rounded-2xl transition-colors ${
+                  active ? 'bg-primary/15' : 'bg-muted/40 hover:bg-muted/70'
+                }`}>
+                  <Icon className="h-6 w-6 flex-shrink-0" />
+                </div>
+                <span className="text-[10px] tracking-wide text-center truncate w-full">{item.label}</span>
+              </a>
+            );
+          })}
+        </div>
+
         {/* User Session Footer */}
         {session?.user?.name && (
-          <div className="mt-8 pt-4 border-t border-border/60 flex items-center text-xs text-muted-foreground">
+          <div className="mt-6 pt-4 border-t border-border/60 flex items-center text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-[10px] font-semibold text-primary">

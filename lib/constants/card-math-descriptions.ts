@@ -63,56 +63,6 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
     description:
       'Three modes: historical (averages actual income/expenses over the lookback period), budget (uses recurring budget amounts), or hybrid (budgets where available, historical averages otherwise). Projected balance = starting balance + inflows − outflows per month.',
   },
-
-  // ── FIRE ──────────────────────────────────────────────────────
-  fireMetrics: {
-    title: 'FIRE Metrics',
-    description:
-      'FIRE Number = Target Annual Expenses / Safe Withdrawal Rate. % to FIRE = Current Investable Assets / FIRE Number × 100. Years to FI uses the logarithmic future value formula: ln((needed + annual/rate) / (annual/rate)) / ln(1 + rate), where needed = FIRE Number − current savings and rate = expected return − inflation. If rate ≤ 0, uses linear: (target − current) / annual contributions.',
-  },
-  fireProjectionChart: {
-    title: 'Projection Chart',
-    description:
-      'Portfolio at year N = current × (1 + rate)^N + annual contributions × ((1 + rate)^N − 1) / rate. Three scenarios: Conservative (rate − 2%), Moderate (rate), Aggressive (rate + 2%). The FIRE number is displayed as a horizontal reference line.',
-  },
-  fireProgressRing: {
-    title: 'Progress Ring',
-    description:
-      'Percent to FIRE = Current Investable Assets / FIRE Number × 100, displayed as a circular progress indicator.',
-  },
-  whatIfAnalysis: {
-    title: 'What-If Analysis',
-    description:
-      'Applies the same logarithmic years-to-FI formula across five scenarios: save $500/mo more, save $1,000/mo more, 1% higher returns, 1% lower returns, or retire with $10k less in annual expenses. Each is compared to the baseline.',
-  },
-  fireScenarios: {
-    title: 'Scenarios',
-    description:
-      'Saved assumption sets (expected return, contributions, expenses, withdrawal rate, etc.) that are loaded into the FIRE calculator and projection formulas.',
-  },
-
-  // ── Retirement Planner ────────────────────────────────────────
-  retirementInputs: {
-    title: 'Assumptions Inputs',
-    description:
-      'User-configured parameters: retirement age, life expectancy, expected return rate, inflation rate, annual withdrawal, Social Security start age/amount, pension start age/amount, part-time income, rental income, healthcare costs, and legacy goal. These feed into the decumulation model.',
-  },
-  retirementMetrics: {
-    title: 'Retirement Metrics',
-    description:
-      'Portfolio Runway = years until the portfolio is fully depleted. End Balance = portfolio value at life expectancy. Peak Portfolio = highest balance reached. Total Withdrawn = sum of all inflation-adjusted withdrawals and healthcare costs. Monte Carlo Success = percentage of 1,000 simulations where the ending balance meets or exceeds the legacy goal.',
-  },
-  retirementRunwayChart: {
-    title: 'Runway Chart',
-    description:
-      'Each year of retirement: inflation factor = (1 + inflation)^years-into-retirement. Withdrawal = annual withdrawal × inflation factor. Income sources (SS, pension, part-time, rental) are all inflated. Net cash flow = total income − withdrawal − healthcare. Investment return = starting balance × expected return rate. Ending balance = starting balance + investment return + net cash flow.',
-  },
-  retirementMonteCarlo: {
-    title: 'Monte Carlo Analysis',
-    description:
-      'Runs 1,000 simulations with normally distributed annual returns (mean = expected return rate, standard deviation = 10%). Each simulation follows the same decumulation formula with randomized returns. Plots median, 10th percentile (P10), and 90th percentile (P90) paths. Success rate = percentage of simulations ending with balance ≥ legacy goal.',
-  },
-
   // ── Real Estate ───────────────────────────────────────────────
   equityOverTimeChart: {
     title: 'Equity Over Time',
@@ -152,17 +102,7 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
       'Tabular view of each budget item showing: budgeted amount, actual amount, remaining (budgeted − actual for expenses), and percent used (actual / budgeted × 100).',
   },
 
-  // ── Investment Allocation ─────────────────────────────────────
-  retirementAccountAllocation: {
-    title: 'Investment Account Allocation',
-    description:
-      'Groups investment accounts (401k, Roth IRA, Traditional IRA, Brokerage, HSA, 529, etc.) by sub-type. Each slice = sum of account balances in that group / total investable assets × 100.',
-  },
-  withdrawalRateSensitivity: {
-    title: 'Withdrawal Rate Sensitivity',
-    description:
-      'Runs the FIRE number and years-to-FI formula across 8 safe withdrawal rates (2.5%–6.0%). Bar shows years-to-FI at each rate. The current SWR is highlighted.',
-  },
+
   expenseCategoryTrend: {
     title: 'Top Expense Categories',
     description:

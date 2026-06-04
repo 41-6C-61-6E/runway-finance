@@ -15,7 +15,11 @@ type TransactionData = {
   categoryId: string | null;
 };
 
-export type RuleAction = {
+export async function applyRulesToTransactions(
+  txns: TransactionData[],
+  userId: string,
+  dek: Uint8Array
+): Promise<Map<string, {
   categoryId: string | null;
   payee: string | null;
   reviewed: boolean | null;
@@ -23,13 +27,7 @@ export type RuleAction = {
   overrideExisting: boolean;
   shouldUpdateTags: boolean;
   shouldUpdateCategory: boolean;
-};
-
-export async function applyRulesToTransactions(
-  txns: TransactionData[],
-  userId: string,
-  dek: Uint8Array
-): Promise<Map<string, RuleAction>> {
+}>> {
   const rules = await getDb()
     .select()
     .from(categoryRules)
@@ -43,7 +41,15 @@ export async function applyRulesToTransactions(
 
   const decryptedRules = await decryptRows('category_rules', rules, dek);
 
-  const results = new Map<string, RuleAction>();
+  const results = new Map<string, {
+  categoryId: string | null;
+  payee: string | null;
+  reviewed: boolean | null;
+  setTagId: string | null;
+  overrideExisting: boolean;
+  shouldUpdateTags: boolean;
+  shouldUpdateCategory: boolean;
+}>();
 
   // Fetch which transactions have existing tags
   const txIds = txns.map((t) => t.id);
@@ -72,7 +78,7 @@ export async function applyRulesToTransactions(
             overrideExisting: !!rule.overrideExisting,
             shouldUpdateTags,
             shouldUpdateCategory,
-          });
+          } as any);
         }
         break;
       }
@@ -161,20 +167,20 @@ function getFieldValue(field: string, tx: TransactionData): string | null {
   }
 }
 
-export type NormalizedCondition = {
-  field: string;
-  operator: string;
-  value: string;
-  caseSensitive: boolean;
-};
 
-export function normalizeConditions(rule: {
+
+function normalizeConditions(rule: {
   conditionField?: string | null;
   conditionOperator?: string | null;
   conditionValue?: string | null;
   conditionCaseSensitive?: boolean | null;
   conditions?: any;
-}): NormalizedCondition[] {
+}): Array<{
+  field: string;
+  operator: string;
+  value: string;
+  caseSensitive: boolean;
+}> {
   if (Array.isArray(rule.conditions) && rule.conditions.length > 0) {
     return rule.conditions.map((c: any) => ({
       field: String(c.field || '').trim(),
@@ -201,7 +207,17 @@ export function normalizeConditions(rule: {
   return [];
 }
 
-export function conditionsEqual(a: NormalizedCondition[], b: NormalizedCondition[]): boolean {
+function conditionsEqual(a: Array<{
+  field: string;
+  operator: string;
+  value: string;
+  caseSensitive: boolean;
+}>, b: Array<{
+  field: string;
+  operator: string;
+  value: string;
+  caseSensitive: boolean;
+}>): boolean {
   if (a.length !== b.length) return false;
 
   const matchedIndices = new Set<number>();

@@ -16,8 +16,7 @@ import {
   monthlyCashFlow,
   categorySpendingSummary,
   categoryIncomeSummary,
-  retirementProjections,
-  fireScenarios,
+
   simplifinConnections,
   aiProviders,
   aiProposals,
@@ -43,11 +42,9 @@ const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
   { table: categoryRules, dbName: 'category_rules' },
-  { table: retirementProjections, dbName: 'retirement_projections' },
   { table: accounts, dbName: 'accounts' },
   { table: simplifinConnections, dbName: 'simplefin_connections' },
   { table: categories, dbName: 'categories' },
-  { table: fireScenarios, dbName: 'fire_scenarios' },
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
   { table: netWorthSnapshots, dbName: 'net_worth_snapshots' },
@@ -56,7 +53,6 @@ const DELETE_ORDER: { table: any; dbName: string }[] = [
 
 const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: simplifinConnections, dbName: 'simplefin_connections' },
-  { table: fireScenarios, dbName: 'fire_scenarios' },
   { table: categories, dbName: 'categories' },
   { table: accounts, dbName: 'accounts' },
   { table: aiProviders, dbName: 'ai_providers' },
@@ -66,7 +62,7 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: categoryRules, dbName: 'category_rules' },
   { table: budgets, dbName: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals' },
-  { table: retirementProjections, dbName: 'retirement_projections' },
+
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
   { table: importLog, dbName: 'import_log' },

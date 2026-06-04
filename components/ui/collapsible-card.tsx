@@ -6,14 +6,12 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { Card } from './card';
 import { CollapsibleCardHeader } from './collapsible-card-header';
 
-interface CollapsibleCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
+const CollapsibleCard = React.forwardRef<HTMLDivElement, Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> & {
   cardId: string;
   title: React.ReactNode;
   children: React.ReactNode;
   actions?: React.ReactNode;
-}
-
-const CollapsibleCard = React.forwardRef<HTMLDivElement, CollapsibleCardProps>(
+}>(
   ({ cardId, title, children, actions, className, ...props }, ref) => {
     const [isCollapsed, setIsCollapsed] = useCardCollapsed(cardId);
 

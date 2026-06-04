@@ -19,8 +19,7 @@ import {
   categoryIncomeSummary,
   budgets,
   financialGoals,
-  retirementProjections,
-  fireScenarios,
+
   paystubs,
   paystubLineItems,
   paystubFieldMappings,
@@ -229,8 +228,7 @@ export async function DELETE() {
         await tx.delete(importLog).where(eq(importLog.userId, userId));
         await tx.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
         await tx.delete(financialGoals).where(eq(financialGoals.userId, userId));
-        await tx.delete(retirementProjections).where(eq(retirementProjections.userId, userId));
-        await tx.delete(fireScenarios).where(eq(fireScenarios.userId, userId));
+
         await tx.delete(paystubLineItems).where(eq(paystubLineItems.userId, userId));
         await tx.delete(paystubAutoGenerateSettings).where(eq(paystubAutoGenerateSettings.userId, userId));
         await tx.delete(paystubs).where(eq(paystubs.userId, userId));

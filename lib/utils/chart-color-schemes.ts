@@ -9,14 +9,12 @@ const SCHEME_META: Record<ChartColorSchemeId, { name: string; description: strin
   vashon: { name: 'Vashon', description: 'Warm and vibrant cyan, violet, gold, lime, and peach' },
 };
 
-export interface ChartColorScheme {
+export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, {
   id: ChartColorSchemeId;
   name: string;
   description: string;
   colors: [string, string, string, string, string];
-}
-
-export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> = Object.fromEntries(
+}> = Object.fromEntries(
   (Object.keys(PALETTE_SCHEMES) as ChartColorSchemeId[]).map((id) => {
     const schemeColors = PALETTE_SCHEMES[id];
     return [
@@ -34,9 +32,12 @@ export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, ChartColorScheme> =
       },
     ];
   }),
-) as Record<ChartColorSchemeId, ChartColorScheme>;
-
-export const CHART_SCHEME_NAMES = Object.keys(CHART_COLOR_SCHEMES) as ChartColorSchemeId[];
+) as Record<ChartColorSchemeId, {
+  id: ChartColorSchemeId;
+  name: string;
+  description: string;
+  colors: [string, string, string, string, string];
+}>;
 
 export function applyChartColorScheme(id: ChartColorSchemeId) {
   const scheme = CHART_COLOR_SCHEMES[id] || CHART_COLOR_SCHEMES['fauntleroy'];

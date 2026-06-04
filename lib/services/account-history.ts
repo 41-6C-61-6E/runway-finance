@@ -7,21 +7,7 @@ import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
 
-/**
- * Result of a single synthetic snapshot generation.
- */
-export interface SyntheticSnapshotResult {
-  accountId: string;
-  date: string;
-  balance: string;
-  isSynthetic: true;
-}
-
-/**
- * Fetch the latest non-synthetic snapshot for an account on or before a given date.
- * Returns null if no real snapshot exists.
- */
-export async function getLatestRealSnapshot(
+async function getLatestRealSnapshot(
   accountId: string,
   userId: string,
   onOrBeforeDate: string,
@@ -83,10 +69,7 @@ export async function getEarliestTransactionDate(
   return tx ? String(tx.date) : null;
 }
 
-/**
- * Fetch all posted (non-pending) transactions for an account within a date range.
- */
-export async function getPostedTransactions(
+async function getPostedTransactions(
   accountId: string,
   fromDate: string,
   toDate: string

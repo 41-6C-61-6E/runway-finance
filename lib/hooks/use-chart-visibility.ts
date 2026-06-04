@@ -31,27 +31,7 @@ export const CHARTS = {
       categoryExpenses: 'Expenses Section',
     },
   },
-  fire: {
-    label: 'FIRE',
-    charts: {
-      fireMetrics: 'Summary Cards',
-      fireProjectionChart: 'Projection Chart',
-      fireProgressRing: 'Progress Ring',
-      whatIfAnalysis: 'What-If Analysis',
-      fireScenarios: 'Scenarios',
-      retirementAccountAllocation: 'Investment Account Allocation',
-      withdrawalRateSensitivity: 'Withdrawal Rate Sensitivity',
-    },
-  },
-  retirement: {
-    label: 'Retirement Planner',
-    charts: {
-      retirementInputs: 'Assumptions Inputs',
-      retirementMetrics: 'Summary Cards',
-      retirementRunwayChart: 'Runway Chart',
-      retirementMonteCarlo: 'Monte Carlo Analysis',
-    },
-  },
+
   realEstate: {
     label: 'Real Estate',
     charts: {
@@ -78,16 +58,10 @@ export const CHARTS = {
   },
 } as const;
 
-export type ChartId = {
-  [K in keyof typeof CHARTS]: keyof typeof CHARTS[K]['charts'];
-}[keyof typeof CHARTS];
-
-export type ChartVisibility = Partial<Record<string, boolean>>;
-
-const defaultVisibility: ChartVisibility = {};
+const defaultVisibility: Partial<Record<string, boolean>> = {};
 
 export function useChartVisibility() {
-  const [visibility, setVisibility] = useState<ChartVisibility>(defaultVisibility);
+  const [visibility, setVisibility] = useState<Partial<Record<string, boolean>>>(defaultVisibility);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

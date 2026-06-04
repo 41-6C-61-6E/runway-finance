@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ChartSpline, Receipt, TrendingUp, Flame, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark } from 'lucide-react'
+import { ChartSpline, Receipt, TrendingUp, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
@@ -18,11 +18,14 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
-  { href: '/fire', label: 'FIRE', icon: Flame, pageKey: 'fire' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
   { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
   { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
+]
+
+const planningItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
+  { href: '/plans', label: 'Plans', icon: LayoutDashboard, pageKey: 'plans' },
 ]
 
 export default function ResizableSidebar() {
@@ -41,7 +44,6 @@ export default function ResizableSidebar() {
   }, [])
 
   useEffect(() => {
-    // Check for pending AI proposals
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
       .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
@@ -56,8 +58,31 @@ export default function ResizableSidebar() {
   const isActive = (href: string) => pathname === href
   const isCollapsed = sidebarWidth === COLLAPSED_WIDTH
 
-  // Return null or a simple skeleton on server/initial hydration to avoid mismatch
   if (!mounted) return null
+
+  const renderNavLink = (
+    href: string,
+    label: string,
+    Icon: React.ComponentType<{ className?: string }>,
+    active: boolean,
+    showLabel: boolean,
+  ) => (
+    <a
+      href={href}
+      className={`flex items-center rounded-lg transition-all duration-150 ${
+        !showLabel
+          ? 'justify-center py-2'
+          : 'px-3 py-2 gap-3'
+      } ${
+        active
+          ? 'bg-primary/15 text-primary font-medium'
+          : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+      }`}
+    >
+      <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
+      {showLabel && <span className="text-sm truncate">{label}</span>}
+    </a>
+  )
 
   return (
     <>
@@ -91,7 +116,13 @@ export default function ResizableSidebar() {
         </div>
 
         {/* Navigation Links */}
-        <nav className={`flex-1 ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
+        <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
+          {/* ── Finances Section ── */}
+          {!isCollapsed && (
+            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              Finances
+            </div>
+          )}
           {navItems.filter((item) => {
             const isDevModePage = (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey)
             if (isDevModePage && devMode !== true) return false
@@ -99,32 +130,30 @@ export default function ResizableSidebar() {
           }).map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
-            const link = (
-              <a
-                href={item.href}
-                className={`flex items-center rounded-lg transition-all duration-150 ${
-                  isCollapsed
-                    ? 'justify-center py-2'
-                    : 'px-3 py-2 gap-3'
-                } ${
-                  active
-                    ? 'bg-primary/15 text-primary font-medium'
-                    : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
-                }`}
-              >
-                  <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
-                  {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
-                  {item.href === '/ai-suggestions' && pendingAiCount > 0 && (
-                    isCollapsed ? (
-                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />
-                    ) : (
-                      <span className="ml-auto px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full">
-                        {pendingAiCount}
-                      </span>
-                    )
-                  )}
-                </a>
+            const link = renderNavLink(item.href, item.label, Icon, active, !isCollapsed)
+            return isCollapsed ? (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <div key={item.href}>{link}</div>
             )
+          })}
+
+          {/* Separator */}
+          <div className="my-3 border-t border-sidebar-border/50" />
+
+          {/* ── Planning Section ── */}
+          {!isCollapsed && (
+            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              Planning
+            </div>
+          )}
+          {planningItems.map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.href)
+            const link = renderNavLink(item.href, item.label, Icon, active, !isCollapsed)
             return isCollapsed ? (
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>

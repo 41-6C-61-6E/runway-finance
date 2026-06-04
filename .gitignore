@@ -11,6 +11,8 @@ node_modules/
 # Build outputs
 out/
 build/
+build.log
+*.tsbuildinfo
 
 # Database
 *.db
