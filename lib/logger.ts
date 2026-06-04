@@ -114,7 +114,7 @@ export const logger = {
     const logLineConsole = `[INFO ${ts()}] ${message}`;
     const logLineFile = `[${ts()}] [INFO] ${message}${formattedMeta}`;
 
-    console.log(logLineConsole, metadata ?? '');
+    console.log('%s', logLineConsole, metadata ?? '');
     if (fileLogger) {
       fileLogger.write(logLineFile);
     }
@@ -125,7 +125,7 @@ export const logger = {
     const logLineConsole = `[WARN ${ts()}] ${message}`;
     const logLineFile = `[${ts()}] [WARN] ${message}${formattedMeta}`;
 
-    console.warn(logLineConsole, metadata ?? '');
+    console.warn('%s', logLineConsole, metadata ?? '');
     if (fileLogger) {
       fileLogger.write(logLineFile);
     }
@@ -136,7 +136,7 @@ export const logger = {
     const logLineConsole = `[ERROR ${ts()}] ${message}`;
     const logLineFile = `[${ts()}] [ERROR] ${message}${formattedMeta}`;
 
-    console.error(logLineConsole, metadata ?? '');
+    console.error('%s', logLineConsole, metadata ?? '');
     if (fileLogger) {
       fileLogger.write(logLineFile);
     }
@@ -148,7 +148,7 @@ export const logger = {
       const logLineConsole = `[DEBUG ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [DEBUG] ${message}${formattedMeta}`;
 
-      console.debug(logLineConsole, metadata ?? '');
+      console.debug('%s', logLineConsole, metadata ?? '');
       if (fileLogger) {
         fileLogger.write(logLineFile);
       }

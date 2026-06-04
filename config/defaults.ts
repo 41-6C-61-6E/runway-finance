@@ -173,9 +173,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'hideAccountSubheadings', label: 'Hide Account Subheadings', description: 'Group accounts by major category only', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.hideAccountSubheadings },
   { key: 'hideAccountsSidebarByDefault', label: 'Hide Accounts Sidebar by Default', description: 'Start with the accounts sidebar collapsed on all pages', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.hideAccountsSidebarByDefault },
   { key: 'chartSelections', label: 'Chart Selections', description: 'Persisted chart timeframes, types, and filter choices', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.chartSelections },
+  { key: 'cardCollapsedStates', label: 'Card Collapsed States', description: 'Persisted collapsed/expanded state of analytics cards (JSON object of card key → boolean)', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.cardCollapsedStates },
   { key: 'compactMode', label: 'Compact Mode', description: 'Compact UI mode with reduced spacing', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.compactMode },
   { key: 'hiddenPages', label: 'Hidden Pages', description: 'Pages hidden from navigation sidebar (JSON object of page key → boolean)', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.hiddenPages },
   { key: 'showMathEnabled', label: 'Show Math Explanations', description: 'Display math/logic descriptions on analytics cards', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.showMathEnabled },
+  { key: 'paystubEnabled', label: 'Paystub Enabled', description: 'Enable paystub parsing and forecasting features', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.paystubEnabled },
   { key: 'accountTagVisibility', label: 'Account Tag Visibility', description: 'Control visibility of account tag indicators (JSON object: {sidebar, transactions, legend, budgets, forecast, suggestions})', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.accountTagVisibility },
 
   // ── Analytics ──

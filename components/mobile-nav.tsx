@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { 
   Landmark, 
   Receipt, 
@@ -44,7 +43,6 @@ const planningDrawerItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
-  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [devMode, setDevMode] = useState<boolean | null>(null);
@@ -208,20 +206,6 @@ export function MobileNav() {
             );
           })}
         </div>
-
-        {/* User Session Footer */}
-        {session?.user?.name && (
-          <div className="mt-6 pt-4 border-t border-border/60 flex items-center text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-[10px] font-semibold text-primary">
-                  {session.user.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <span>{session.user.name}</span>
-            </div>
-          </div>
-        )}
       </div>
     </>
   );

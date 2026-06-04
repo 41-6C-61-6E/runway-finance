@@ -7,6 +7,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -48,7 +49,13 @@ export async function POST(request: Request) {
     try { apiKey = await decryptField(provider.apiKeyEncrypted, dek); } catch { /* empty */ }
   }
 
-  const endpoint = provider.endpoint.replace(/\/$/, '');
+  const rawEndpoint = provider.endpoint.replace(/\/$/, '');
+  const validated = await validateEndpointUrl(rawEndpoint);
+  if ('error' in validated) {
+    return NextResponse.json({ ok: false, message: validated.error });
+  }
+
+  const endpoint = validated.url.toString().replace(/\/$/, '');
   const model = provider.model;
   const userPrompt = body.prompt || DEFAULT_TEST_PROMPT;
 
