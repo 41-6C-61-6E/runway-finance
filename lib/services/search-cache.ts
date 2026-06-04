@@ -4,7 +4,9 @@ import { eq, and, or, sql } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
-export type CachedTransaction = {
+// Global-safe caches to survive Next.js dev server hot reloads
+const globalForSearchCache = globalThis as unknown as {
+  searchCache?: Map<string, Map<string, {
   description: string;
   payee: string;
   notes: string;
@@ -16,16 +18,24 @@ export type CachedTransaction = {
   date: string;
   ignored: boolean;
   source: string | null;
-};
-
-// Global-safe caches to survive Next.js dev server hot reloads
-const globalForSearchCache = globalThis as unknown as {
-  searchCache?: Map<string, Map<string, CachedTransaction>>;
+}>>;
   searchCacheStatus?: Map<string, 'uninitialized' | 'hydrating' | 'ready'>;
   searchCachePromises?: Map<string, Promise<void>>;
 };
 
-const searchCache = globalForSearchCache.searchCache ?? new Map<string, Map<string, CachedTransaction>>();
+const searchCache = globalForSearchCache.searchCache ?? new Map<string, Map<string, {
+  description: string;
+  payee: string;
+  notes: string;
+  categoryName: string;
+  accountName: string;
+  amount: string;
+  categoryId: string | null;
+  accountId: string;
+  date: string;
+  ignored: boolean;
+  source: string | null;
+}>>();
 const searchCacheStatus = globalForSearchCache.searchCacheStatus ?? new Map<string, 'uninitialized' | 'hydrating' | 'ready'>();
 const searchCachePromises = globalForSearchCache.searchCachePromises ?? new Map<string, Promise<void>>();
 
@@ -85,7 +95,19 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           )
         );
 
-      const userCache = new Map<string, CachedTransaction>();
+      const userCache = new Map<string, {
+  description: string;
+  payee: string;
+  notes: string;
+  categoryName: string;
+  accountName: string;
+  amount: string;
+  categoryId: string | null;
+  accountId: string;
+  date: string;
+  ignored: boolean;
+  source: string | null;
+}>();
 
       // Decrypt search fields for each transaction in parallel batch
       await Promise.all(
@@ -176,7 +198,19 @@ export async function getSearchMatchingTransactionIds(
 export async function getUserTransactionsFromCache(
   userId: string,
   dek: Uint8Array
-): Promise<CachedTransaction[]> {
+): Promise<Array<{
+  description: string;
+  payee: string;
+  notes: string;
+  categoryName: string;
+  accountName: string;
+  amount: string;
+  categoryId: string | null;
+  accountId: string;
+  date: string;
+  ignored: boolean;
+  source: string | null;
+}>> {
   await hydrateUserSearchCache(userId, dek);
   const userCache = searchCache.get(userId);
   if (!userCache) return [];

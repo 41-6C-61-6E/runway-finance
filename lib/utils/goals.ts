@@ -17,17 +17,6 @@ export function formatCurrency(
 }
 
 /**
- * Format a number as a percentage
- */
-export function formatPercent(
-  value: number | string,
-  decimals = 1,
-): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  return `${num.toFixed(decimals)}%`;
-}
-
-/**
  * Format date consistently
  */
 export function formatDate(date: string | null): string {
@@ -49,14 +38,14 @@ export function getDaysRemaining(date: string | null): number | null {
 /**
  * Get goal type icon and label
  */
-export function getGoalTypeInfo(type: string): { icon: string; label: string; color: string } {
+export function getGoalTypeInfo(_type: string): { icon: string; label: string; color: string } {
   const types: Record<string, { icon: string; label: string; color: string }> = {
     savings: { icon: '💰', label: 'Savings', color: 'bg-emerald-500/10 text-emerald-400' },
     payoff: { icon: '💳', label: 'Payoff', color: 'bg-red-500/10 text-red-400' },
     investment: { icon: '📈', label: 'Investment', color: 'bg-blue-500/10 text-blue-400' },
     other: { icon: '🎯', label: 'Other', color: 'bg-purple-500/10 text-purple-400' },
   };
-  return types[type] || types.other;
+  return types[_type] || types.other;
 }
 
 /**
@@ -77,16 +66,6 @@ export function getProgressBgClass(progress: number): string {
   if (progress >= 50) return 'bg-chart-3';
   if (progress >= 25) return 'bg-status-warning';
   return 'bg-destructive';
-}
-
-/**
- * Get progress ring stroke color based on percentage
- */
-export function getProgressStrokeColor(progress: number): string {
-  if (progress >= 75) return 'var(--color-chart-1)';
-  if (progress >= 50) return 'var(--color-chart-3)';
-  if (progress >= 25) return 'var(--color-status-warning)';
-  return 'var(--color-destructive)';
 }
 
 /**

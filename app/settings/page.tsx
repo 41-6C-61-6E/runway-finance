@@ -780,7 +780,7 @@ function SettingsPageBody() {
                     pageKey === 'cashFlow' ? 'Cash Flow' :
                     pageKey === 'budgets' ? 'Budgets' :
                     pageKey === 'realEstate' ? 'Real Estate' :
-                    pageKey === 'fire' ? 'FIRE' :
+
                     pageKey === 'dataExplorer' ? 'Data Explorer' :
                     pageKey === 'financialLogic' ? 'Financial Logic' :
                     pageKey === 'goals' ? 'Goals' :

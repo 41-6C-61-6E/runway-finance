@@ -16,7 +16,7 @@ const LOG_TAG = '[manual-accounts]';
 
 export type { ApiConfig };
 
-export const DEFAULT_API_CONFIG: ApiConfig = { ...API_KEY_DEFAULTS };
+const DEFAULT_API_CONFIG: ApiConfig = { ...API_KEY_DEFAULTS };
 
 export async function readApiConfig(userId: string): Promise<ApiConfig> {
   try {
@@ -49,13 +49,11 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
   }
 }
 
-export type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
-
-export const MANUAL_ACCOUNT_TYPES: AssetSubType[] = [
+export const MANUAL_ACCOUNT_TYPES: Array<'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash'> = [
   'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset', 'mortgage', 'cash',
 ];
 
-export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
+export const ACCOUNT_TYPE_MAP: Record<string, string> = {
   realestate: 'realestate',
   vehicle: 'vehicle',
   crypto: 'crypto',
@@ -66,23 +64,7 @@ export const ACCOUNT_TYPE_MAP: Record<AssetSubType, string> = {
   cash: 'cash',
 };
 
-export interface CreateManualAccountInput {
-  userId: string;
-  name: string;
-  type: AssetSubType;
-  metadata?: Record<string, unknown>;
-  initialValue?: number;
-  currency?: string;
-  apiConfig?: ApiConfig;
-}
 
-export interface SyncResult {
-  status: 'success' | 'error';
-  newBalance: number;
-  oldBalance: number;
-  changed: boolean;
-  errorMessage?: string;
-}
 
 function nowISO(): string {
   return new Date().toISOString().split('T')[0];
@@ -96,7 +78,7 @@ function manualExternalId(): string {
   return `manual-${randomUUID()}`;
 }
 
-export async function fetchRedfinValue(propertyId: string, apiConfig?: ApiConfig): Promise<number> {
+async function fetchRedfinValue(propertyId: string, apiConfig?: ApiConfig): Promise<number> {
   const baseUrl = apiConfig?.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl!;
   const url = `${baseUrl}?propertyId=${encodeURIComponent(propertyId)}`;
   const curlCmd = `curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' '${url}'`;
@@ -153,7 +135,7 @@ async function fetchBtcPrice(apiConfig?: ApiConfig): Promise<number> {
   return price;
 }
 
-export async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise<number> {
+async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise<number> {
   const hasDescriptor = xpub.includes('(');
   const xpubFormats = hasDescriptor
     ? [xpub]
@@ -257,7 +239,7 @@ export async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): 
   return usdValue;
 }
 
-export async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): Promise<number> {
+async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): Promise<number> {
   const baseUrl = apiConfig?.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl!;
   const ticker = type === 'gold' ? 'GC=F' : 'SI=F';
   const url = `${baseUrl}/${ticker}`;
@@ -286,7 +268,15 @@ export async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiCon
   return price;
 }
 
-export async function createManualAccount(input: CreateManualAccountInput, dek?: Uint8Array) {
+export async function createManualAccount(input: {
+  userId: string;
+  name: string;
+  type: string;
+  metadata?: Record<string, unknown>;
+  initialValue?: number;
+  currency?: string;
+  apiConfig?: ApiConfig;
+}, dek?: Uint8Array) {
   const db = getDb();
   const accountType = ACCOUNT_TYPE_MAP[input.type];
 
@@ -361,7 +351,13 @@ export async function syncManualAccount(
   userId: string,
   apiConfig?: ApiConfig,
   dek?: Uint8Array
-): Promise<SyncResult> {
+): Promise<{
+  status: 'success' | 'error';
+  newBalance: number;
+  oldBalance: number;
+  changed: boolean;
+  errorMessage?: string;
+}> {
   const db = getDb();
   const [account] = await db
     .select()
@@ -525,7 +521,13 @@ export async function adjustManualAccountValue(
   amountOz?: number,
   apiConfig?: ApiConfig,
   dek?: Uint8Array
-): Promise<SyncResult> {
+): Promise<{
+  status: 'success' | 'error';
+  newBalance: number;
+  oldBalance: number;
+  changed: boolean;
+  errorMessage?: string;
+}> {
   const db = getDb();
   const [account] = await db
     .select()

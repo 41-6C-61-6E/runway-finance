@@ -22,12 +22,6 @@ export interface ApiConfig {
   btcXpubApiUrl?: string;
 }
 
-export interface PurchaseInfo {
-  purchasePrice: number;
-  purchaseDate: string;
-  zipCode?: string;
-}
-
 // Re-export pure amortization functions (client-safe)
 export {
   calculateAmortizationSchedule,
@@ -118,7 +112,7 @@ function findMetroSeries(zipCode: string): string | null {
 
 // ─── Real Estate Historical Estimation ───────────────────────────────────────
 
-export async function estimateRealEstateHistory(
+async function estimateRealEstateHistory(
   purchasePrice: number,
   purchaseDate: string,
   currentValue: number,
@@ -192,7 +186,7 @@ export async function estimateRealEstateHistory(
 
 // ─── Vehicle Depreciation ────────────────────────────────────────────────────
 
-export function estimateVehicleHistory(
+function estimateVehicleHistory(
   purchasePrice: number,
   purchaseDate: string,
   currentValue?: number
@@ -232,7 +226,7 @@ export function estimateVehicleHistory(
 
 // ─── Precious Metals Historical ──────────────────────────────────────────────
 
-export async function estimateMetalsHistory(
+async function estimateMetalsHistory(
   amountOz: number,
   metalType: 'gold' | 'silver',
   purchaseDate: string,

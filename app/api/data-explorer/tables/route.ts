@@ -13,8 +13,7 @@ const TABLE_METADATA = [
   { key: 'category_income_summary', label: 'Category Income', group: 'Cash Flow' },
   { key: 'budgets', label: 'Budgets', group: 'Budgets' },
   { key: 'financial_goals', label: 'Financial Goals', group: 'Budgets' },
-  { key: 'fire_scenarios', label: 'FIRE Scenarios', group: 'FIRE' },
-  { key: 'retirement_projections', label: 'Retirement Projections', group: 'FIRE' },
+
   { key: 'sync_logs', label: 'Sync Logs', group: 'System' },
   { key: 'simplefin_connections', label: 'SimpleFIN Connections', group: 'System' },
   { key: 'user_settings', label: 'User Settings', group: 'System' },

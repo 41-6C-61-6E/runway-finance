@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-export type ImportedDataSettings = {
+const DEFAULTS: {
   global: boolean;
   netWorth: boolean;
   realEstate: boolean;
   cashFlowProjections: boolean;
-};
-
-const DEFAULTS: ImportedDataSettings = {
+} = {
   global: true,
   netWorth: true,
   realEstate: true,
@@ -17,7 +15,7 @@ const DEFAULTS: ImportedDataSettings = {
 };
 
 export function useImportedData() {
-  const [settings, setSettings] = useState<ImportedDataSettings>(DEFAULTS);
+  const [settings, setSettings] = useState<typeof DEFAULTS>(DEFAULTS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +32,7 @@ export function useImportedData() {
   }, []);
 
   const isEnabled = useCallback(
-    (module: keyof ImportedDataSettings) => {
+    (module: keyof typeof DEFAULTS) => {
       if (loading) return true;
       if (settings.global !== undefined && !settings.global) return false;
       return settings[module] !== false;
@@ -43,7 +41,7 @@ export function useImportedData() {
   );
 
   const updateSettings = useCallback(
-    async (next: Partial<ImportedDataSettings>) => {
+    async (next: Partial<typeof DEFAULTS>) => {
       const prev = settings;
       const merged = { ...prev, ...next };
       setSettings(merged);
