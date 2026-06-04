@@ -263,6 +263,40 @@ export function NetWorthChart() {
     return [rawMin - minPad, rawMax + minPad] as [number, number];
   }, [barData]);
 
+  const areaYDomain = useMemo(() => {
+    if (processedData.length === 0) return [-1000, 1000] as [number, number];
+    const values = processedData.map((d) => d.netWorth);
+    const rawMax = Math.max(...values);
+    const rawMin = Math.min(...values);
+    const range = rawMax - rawMin;
+    const pad = range === 0 ? 1000 : range * 0.05;
+    const minPad = Math.max(pad, 1000);
+    return [rawMin - minPad, rawMax + minPad] as [number, number];
+  }, [processedData]);
+
+  const areaGradientOffset = useMemo(() => {
+    const [yMin, yMax] = areaYDomain;
+    if (yMax <= 0) return 0;
+    if (yMin >= 0) return 1;
+    return yMax / (yMax - yMin);
+  }, [areaYDomain]);
+
+  const ActiveDot = useCallback((props: any) => {
+    const { cx, cy, payload } = props;
+    if (!cx || !cy || !payload) return null;
+    const color = payload.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)';
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={color}
+        stroke={color}
+        strokeWidth={1}
+      />
+    );
+  }, []);
+
   const areaTicks = useMemo(() => getChartXTicks(processedData, timeframe), [processedData, timeframe]);
 
   const barTicks = useMemo(() => {
@@ -321,7 +355,11 @@ export function NetWorthChart() {
     return (
       <ChartTooltip>
         <TooltipHeader>{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
-        <TooltipRow label="Net Worth" value={formatCurrency(point.netWorth)} color="var(--color-chart-1)" />
+        <TooltipRow
+          label="Net Worth"
+          value={formatCurrency(point.netWorth)}
+          color={point.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+        />
         <TooltipRow label="Total Assets" value={formatCurrency(point.totalAssets)} color="var(--color-chart-1)" />
         <TooltipRow label="Total Liabilities" value={formatCurrency(point.totalLiabilities)} color="var(--color-destructive)" />
       </ChartTooltip>
@@ -446,11 +484,18 @@ export function NetWorthChart() {
                   <AreaChart data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                        <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
+                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0.05} />
+                        <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                      </linearGradient>
+                      <linearGradient id="netWorthStrokeGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" />
+                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                    <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
                     <XAxis
                       dataKey="date"
                       tickLine={false}
@@ -463,7 +508,7 @@ export function NetWorthChart() {
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={['auto', 'auto']}
+                      domain={areaYDomain}
                       tickFormatter={formatYTick}
                     />
                     <RechartsTooltip
@@ -473,11 +518,11 @@ export function NetWorthChart() {
                     <Area
                       type="monotone"
                       dataKey="netWorth"
-                      stroke="var(--color-chart-1)"
+                      stroke="url(#netWorthStrokeGrad)"
                       strokeWidth={2}
                       fill="url(#netWorthGrad)"
                       dot={false}
-                      activeDot={{ r: 4, stroke: 'var(--color-chart-1)', strokeWidth: 1 }}
+                      activeDot={<ActiveDot />}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

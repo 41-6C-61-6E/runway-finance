@@ -75,8 +75,8 @@ export default function ResizableSidebar() {
           : 'px-3 py-2 gap-3'
       } ${
         active
-          ? 'bg-primary/15 text-primary font-medium'
-          : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+          ? 'bg-primary/20 text-primary font-semibold'
+          : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8'
       }`}
     >
       <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
@@ -93,13 +93,7 @@ export default function ResizableSidebar() {
         style={{ width: `${sidebarWidth}px` }}
       >
         {/* Dynamic Sidebar Background Panel */}
-        <div 
-          className={`absolute inset-0 -z-10 transition-all duration-200 border-r border-sidebar-border ${
-            reduceTransparency
-              ? 'bg-sidebar'
-              : 'backdrop-blur-md bg-sidebar/40 dark:bg-sidebar/40'
-          }`}
-        />
+        <div className="absolute inset-0 -z-10 transition-all duration-200 border-r border-sidebar-border bg-sidebar" />
         {/* Logo / Brand */}
         <div className={isCollapsed ? 'flex justify-center pt-4 pb-2' : 'px-4 pt-4 pb-3'}>
           {isCollapsed ? (
