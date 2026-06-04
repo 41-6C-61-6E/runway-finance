@@ -34,6 +34,9 @@ export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }>
   health:     { group: 'Investments',   subGroup: 'HSA Account' },
   loan:       { group: 'Loans',         subGroup: 'Loans' },
   mortgage:   { group: 'Loans',         subGroup: 'Mortgages' },
+  studentloan: { group: 'Loans',        subGroup: 'Student Loans' },
+  autoloan:    { group: 'Loans',        subGroup: 'Auto Loans' },
+  otherloan:   { group: 'Loans',        subGroup: 'Other Loans' },
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities' },
 };
 
@@ -77,6 +80,9 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   hsachecking: 'HSA (Checking)',
   health: 'HSA',
   mortgage: 'Mortgage',
+  studentloan: 'Student Loan',
+  autoloan: 'Auto Loan',
+  otherloan: 'Other Loan',
   otherLiability: 'Other Liability',
 };
 

@@ -46,6 +46,9 @@ export const LIABILITY_ACCOUNT_TYPES = [
   'loan',
   'mortgage',
   'otherLiability',
+  'studentloan',
+  'autoloan',
+  'otherloan',
 ];
 
 export function isAssetAccount(type: string): boolean {
