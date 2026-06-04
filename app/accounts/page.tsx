@@ -292,7 +292,7 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
     );
   }, []);
 
-  const chartColor = isLiability ? 'var(--color-destructive)' : 'var(--color-primary)';
+  const chartColor = 'var(--color-primary)';
 
   const txs = txData?.data || [];
 
@@ -325,7 +325,7 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
             )}
           </div>
 
-          <div className="h-[140px] w-full relative bg-card/20 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
+          <div className="h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
             {accountHistory.length < 2 ? (
               <span className="text-[10px] text-muted-foreground/60 italic">Insufficient historical data for this account</span>
             ) : (
@@ -400,11 +400,11 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
             ) : (
               <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
                 {txs.map((tx: any) => {
-                  const { text, isExpense } = formatTransactionAmount(tx.amount);
+                  const { text } = formatTransactionAmount(tx.amount);
                   return (
                     <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
                       <div className="min-w-0 flex-1 pr-4">
-                        <p className="font-medium text-foreground truncate text-[11px]">{tx.description || tx.payee || 'Unidentified Transaction'}</p>
+                        <p className="font-medium text-foreground truncate text-[11px]">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[9px] text-muted-foreground">{formatDate(tx.date)}</span>
                           {tx.category && (
@@ -420,7 +420,7 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
                           )}
                         </div>
                       </div>
-                      <span className={`font-mono text-[11px] font-semibold ${isExpense ? 'text-chart-5' : 'text-chart-1'}`}>
+                      <span className="font-mono text-[11px] font-semibold text-foreground">
                         {text}
                       </span>
                     </div>
@@ -2713,16 +2713,16 @@ export default function AccountsPage() {
                                         return (
                                           <Fragment key={acc.id}>
                                             <div 
-                                              onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
+onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                               className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 transition-all cursor-pointer select-none ${
                                         isAccExpanded 
                                           ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
                                           : 'hover:bg-muted/10'
-                                      } ${
-                                        acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                      }`}
-                                            >
-                                              <div className="flex items-center min-w-0 flex-1 pl-1 sm:pl-8">
+                                    } ${
+                                      acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                    }`}
+                                                >
+                                                  <div className="flex items-center min-w-0 flex-1 pl-1 sm:pl-8">
                                                 <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                                 </div>
@@ -2808,7 +2808,7 @@ export default function AccountsPage() {
                                 return (
                                   <Fragment key={acc.id}>
                                     <div 
-                                      onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
+onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 transition-all cursor-pointer select-none ${
                                           isAccExpanded 
                                             ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -2816,8 +2816,8 @@ export default function AccountsPage() {
                                         } ${
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
-                                    >
-                                      <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
+                                                  >
+                                                    <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
                                         <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                           <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                         </div>
