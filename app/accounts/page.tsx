@@ -297,11 +297,7 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
   const txs = txData?.data || [];
 
   return (
-    <div className={`py-4 px-2 sm:px-6 transition-all duration-300 !border-none [&+div]:!border-t-0 ${
-      isLiability 
-        ? 'bg-destructive/10' 
-        : 'bg-primary/10'
-    }`}>
+    <div className="py-4 px-2 sm:px-6 transition-all duration-300 !border-none [&+div]:!border-t-0 bg-primary/10">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6">
         {/* Left Side: Balance History Mini-Chart */}
         <div className="md:col-span-3 flex flex-col space-y-3">
@@ -2713,19 +2709,18 @@ export default function AccountsPage() {
                                         const accStats = getTrendStats([acc]);
                                         const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
                                         const isAccExpanded = expandedAccounts[acc.id] ?? false;
-                                        const isLiab = isLiabilityAccount(acc.type);
 
                                         return (
                                           <Fragment key={acc.id}>
                                             <div 
                                               onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
                                               className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 transition-all cursor-pointer select-none ${
-                                                isAccExpanded 
-                                                  ? `${isLiab ? 'bg-destructive/10 hover:bg-destructive/15' : 'bg-primary/10 hover:bg-primary/15'} font-medium` 
-                                                  : 'hover:bg-muted/10'
-                                              } ${
-                                                acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                              }`}
+                                        isAccExpanded 
+                                          ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
+                                          : 'hover:bg-muted/10'
+                                      } ${
+                                        acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                      }`}
                                             >
                                               <div className="flex items-center min-w-0 flex-1 pl-1 sm:pl-8">
                                                 <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
@@ -2809,7 +2804,6 @@ export default function AccountsPage() {
                                 const accStats = getTrendStats([acc]);
                                 const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
                                 const isAccExpanded = expandedAccounts[acc.id] ?? false;
-                                const isLiab = isLiabilityAccount(acc.type);
 
                                 return (
                                   <Fragment key={acc.id}>
@@ -2817,7 +2811,7 @@ export default function AccountsPage() {
                                       onClick={() => setExpandedAccounts(prev => ({ ...prev, [acc.id]: !isAccExpanded }))}
                                         className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 transition-all cursor-pointer select-none ${
                                           isAccExpanded 
-                                            ? `${isLiab ? 'bg-destructive/10 hover:bg-destructive/15' : 'bg-primary/10 hover:bg-primary/15'} font-medium` 
+                                            ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
                                             : 'hover:bg-muted/10'
                                         } ${
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''

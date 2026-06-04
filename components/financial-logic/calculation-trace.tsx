@@ -114,20 +114,4 @@ export function CalculationTraceOverlay({ trace }: { trace: CalculationTrace }) 
   );
 }
 
-export function CalculationTraceExplorerPage({ traces }: { traces: CalculationTrace[] }) {
-  return (
-    <div className="space-y-4">
-      {traces.map((trace) => (
-        <div key={trace.id} className="bg-card border border-border rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-foreground">{trace.title}</h3>
-            <span className="text-lg font-bold text-foreground font-mono">
-              {formatTraceResult(trace.result, trace.format)}
-            </span>
-          </div>
-          <CalculationTraceOverlay trace={trace} />
-        </div>
-      ))}
-    </div>
-  );
-}
+

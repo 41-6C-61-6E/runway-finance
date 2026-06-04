@@ -3,8 +3,6 @@
 import { Suspense } from 'react';
 import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
-
-import { CashFlowForecast } from '@/components/budgets/cash-flow-forecast';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { TrendingUp } from 'lucide-react';
@@ -47,18 +45,7 @@ function CashFlowContent() {
           </div>
         )}
 
-        {isVisible('cashFlowForecast') && (
-          <div className="mt-5 sm:mt-6">
-            <Suspense fallback={<LoadingSpinner category="forecast" />}>
-              <ChartErrorBoundary name="Cash Flow Forecast">
-                <div>
-                  <CashFlowForecast />
-                  <MathDescription chartId="cashFlowForecast" />
-                </div>
-              </ChartErrorBoundary>
-            </Suspense>
-          </div>
-        )}
+
       </PageContent>
     </div>
   );

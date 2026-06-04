@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
 import { eq, and, isNull, asc, inArray } from 'drizzle-orm';
-import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES, type AssetSubType } from '@/lib/services/manual-accounts';
+import { createManualAccount, readApiConfig, MANUAL_ACCOUNT_TYPES } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'validation_error', message: 'name and type are required' }, { status: 400 });
   }
 
-  if (!MANUAL_ACCOUNT_TYPES.includes(body.type as AssetSubType)) {
+  if (!MANUAL_ACCOUNT_TYPES.includes(body.type as 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash')) {
     return NextResponse.json({ error: 'validation_error', message: `Invalid type. Must be one of: ${MANUAL_ACCOUNT_TYPES.join(', ')}` }, { status: 400 });
   }
 
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const account = await createManualAccount({
       userId,
       name: body.name,
-      type: body.type as AssetSubType,
+      type: body.type,
       metadata: body.metadata,
       initialValue: body.initialValue,
       currency: body.currency,

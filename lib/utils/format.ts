@@ -32,19 +32,6 @@ export function formatPercent(
 }
 
 /**
- * Format a number with thousand separators
- */
-export function formatNumber(value: number | string | undefined | null, decimals = 2): string {
-  const val = value === undefined || value === null ? 0 : value;
-  const num = typeof val === 'string' ? parseFloat(val) : val;
-  const validNum = isNaN(num) ? 0 : num;
-  return validNum.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-/**
  * Format date consistently across the app
  */
 export function formatDate(date: Date | string, locale = 'en-US'): string {

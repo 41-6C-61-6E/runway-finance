@@ -8,7 +8,6 @@ export const HIDDEN_PAGE_KEYS = [
   'cashFlow',
   'budgets',
   'realEstate',
-  'fire',
   'dataExplorer',
   'goals',
   'spending',
@@ -20,12 +19,10 @@ export const DEV_MODE_PAGE_KEYS = ['financialLogic', 'dataExplorer'] as const;
 
 export type HiddenPageKey = (typeof HIDDEN_PAGE_KEYS)[number];
 
-export type HiddenPages = Partial<Record<HiddenPageKey, boolean>>;
-
-const defaultHiddenPages: HiddenPages = {};
+const defaultHiddenPages: Partial<Record<HiddenPageKey, boolean>> = {};
 
 export function useHiddenPages() {
-  const [hiddenPages, setHiddenPages] = useState<HiddenPages>(defaultHiddenPages);
+  const [hiddenPages, setHiddenPages] = useState<Partial<Record<HiddenPageKey, boolean>>>(defaultHiddenPages);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
