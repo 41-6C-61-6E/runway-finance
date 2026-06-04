@@ -6,6 +6,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
+import { getTypesByGroup, ACCOUNT_TYPE_LABELS, TYPE_HIERARCHY } from '@/lib/constants/account-types';
+import { isLiabilityAccount } from '@/lib/utils/account-scope';
 
 type ManualAccount = {
   id: string;
@@ -21,7 +23,7 @@ type ManualAccount = {
   tags?: { id: string; name: string; color: string }[];
 };
 
-type AssetSubType = 'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash';
+type AssetSubType = string;
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
   realestate: 'Real Estate',
@@ -81,14 +83,101 @@ const SYNC_FREQ_COLORS: Record<string, string> = {
 };
 
 const ASSET_TYPE_ICONS: Record<string, string> = {
+  checking: '🏦',
+  savings: '🏦',
+  other: '🏦',
+  credit: '💳',
+  investment: '📈',
+  brokerage: '📈',
+  retirement: '📈',
+  otherinvestment: '📈',
+  rothira: '📈',
+  traditionalira: '📈',
+  '401k': '📈',
+  '403b': '📈',
+  sepira: '📈',
+  simpleira: '📈',
+  '529': '📈',
+  otherAsset: '📦',
+  hsa: '🏥',
+  hsachecking: '🏥',
+  health: '🏥',
+  loan: '📋',
+  mortgage: '📋',
   realestate: '🏠',
+  primaryhome: '🏠',
+  secondaryhome: '🏠',
+  rentalproperty: '🏠',
+  commercial: '🏢',
+  land: '🌳',
+  otherrealestate: '🏠',
+  otherLiability: '⚠️',
   vehicle: '🚗',
   crypto: '₿',
   gold: '🥇',
   silver: '🥈',
-  otherAsset: '📦',
-  mortgage: '📋',
   cash: '💵',
+};
+
+const REAL_ESTATE_TYPES = [
+  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+  'single-family', 'condo', 'townhouse', 'multi-family'
+];
+
+function getAccountIcon(account: ManualAccount): string {
+  if (account.type === 'metals') {
+    const meta = account.metadata ?? {};
+    const subType = (meta as Record<string, string>).subType ?? 'gold';
+    return ASSET_TYPE_ICONS[subType] ?? '🥇';
+  }
+  return ASSET_TYPE_ICONS[account.type] ?? '📦';
+}
+
+function getBadgeClasses(type: string): string {
+  const lowerType = type.toLowerCase();
+  if (lowerType === 'vehicle') return 'bg-chart-4/20 text-chart-4';
+  if (lowerType === 'metals') return 'bg-chart-5/20 text-chart-5';
+  
+  const hierarchy = TYPE_HIERARCHY[lowerType];
+  const group = hierarchy?.group ?? 'Other';
+  
+  switch (group) {
+    case 'Banking':
+    case 'Assets':
+      return 'bg-status-positive/20 text-status-positive';
+    case 'Credit':
+    case 'Loans':
+    case 'Liabilities':
+      return 'bg-destructive/20 text-destructive';
+    case 'Investments':
+      return 'bg-chart-1/20 text-chart-1';
+    case 'Real Estate':
+      return 'bg-chart-3/20 text-chart-3';
+    default:
+      return 'bg-muted text-muted-foreground';
+  }
+}
+
+const getGroupedOptions = () => {
+  const groups = getTypesByGroup();
+  return groups.map(g => {
+    let types = [...g.types];
+    if (g.group === 'Assets') {
+      types = types.flatMap(t => {
+        if (t.value === 'metals') {
+          return [
+            { value: 'gold', label: 'Gold (Metal)' },
+            { value: 'silver', label: 'Silver (Metal)' }
+          ];
+        }
+        return t;
+      });
+    }
+    if (g.group === 'Banking') {
+      types.push({ value: 'cash', label: 'Cash (Manual)' });
+    }
+    return { ...g, types };
+  });
 };
 
 function getSubTypeLabel(account: ManualAccount): string {
@@ -100,7 +189,7 @@ function getSubTypeLabel(account: ManualAccount): string {
   for (const [key, val] of Object.entries(ASSET_TYPE_LABELS)) {
     if (ACCOUNT_TYPE_MAP[key] === account.type) return val;
   }
-  return account.type;
+  return ACCOUNT_TYPE_LABELS[account.type] ?? account.type;
 }
 
 const ACCOUNT_TYPE_MAP: Record<string, string> = {
@@ -169,6 +258,7 @@ export default function ManualAccountsSection() {
 
   const [adjustAccount, setAdjustAccount] = useState<ManualAccount | null>(null);
   const [adjustValue, setAdjustValue] = useState('');
+  const [adjustDate, setAdjustDate] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
   const [adjustLoading, setAdjustLoading] = useState(false);
 
@@ -234,7 +324,7 @@ export default function ManualAccountsSection() {
         metadata.amountOz = parseFloat(createMeta.amountOz || '0');
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
       }
-      if (createType === 'realestate') {
+      if (REAL_ESTATE_TYPES.includes(createType)) {
         metadata.propertyId = createMeta.propertyId || '';
         if (createMeta.propertyType) metadata.propertyType = createMeta.propertyType;
         if (createMeta.purchasePrice) metadata.purchasePrice = parseFloat(createMeta.purchasePrice);
@@ -267,13 +357,17 @@ export default function ManualAccountsSection() {
           metadata.refinancedByLoanId = createMeta.refinancedByLoanId || '';
         }
       }
+      if (['loan', 'studentloan', 'autoloan', 'otherloan'].includes(createType)) {
+        if (createMeta.originalLoanAmount) metadata.originalLoanAmount = parseFloat(createMeta.originalLoanAmount);
+        if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
+      }
       if (createType === 'crypto') {
         metadata.xpub = createMeta.xpub || '';
       }
       if (createType === 'otherAsset') {
         metadata.description = createMeta.description || '';
       }
-      if (['realestate', 'crypto', 'gold', 'silver'].includes(createType)) {
+      if ([...REAL_ESTATE_TYPES, 'crypto', 'gold', 'silver'].includes(createType)) {
         metadata.syncFrequency = createMeta.syncFrequency || 'manual';
       }
 
@@ -359,6 +453,7 @@ export default function ManualAccountsSection() {
     try {
       const body: Record<string, unknown> = {
         note: adjustNote || undefined,
+        date: adjustDate || undefined,
       };
       if (isMetalsAdjust) {
         body.amountOz = parseFloat(adjustValue);
@@ -373,10 +468,11 @@ export default function ManualAccountsSection() {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || 'Failed to adjust value');
+        throw new Error(data.message || 'Failed to add snapshot');
       }
       setAdjustAccount(null);
       setAdjustValue('');
+      setAdjustDate('');
       setAdjustNote('');
       await fetchAccounts();
     } catch (err) {
@@ -416,7 +512,7 @@ export default function ManualAccountsSection() {
     Object.entries(meta).forEach(([k, v]) => {
       if (v !== undefined && v !== null) flat[k] = String(v);
     });
-    if (account.type === 'realestate') {
+    if (REAL_ESTATE_TYPES.includes(account.type)) {
       const ids = (meta.mortgageAccountIds as string[]) ?? [];
       flat.linkedMortgageId = ids[0] ?? '';
     }
@@ -434,7 +530,7 @@ export default function ManualAccountsSection() {
     try {
       const metadata: Record<string, unknown> = {};
 
-      if (editAccount.type === 'realestate') {
+      if (REAL_ESTATE_TYPES.includes(editAccount.type)) {
         metadata.propertyId = editMeta.propertyId || '';
         if (editMeta.propertyType) metadata.propertyType = editMeta.propertyType;
         if (editMeta.purchasePrice) metadata.purchasePrice = parseFloat(editMeta.purchasePrice);
@@ -485,6 +581,10 @@ export default function ManualAccountsSection() {
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
         metadata.syncFrequency = editMeta.syncFrequency || 'manual';
       }
+      else if (['loan', 'studentloan', 'autoloan', 'otherloan'].includes(editAccount.type)) {
+        if (editMeta.originalLoanAmount) metadata.originalLoanAmount = parseFloat(editMeta.originalLoanAmount);
+        if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
+      }
       else if (editAccount.type === 'otherAsset' || editAccount.type === 'cash') {
         metadata.description = editMeta.description || '';
       }
@@ -518,11 +618,11 @@ export default function ManualAccountsSection() {
   };
 
   const canSync = (account: ManualAccount) => {
-    return ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'].includes(account.type);
+    return [...REAL_ESTATE_TYPES, 'crypto', 'metals'].includes(account.type);
   };
 
   const canAdjust = (account: ManualAccount) => {
-    return ['vehicle', 'otherAsset', 'mortgage', 'cash'].includes(account.type) || account.type === 'metals';
+    return !canSync(account) || account.type === 'metals';
   };
 
   const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
@@ -591,63 +691,65 @@ export default function ManualAccountsSection() {
   };
 
   const typeSpecificFields = () => {
+    if (REAL_ESTATE_TYPES.includes(createType)) {
+      return (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
+            <select
+              value={createMeta.propertyType || ''}
+              onChange={(e) => setCreateMeta((m) => ({ ...m, propertyType: e.target.value }))}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select property type...</option>
+              {PROPERTY_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
+            <Input
+              value={createMeta.propertyId || ''}
+              onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
+              placeholder="e.g., 446533"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={createMeta.purchasePrice || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
+                placeholder="e.g., 350000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
+              <Input
+                type="date"
+                value={createMeta.purchaseDate || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
+            <Input
+              value={createMeta.zipCode || ''}
+              onChange={(e) => setCreateMeta((m) => ({ ...m, zipCode: e.target.value }))}
+              placeholder="e.g., 94105"
+            />
+          </div>
+          {linkedMortgageField(createMeta, setCreateMeta)}
+          {syncFrequencyField(createMeta, setCreateMeta)}
+        </>
+      );
+    }
+
     switch (createType) {
-      case 'realestate':
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
-              <select
-                value={createMeta.propertyType || ''}
-                onChange={(e) => setCreateMeta((m) => ({ ...m, propertyType: e.target.value }))}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select property type...</option>
-                {PROPERTY_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
-              <Input
-                value={createMeta.propertyId || ''}
-                onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
-                placeholder="e.g., 446533"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createMeta.purchasePrice || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
-                  placeholder="e.g., 350000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
-                <Input
-                  type="date"
-                  value={createMeta.purchaseDate || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
-              <Input
-                value={createMeta.zipCode || ''}
-                onChange={(e) => setCreateMeta((m) => ({ ...m, zipCode: e.target.value }))}
-                placeholder="e.g., 94105"
-              />
-            </div>
-            {linkedMortgageField(createMeta, setCreateMeta)}
-            {syncFrequencyField(createMeta, setCreateMeta)}
-          </>
-        );
       case 'mortgage':
         return (
           <>
@@ -741,6 +843,32 @@ export default function ManualAccountsSection() {
             {syncFrequencyField(createMeta, setCreateMeta)}
           </>
         );
+      case 'loan':
+      case 'studentloan':
+      case 'autoloan':
+      case 'otherloan':
+        return (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount (optional)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={createMeta.originalLoanAmount || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
+                placeholder="e.g., 30000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Origination Date (optional)</label>
+              <Input
+                type="date"
+                value={createMeta.purchaseDate || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+              />
+            </div>
+          </>
+        );
       case 'otherAsset':
         return (
           <div>
@@ -813,7 +941,7 @@ export default function ManualAccountsSection() {
         <div className="space-y-2">
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
-            const isLiability = account.type === 'mortgage';
+            const isLiability = isLiabilityAccount(account.type);
             const isSimpleFin = !!account.connectionId;
             const syncFrequency = canSync(account) && account.metadata
               ? String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')
@@ -828,16 +956,8 @@ export default function ManualAccountsSection() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{ASSET_TYPE_ICONS[getSubTypeLabel(account) === 'Real Estate' ? 'realestate' : getSubTypeLabel(account) === 'Vehicle' ? 'vehicle' : getSubTypeLabel(account) === 'Bitcoin' ? 'crypto' : getSubTypeLabel(account) === 'Gold' ? 'gold' : getSubTypeLabel(account) === 'Silver' ? 'silver' : getSubTypeLabel(account) === 'Mortgage' ? 'mortgage' : getSubTypeLabel(account) === 'Cash' ? 'cash' : 'otherAsset']}</span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                        account.type === 'realestate' ? 'bg-chart-3/20 text-chart-3' :
-                        account.type === 'vehicle' ? 'bg-chart-4/20 text-chart-4' :
-                         account.type === 'crypto' ? 'bg-status-positive/20 text-status-positive' :
-                        account.type === 'metals' ? 'bg-chart-5/20 text-chart-5' :
-                        account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
-                         account.type === 'cash' ? 'bg-status-positive/20 text-status-positive' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
+                      <span className="text-sm">{getAccountIcon(account)}</span>
+                      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getBadgeClasses(account.type)}`}>
                         {getSubTypeLabel(account)}
                       </span>
                       {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
@@ -891,11 +1011,12 @@ export default function ManualAccountsSection() {
                                 ? String((meta as Record<string, unknown>).amountOz ?? '0')
                                 : account.balance
                             );
+                            setAdjustDate(new Date().toISOString().split('T')[0]);
                             setAdjustNote('');
                           }}
                           className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
                         >
-                          Adjust
+                          Add Snapshot
                         </button>
                       )}
                       <button
@@ -962,17 +1083,18 @@ export default function ManualAccountsSection() {
               <label className="block text-sm font-medium text-foreground mb-1">Type</label>
               <select
                 value={createType}
-                onChange={(e) => { setCreateType(e.target.value as AssetSubType); setCreateMeta({}); }}
+                onChange={(e) => { setCreateType(e.target.value); setCreateMeta({}); }}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="realestate">Real Estate</option>
-                <option value="mortgage">Mortgage</option>
-                <option value="vehicle">Vehicle</option>
-                <option value="crypto">Bitcoin</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="otherAsset">Other Asset</option>
-                <option value="cash">Cash</option>
+                {getGroupedOptions().map((g) => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.types.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div>
@@ -1067,14 +1189,14 @@ export default function ManualAccountsSection() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                {createType === 'mortgage' ? 'Outstanding Balance (positive)' : 'Initial Value (optional)'}
+                {isLiabilityAccount(createType) ? 'Outstanding Balance (positive)' : 'Initial Value (optional)'}
               </label>
               <Input
                 type="number"
                 step="0.01"
                 value={createInitialValue}
                 onChange={(e) => setCreateInitialValue(e.target.value)}
-                placeholder={createType === 'mortgage' ? "e.g., 250000" : "e.g., 500000"}
+                placeholder={isLiabilityAccount(createType) ? "e.g., 250000" : "e.g., 500000"}
               />
             </div>
             <div className="flex justify-end gap-2 pt-4">
@@ -1098,28 +1220,36 @@ export default function ManualAccountsSection() {
         </SheetContent>
       </Sheet>
 
-      {/* Adjust Value Dialog */}
+      {/* Add Snapshot Dialog */}
       <Dialog open={!!adjustAccount} onOpenChange={(open) => { if (!open) setAdjustAccount(null); setError(''); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Adjust Value</DialogTitle>
+            <DialogTitle>Add Balance Snapshot</DialogTitle>
             <DialogDescription>
               {isMetalsAdjust
-                ? 'Update the number of ounces. The dollar value will be recalculated from the current spot price.'
-                : `Update the value for ${adjustAccount?.name}.`}
+                ? 'Record the gold/silver ounces you held at a specific point in time. The dollar value will be calculated using the spot price.'
+                : 'A snapshot logs your account balance at a specific point in time. Adding historical snapshots helps build a timeline of your balances to plot your net worth history.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                {isMetalsAdjust ? 'Amount (oz)' : 'New Value'}
+                {isMetalsAdjust ? 'Amount (oz)' : 'Snapshot Balance'}
               </label>
               <Input
                 type="number"
-                step={isMetalsAdjust ? '0.01' : '0.01'}
+                step="0.01"
                 value={adjustValue}
                 onChange={(e) => setAdjustValue(e.target.value)}
-                placeholder={isMetalsAdjust ? 'e.g., 10.5' : 'Enter new value'}
+                placeholder={isMetalsAdjust ? 'e.g., 10.5' : 'Enter balance amount'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Snapshot Date</label>
+              <Input
+                type="date"
+                value={adjustDate}
+                onChange={(e) => setAdjustDate(e.target.value)}
               />
             </div>
             <div>
@@ -1127,7 +1257,7 @@ export default function ManualAccountsSection() {
               <Input
                 value={adjustNote}
                 onChange={(e) => setAdjustNote(e.target.value)}
-                placeholder="e.g., Updated appraisal"
+                placeholder="e.g., Year-end statement balance"
               />
             </div>
           </div>
@@ -1167,7 +1297,7 @@ export default function ManualAccountsSection() {
               />
             </div>
 
-            {editAccount?.type === 'realestate' && (
+            {editAccount && REAL_ESTATE_TYPES.includes(editAccount.type) && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
@@ -1330,6 +1460,29 @@ export default function ManualAccountsSection() {
               </>
             )}
 
+            {editAccount && ['loan', 'studentloan', 'autoloan', 'otherloan'].includes(editAccount.type) && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Original Loan Amount (optional)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editMeta.originalLoanAmount || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, originalLoanAmount: e.target.value }))}
+                    placeholder="e.g., 30000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Origination Date (optional)</label>
+                  <Input
+                    type="date"
+                    value={editMeta.purchaseDate || ''}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
+                  />
+                </div>
+              </>
+            )}
+
             {(editAccount?.type === 'otherAsset' || editAccount?.type === 'cash') && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Description</label>
@@ -1433,7 +1586,7 @@ export default function ManualAccountsSection() {
                 className="bg-muted cursor-not-allowed"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                The balance is read-only here. Use the <strong>Adjust</strong> button to record changes and maintain history.
+                The balance is read-only here. Use the <strong>Add Snapshot</strong> button to record changes and maintain history.
               </p>
             </div>
 

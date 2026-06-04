@@ -11,6 +11,8 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import type { ApiConfig } from '@/lib/services/asset-estimator';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -49,8 +51,9 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
   }
 }
 
-export const MANUAL_ACCOUNT_TYPES: Array<'realestate' | 'vehicle' | 'crypto' | 'gold' | 'silver' | 'otherAsset' | 'mortgage' | 'cash'> = [
+export const MANUAL_ACCOUNT_TYPES: string[] = [
   'realestate', 'vehicle', 'crypto', 'gold', 'silver', 'otherAsset', 'mortgage', 'cash',
+  ...Object.keys(TYPE_HIERARCHY),
 ];
 
 export const ACCOUNT_TYPE_MAP: Record<string, string> = {
@@ -278,7 +281,7 @@ export async function createManualAccount(input: {
   apiConfig?: ApiConfig;
 }, dek?: Uint8Array) {
   const db = getDb();
-  const accountType = ACCOUNT_TYPE_MAP[input.type];
+  const accountType = ACCOUNT_TYPE_MAP[input.type] || input.type;
 
   const initialValue = input.initialValue ?? 0;
 
@@ -618,6 +621,164 @@ export async function adjustManualAccountValue(
     newBalance: newValue,
     oldBalance,
     changed,
+  };
+}
+
+export async function addAccountSnapshot(
+  accountId: string,
+  userId: string,
+  date: string,
+  value: number,
+  note?: string,
+  amountOz?: number,
+  apiConfig?: ApiConfig,
+  dek?: Uint8Array
+): Promise<{
+  status: 'success' | 'error';
+  newBalance: number;
+  oldBalance: number;
+  changed: boolean;
+  errorMessage?: string;
+}> {
+  const db = getDb();
+  const [account] = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+    .limit(1);
+
+  if (!account) {
+    return { status: 'error', newBalance: 0, oldBalance: 0, changed: false, errorMessage: 'Account not found' };
+  }
+
+  const oldBalance = parseFloat(dek ? await decryptField(account.balance, dek) : account.balance.toString());
+  let finalNewValue = value;
+  let rawMeta: string | Record<string, unknown>;
+  if (dek && account.metadata) {
+    const decrypted = await decryptField(account.metadata, dek);
+    rawMeta = decrypted || '{}';
+  } else if (typeof account.metadata === 'string') {
+    rawMeta = account.metadata || '{}';
+  } else {
+    rawMeta = account.metadata || {};
+  }
+  const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta));
+
+  if (account.type === 'metals' && amountOz !== undefined) {
+    try {
+      const subType = (meta.subType ?? 'gold') as 'gold' | 'silver';
+      const spotPrice = await fetchSpotPrice(subType, apiConfig);
+      finalNewValue = amountOz * spotPrice;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Spot price fetch failed';
+      logger.error(`${LOG_TAG} Add snapshot failed for metals account`, { accountId, error: msg });
+      return { status: 'error', newBalance: oldBalance, oldBalance, changed: false, errorMessage: msg };
+    }
+
+    const updatedMeta = { ...meta, amountOz };
+    const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
+    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    
+    // Update current account balance only if snapshot date is >= current balanceDate
+    const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
+    if (date >= currentBalanceDate) {
+      await db.update(accounts).set({
+        balance: encryptedBalance,
+        balanceDate: new Date(date),
+        updatedAt: new Date(),
+        metadata: encryptedMeta,
+      }).where(eq(accounts.id, accountId));
+    } else {
+      await db.update(accounts).set({
+        updatedAt: new Date(),
+        metadata: encryptedMeta,
+      }).where(eq(accounts.id, accountId));
+    }
+  } else {
+    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    // Update current account balance only if snapshot date is >= current balanceDate
+    const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
+    if (date >= currentBalanceDate) {
+      await db.update(accounts).set({
+        balance: encryptedBalance,
+        balanceDate: new Date(date),
+        updatedAt: new Date(),
+      }).where(eq(accounts.id, accountId));
+    }
+  }
+
+  // Insert or update the snapshot in account_snapshots (isSynthetic = false, isImported = true)
+  const encryptedSnapshotBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+  await db.insert(accountSnapshots).values({
+    userId,
+    accountId,
+    snapshotDate: date,
+    balance: String(encryptedSnapshotBalance),
+    isSynthetic: false,
+    isImported: true,
+  }).onConflictDoUpdate({
+    target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
+    set: {
+      balance: String(encryptedSnapshotBalance),
+      isSynthetic: false,
+      isImported: true,
+    },
+  });
+
+  // If a note is provided, insert a zero-amount transaction
+  if (note) {
+    const formattedBalance = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(finalNewValue);
+    const txnDescription = `Snapshot Balance: ${formattedBalance} (${note})`;
+    const txnValues = {
+      userId,
+      accountId,
+      externalId: adjExternalId(),
+      date,
+      amount: '0',
+      description: txnDescription,
+      payee: null,
+      memo: null,
+      pending: false,
+      categoryId: await ensureSystemCategories(userId, dek),
+    };
+    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+    await db.insert(transactions).values(encryptedTxn);
+  }
+
+  // Regenerate history for this account
+  const MODEL_SNAPSHOT_TYPES = [
+    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+    'single-family', 'condo', 'townhouse', 'multi-family', 'other',
+    'vehicle', 'metals', 'mortgage'
+  ];
+
+  if (MODEL_SNAPSHOT_TYPES.includes(account.type)) {
+    try {
+      const latestMeta = account.type === 'metals' && amountOz !== undefined ? { ...meta, amountOz } : meta;
+      await generateAssetHistorySnapshots(accountId, userId, account.type, latestMeta, apiConfig, dek);
+    } catch (err) {
+      logger.error(`${LOG_TAG} Failed to generate asset history snapshots in addAccountSnapshot`, { accountId, err });
+    }
+  } else {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const earliestDate = date < '2023-01-01' ? date : '2023-01-01';
+      await generateHistoricalAccountSnapshots(accountId, userId, earliestDate, today, dek);
+    } catch (err) {
+      logger.error(`${LOG_TAG} Failed to generate historical snapshots in addAccountSnapshot`, { accountId, err });
+    }
+  }
+
+  // Rebuild aggregated net worth snapshots
+  await recalculateNetWorthSnapshots(userId, dek);
+
+  invalidateUserSearchCache(userId);
+
+  return {
+    status: 'success',
+    newBalance: finalNewValue,
+    oldBalance,
+    changed: true,
   };
 }
 
