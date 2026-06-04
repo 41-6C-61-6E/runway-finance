@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -15,12 +16,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const endpoint = body.endpoint?.replace(/\/$/, '');
+  const rawEndpoint = body.endpoint?.replace(/\/$/, '');
   const apiKey = body.apiKey || '';
 
-  if (!endpoint) {
+  if (!rawEndpoint) {
     return NextResponse.json({ error: 'No endpoint provided' }, { status: 400 });
   }
+
+  const validated = await validateEndpointUrl(rawEndpoint);
+  if ('error' in validated) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+
+  const endpoint = validated.url.toString().replace(/\/$/, '');
 
   try {
     const headers: Record<string, string> = {

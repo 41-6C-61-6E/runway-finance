@@ -26,13 +26,14 @@ export async function POST(request: Request) {
     if (sharingEmail && sharingPin) {
       const existingUser = await findUser(username);
       if (existingUser) {
-        return NextResponse.json({ message: 'User already exists' }, { status: 409 });
+        logger.warn('Register API: username already taken in sharing path', { username });
+        return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
       }
 
       const result = await validateInvitation(sharingEmail, sharingPin);
       if (result.valid === false) {
         logger.warn('Register API: sharing invitation validation failed', { sharingEmail });
-        return NextResponse.json({ message: result.error }, { status: 403 });
+        return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
       }
 
       const { invitationId, inviterUserId } = result;
@@ -84,27 +85,27 @@ export async function POST(request: Request) {
 
     if (process.env.ALLOW_REGISTRATION === 'false') {
       logger.warn('Register API: registration is disabled');
-      return NextResponse.json({ message: 'Registration is currently disabled' }, { status: 403 });
+      return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
     }
 
     const requiredPin = process.env.REGISTRATION_PIN;
     if (requiredPin && requiredPin.length > 0) {
       if (!pin) {
         logger.warn('Register API: missing registration PIN');
-        return NextResponse.json({ message: 'Registration PIN is required' }, { status: 403 });
+        return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
       }
       const pinBuffer = Buffer.from(pin);
       const requiredPinBuffer = Buffer.from(requiredPin);
       if (pinBuffer.length !== requiredPinBuffer.length || !timingSafeEqual(pinBuffer, requiredPinBuffer)) {
         logger.warn('Register API: invalid registration PIN');
-        return NextResponse.json({ message: 'Invalid registration PIN' }, { status: 403 });
+        return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
       }
     }
 
     const existingUser = await findUser(username);
     if (existingUser) {
       logger.warn('Register API: user already exists', { username });
-      return NextResponse.json({ message: 'User already exists' }, { status: 409 });
+      return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
     }
 
     await addUser({ username, password, email });
