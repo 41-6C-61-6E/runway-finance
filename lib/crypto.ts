@@ -192,15 +192,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   category_spending_summary: ['amount', 'transactionCount'],
   category_income_summary: ['amount', 'transactionCount'],
   account_snapshots: ['balance'],
-  retirement_projections: [
-    'name', 'portfolioAtRetirement', 'expectedReturnRate', 'inflationRate',
-    'annualWithdrawal', 'ssAnnual', 'pensionAnnual', 'partTimeIncome',
-    'rentalIncomeAnnual', 'healthcareAnnual', 'legacyGoal',
-  ],
-  fire_scenarios: [
-    'name', 'targetAnnualExpenses', 'currentInvestableAssets', 'annualContributions',
-    'expectedReturnRate', 'inflationRate', 'safeWithdrawalRate',
-  ],
+
   simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
   sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs', 'details'],
   user_settings: ['apiKeys'],

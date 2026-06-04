@@ -36,13 +36,10 @@ export const ASSET_ACCOUNT_TYPES = [
   'health',
 ];
 
-export const INVESTMENT_ACCOUNT_TYPES = [
-  'investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
+export const isInvestmentAccount = (type: string) => ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
   'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529',
   'hsa', 'health',
-];
-
-export const isInvestmentAccount = (type: string) => INVESTMENT_ACCOUNT_TYPES.includes(type.toLowerCase());
+].includes(type.toLowerCase());
 
 export const LIABILITY_ACCOUNT_TYPES = [
   'credit',
@@ -50,12 +47,6 @@ export const LIABILITY_ACCOUNT_TYPES = [
   'mortgage',
   'otherLiability',
 ];
-
-export type AccountScopeFields = {
-  type: string;
-  isHidden?: boolean | null;
-  isExcludedFromNetWorth?: boolean | null;
-};
 
 export function isAssetAccount(type: string): boolean {
   return ASSET_ACCOUNT_TYPES.includes(type) || ASSET_ACCOUNT_TYPES.includes(type.toLowerCase());
@@ -65,10 +56,18 @@ export function isLiabilityAccount(type: string): boolean {
   return LIABILITY_ACCOUNT_TYPES.includes(type) || LIABILITY_ACCOUNT_TYPES.includes(type.toLowerCase());
 }
 
-export function isReportableAccount(account: AccountScopeFields): boolean {
+export function isReportableAccount(account: {
+  type: string;
+  isHidden?: boolean | null;
+  isExcludedFromNetWorth?: boolean | null;
+}): boolean {
   return !account.isHidden && !account.isExcludedFromNetWorth;
 }
 
-export function filterReportableAccounts<T extends AccountScopeFields>(accounts: T[]): T[] {
+export function filterReportableAccounts<T extends {
+  type: string;
+  isHidden?: boolean | null;
+  isExcludedFromNetWorth?: boolean | null;
+}>(accounts: T[]): T[] {
   return accounts.filter(isReportableAccount);
 }

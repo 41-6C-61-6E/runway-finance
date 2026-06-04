@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-export type SyntheticDataSettings = {
+const DEFAULTS: {
   global: boolean;
   netWorth: boolean;
   realEstate: boolean;
   cashFlowProjections: boolean;
-};
-
-const DEFAULTS: SyntheticDataSettings = {
+} = {
   global: false,
   netWorth: false,
   realEstate: false,
@@ -17,7 +15,7 @@ const DEFAULTS: SyntheticDataSettings = {
 };
 
 export function useSyntheticData() {
-  const [settings, setSettings] = useState<SyntheticDataSettings>(DEFAULTS);
+  const [settings, setSettings] = useState<typeof DEFAULTS>(DEFAULTS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +32,7 @@ export function useSyntheticData() {
   }, []);
 
   const isEnabled = useCallback(
-    (module: keyof SyntheticDataSettings) => {
+    (module: keyof typeof DEFAULTS) => {
       if (loading) return true;
       // When global flag is not present, default to true for backward compatibility
       // But when it's explicitly false, respect the individual module toggle
@@ -45,7 +43,7 @@ export function useSyntheticData() {
   );
 
   const updateSettings = useCallback(
-    async (next: Partial<SyntheticDataSettings>) => {
+    async (next: Partial<typeof DEFAULTS>) => {
       const prev = settings;
       const merged = { ...prev, ...next };
       setSettings(merged);

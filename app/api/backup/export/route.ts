@@ -16,8 +16,7 @@ import {
   monthlyCashFlow,
   categorySpendingSummary,
   categoryIncomeSummary,
-  retirementProjections,
-  fireScenarios,
+
   simplifinConnections,
   aiProviders,
   aiProposals,
@@ -38,8 +37,7 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: monthlyCashFlow, dbName: 'monthly_cash_flow' },
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
-  { table: retirementProjections, dbName: 'retirement_projections' },
-  { table: fireScenarios, dbName: 'fire_scenarios' },
+
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
   { table: importLog, dbName: 'import_log' },

@@ -3,15 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 
-export interface PersistentStateOptions<T> {
-  serialize?: (val: T) => string;
-  deserialize?: (raw: string) => T;
-}
-
 export function usePersistentState<T>(
   key: string,
   defaultValue: T,
-  options?: PersistentStateOptions<T>
+  options?: {
+  serialize?: (val: T) => string;
+  deserialize?: (raw: string) => T;
+}
 ): [T, (val: T | ((prev: T) => T)) => void, boolean] {
   const context = useUserSettings();
   const [state, setState] = useState<T>(defaultValue);

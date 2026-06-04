@@ -170,28 +170,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
       current_amount: { type: 'number', label: 'Current Amount' },
     },
   },
-  fire_scenarios: {
-    table: schema.fireScenarios,
-    label: 'FIRE Scenarios',
-    group: 'FIRE',
-    defaultSort: 'name',
-    defaultSortOrder: 'asc',
-    searchColumns: ['name'],
-    columnOverrides: {
-      userId: { hidden: true },
-    },
-  },
-  retirement_projections: {
-    table: schema.retirementProjections,
-    label: 'Retirement Projections',
-    group: 'FIRE',
-    defaultSort: 'name',
-    defaultSortOrder: 'asc',
-    searchColumns: ['name'],
-    columnOverrides: {
-      userId: { hidden: true },
-    },
-  },
+
   sync_logs: {
     table: schema.syncLogs,
     label: 'Sync Logs',

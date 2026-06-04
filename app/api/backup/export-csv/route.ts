@@ -16,8 +16,7 @@ import {
   monthlyCashFlow,
   categorySpendingSummary,
   categoryIncomeSummary,
-  retirementProjections,
-  fireScenarios,
+
   simplifinConnections,
   aiProviders,
 } from '@/lib/db/schema';
@@ -35,8 +34,7 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: monthlyCashFlow, dbName: 'monthly_cash_flow', label: 'monthly_cash_flow' },
   { table: categorySpendingSummary, dbName: 'category_spending_summary', label: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary', label: 'category_income_summary' },
-  { table: retirementProjections, dbName: 'retirement_projections', label: 'retirement_projections' },
-  { table: fireScenarios, dbName: 'fire_scenarios', label: 'fire_scenarios' },
+
   { table: simplifinConnections, dbName: 'simplefin_connections', label: 'simplefin_connections' },
   { table: aiProviders, dbName: 'ai_providers', label: 'ai_providers' },
 ];

@@ -22,29 +22,6 @@ function ms(start: number): number {
   return Date.now() - start;
 }
 
-export type AccountSyncDetail = {
-  externalId: string;
-  name: string;
-  type: string;
-  currency: string;
-  balance: string;
-  transactionsFetched: number;
-  transactionsNew: number;
-  transactionsPending: number;
-  wasNewAccount: boolean;
-};
-
-export type SyncResult = {
-  status: 'success' | 'error';
-  accountsSynced: number;
-  transactionsFetched: number;
-  transactionsNew: number;
-  transactionsUpdated: number;
-  errorMessage?: string;
-  details?: AccountSyncDetail[];
-  durationMs?: number;
-};
-
 export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, snapshotDate: string) {
   const userAccounts = await getDb()
     .select()
@@ -543,7 +520,26 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
 }
 
-export async function syncConnection(connectionId: string, userId: string, dekOverride?: Uint8Array): Promise<SyncResult> {
+export async function syncConnection(connectionId: string, userId: string, dekOverride?: Uint8Array): Promise<{
+  status: 'success' | 'error';
+  accountsSynced: number;
+  transactionsFetched: number;
+  transactionsNew: number;
+  transactionsUpdated: number;
+  errorMessage?: string;
+  details?: Array<{
+    externalId: string;
+    name: string;
+    type: string;
+    currency: string;
+    balance: string;
+    transactionsFetched: number;
+    transactionsNew: number;
+    transactionsPending: number;
+    wasNewAccount: boolean;
+  }>;
+  durationMs?: number;
+}> {
   const startedAt = Date.now();
 
   logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
@@ -624,7 +620,17 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(accounts.connectionId, connectionId));
     for (const a of existingAccts) existingExternalIds.add(a.externalId);
 
-    const accountDetails: AccountSyncDetail[] = [];
+    const accountDetails: Array<{
+  externalId: string;
+  name: string;
+  type: string;
+  currency: string;
+  balance: string;
+  transactionsFetched: number;
+  transactionsNew: number;
+  transactionsPending: number;
+  wasNewAccount: boolean;
+}> = [];
 
     // Track plaintext transaction data for in-memory rule matching
     const rawTxData: Array<{
@@ -776,7 +782,17 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       accountsSynced++;
 
       const wasNewAccount = !orphanedAccount && !existingExternalIds.has(sfAccount.id);
-      const acctDetail: AccountSyncDetail = {
+      const acctDetail: {
+        externalId: string;
+        name: string;
+        type: string;
+        currency: string;
+        balance: string;
+        transactionsFetched: number;
+        transactionsNew: number;
+        transactionsPending: number;
+        wasNewAccount: boolean;
+      } = {
         externalId: sfAccount.id,
         name: sfAccount.name,
         type: inferAccountType(sfAccount),

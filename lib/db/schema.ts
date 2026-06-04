@@ -130,6 +130,7 @@ export const userSettings = pgTable('user_settings', {
   chartColorScheme: text('chart_color_scheme').notNull().default('forest'),
   forecastMode: text('forecast_mode').notNull().default('hybrid'),
   forecastLookbackMonths: integer('forecast_lookback_months').notNull().default(3),
+
   hiddenPages: jsonb('hidden_pages').default({}),
   cardStyle: text('card_style').notNull().default('default'),
   showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
@@ -523,49 +524,6 @@ export const financialGoals = pgTable('financial_goals', {
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   percentage: text('percentage').notNull(),
   reserve: text('reserve').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ── Retirement Projections ────────────────────────────────────────────────────
-export const retirementProjections = pgTable('retirement_projections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  name: text('name').notNull(),
-  fireScenarioId: uuid('fire_scenario_id').references(() => fireScenarios.id, { onDelete: 'set null' }),
-  retirementAge: integer('retirement_age'),
-  lifeExpectancy: integer('life_expectancy').default(95),
-  portfolioAtRetirement: text('portfolio_at_retirement'),
-  expectedReturnRate: text('expected_return_rate'),
-  inflationRate: text('inflation_rate'),
-  annualWithdrawal: text('annual_withdrawal'),
-  ssStartAge: integer('ss_start_age').default(67),
-  ssAnnual: text('ss_annual'),
-  pensionStartAge: integer('pension_start_age').default(65),
-  pensionAnnual: text('pension_annual'),
-  partTimeIncome: text('part_time_income'),
-  partTimeEndAge: integer('part_time_end_age'),
-  rentalIncomeAnnual: text('rental_income_annual'),
-  healthcareAnnual: text('healthcare_annual'),
-  legacyGoal: text('legacy_goal'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ── FIRE Scenarios ───────────────────────────────────────────────────────────
-export const fireScenarios = pgTable('fire_scenarios', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  name: text('name').notNull(),
-  isDefault: boolean('is_default').notNull().default(false),
-  currentAge: integer('current_age'),
-  targetAge: integer('target_age'),
-  targetAnnualExpenses: text('target_annual_expenses'),
-  currentInvestableAssets: text('current_investable_assets'),
-  annualContributions: text('annual_contributions'),
-  expectedReturnRate: text('expected_return_rate'),
-  inflationRate: text('inflation_rate'),
-  safeWithdrawalRate: text('safe_withdrawal_rate'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
