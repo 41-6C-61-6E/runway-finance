@@ -307,8 +307,8 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
   const txs = txData?.data || [];
 
   return (
-    <div className="py-4 px-2 sm:px-6 transition-all duration-300 !border-none [&+div]:!border-t-0 bg-primary/10">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6">
+    <div className="py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0 bg-primary/10">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6 px-2 sm:px-4">
         {/* Left Side: Balance History Mini-Chart */}
         <div className="md:col-span-3 flex flex-col space-y-3">
           <div className="flex items-center justify-between">
@@ -2231,23 +2231,27 @@ export default function AccountsPage() {
                 }
               />
               {!hierarchyCollapsed && (
-                <CardContent className="p-2 sm:p-5">
+                <>
                 {accountsLoading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
+                  <CardContent className="p-2 sm:p-5">
+                    <div className="space-y-4">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  </CardContent>
                 ) : filteredAllAccounts.length === 0 ? (
-                  <div className="p-12 text-center border border-dashed border-border/40 rounded-xl">
-                    <p className="text-muted-foreground text-sm mb-4">No accounts linked yet.</p>
-                    <Link
-                      href="/settings?tab=accounts"
-                      className="px-5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all flex items-center gap-2 mx-auto w-fit"
-                    >
-                      <Plus className="w-4 h-4" /> Link Institution
-                    </Link>
-                  </div>
+                  <CardContent className="p-2 sm:p-5">
+                    <div className="p-12 text-center border border-dashed border-border/40 rounded-xl">
+                      <p className="text-muted-foreground text-sm mb-4">No accounts linked yet.</p>
+                      <Link
+                        href="/settings?tab=accounts"
+                        className="px-5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all flex items-center gap-2 mx-auto w-fit"
+                      >
+                        <Plus className="w-4 h-4" /> Link Institution
+                      </Link>
+                    </div>
+                  </CardContent>
                 ) : (
                   <>
                     <CollapsibleFilterPanel
@@ -2268,7 +2272,6 @@ export default function AccountsPage() {
                           )}
                         </div>
                       }
-                      className="mb-4 border border-border/40 rounded-xl bg-muted/5"
                     >
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         {/* Left side: Timeframe / Date Ranges */}
@@ -2602,7 +2605,9 @@ export default function AccountsPage() {
                         </div>
                       </div>
                     </CollapsibleFilterPanel>
-                    <div className="space-y-3">
+                    <div className="border-t border-border/10" />
+                    <div>
+                      <div className="divide-y divide-border/10">
                     {sortedGroups.map((group) => {
                       const subMap = treeHierarchy.get(group);
                       if (!subMap) return null;
@@ -2621,11 +2626,11 @@ export default function AccountsPage() {
                       );
 
                       return (
-                        <div key={group} className="border border-border/30 rounded-xl overflow-hidden bg-card/25 shadow-sm">
+                        <div key={group} className="divide-y divide-border/10">
                           {/* ── Group Header Row ── */}
                           <div 
                             onClick={() => setExpandedGroups(prev => ({ ...prev, [group]: !isGroupExpanded }))}
-                            className="w-full flex items-center justify-between px-2.5 sm:px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
+                            className="w-full flex items-center justify-between px-0 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
                           >
                             <div className="flex items-center min-w-0 flex-1">
                               <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
@@ -2663,7 +2668,7 @@ export default function AccountsPage() {
 
                           {/* ── Subgroups / Nested Accounts (Flat divide-y container) ── */}
                           {isGroupExpanded && (
-                            <div className="border-t border-border/10 divide-y divide-border/10 bg-card/5">
+                            <div className="divide-y divide-border/10 bg-card/5">
                               {Array.from(subMap.entries()).map(([subgroup, accs]) => {
                                 const isLiabSub = accs[0] ? isLiabilityAccount(accs[0].type) : false;
                                 const subStats = getTrendStats(accs);
@@ -2679,7 +2684,7 @@ export default function AccountsPage() {
                                       {/* Subgroup Header */}
                                       <div
                                         onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
-                                        className="w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
+                                        className="w-full flex items-center justify-between px-0 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
                                       >
                                         <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
                                           <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
@@ -2724,7 +2729,7 @@ export default function AccountsPage() {
                                           <Fragment key={acc.id}>
                                             <div 
 onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
-                                              className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2 transition-all cursor-pointer select-none ${
+                                              className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
                                         isAccExpanded 
                                           ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
                                           : 'hover:bg-muted/10'
@@ -2819,7 +2824,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                   <Fragment key={acc.id}>
                                     <div 
 onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
-                                        className={`w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 transition-all cursor-pointer select-none ${
+                                        className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                           isAccExpanded 
                                             ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
                                             : 'hover:bg-muted/10'
@@ -2908,11 +2913,12 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                         </div>
                       );
                     })}
+                    </div>
                   </div>
+                  </>
+                  )}
                 </>
                 )}
-              </CardContent>
-              )}
             </Card>
           </>
       </PageContent>

@@ -20,7 +20,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             <ClientErrorReporter>
               <ChartColorSchemeInitializer />
               <CardStyleInitializer />
-              <div className="min-h-screen flex flex-col">
+              <div className="min-h-[100dvh] flex flex-col">
                 <Suspense fallback={null}>
                   <main className="flex-1">{children}</main>
                 </Suspense>

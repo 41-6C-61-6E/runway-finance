@@ -157,17 +157,21 @@ export function NetWorthSummary() {
 
   const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean, trace?: CalculationTrace) => (
     <div className="p-5">
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center justify-between sm:justify-start gap-0 sm:gap-3 mb-3">
         <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
         <Sparkline data={history} width={80} height={20} isPositive={trendPositive} />
       </div>
-      <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
-      <div className={`flex items-center gap-1 mt-1 text-sm font-medium ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
-        <span>{delta >= 0 ? '↑' : '↓'}</span>
-        <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
-        <span className="text-xs opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
+      <div className="flex flex-row sm:flex-col items-start sm:items-stretch justify-between sm:justify-start gap-2 sm:gap-1">
+        <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
+        <div className="text-right sm:text-left">
+          <div className={`flex items-center gap-1 text-sm font-medium justify-end sm:justify-start ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+            <span>{delta >= 0 ? '↑' : '↓'}</span>
+            <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
+            <span className="text-xs opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">in the last 1 year</div>
+        </div>
       </div>
-      <div className="text-xs text-muted-foreground mt-1">in the last 1 year</div>
       {showMath && trace && <CalculationTraceOverlay trace={trace} />}
     </div>
   );
