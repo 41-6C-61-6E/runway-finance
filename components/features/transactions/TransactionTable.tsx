@@ -88,6 +88,8 @@ interface TransactionTableProps {
   onTransactionClick?: (tx: Transaction) => void;
   onTotalChange?: (total: number) => void;
   onAddTransaction?: () => void;
+  compactView?: boolean;
+  onCompactViewChange?: (compact: boolean) => void;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -175,6 +177,8 @@ export default function TransactionTable({
   onTransactionClick,
   onTotalChange,
   onAddTransaction,
+  compactView,
+  onCompactViewChange,
 }: TransactionTableProps) {
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
@@ -253,6 +257,28 @@ export default function TransactionTable({
       }));
     }
   }, []);
+
+  // Default compact view on mobile (first visit only)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      const hasSavedPref = localStorage.getItem("finance:transactions:compactView") !== null;
+      if (!hasSavedPref && !compactView) {
+        onCompactViewChange?.(true);
+      }
+    }
+  }, []);
+
+  // Restore select column when switching from compact to single-line view on desktop
+  useEffect(() => {
+    if (!compactView && typeof window !== "undefined" && window.innerWidth >= 768) {
+      setColumnVisibility((prev) => {
+        if (!prev.select) {
+          return { ...prev, select: true };
+        }
+        return prev;
+      });
+    }
+  }, [compactView]);
 
   const [dragColId, setDragColId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -1364,7 +1390,7 @@ export default function TransactionTable({
                 )}
               </div>
 
-              {transactions.length > 0 && (
+              {transactions.length > 0 && !compactView && (
                 <div className="relative">
                   <button
                     onClick={() => setShowColumnMenu(!showColumnMenu)}
@@ -1421,8 +1447,331 @@ export default function TransactionTable({
               </div>
             ) : (
               <>
+            {compactView ? (
+              <div className="divide-y divide-border/50">
+                {table.getRowModel().rows.map((row) => {
+                  const tx = row.original;
+                  const isPending = tx.pending;
+                  const { text: formattedAmount } = formatAmount(tx.amount);
+                  const formattedDate = new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                  const txTags = tx.tags ?? [];
+                  const isCatOpen = openCategoryTx === tx.id;
+                  const parents = categories.filter((c) => !c.parentId);
+                  const getChildren = (parentId: string) =>
+                    categories.filter((c) => c.parentId === parentId);
 
-            {/* Table */}
+                  return (
+                    <div
+                      key={row.id}
+                      className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5 px-3 sm:px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer group w-full ${
+                        isPending ? "bg-chart-3/[0.02]" : ""
+                      }`}
+                      onClick={() => onTransactionClick?.(tx)}
+                    >
+                      {/* Row 1, Col 1: Date */}
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formattedDate}
+                        </span>
+                      </div>
+                      {/* Row 1, Col 2: Description + pending dot + tags */}
+                      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                        <span className="text-sm text-foreground truncate font-medium">
+                          {tx.payee || tx.description}
+                        </span>
+                        {isPending && (
+                          <span className="inline-flex items-center text-chart-3 shrink-0" title="Pending">
+                            <svg className="h-2 w-2 animate-pulse" fill="currentColor" viewBox="0 0 8 8">
+                              <circle cx="4" cy="4" r="3" />
+                            </svg>
+                          </span>
+                        )}
+                        {txTags.length > 0 && (
+                          <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
+                            {txTags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
+                                style={{
+                                  backgroundColor: `${tag.color}22`,
+                                  color: tag.color,
+                                  border: `1px solid ${tag.color}44`,
+                                }}
+                              >
+                                #{tag.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Row 1, Col 3: Amount */}
+                      <div className="flex items-center justify-end gap-1">
+                        {tx.categorizedByAi && (
+                          <Sparkles className="h-3 w-3 text-primary/60 shrink-0" />
+                        )}
+                        <span className={`text-sm font-mono font-medium whitespace-nowrap financial-value ${
+                          parseFloat(tx.amount) >= 0 ? "text-foreground" : ""
+                        }`}>
+                          {formattedAmount}
+                        </span>
+                      </div>
+
+                      {/* Row 2, Col 1: spacer for date alignment */}
+                      <div />
+
+                      {/* Row 2, Col 2: Account + Category + Tags */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                        <span className="text-[11px] text-muted-foreground truncate max-w-[120px] shrink-0">
+                          {tx.accountName || "—"}
+                        </span>
+                        {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
+                          <div className="flex items-center gap-1 shrink-0 min-w-0 overflow-hidden">
+                            {tx.accountTags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
+                                style={{
+                                  backgroundColor: `${tag.color}22`,
+                                  color: tag.color,
+                                  border: `1px solid ${tag.color}44`,
+                                }}
+                                title={tag.name}
+                              >
+                                #{tag.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <span className="text-muted-foreground/25 shrink-0 select-none">·</span>
+
+                        {/* Clickable category with dropdown */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              const dropdownWidth = 224;
+                              let left = rect.left;
+                              if (left + dropdownWidth > window.innerWidth - 8) {
+                                left = window.innerWidth - dropdownWidth - 8;
+                              }
+                              if (left < 8) left = 8;
+                              const dropdownHeight = 320;
+                              let top = rect.bottom + 4;
+                              if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
+                                top = rect.top - dropdownHeight - 4;
+                              }
+                              setDropdownPos({ top, left });
+                              setOpenCategoryTx(isCatOpen ? null : tx.id);
+                            }}
+                            className="flex items-center gap-1 max-w-full group/cat"
+                          >
+                            {tx.categoryName ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
+                                style={{
+                                  backgroundColor: `${tx.categoryColor}22`,
+                                  color: tx.categoryColor || "var(--color-primary)",
+                                }}
+                              >
+                                {tx.categorizedByAi && (
+                                  <Sparkles className="h-2.5 w-2.5 shrink-0 opacity-60" />
+                                )}
+                                {tx.categoryName}
+                                <ChevronDown className="h-2.5 w-2.5 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground italic hover:text-foreground transition-colors inline-flex items-center gap-1">
+                                Uncategorized
+                                <ChevronDown className="h-2.5 w-2.5 opacity-30 group-hover/cat:opacity-100 transition-opacity" />
+                              </span>
+                            )}
+                          </button>
+                          {isCatOpen && dropdownPos && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenCategoryTx(null);
+                                  setDropdownPos(null);
+                                  setCategoryFilter("");
+                                  setIsCreatingCategory(false);
+                                }}
+                              />
+                              <div
+                                className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
+                                style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                              >
+                                {isCreatingCategory ? (
+                                  <div className="p-3 space-y-2 flex flex-col text-xs">
+                                    <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-0.5">
+                                      New Category
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                                        Name
+                                      </label>
+                                      <input
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        placeholder="Category name"
+                                        className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                                        Parent Category
+                                      </label>
+                                      <select
+                                        value={newCategoryParentId || ""}
+                                        onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                                        className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <option value="">None (top-level)</option>
+                                        {categories.filter((c) => !c.parentId).map((p) => (
+                                          <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="color"
+                                          value={newCategoryColor}
+                                          onChange={(e) => setNewCategoryColor(e.target.value)}
+                                          className="w-5 h-5 rounded cursor-pointer border border-input"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <span className="text-[9px] font-mono text-muted-foreground">{newCategoryColor}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="checkbox"
+                                          id={`compact-new-cat-income-${tx.id}`}
+                                          checked={newCategoryIsIncome}
+                                          onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
+                                          className="rounded border-border text-primary focus:ring-ring"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <label htmlFor={`compact-new-cat-income-${tx.id}`} className="text-[9px] font-medium text-muted-foreground">Income</label>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-2 border-t border-border/50">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setIsCreatingCategory(false); }}
+                                        className="flex-1 py-1 text-[10px] text-foreground bg-muted hover:bg-accent rounded transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleCreateCategory(tx.id); }}
+                                        disabled={creatingCategoryLoading || !newCategoryName.trim()}
+                                        className="flex-1 py-1 text-[10px] font-semibold text-primary-foreground bg-primary rounded hover:opacity-90 disabled:opacity-50 transition-all"
+                                      >
+                                        {creatingCategoryLoading ? "Saving..." : "Create"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="relative p-2 border-b border-border">
+                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                                      <input
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        placeholder="Search categories..."
+                                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto max-h-56">
+                                      {(() => {
+                                        const filter = categoryFilter.toLowerCase();
+                                        const filteredParents = filter
+                                          ? parents.filter((p) =>
+                                              p.name.toLowerCase().includes(filter) ||
+                                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                                            )
+                                          : parents;
+                                        const noResults = filteredParents.length === 0;
+                                        return (
+                                          <>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, null, null, null); }}
+                                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors text-left"
+                                            >
+                                              None
+                                            </button>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setIsCreatingCategory(true); setNewCategoryName(""); setNewCategoryParentId(null); setNewCategoryColor("#6366f1"); setNewCategoryIsIncome(false); }}
+                                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium border-b border-border/50 transition-colors text-left"
+                                            >
+                                              + Create new category
+                                            </button>
+                                            {filteredParents.map((parent) => {
+                                              const childList = filter
+                                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                                : getChildren(parent.id);
+                                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                                              return (
+                                                <div key={parent.id}>
+                                                  <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
+                                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
+                                                    {parent.name}
+                                                  </div>
+                                                  <button
+                                                    onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, parent.id, parent.name, parent.color); }}
+                                                    className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
+                                                      tx.categoryId === parent.id ? "text-primary bg-primary/10" : "text-foreground/80 hover:bg-muted"
+                                                    }`}
+                                                  >
+                                                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: parent.color }} />
+                                                    {parent.name}
+                                                  </button>
+                                                  {childList.map((child) => (
+                                                    <button
+                                                      key={child.id}
+                                                      onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, child.id, child.name, child.color); }}
+                                                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
+                                                        tx.categoryId === child.id ? "text-primary bg-primary/10" : "text-foreground/80 hover:bg-muted"
+                                                      }`}
+                                                    >
+                                                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: child.color }} />
+                                                      {child.name}
+                                                      {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              );
+                                            })}
+                                            {noResults && (
+                                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">No categories found</div>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                      </div>
+
+                      {/* Row 2, Col 3: spacer */}
+                      <div />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="overflow-x-auto no-scrollbar">
               <table
                 className="text-sm border-collapse"
@@ -1534,6 +1883,7 @@ export default function TransactionTable({
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* Pagination & Summary */}
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">

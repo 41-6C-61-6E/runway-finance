@@ -23,10 +23,11 @@ export async function GET() {
   }
 
   const db = getDb();
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const result = await db
     .select()
     .from(paystubAutoGenerateSettings)
-    .where(eq(paystubAutoGenerateSettings.userId, session.user.id));
+    .where(eq(paystubAutoGenerateSettings.userId, dataUserId));
 
   return Response.json(result);
 }
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     .from(paystubAutoGenerateSettings)
     .where(
       and(
-        eq(paystubAutoGenerateSettings.userId, userId),
+        eq(paystubAutoGenerateSettings.userId, dataUserId),
         eq(paystubAutoGenerateSettings.mappingId, mappingId)
       )
     )
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(paystubAutoGenerateSettings)
     .values({
-      userId,
+      userId: dataUserId,
       mappingId,
       isEnabled: isEnabled ?? false,
       frequency: frequency || 'biweekly',
@@ -117,7 +118,7 @@ export async function PATCH() {
     .from(paystubAutoGenerateSettings)
     .where(
       and(
-        eq(paystubAutoGenerateSettings.userId, userId),
+        eq(paystubAutoGenerateSettings.userId, dataUserId),
         eq(paystubAutoGenerateSettings.isEnabled, true)
       )
     );
@@ -182,7 +183,7 @@ export async function PATCH() {
     const [newPaystub] = await db
       .insert(paystubs)
       .values({
-        userId,
+        userId: dataUserId,
         employerName: basePaystub.employerName,
         employeeName: basePaystub.employeeName,
         payPeriodStart: newPeriodStart,
@@ -217,7 +218,7 @@ export async function PATCH() {
         .insert(paystubLineItems)
         .values({
           paystubId: newPaystub.id,
-          userId,
+          userId: dataUserId,
           section: baseItem.section,
           description: baseItem.description,
           amount: baseItem.amount,
@@ -236,7 +237,7 @@ export async function PATCH() {
     // Create transactions from cloned line items
     await createTransactionsFromLineItems(
       db,
-      userId,
+      dataUserId,
       newPaystub,
       clonedLineItems,
       basePaystub.employerName,

@@ -28,7 +28,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       <div 
         className={`absolute inset-0 -z-10 transition-all duration-200 border-b border-border/30 ${
           reduceTransparency 
-            ? 'bg-card' 
+            ? 'bg-background' 
             : 'bg-card/15 backdrop-blur-md'
         }`}
         style={!reduceTransparency ? {

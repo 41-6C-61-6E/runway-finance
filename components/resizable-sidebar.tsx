@@ -111,12 +111,6 @@ export default function ResizableSidebar() {
 
         {/* Navigation Links */}
         <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 space-y-0.5' : 'px-2 space-y-0.5'}`}>
-          {/* ── Finances Section ── */}
-          {!isCollapsed && (
-            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              Finances
-            </div>
-          )}
           {navItems.filter((item) => {
             const isDevModePage = (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey)
             if (isDevModePage && devMode !== true) return false
@@ -135,15 +129,6 @@ export default function ResizableSidebar() {
             )
           })}
 
-          {/* Separator */}
-          <div className="my-3 border-t border-sidebar-border/50" />
-
-          {/* ── Planning Section ── */}
-          {!isCollapsed && (
-            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              Planning
-            </div>
-          )}
           {planningItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)

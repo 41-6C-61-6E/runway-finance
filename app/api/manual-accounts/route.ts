@@ -99,9 +99,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const apiConfig = await readApiConfig(userId);
+    const apiConfig = await readApiConfig(dataUserId);
     const account = await createManualAccount({
-      userId,
+      userId: dataUserId,
       name: body.name,
       type: body.type,
       metadata: body.metadata,
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       currency: body.currency,
       apiConfig,
     }, dek);
-    logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
+    logger.info('POST /api/manual-accounts - created', { userId: dataUserId, type: body.type, name: body.name, initialValue: body.initialValue });
 
     // Associate tags if specified
     const tagIds = body.tagIds;
