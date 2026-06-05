@@ -153,7 +153,7 @@ export async function POST(request: Request) {
     const [paystub] = await db
       .insert(paystubs)
       .values({
-        userId,
+        userId: dataUserId,
         employerName: employerName || '',
         employeeName: raw.employeeName || null,
         payPeriodStart,
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
           .insert(paystubLineItems)
           .values({
             paystubId: paystub.id,
-            userId,
+            userId: dataUserId,
             section,
             description: descKey,
             amount: String(item.amount ?? '0'),
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
     // Create transactions from mapped line items
     await createTransactionsFromLineItems(
       db,
-      userId,
+      dataUserId,
       paystub,
       allLineItems,
       employerName,

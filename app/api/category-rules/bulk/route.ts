@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     }
 
     if (totalMatched > 0) {
-      invalidateUserSearchCache(userId);
+      invalidateUserSearchCache(dataUserId);
     }
 
     return NextResponse.json({ success: true, matched: totalMatched, total: allTxns.length });

@@ -73,7 +73,7 @@ export async function POST() {
 
   logger.info('POST /api/category-rules/apply-all', { userId, updated: ruleResults.size, total: allTxns.length });
   if (ruleResults.size > 0) {
-    invalidateUserSearchCache(userId);
+    invalidateUserSearchCache(dataUserId);
   }
   return NextResponse.json({
     updated: ruleResults.size,

@@ -134,7 +134,7 @@ export async function POST(request: Request) {
   }
 
   const encryptedValues = await encryptRow('category_rules', {
-    userId,
+    userId: dataUserId,
     name,
     priority,
     isActive,

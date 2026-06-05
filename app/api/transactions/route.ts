@@ -167,7 +167,7 @@ export async function GET(request: Request) {
   const userSettingsList = await getDb()
     .select()
     .from(userSettings)
-    .where(eq(userSettings.userId, userId))
+    .where(eq(userSettings.userId, dataUserId))
     .limit(1);
 
   const userSetting = userSettingsList[0];
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
   ];
 
   if (filters.search) {
-    const matchingSearchIds = await getSearchMatchingTransactionIds(userId, dek, filters.search);
+    const matchingSearchIds = await getSearchMatchingTransactionIds(dataUserId, dek, filters.search);
     if (matchingSearchIds.size === 0) {
       if (filters.idsOnly) {
         return NextResponse.json({ ids: [] });
@@ -905,7 +905,7 @@ export async function PATCH(request: Request) {
     const userSettingsList = await getDb()
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, userId))
+      .where(eq(userSettings.userId, dataUserId))
       .limit(1);
 
     const userSetting = userSettingsList[0];
@@ -1281,7 +1281,7 @@ export async function DELETE(request: Request) {
     const userSettingsList = await getDb()
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, userId))
+      .where(eq(userSettings.userId, dataUserId))
       .limit(1);
 
     const userSetting = userSettingsList[0];

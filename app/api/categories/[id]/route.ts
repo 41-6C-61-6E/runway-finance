@@ -62,7 +62,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  await mergeDuplicateCategories(userId, dek);
+  await mergeDuplicateCategories(dataUserId, dek);
 
   const allCategories = await getDb()
     .select()
@@ -134,7 +134,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await tx.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, dataUserId)));
     });
 
-    await mergeDuplicateCategories(userId, dek);
+    await mergeDuplicateCategories(dataUserId, dek);
 
     const [merged] = await getDb()
       .select()

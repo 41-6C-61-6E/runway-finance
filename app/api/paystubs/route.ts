@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const [paystub] = await db
     .insert(paystubs)
     .values({
-      userId,
+      userId: dataUserId,
       employerName: employerName || '',
       employeeName: employeeName || null,
       payPeriodStart,
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
         .insert(paystubLineItems)
         .values({
           paystubId: paystub.id,
-          userId,
+          userId: dataUserId,
           section: item.section,
           description: item.description,
           amount: String(item.amount ?? '0'),
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
   const dek = await getSessionDEK();
   await createTransactionsFromLineItems(
     db,
-    userId,
+    dataUserId,
     paystub,
     insertedLineItems,
     employerName,
