@@ -149,11 +149,17 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: st
   simpleira:      { group: 'Investments',   subGroup: 'Simple IRA',       icon: '📈' },
   '529':          { group: 'Investments',   subGroup: '529 Account',      icon: '📈' },
   otherAsset: { group: 'Investments',   subGroup: 'Other Assets',     icon: '📈' },
+  vehicle:    { group: 'Assets',        subGroup: 'Vehicles',         icon: '🚗' },
+  crypto:     { group: 'Assets',        subGroup: 'Crypto Currency',  icon: '₿' },
+  metals:     { group: 'Assets',        subGroup: 'Metals',           icon: '🏅' },
   hsa:        { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
   hsachecking: { group: 'Banking',      subGroup: 'HSA Account',      icon: '🏥' },
   health:     { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
   loan:       { group: 'Loans',         subGroup: 'Loans',            icon: '📋' },
   mortgage:   { group: 'Loans',         subGroup: 'Mortgages',        icon: '📋' },
+  studentloan: { group: 'Loans',        subGroup: 'Student Loans',    icon: '📋' },
+  autoloan:    { group: 'Loans',        subGroup: 'Auto Loans',       icon: '📋' },
+  otherloan:   { group: 'Loans',        subGroup: 'Other Loans',      icon: '📋' },
   realestate: { group: 'Real Estate',   subGroup: 'Real Estate',      icon: '🏠' },
   primaryhome: { group: 'Real Estate',  subGroup: 'Primary Home',     icon: '🏠' },
   secondaryhome: { group: 'Real Estate', subGroup: 'Secondary Home',   icon: '🏠' },
@@ -161,6 +167,10 @@ const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: st
   commercial:   { group: 'Real Estate', subGroup: 'Commercial',        icon: '🏢' },
   land:         { group: 'Real Estate', subGroup: 'Land',              icon: '🌳' },
   otherrealestate: { group: 'Real Estate', subGroup: 'Other Real Estate', icon: '🏠' },
+  'single-family': { group: 'Real Estate', subGroup: 'Single Family Home', icon: '🏠' },
+  condo:           { group: 'Real Estate', subGroup: 'Condo',              icon: '🏢' },
+  townhouse:       { group: 'Real Estate', subGroup: 'Townhouse',          icon: '🏠' },
+  'multi-family':  { group: 'Real Estate', subGroup: 'Multi-Family',       icon: '🏢' },
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities',    icon: '⚠️' },
 };
 
@@ -1224,7 +1234,7 @@ export default function AccountsPage() {
       for (const acc of accs) {
         sum += (d[acc.id] ?? 0);
       }
-      return isLiab ? -sum : sum;
+      return sum;
     });
 
     const starting = points.length > 0 ? Math.abs(points[0]) : 0;

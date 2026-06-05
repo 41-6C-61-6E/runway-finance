@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         showImportedData: userSettings.showImportedData,
       })
       .from(userSettings)
-      .where(eq(userSettings.userId, userId))
+      .where(eq(userSettings.userId, dataUserId))
       .limit(1);
 
     const userSetting = settingsRows[0];
