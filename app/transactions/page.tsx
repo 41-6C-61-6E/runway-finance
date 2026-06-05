@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Receipt } from 'lucide-react';
+import { Sparkles, Receipt, LayoutList, Columns2 } from 'lucide-react';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
@@ -78,6 +78,7 @@ function TransactionsContent() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
+  const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
@@ -338,6 +339,8 @@ function TransactionsContent() {
               onApplyPreset={handleApplyPreset}
               onSavePreset={handleSavePreset}
               onDeletePreset={handleDeletePreset}
+              compactView={compactView}
+              onCompactViewChange={setCompactView}
             />
 
             <div className="min-w-0">
@@ -358,6 +361,8 @@ function TransactionsContent() {
                 onTransactionClick={handleTransactionClick}
                 onTotalChange={handleTotalChange}
                 onAddTransaction={handleAddTransaction}
+                compactView={compactView}
+                onCompactViewChange={setCompactView}
               />
               {(selectedTransaction || drawerMode === 'create') && (
                 <TransactionDetailDrawer

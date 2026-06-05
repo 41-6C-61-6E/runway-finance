@@ -352,7 +352,7 @@ export async function GET(request: Request) {
 
     // 1. Fetch all rows for the user from the database
     const userIdCol = tableCols['userId'] || (table as any).userId;
-    const baseConditions = userIdCol ? [eq(userIdCol, userId)] : [];
+    const baseConditions = userIdCol ? [eq(userIdCol, dataUserId)] : [];
     
     const rawData = await db
       .select()
@@ -545,7 +545,7 @@ export async function DELETE(request: Request) {
     const db = getDb();
     const conditions = [eq(idCol, id)];
     if (userIdCol) {
-      conditions.push(eq(userIdCol, userId));
+      conditions.push(eq(userIdCol, dataUserId));
     }
 
     // Perform delete query
