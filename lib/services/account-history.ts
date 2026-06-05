@@ -276,6 +276,28 @@ export async function generateHistoricalAccountSnapshots(
     }
   }
 
+  // Extract loan origination metadata for non-mortgage liability accounts (studentloan, loan, autoloan, otherloan)
+  let loanOriginationAmount: number | undefined;
+  let loanOriginationDate: string | undefined;
+  if (account?.type && isLiabilityAccount(account.type) && account.type !== 'mortgage' && account.metadata) {
+    try {
+      const decryptedMeta = dek ? await decryptField(account.metadata, dek) : account.metadata;
+      if (decryptedMeta) {
+        const meta = JSON.parse(decryptedMeta);
+        const rawAmount = meta.originalLoanAmount;
+        if (rawAmount) {
+          const parsed = parseFloat(rawAmount);
+          if (!isNaN(parsed) && parsed > 0) {
+            loanOriginationAmount = parsed;
+            loanOriginationDate = meta.purchaseDate as string | undefined;
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn(`${LOG_TAG} Failed to decrypt metadata for loan account`, { accountId, err });
+    }
+  }
+
   const calculationToDate = endEventDateStr && endEventDateStr < toDate ? endEventDateStr : toDate;
 
   // 1. Fetch all real snapshots for this account
@@ -384,7 +406,7 @@ export async function generateHistoricalAccountSnapshots(
     const firstReal = decryptedRealSnapshots[0];
     const firstRealDate = firstReal ? firstReal.date : null;
 
-    const calculationStartDate = [earliestTxDate, firstRealDate]
+    const calculationStartDate = [earliestTxDate, firstRealDate, loanOriginationDate]
       .filter((d): d is string => !!d)
       .sort()[0];
 
@@ -540,16 +562,37 @@ export async function generateHistoricalAccountSnapshots(
         balanceByDate.set(dateStr, runningBalance);
       }
     } else if (earliestTxDate) {
+      // Determine starting balance: use loan origination amount if available
+      const startingBalance = (loanOriginationAmount !== undefined && loanOriginationDate !== undefined && loanOriginationDate <= earliestTxDate)
+        ? loanOriginationAmount
+        : (loanOriginationAmount !== undefined ? loanOriginationAmount : 0);
+
+      // If anchored from loan origination data, pre-fill dates from origination to earliestTxDate
+      if (loanOriginationAmount !== undefined && loanOriginationDate !== undefined && loanOriginationDate < earliestTxDate) {
+        let fillDate = new Date(loanOriginationDate + 'T00:00:00Z');
+        const txStartDate = new Date(earliestTxDate + 'T00:00:00Z');
+        while (fillDate < txStartDate) {
+          balanceByDate.set(fillDate.toISOString().split('T')[0], startingBalance);
+          fillDate.setUTCDate(fillDate.getUTCDate() + 1);
+        }
+      }
+
       let current = new Date(earliestTxDate + 'T00:00:00Z');
       const endLimit = new Date(calculationToDate + 'T00:00:00Z');
-      let runningBalance = getDailyChange(earliestTxDate, 0);
+      const dailyChange = getDailyChange(earliestTxDate, startingBalance);
+      let runningBalance = startingBalance + dailyChange;
       balanceByDate.set(earliestTxDate, runningBalance);
 
       while (current < endLimit) {
         current.setUTCDate(current.getUTCDate() + 1);
         const dateStr = current.toISOString().split('T')[0];
-        const dailyChange = getDailyChange(dateStr, runningBalance);
-        runningBalance += dailyChange;
+        const realBal = realByDate.get(dateStr);
+        if (realBal !== undefined) {
+          runningBalance = realBal;
+        } else {
+          const nextDailyChange = getDailyChange(dateStr, runningBalance);
+          runningBalance += nextDailyChange;
+        }
         balanceByDate.set(dateStr, runningBalance);
       }
     }
