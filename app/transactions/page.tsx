@@ -8,7 +8,7 @@ import TransactionTable from '@/components/features/transactions/TransactionTabl
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
 import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
-import ContentWrapper from '@/components/content-wrapper';
+import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
@@ -327,56 +327,51 @@ function TransactionsContent() {
           )
         }
       />
-      <div className="relative z-10">
-        <ContentWrapper>
-          <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px] overflow-visible">
+      <PageContent maxWidth="max-w-[1920px]">
+        <FilterBar 
+          filters={filters} 
+          onChange={updateFilter} 
+          onClearAll={clearAllFilters}
+          customPresets={customPresets}
+          onApplyPreset={handleApplyPreset}
+          onSavePreset={handleSavePreset}
+          onDeletePreset={handleDeletePreset}
+          compactView={compactView}
+          onCompactViewChange={setCompactView}
+        />
 
-            <FilterBar 
-              filters={filters} 
-              onChange={updateFilter} 
-              onClearAll={clearAllFilters}
-              customPresets={customPresets}
-              onApplyPreset={handleApplyPreset}
-              onSavePreset={handleSavePreset}
-              onDeletePreset={handleDeletePreset}
-              compactView={compactView}
-              onCompactViewChange={setCompactView}
+        <div className="min-w-0">
+          {(selectedIds.size > 0 || selectAllMatching) && (
+            <BulkActionsToolbar
+              selectedIds={Array.from(selectedIds)}
+              onClear={handleBulkActionComplete}
+              totalCount={totalCount}
+              selectAllMatching={selectAllMatching}
+              onSelectAllMatching={handleSelectAllMatching}
+              filters={filters}
             />
-
-            <div className="min-w-0">
-              {(selectedIds.size > 0 || selectAllMatching) && (
-                <BulkActionsToolbar
-                  selectedIds={Array.from(selectedIds)}
-                  onClear={handleBulkActionComplete}
-                  totalCount={totalCount}
-                  selectAllMatching={selectAllMatching}
-                  onSelectAllMatching={handleSelectAllMatching}
-                  filters={filters}
-                />
-              )}
-              <TransactionTable
-                key={refreshKey}
-                filters={filters}
-                onSelectAll={handleSelectAll}
-                onTransactionClick={handleTransactionClick}
-                onTotalChange={handleTotalChange}
-                onAddTransaction={handleAddTransaction}
-                compactView={compactView}
-                onCompactViewChange={setCompactView}
-              />
-              {(selectedTransaction || drawerMode === 'create') && (
-                <TransactionDetailDrawer
-                  transaction={selectedTransaction || undefined}
-                  open={drawerOpen}
-                  onClose={handleDrawerClose}
-                  onSuccess={handleDrawerSuccess}
-                  mode={drawerMode}
-                />
-              )}
-            </div>
-          </div>
-        </ContentWrapper>
-      </div>
+          )}
+          <TransactionTable
+            key={refreshKey}
+            filters={filters}
+            onSelectAll={handleSelectAll}
+            onTransactionClick={handleTransactionClick}
+            onTotalChange={handleTotalChange}
+            onAddTransaction={handleAddTransaction}
+            compactView={compactView}
+            onCompactViewChange={setCompactView}
+          />
+          {(selectedTransaction || drawerMode === 'create') && (
+            <TransactionDetailDrawer
+              transaction={selectedTransaction || undefined}
+              open={drawerOpen}
+              onClose={handleDrawerClose}
+              onSuccess={handleDrawerSuccess}
+              mode={drawerMode}
+            />
+          )}
+        </div>
+      </PageContent>
     </div>
   );
 }
