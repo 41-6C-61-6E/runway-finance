@@ -96,7 +96,7 @@ export async function POST(request: Request) {
   const { name, color, description } = parsed.data;
 
   const encrypted = await encryptRow('tags', {
-    userId,
+    userId: dataUserId,
     name,
     color,
     description: description ?? null,

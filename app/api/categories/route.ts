@@ -91,7 +91,7 @@ export async function POST(request: Request) {
 
   const { name, parentId, color, isIncome, excludeFromReports, displayOrder, categoryType, expenseParentId } = parsed.data;
 
-  await mergeDuplicateCategories(userId, dek);
+  await mergeDuplicateCategories(dataUserId, dek);
 
   const existingCategories = await decryptRows(
     'categories',
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   }
 
   const encryptedValues = await encryptRow('categories', {
-    userId,
+    userId: dataUserId,
     name,
     parentId: parentId ?? null,
     color,

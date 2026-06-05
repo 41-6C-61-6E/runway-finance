@@ -153,7 +153,7 @@ export async function GET(request: Request) {
       const userSettingsList = await db
         .select()
         .from(userSettings)
-        .where(eq(userSettings.userId, session.user.id))
+        .where(eq(userSettings.userId, dataUserId))
         .limit(1);
 
       const userSetting = userSettingsList[0];

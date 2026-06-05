@@ -196,7 +196,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
         await generateAssetHistorySnapshots(
           id,
-          userId,
+          dataUserId,
           decrypted.type,
           meta,
           apiConfig,

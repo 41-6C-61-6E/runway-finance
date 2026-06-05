@@ -31,7 +31,7 @@ export async function DELETE(
     const log = await db
       .select()
       .from(importLog)
-      .where(and(eq(importLog.id, id), eq(importLog.userId, userId)))
+      .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)))
       .limit(1);
 
     if (log.length === 0) {
@@ -71,7 +71,7 @@ export async function DELETE(
       // Delete the import log
       await tx
         .delete(importLog)
-        .where(and(eq(importLog.id, id), eq(importLog.userId, userId)));
+        .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)));
     });
 
     // Step 5: Post-delete processing (recalculating snapshots & balances)
@@ -84,7 +84,7 @@ export async function DELETE(
           const fromDateStr = earliestTx || todayStr;
           await generateHistoricalAccountSnapshots(
             acctId,
-            userId,
+            dataUserId,
             fromDateStr,
             todayStr,
             dek
@@ -128,7 +128,7 @@ export async function DELETE(
       }
 
       // Historically recalculate the daily net worth snapshots table
-      await recalculateNetWorthSnapshots(userId, dek);
+      await recalculateNetWorthSnapshots(dataUserId, dek);
 
       // Update cash flow, category spending, and category income summaries for charts
       await updateMonthlyCashFlowSummaries(dataUserId, dek);

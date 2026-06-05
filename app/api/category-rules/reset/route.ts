@@ -20,7 +20,7 @@ export async function POST() {
     .delete(categoryRules)
     .where(eq(categoryRules.userId, dataUserId));
 
-  await seedUserDefaultRules(userId);
+  await seedUserDefaultRules(dataUserId);
 
   logger.info('POST /api/category-rules/reset', { userId });
   return NextResponse.json({ success: true, message: 'Rules reset to defaults' });

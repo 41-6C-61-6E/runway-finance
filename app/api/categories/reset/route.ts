@@ -19,7 +19,7 @@ export async function POST() {
   const db = getDb();
   const dek = await getSessionDEK();
 
-  await mergeDuplicateCategories(userId, dek);
+  await mergeDuplicateCategories(dataUserId, dek);
 
   // Collect all category IDs referenced by transactions, budgets, rules, and summaries
   const [txRefs, budgetRefs, ruleRefs, spendingRefs, incomeRefs] = await Promise.all([
@@ -106,7 +106,7 @@ export async function POST() {
       const [parent] = await db
         .insert(categories)
         .values({
-          userId,
+          userId: dataUserId,
           name: group.name,
           color: group.color,
           isIncome: group.isIncome,
@@ -127,7 +127,7 @@ export async function POST() {
       for (const child of group.children) {
         if (!keptChildNames.has(child.name)) {
           await db.insert(categories).values({
-            userId,
+            userId: dataUserId,
             parentId,
             name: child.name,
             color: child.color,

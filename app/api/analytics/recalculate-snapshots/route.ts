@@ -65,7 +65,7 @@ export async function POST(request: Request) {
               ? JSON.parse(account.metadata)
               : (typeof account.metadata === 'object' && account.metadata !== null ? account.metadata : {});
             const count = await generateAssetHistorySnapshots(
-              account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
+              account.id, dataUserId, account.type, meta as Record<string, unknown>, apiConfig, dek
             );
             syntheticCount += count;
             logger.info('Generated model-based snapshots for account during netWorth recalculate', {
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
           } else {
             const result = await generateHistoricalAccountSnapshots(
               account.id,
-              userId,
+              dataUserId,
               '2023-01-01',
               today,
               dek
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         }
       }
       // Rebuild the aggregated net worth table from the regenerated account snapshots
-      await recalculateNetWorthSnapshots(userId, dek);
+      await recalculateNetWorthSnapshots(dataUserId, dek);
     } else if (type === 'realEstate') {
       const apiConfig = await readApiConfig(userId).catch(() => undefined);
       const relevant = decrypted.filter((a: any) => MODEL_SNAPSHOT_TYPES.includes(a.type));
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             ? JSON.parse(account.metadata)
             : (typeof account.metadata === 'object' && account.metadata !== null ? account.metadata : {});
           const count = await generateAssetHistorySnapshots(
-            account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
+            account.id, dataUserId, account.type, meta as Record<string, unknown>, apiConfig, dek
           );
           syntheticCount += count;
           logger.info('Generated model-based snapshots for account', {
@@ -128,15 +128,15 @@ export async function POST(request: Request) {
         }
       }
       // Rebuild the aggregated net worth table from the regenerated real estate snapshots
-      await recalculateNetWorthSnapshots(userId, dek);
+      await recalculateNetWorthSnapshots(dataUserId, dek);
     } else if (type === 'cashFlow') {
       // Cash flow projections are computed on-the-fly from budgets and
       // spending patterns; no stored snapshots to regenerate.
     } else if (type === 'summaries') {
-      invalidateUserSearchCache(userId);
-      const monthlyResult = await updateMonthlyCashFlowSummaries(userId, dek);
-      const spendingResult = await updateCategorySpendingSummaries(userId, dek);
-      const incomeResult = await updateCategoryIncomeSummaries(userId, dek);
+      invalidateUserSearchCache(dataUserId);
+      const monthlyResult = await updateMonthlyCashFlowSummaries(dataUserId, dek);
+      const spendingResult = await updateCategorySpendingSummaries(dataUserId, dek);
+      const incomeResult = await updateCategoryIncomeSummaries(dataUserId, dek);
       summaryMonths = monthlyResult.monthsUpdated;
       summaryTransactions = monthlyResult.transactionsProcessed;
       summarySpendingRows = spendingResult.categoryRows;

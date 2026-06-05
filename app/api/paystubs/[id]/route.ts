@@ -133,6 +133,6 @@ export async function DELETE(
   // Delete the paystub (cascade will delete line items)
   await db.delete(paystubs).where(eq(paystubs.id, id));
 
-  invalidateUserSearchCache(session.user.id);
+  invalidateUserSearchCache(dataUserId);
   return Response.json({ success: true });
 }
