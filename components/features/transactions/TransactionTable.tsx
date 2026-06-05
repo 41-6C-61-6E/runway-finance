@@ -118,7 +118,7 @@ const COLUMN_LABELS: Record<string, string> = {
 
 const COLUMN_MIN_WIDTHS: Record<string, number> = {
   select: 40,
-  date: 70,
+  date: 95,
   postedDate: 70,
   description: 80,
   ai: 30,
@@ -830,13 +830,13 @@ export default function TransactionTable({
           const tx = row.original;
           const isPending = tx.pending;
           return (
-            <div className="whitespace-nowrap truncate flex items-center">
+            <div className="whitespace-nowrap flex items-center">
               <span className="text-foreground text-sm">
                 {new Date(row.getValue("date")).toLocaleDateString()}
               </span>
               {isPending && (
                 <span
-                  className="ml-1.5 inline-flex items-center text-chart-3"
+                  className="ml-1.5 inline-flex items-center text-chart-3 shrink-0"
                   title="Pending"
                 >
                   <svg

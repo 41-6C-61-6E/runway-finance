@@ -34,7 +34,7 @@ export function CollapsibleFilterPanel({
             className="flex items-center gap-1.5 px-2.5 py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none"
           >
             <Filter size={12} className="text-primary shrink-0" />
-            <span>Filters</span>
+            <span>Options</span>
             {isOpen ? (
               <ChevronUp size={12} className="text-muted-foreground/60 shrink-0" />
             ) : (

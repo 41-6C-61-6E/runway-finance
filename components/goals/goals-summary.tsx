@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
+import { formatCurrency } from '@/lib/utils/goals';
 import { useShowMath } from '@/lib/hooks/use-show-math';
 import { buildGoalsTrace } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { Target, Coins, PiggyBank, TrendingUp, PieChart } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Target, Coins, PiggyBank, TrendingUp, PieChart, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Goal {
   id: string;
@@ -30,10 +32,7 @@ interface SummaryData {
 
 export function GoalsSummary() {
   const { enabled: showMath } = useShowMath();
-  const [totalCollapsed, setTotalCollapsed] = useCardCollapsed('goalsTotal');
-  const [targetCollapsed, setTargetCollapsed] = useCardCollapsed('goalsTarget');
-  const [savedCollapsed, setSavedCollapsed] = useCardCollapsed('goalsSaved');
-  const [progressCollapsed, setProgressCollapsed] = useCardCollapsed('goalsProgress');
+  const [collapsed, setCollapsed] = useCardCollapsed('goalsSummary');
   const [breakdownCollapsed, setBreakdownCollapsed] = useCardCollapsed('goalsBreakdown');
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,10 +79,10 @@ export function GoalsSummary() {
         });
 
         const byTypeWithProgress: Record<string, { count: number; target: number; current: number; progress: number }> = {};
-        Object.entries(byType).forEach(([type, data]) => {
+        Object.entries(byType).forEach(([type, d]) => {
           byTypeWithProgress[type] = {
-            ...data,
-            progress: data.target > 0 ? Math.min((data.current / data.target) * 100, 100) : 0,
+            ...d,
+            progress: d.target > 0 ? Math.min((d.current / d.target) * 100, 100) : 0,
           };
         });
 
@@ -108,25 +107,33 @@ export function GoalsSummary() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-card border border-border rounded-xl p-5 shadow-sm animate-pulse">
-            <div className="h-3 bg-muted rounded w-20 mb-2" />
-            <div className="h-7 bg-muted rounded w-28 mb-1" />
-            <div className="h-2.5 bg-muted/50 rounded w-full" />
+      <Card className="animate-pulse">
+        <CardContent className="p-5">
+          <div className="h-4 bg-muted rounded w-32 mb-6" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i}>
+                <div className="h-3 bg-muted rounded w-16 mb-2" />
+                <div className="h-6 bg-muted rounded w-24 mb-1" />
+                <div className="h-2.5 bg-muted/50 rounded w-14" />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+          <div className="mt-4 h-2 bg-muted rounded w-full" />
+        </CardContent>
+      </Card>
     );
   }
 
   if (!data || data.totalGoals === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl p-8 shadow-sm text-center">
-        <div className="text-4xl mb-3">🎯</div>
-        <p className="text-lg font-semibold text-foreground mb-1">No goals set yet</p>
-        <p className="text-sm text-muted-foreground">Create your first financial goal to start tracking your progress.</p>
-      </div>
+      <Card>
+        <CardContent className="p-8 text-center">
+          <div className="text-4xl mb-3">🎯</div>
+          <p className="text-lg font-semibold text-foreground mb-1">No goals set yet</p>
+          <p className="text-sm text-muted-foreground">Create your first financial goal to start tracking your progress.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -137,143 +144,136 @@ export function GoalsSummary() {
     other: '🎯',
   };
 
+  const remaining = Math.max(0, data.totalTarget - data.totalCurrent);
+  const progressPercent = data.overallProgress;
+
   return (
     <div className="space-y-5">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={totalCollapsed}
-            onToggle={setTotalCollapsed}
-            title={
-              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" /> Total Goals
-              </h3>
-            }
-          />
-          {!totalCollapsed && (
-            <div className="p-5">
-              <p className="text-2xl font-bold text-foreground">{data.totalGoals}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {data.activeGoals} active · {data.completedGoals} done
-              </p>
+      <Card>
+        <CollapsibleCardHeader
+          isCollapsed={collapsed}
+          onToggle={setCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" /> Goals Summary
+            </h3>
+          }
+          actions={
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <span className="font-semibold text-foreground">{data.totalGoals} total</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-chart-2">{data.activeGoals} active</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-chart-1">{data.completedGoals} done</span>
             </div>
-          )}
-        </div>
-
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={targetCollapsed}
-            onToggle={setTargetCollapsed}
-            title={
-              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-                <Coins className="w-4 h-4 text-primary" /> Total Target
-              </h3>
-            }
-          />
-          {!targetCollapsed && (
-            <div className="p-5">
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(data.totalTarget)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Across all goals</p>
+          }
+        />
+        {!collapsed && (
+          <CardContent>
+            {/* 3-column metrics */}
+            <div className="grid grid-cols-3 divide-x divide-border">
+              <div className="pr-3 sm:pr-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <Coins className="w-3 h-3" /> Total Target
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-foreground truncate blur-number">
+                  {formatCurrency(data.totalTarget)}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Across all goals</p>
+              </div>
+              <div className="px-3 sm:px-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <PiggyBank className="w-3 h-3" /> Total Saved
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-chart-1 truncate blur-number">
+                  {formatCurrency(data.totalCurrent)}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Saved so far</p>
+              </div>
+              <div className="pl-3 sm:pl-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <TrendingUp className="w-3 h-3" /> Remaining
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-foreground truncate blur-number">
+                  {formatCurrency(remaining)}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Still needed</p>
+              </div>
             </div>
-          )}
-        </div>
 
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={savedCollapsed}
-            onToggle={setSavedCollapsed}
-            title={
-              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-                <PiggyBank className="w-4 h-4 text-primary" /> Total Saved
-              </h3>
-            }
-          />
-          {!savedCollapsed && (
-            <div className="p-5">
-              <p className="text-2xl font-bold text-chart-1">{formatCurrency(data.totalCurrent)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {formatCurrency(data.totalTarget - data.totalCurrent)} remaining
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={progressCollapsed}
-            onToggle={setProgressCollapsed}
-            title={
-              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" /> Overall Progress
-              </h3>
-            }
-          />
-          {!progressCollapsed && (
-            <div className="p-5">
-              <p className="text-2xl font-bold text-foreground blur-number">{data.overallProgress.toFixed(1)}%</p>
-              <div className="w-full bg-muted/30 rounded-full h-1.5 mt-2 overflow-hidden">
+            {/* Progress bar */}
+            <div className="border-t border-border mt-4 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs sm:text-sm font-medium text-foreground">Overall Progress</span>
+                <span className="text-xs sm:text-sm font-bold text-foreground blur-number">{progressPercent.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    data.overallProgress >= 75 ? 'bg-chart-1' :
-                    data.overallProgress >= 50 ? 'bg-chart-3' :
-                    data.overallProgress >= 25 ? 'bg-status-warning' : 'bg-destructive'
-                  }`}
-                  style={{ width: `${data.overallProgress}%` }}
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700',
+                    progressPercent >= 75 ? 'bg-chart-1' :
+                    progressPercent >= 50 ? 'bg-chart-3' :
+                    progressPercent >= 25 ? 'bg-status-warning' : 'bg-destructive'
+                  )}
+                  style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Breakdown by Type (collapsible) */}
+            {Object.keys(data.byType).length > 1 && (
+              <div className="border-t border-border mt-4 pt-3">
+                <button
+                  onClick={() => setBreakdownCollapsed(!breakdownCollapsed)}
+                  className="flex items-center gap-2 w-full text-left group cursor-pointer"
+                  type="button"
+                >
+                  <PieChart className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-foreground">Breakdown by Type</span>
+                  <ChevronDown
+                    className={cn(
+                      'w-4 h-4 text-muted-foreground transition-transform duration-200 ml-auto',
+                      !breakdownCollapsed && 'rotate-180'
+                    )}
+                  />
+                </button>
+                {!breakdownCollapsed && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                    {Object.entries(data.byType).map(([type, td]) => (
+                      <div key={type} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                        <span className="text-xl shrink-0">{typeIcons[type] || '🎯'}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-xs font-medium text-foreground capitalize">{type}</span>
+                            <span className="text-xs text-muted-foreground">{td.count}</span>
+                          </div>
+                          <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={cn(
+                                'h-full rounded-full transition-all duration-500',
+                                td.progress >= 75 ? 'bg-chart-1' :
+                                td.progress >= 50 ? 'bg-chart-3' :
+                                td.progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
+                              )}
+                              style={{ width: `${td.progress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-0.5">
+                            <span className="text-[10px] text-muted-foreground">{formatCurrency(td.current)}</span>
+                            <span className="text-[10px] text-muted-foreground">{formatCurrency(td.target)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {showMath && goalsTrace && <CalculationTraceOverlay trace={goalsTrace} />}
-
-      {/* Breakdown by Type */}
-      {Object.keys(data.byType).length > 1 && (
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={breakdownCollapsed}
-            onToggle={setBreakdownCollapsed}
-            title={
-              <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-primary" /> Breakdown by Type
-              </h3>
-            }
-          />
-          {!breakdownCollapsed && (
-            <div className="p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {Object.entries(data.byType).map(([type, data]) => (
-                  <div key={type} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                    <span className="text-2xl">{typeIcons[type] || '🎯'}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-medium text-foreground capitalize">{type}</span>
-                        <span className="text-xs text-muted-foreground">{data.count}</span>
-                      </div>
-                      <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            data.progress >= 75 ? 'bg-chart-1' :
-                            data.progress >= 50 ? 'bg-chart-3' :
-                            data.progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
-                          }`}
-                          style={{ width: `${data.progress}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">{formatCurrency(data.current)}</span>
-                        <span className="text-[10px] text-muted-foreground">{formatCurrency(data.target)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
