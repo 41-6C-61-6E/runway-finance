@@ -17,7 +17,7 @@ export async function GET() {
     const logs = await getDb()
       .select()
       .from(importLog)
-      .where(eq(importLog.userId, userId))
+      .where(eq(importLog.userId, dataUserId))
       .orderBy(desc(importLog.createdAt));
 
     return NextResponse.json(logs);

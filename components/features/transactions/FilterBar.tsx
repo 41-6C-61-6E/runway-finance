@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Columns2 } from 'lucide-react';
 import { getTypesByGroup } from '@/lib/constants/account-types';
 
 type FilterState = {
@@ -40,6 +41,8 @@ interface FilterBarProps {
   onApplyPreset: (preset: TransactionPreset) => void;
   onSavePreset: (name: string) => void;
   onDeletePreset: (id: string) => void;
+  compactView?: boolean;
+  onCompactViewChange?: (compact: boolean) => void;
 }
 
 type Account = {
@@ -172,7 +175,9 @@ export default function FilterBar({
   customPresets = [],
   onApplyPreset,
   onSavePreset,
-  onDeletePreset
+  onDeletePreset,
+  compactView,
+  onCompactViewChange
 }: FilterBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSavingView, setIsSavingView] = useState(false);
@@ -490,6 +495,21 @@ export default function FilterBar({
           </div>
         }
         className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
+        rightActions={
+          <button
+            type="button"
+            onClick={() => onCompactViewChange?.(!compactView)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer select-none ${
+              compactView
+                ? 'bg-primary/15 border border-primary/50 text-primary shadow-sm'
+                : 'bg-background hover:bg-muted border border-border/80 text-muted-foreground hover:text-foreground shadow-sm'
+            }`}
+            title={compactView ? 'Switch to standard view' : 'Switch to compact view'}
+          >
+            <Columns2 size={12} className="shrink-0" />
+            <span className="hidden sm:inline">Compact</span>
+          </button>
+        }
       >
         <div className="space-y-4">
           {/* Quick Views Presets */}
