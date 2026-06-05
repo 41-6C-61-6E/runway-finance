@@ -26,7 +26,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
     >
       {/* Gradient-masked glassmorphic background panel */}
       <div 
-        className={`absolute inset-0 -z-10 transition-all duration-200 border-b border-border/30 ${
+        className={`absolute inset-0 -z-10 transition-all duration-200 ${
           reduceTransparency 
             ? 'bg-background' 
             : 'bg-card/15 backdrop-blur-md'
