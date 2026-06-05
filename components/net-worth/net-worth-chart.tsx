@@ -275,11 +275,13 @@ export function NetWorthChart() {
   }, [processedData]);
 
   const areaGradientOffset = useMemo(() => {
-    const [yMin, yMax] = areaYDomain;
-    if (yMax <= 0) return 0;
-    if (yMin >= 0) return 1;
-    return yMax / (yMax - yMin);
-  }, [areaYDomain]);
+    const values = processedData.map((d) => d.netWorth);
+    const rawMax = Math.max(...values);
+    const rawMin = Math.min(...values);
+    if (rawMax <= 0) return 0;
+    if (rawMin >= 0) return 1;
+    return rawMax / (rawMax - rawMin);
+  }, [processedData]);
 
   const ActiveDot = useCallback((props: any) => {
     const { cx, cy, payload } = props;
@@ -484,14 +486,36 @@ export function NetWorthChart() {
                   <AreaChart data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0.05} />
-                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0.05} />
-                        <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                        {areaGradientOffset === 1 ? (
+                          <>
+                            <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                          </>
+                        ) : areaGradientOffset === 0 ? (
+                          <>
+                            <stop offset="0%" stopColor="var(--color-chart-5)" stopOpacity={0.05} />
+                            <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                          </>
+                        ) : (
+                          <>
+                            <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0.05} />
+                            <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                          </>
+                        )}
                       </linearGradient>
                       <linearGradient id="netWorthStrokeGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" />
-                        <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" />
+                        {areaGradientOffset === 1 ? (
+                          <stop offset="0%" stopColor="var(--color-chart-1)" />
+                        ) : areaGradientOffset === 0 ? (
+                          <stop offset="0%" stopColor="var(--color-chart-5)" />
+                        ) : (
+                          <>
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" />
+                          </>
+                        )}
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
@@ -521,6 +545,7 @@ export function NetWorthChart() {
                       stroke="url(#netWorthStrokeGrad)"
                       strokeWidth={2}
                       fill="url(#netWorthGrad)"
+                      baseValue={0}
                       dot={false}
                       activeDot={<ActiveDot />}
                     />
