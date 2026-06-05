@@ -200,7 +200,7 @@ export async function POST(request: Request) {
             return {
               type: 'transaction',
               data: {
-                userId,
+                userId: dataUserId,
                 accountId: resolvedAccountId,
                 externalId,
                 date: parseDateField(mapped.date),
@@ -222,7 +222,7 @@ export async function POST(request: Request) {
             return {
               type: 'snapshot',
               data: {
-                userId,
+                userId: dataUserId,
                 accountId: resolvedAccountId,
                 snapshotDate: parseDateField(mapped.date, snapshotDayOfMonth ?? 'end'),
                 balance: encryptedBalance,
@@ -281,7 +281,7 @@ export async function POST(request: Request) {
       // Step 1: Create import log entry FIRST so FK constraints on import_id are satisfied
       await tx.insert(importLog).values({
         id: importId,
-        userId,
+        userId: dataUserId,
         fileName: body.fileName || 'unknown.csv',
         importType: importType as ImportType,
         status: recordsErrored > 0 && recordsImported > 0 ? 'partial' : recordsErrored > 0 ? 'failed' : 'completed',
@@ -308,7 +308,7 @@ export async function POST(request: Request) {
 
           await tx.insert(accounts).values({
             id: newAccountId,
-            userId,
+            userId: dataUserId,
             externalId: 'imported-' + randomUUID(),
             name: encryptedName,
             balance: encryptedBalance,
@@ -328,7 +328,7 @@ export async function POST(request: Request) {
 
           await tx.insert(categories).values({
             id: newCategoryId,
-            userId,
+            userId: dataUserId,
             name: await encryptField(data.name, dek),
             color: data.color || '#6366f1',
             isIncome: data.isIncome ?? false,
@@ -392,7 +392,7 @@ export async function POST(request: Request) {
           const fromDateStr = earliestTx || todayStr;
           await generateHistoricalAccountSnapshots(
             acctId,
-            userId,
+            dataUserId,
             fromDateStr,
             todayStr,
             dek
@@ -425,7 +425,7 @@ export async function POST(request: Request) {
       }
 
       // Historically recalculate the daily net worth snapshots table
-      await recalculateNetWorthSnapshots(userId, dek);
+      await recalculateNetWorthSnapshots(dataUserId, dek);
 
       // Update cash flow, category spending, and category income summaries for charts
       await updateMonthlyCashFlowSummaries(dataUserId, dek);

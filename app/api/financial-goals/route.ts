@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     const dek = await getSessionDEK();
     const body = await req.json();
     const userId = session.user.id;
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve } = body;
 
     if (!name || !type || !targetAmount) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const encryptedValues = await encryptRow('financial_goals', {
-      userId: session.user.id,
+      userId: dataUserId,
       name,
       description: description || null,
       type,

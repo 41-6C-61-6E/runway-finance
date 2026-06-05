@@ -112,7 +112,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   logger.info('POST /api/category-rules/[id]/apply', { userId, ruleId: id, matched: matchedIds.length, total: allTxns.length });
   if (matchedIds.length > 0) {
-    invalidateUserSearchCache(userId);
+    invalidateUserSearchCache(dataUserId);
   }
   return NextResponse.json({
     matched: matchedIds.length,
