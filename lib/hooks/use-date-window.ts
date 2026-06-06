@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
 import { getCurrentMonth, getMonthRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
@@ -23,19 +23,30 @@ export interface DateWindowState {
 }
 
 export function useDateWindow(
-  timeframeKey: string,
+  timeframeKey: string | null,
   windowEndKey: string,
   defaultTimeframe: TimeRange = '1m',
+  controlledTimeframe?: TimeRange,
 ): DateWindowState {
   const currentMonth = getCurrentMonth();
 
-  const [timeframe, _setTimeframe] = usePersistentState<TimeRange>(timeframeKey, defaultTimeframe);
+  const [timeframeState, _setTimeframe] = usePersistentState<TimeRange>(timeframeKey || '', defaultTimeframe);
   const [windowEnd, setWindowEnd] = usePersistentState<string>(windowEndKey, currentMonth);
 
+  const timeframe = controlledTimeframe !== undefined ? controlledTimeframe : timeframeState;
+
   const setTimeframe = (tf: TimeRange) => {
-    _setTimeframe(tf);
+    if (controlledTimeframe === undefined) {
+      _setTimeframe(tf);
+    }
     setWindowEnd(snapToPeriod(windowEnd, tf));
   };
+
+  useEffect(() => {
+    if (controlledTimeframe !== undefined) {
+      setWindowEnd((prev) => snapToPeriod(prev, controlledTimeframe));
+    }
+  }, [controlledTimeframe, setWindowEnd]);
 
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 
