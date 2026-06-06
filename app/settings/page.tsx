@@ -819,7 +819,7 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex flex-wrap rounded-lg bg-card border border-border">
+          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden">
             <button
               onClick={() => setAccountSubTab('automatic')}
               className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors ${
@@ -1252,105 +1252,103 @@ function SettingsPageBody() {
                         return (
                           <div
                             key={account.id}
-                            className={`p-4 bg-muted/30 border border-border rounded-lg flex flex-col sm:flex-row items-start gap-3 cursor-pointer group hover:bg-muted/50 transition-colors ${
+                            className={`p-4 bg-muted/30 border border-border rounded-lg cursor-pointer group hover:bg-muted/50 transition-colors ${
                               account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
                             }`}
                             onClick={() => handleOpenAccountDrawer(account)}
                           >
-                            <div className="flex-1 min-w-0 w-full sm:w-auto">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
-                                  account.type === 'checking' ? 'bg-chart-4/20 text-chart-4' :
-                                  account.type === 'savings' ? 'bg-chart-1/20 text-chart-1' :
-                                  account.type === 'credit' ? 'bg-chart-2/20 text-chart-2' :
-                                  isInvestmentAccount(account.type) ? 'bg-chart-3/20 text-chart-3' :
-                                  account.type === 'loan' ? 'bg-chart-5/20 text-chart-5' :
-                                  account.type === 'mortgage' ? 'bg-destructive/20 text-destructive' :
-                                  'bg-muted text-muted-foreground'
-                                }`}>
-                                  {account.type}
-                                </span>
-                                {account.isHidden && (
-                                  <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
-                                )}
-                                {account.isExcludedFromNetWorth && (
-                                  <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">Excluded</span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-foreground font-medium text-sm truncate max-w-[160px] sm:max-w-xs">{account.name}</span>
-                                {account.tags && account.tags.length > 0 && (
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    {account.tags.map((tag) => (
-                                      <span
-                                        key={tag.id}
-                                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
-                                        style={{
-                                          backgroundColor: `${tag.color}15`,
-                                          color: tag.color,
-                                          borderColor: `${tag.color}30`
-                                        }}
-                                      >
-                                        #{tag.name}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              {account.institution && (
-                                <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-                              <div className="text-right">
-                                <div className={`font-mono text-sm text-muted-foreground blur-number`}>
-                                  {formatted}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
+                                    account.type === 'checking' ? 'bg-chart-4 text-white' :
+                                    account.type === 'savings' ? 'bg-chart-1 text-white' :
+                                    account.type === 'credit' ? 'bg-chart-2 text-white' :
+                                    isInvestmentAccount(account.type) ? 'bg-chart-3 text-white' :
+                                    account.type === 'loan' ? 'bg-chart-5 text-white' :
+                                    account.type === 'mortgage' ? 'bg-chart-5 text-white' :
+                                    'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {account.type}
+                                  </span>
+                                  {account.isHidden && (
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
+                                  )}
+                                  {account.isExcludedFromNetWorth && (
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Excluded</span>
+                                  )}
                                 </div>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <span className="text-foreground font-medium text-sm truncate max-w-[160px] sm:max-w-xs">{account.name}</span>
+                                  {account.tags && account.tags.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {account.tags.map((tag) => (
+                                        <span
+                                          key={tag.id}
+                                          className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
+                                          style={{
+                                            backgroundColor: `${tag.color}15`,
+                                            color: tag.color,
+                                            borderColor: `${tag.color}30`
+                                          }}
+                                        >
+                                          #{tag.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {account.institution && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-mono text-sm text-foreground blur-number">{formatted}</div>
                                 <div className="text-xs text-muted-foreground/60">{account.currency}</div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleToggleAccount(account.id, 'isHidden')}
-                                    className={`relative w-9 h-4 rounded-full transition-colors ${
-                                      account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                    title={account.isHidden ? 'Show account' : 'Hide account'}
-                                  >
-                                    <span
-                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
-                                        account.isHidden ? 'translate-x-5' : 'translate-x-0'
-                                      }`}
-                                    />
-                                  </button>
-                                  <span className="text-[10px] text-muted-foreground">{account.isHidden ? 'Show' : 'Hide'}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
-                                    className={`relative w-9 h-4 rounded-full transition-colors ${
-                                        account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                    title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
-                                  >
-                                    <span
-                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
-                                        account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
-                                      }`}
-                                    />
-                                  </button>
-                                  <span className="text-[10px] text-muted-foreground">{account.isExcludedFromNetWorth ? 'Include' : 'Exclude'}</span>
-                                </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-3 mt-3 pt-3 border-t border-border/50 flex-wrap">
+                              <div className="flex items-center gap-1.5">
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenAccountDrawer(account);
-                                  }}
-                                  className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                                  onClick={handleToggleAccount(account.id, 'isHidden')}
+                                  className={`relative w-9 h-4 rounded-full transition-colors ${
+                                    account.isHidden ? 'bg-primary' : 'bg-muted-foreground/30'
+                                  }`}
+                                  title={account.isHidden ? 'Show account' : 'Hide account'}
                                 >
-                                  Edit
+                                  <span
+                                    className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
+                                      account.isHidden ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                  />
                                 </button>
+                                <span className="text-[10px] text-muted-foreground">{account.isHidden ? 'Hidden' : 'Visible'}</span>
                               </div>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={handleToggleAccount(account.id, 'isExcludedFromNetWorth')}
+                                  className={`relative w-9 h-4 rounded-full transition-colors ${
+                                      account.isExcludedFromNetWorth ? 'bg-primary' : 'bg-muted-foreground/30'
+                                  }`}
+                                  title={account.isExcludedFromNetWorth ? 'Include in net worth' : 'Exclude from net worth'}
+                                >
+                                  <span
+                                    className={`absolute top-0.5 left-0.5 w-3 h-3 bg-background rounded-full shadow transition-transform ${
+                                      account.isExcludedFromNetWorth ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                  />
+                                </button>
+                                <span className="text-[10px] text-muted-foreground">{account.isExcludedFromNetWorth ? 'Excluded' : 'Included'}</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenAccountDrawer(account);
+                                }}
+                                className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                              >
+                                Edit
+                              </button>
                             </div>
                           </div>
                         );
