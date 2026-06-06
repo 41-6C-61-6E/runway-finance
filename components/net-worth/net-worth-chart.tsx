@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
@@ -30,6 +29,9 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { Activity, TrendingUp, BarChart3 } from 'lucide-react';
+import { getMonthRange } from '@/lib/utils/date-window';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 
 interface ChartPoint {
   date: string;
@@ -158,7 +160,15 @@ function computeChangeBarData(data: ChartPoint[]): { barData: BarDataPoint[]; bu
 
 export function NetWorthChart() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:net-worth-chart:timeframe', '1y');
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+    monthRange,
+  } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -169,7 +179,10 @@ export function NetWorthChart() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`/api/net-worth/chart?timeframe=${timeframe}`, { credentials: 'include' });
+        const startDate = monthRange.start + '-01';
+        const [ey, em] = monthRange.end.split('-').map(Number);
+        const endDate = monthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+        const res = await fetch(`/api/net-worth/chart?timeframe=${timeframe}&startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch net worth history data');
         const json: ChartResponse = await res.json();
         setChartData(json.data || []);
@@ -180,7 +193,7 @@ export function NetWorthChart() {
       }
     };
     fetchData();
-  }, [timeframe]);
+  }, [timeframe, monthRange.start, monthRange.end]);
 
   const processedData = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -468,6 +481,19 @@ export function NetWorthChart() {
               <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {timeframe.toUpperCase()}
               </span>
+            }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
             }
           >
             <div className="flex items-center gap-2">

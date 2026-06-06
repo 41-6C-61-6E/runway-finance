@@ -1519,32 +1519,8 @@ export default function TransactionTable({
                       {/* Row 2, Col 1: spacer for date alignment */}
                       <div />
 
-                      {/* Row 2, Col 2: Account + Category + Tags */}
-                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                        <span className="text-[11px] text-muted-foreground truncate max-w-[120px] shrink-0">
-                          {tx.accountName || "—"}
-                        </span>
-                        {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
-                          <div className="flex items-center gap-1 shrink-0 min-w-0 overflow-hidden">
-                            {tx.accountTags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
-                                style={{
-                                  backgroundColor: `${tag.color}22`,
-                                  color: tag.color,
-                                  border: `1px solid ${tag.color}44`,
-                                }}
-                                title={tag.name}
-                              >
-                                #{tag.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <span className="text-muted-foreground/25 shrink-0 select-none">·</span>
-
-                        {/* Clickable category with dropdown */}
+                      {/* Row 2, Col 2: Category pill */}
+                      <div className="flex items-center min-w-0">
                         <div className="relative">
                           <button
                             onClick={(e) => {
@@ -1602,8 +1578,7 @@ export default function TransactionTable({
                               <div
                                 className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
                                 style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                              >
-                                {isCreatingCategory ? (
+                              >                                {isCreatingCategory ? (
                                   <div className="p-3 space-y-2 flex flex-col text-xs">
                                     <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-0.5">
                                       New Category
@@ -1765,8 +1740,31 @@ export default function TransactionTable({
 
                       </div>
 
-                      {/* Row 2, Col 3: spacer */}
-                      <div />
+                      {/* Row 2, Col 3: Account + Tags right-justified */}
+                      <div className="flex items-center justify-end gap-1.5 min-w-0 flex-wrap">
+                        <span className="text-[11px] text-muted-foreground truncate max-w-[120px] shrink-0">
+                          {tx.accountName || "—"}
+                        </span>
+                        {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
+                          <div className="flex items-center gap-1 shrink-0 min-w-0 overflow-hidden">
+                            {tx.accountTags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
+                                style={{
+                                  backgroundColor: `${tag.color}22`,
+                                  color: tag.color,
+                                  border: `1px solid ${tag.color}44`,
+                                }}
+                                title={tag.name}
+                              >
+                                #{tag.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   );
                 })}

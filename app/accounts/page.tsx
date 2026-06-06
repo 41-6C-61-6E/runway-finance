@@ -53,6 +53,9 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
 import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
+import { getMonthRange } from '@/lib/utils/date-window';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 // ── Types ───────────────────────────────────────────────────────────────────
 type ChartType = 'line' | 'bar';
 type GroupingMode = 'account' | 'type' | 'group';
@@ -220,11 +223,22 @@ interface AccountTransactionsProps {
   accountId: string;
   historyData: any[];
   isLiability: boolean;
-  timeframe: TimeRange;
-  setTimeframe: (val: TimeRange) => void;
 }
 
-function AccountTransactions({ accountId, historyData, isLiability, timeframe, setTimeframe }: AccountTransactionsProps) {
+function AccountTransactions({ accountId, historyData, isLiability }: AccountTransactionsProps) {
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+    monthRange: txMonthRange,
+  } = useDateWindow(
+    `finance:account-tx:${accountId}:timeframe`,
+    `finance:account-tx:${accountId}:windowEnd`,
+    '1m'
+  );
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId],
     queryFn: async () => {
@@ -264,9 +278,17 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
 
   const visibleMiniData = useMemo(() => {
     if (accountHistory.length === 0) return [];
-    const [startIdx, endIdx] = getTimeframeIndices(accountHistory, timeframe);
+    if (timeframe === 'all') return accountHistory;
+    const [ey, em] = txMonthRange.end.split('-').map(Number);
+    const endDateStr = txMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+    const startIdx = accountHistory.findIndex((d: any) => d.date >= txMonthRange.start + '-01');
+    if (startIdx === -1) return [];
+    let endIdx = accountHistory.length - 1;
+    for (let i = accountHistory.length - 1; i >= 0; i--) {
+      if (accountHistory[i].date <= endDateStr) { endIdx = i; break; }
+    }
     return accountHistory.slice(startIdx, endIdx + 1);
-  }, [accountHistory, timeframe]);
+  }, [accountHistory, timeframe, txMonthRange.start, txMonthRange.end]);
 
   const { minVal, maxVal } = useMemo(() => {
     if (visibleMiniData.length === 0) return { minVal: 0, maxVal: 1000 };
@@ -315,23 +337,16 @@ function AccountTransactions({ accountId, historyData, isLiability, timeframe, s
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
               <Activity className="w-3.5 h-3.5" /> Balance History
             </span>
-            {accountHistory.length >= 2 && (
-              <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5">
-                {(['1m', '3m', '6m', '1y', 'all'] as const).map((r) => (
-                  <button
-                    type="button"
-                    key={r}
-                    onClick={() => setTimeframe(r)}
-                    className={`px-2 py-0.5 text-[9px] font-semibold rounded capitalize transition-all ${
-                      timeframe === r
-                        ? 'bg-card text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {r === 'all' ? 'All' : r.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+            {accountHistory.length >= 2 && showWindowNav && (
+              <DateWindowNav
+                prev={prevWindow}
+                next={nextWindow}
+                nextDisabled={isNextDisabled}
+                label={windowLabel}
+                options={periodOptions}
+                currentValue={windowEnd}
+                onSelect={setWindowEnd}
+              />
             )}
           </div>
 
@@ -496,7 +511,15 @@ export default function AccountsPage() {
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
 
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:accounts:timeframe', '1m');
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+    monthRange: windowMonthRange,
+  } = useDateWindow('finance:accounts:timeframe', 'finance:accounts:windowEnd', '1m');
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('finance:accounts:groupMode', 'type');
@@ -1027,8 +1050,19 @@ export default function AccountsPage() {
 
   // ── Viewport-sliced data (what the chart actually renders) ──────────────────
   const [defaultStart, defaultEnd] = useMemo(() => {
-    return getTimeframeIndices(rechartsData, timeframe);
-  }, [rechartsData, timeframe]);
+    if (rechartsData.length === 0) return [0, 0];
+    if (timeframe === 'all') return [0, rechartsData.length - 1];
+    // Find indices corresponding to the month range window
+    const startStr = windowMonthRange.start + '-01';
+    const endStr = windowMonthRange.end + '-01';
+    let sIdx = rechartsData.findIndex((d: any) => d.date >= startStr);
+    if (sIdx === -1) sIdx = 0;
+    let eIdx = rechartsData.length - 1;
+    for (let i = rechartsData.length - 1; i >= 0; i--) {
+      if (rechartsData[i].date <= endStr) { eIdx = i; break; }
+    }
+    return [sIdx, eIdx];
+  }, [rechartsData, timeframe, windowMonthRange.start, windowMonthRange.end]);
 
   const currentViewStart = viewStart ?? defaultStart;
   const currentViewEnd = viewEnd ?? defaultEnd;
@@ -1444,6 +1478,19 @@ export default function AccountsPage() {
                           </span>
                         )}
                       </div>
+                    }
+                    rightActions={
+                      showWindowNav && (
+                        <DateWindowNav
+                          prev={prevWindow}
+                          next={nextWindow}
+                          nextDisabled={isNextDisabled}
+                          label={windowLabel}
+                          options={periodOptions}
+                          currentValue={windowEnd}
+                          onSelect={setWindowEnd}
+                        />
+                      )
                     }
                   >
                     <div className="space-y-4">
@@ -2632,7 +2679,7 @@ export default function AccountsPage() {
                             onClick={() => setExpandedGroups(prev => ({ ...prev, [group]: !isGroupExpanded }))}
                             className="w-full flex items-center justify-between px-0 py-3 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
                           >
-                            <div className="flex items-center min-w-0 flex-1">
+                            <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
                               <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                 {isGroupExpanded ? (
                                   <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -2653,7 +2700,7 @@ export default function AccountsPage() {
                               />
                             </div>
 
-                            <div className="flex-shrink-0 w-28 sm:w-36 text-right">
+                            <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
                               <p className="font-mono text-sm font-bold text-foreground blur-number">
                                 {formatCurrency(groupStats.current)}
                               </p>
@@ -2686,7 +2733,7 @@ export default function AccountsPage() {
                                         onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
                                         className="w-full flex items-center justify-between px-0 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
                                       >
-                                        <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
+                                        <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
                                           <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                             {isSubExpanded ? (
                                               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
@@ -2707,7 +2754,7 @@ export default function AccountsPage() {
                                           />
                                         </div>
 
-                                        <div className="flex-shrink-0 w-28 sm:w-36 text-right">
+                            <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
                                           <p className="font-mono text-xs font-bold text-muted-foreground blur-number">
                                             {formatCurrency(subStats.current)}
                                           </p>
@@ -2737,7 +2784,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                       acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                     }`}
                                                 >
-                                                  <div className="flex items-center min-w-0 flex-1 pl-1 sm:pl-8">
+                                                  <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-12">
                                                 <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                                 </div>
@@ -2783,7 +2830,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                                 )}
                                               </div>
 
-                                              <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
+                                              <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
                                                 <p className="font-mono text-xs font-bold text-foreground blur-number">
                                                   {formatCurrency(acc.balance)}
                                                 </p>
@@ -2803,8 +2850,6 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                                 accountId={acc.id} 
                                                 historyData={historyData}
                                                 isLiability={isLiabilityAccount(acc.type)}
-                                                timeframe={hierarchyTimeframe}
-                                                setTimeframe={setHierarchyTimeframe}
                                               />
                                             )}
                                           </Fragment>
@@ -2832,7 +2877,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
                                                   >
-                                                    <div className="flex items-center min-w-0 flex-1 pl-0.5 sm:pl-4">
+                                                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
                                         <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
                                           <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                         </div>
@@ -2881,7 +2926,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         )}
                                       </div>
 
-                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-2">
+                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
                                         <p className="font-mono text-xs font-bold text-foreground blur-number">
                                           {formatCurrency(acc.balance)}
                                         </p>
@@ -2901,8 +2946,6 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         accountId={acc.id} 
                                         historyData={historyData}
                                         isLiability={isLiabilityAccount(acc.type)}
-                                        timeframe={hierarchyTimeframe}
-                                        setTimeframe={setHierarchyTimeframe}
                                       />
                                     )}
                                   </Fragment>

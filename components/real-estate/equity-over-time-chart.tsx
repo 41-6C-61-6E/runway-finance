@@ -18,11 +18,13 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { EstimatePill } from '@/components/ui/estimate-pill';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { TrendingUp } from 'lucide-react';
+import { getMonthRange } from '@/lib/utils/date-window';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 
 interface PropertySnapshot {
   date: string;
@@ -62,7 +64,15 @@ export function EquityOverTimeChart() {
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = usePersistentState<TimeRange>('finance:real-estate:timeRange', 'all');
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+    monthRange,
+  } = useDateWindow('finance:real-estate:timeframe', 'finance:real-estate:windowEnd', 'all');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -303,30 +313,18 @@ export function EquityOverTimeChart() {
     // Filter synthetic data if showSynth is false
     const synthFiltered = rawTimeline.filter((pt) => showSynth || !pt.isSynthetic);
 
-    // Calculate cutoff date string in UTC to match database date format (YYYY-MM-DD)
-    let cutoffStr = '1970-01-01';
-    if (timeRange !== 'all') {
-      const cutoffDate = new Date();
-      if (timeRange === '1m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 1);
-      else if (timeRange === '3m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 3);
-      else if (timeRange === '6m') cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 6);
-      else if (timeRange === '1y') cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 1);
-      else if (timeRange === '5y') cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 5);
-      else if (timeRange === 'ytd') {
-        cutoffDate.setUTCMonth(0, 1);
-      }
-      const y = cutoffDate.getUTCFullYear();
-      const m = String(cutoffDate.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(cutoffDate.getUTCDate()).padStart(2, '0');
-      cutoffStr = `${y}-${m}-${d}`;
-    }
+    if (timeframe === 'all') return synthFiltered;
 
-    return synthFiltered.filter((pt) => pt.date >= cutoffStr);
-  }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeRange]);
+    const startStr = `${monthRange.start}-01`;
+    const [ey, em] = monthRange.end.split('-').map(Number);
+    const endStr = `${ey}-${String(em).padStart(2, '0')}-${new Date(ey, em, 0).getDate()}`;
+
+    return synthFiltered.filter((pt) => pt.date >= startStr && pt.date <= endStr);
+  }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeframe, monthRange.start, monthRange.end]);
 
   const xAxisTicks = useMemo(() => {
-    return getChartXTicks(activeTimeline, timeRange, 'date');
-  }, [activeTimeline, timeRange]);
+    return getChartXTicks(activeTimeline, timeframe, 'date');
+  }, [activeTimeline, timeframe]);
 
   // Map mortgage account IDs to their readable names
   const mortgageNamesMap = useMemo(() => {
@@ -490,9 +488,22 @@ export function EquityOverTimeChart() {
                   {properties.find(p => p.id === selectedPropertyId)?.name ?? 'ALL PROPERTIES'}
                 </span>
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {timeRange.toUpperCase()}
+                  {timeframe.toUpperCase()}
                 </span>
               </div>
+            }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
@@ -515,7 +526,7 @@ export function EquityOverTimeChart() {
               )}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
-                <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
             </div>
           </CollapsibleFilterPanel>
@@ -554,9 +565,9 @@ export function EquityOverTimeChart() {
                     ticks={xAxisTicks}
                     tickFormatter={(d) => {
                       if (!d) return '';
-                      if (timeRange === '1m') {
+                      if (timeframe === '1m') {
                         return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                      } else if (timeRange === '5y' || timeRange === 'all') {
+                      } else if (timeframe === '5y' || timeframe === 'all') {
                         return formatSafeUTCDate(d, { year: 'numeric' });
                       } else {
                         return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });

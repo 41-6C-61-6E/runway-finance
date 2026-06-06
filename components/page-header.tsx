@@ -32,8 +32,8 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
             : 'bg-card/15 backdrop-blur-md'
         }`}
         style={!reduceTransparency ? {
-          WebkitMaskImage: 'linear-gradient(to bottom, black 50%, rgba(0, 0, 0, 0.8) 75%, rgba(0, 0, 0, 0.3) 90%, transparent 100%)',
-          maskImage: 'linear-gradient(to bottom, black 50%, rgba(0, 0, 0, 0.8) 75%, rgba(0, 0, 0, 0.3) 90%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 75%, rgba(0, 0, 0, 0.9) 85%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black 75%, rgba(0, 0, 0, 0.9) 85%, transparent 100%)',
         } : {}}
       />
       <div className="flex items-center justify-between w-full md:w-auto">

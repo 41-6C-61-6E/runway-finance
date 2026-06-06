@@ -97,9 +97,14 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
+  const explicitStart = searchParams.get('startDate');
+  const explicitEnd = searchParams.get('endDate');
 
   let [startDate, endDate] = getDateRange(timeframe);
-  if (timeframe === 'all') {
+  if (explicitStart && explicitEnd) {
+    startDate = new Date(explicitStart + 'T00:00:00Z');
+    endDate = new Date(explicitEnd + 'T00:00:00Z');
+  } else if (timeframe === 'all') {
     const earliestSnap = await getDb()
       .select({ snapshotDate: netWorthSnapshots.snapshotDate })
       .from(netWorthSnapshots)

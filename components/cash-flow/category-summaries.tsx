@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -12,6 +11,9 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { List } from 'lucide-react';
+import { getMonthRange, getPeriodLabel } from '@/lib/utils/date-window';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 
 interface CategoryData {
   categoryId: string;
@@ -60,62 +62,7 @@ function MiniSparkline({ value, prev: rawPrev, isIncome }: { value: number; prev
   );
 }
 
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
-function getMonthRange(timeframe: TimeRange): { start: string; end: string } {
-  const now = new Date();
-  const currentYm = getCurrentMonth();
-
-  if (timeframe === '1m') {
-    return { start: currentYm, end: currentYm };
-  }
-
-  let start: Date;
-  switch (timeframe) {
-    case '3m':
-      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      break;
-    case '6m':
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      break;
-    case '1y':
-      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-      break;
-    case '5y':
-      start = new Date(now.getFullYear() - 5, now.getMonth() + 1, 1);
-      break;
-    case 'ytd':
-      start = new Date(now.getFullYear(), 0, 1);
-      break;
-    case 'all':
-      start = new Date(2000, 0, 1);
-      break;
-    default:
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  return {
-    start: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
-    end: currentYm,
-  };
-}
-
-function formatMonth(ym: string): string {
-  const [year, month] = ym.split('-').map(Number);
-  const date = new Date(year, month - 1, 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-function formatRange(timeframe: TimeRange): string {
-  const { start, end } = getMonthRange(timeframe);
-  if (start === end) {
-    return formatMonth(start);
-  }
-  return `${formatMonth(start)} - ${formatMonth(end)}`;
-}
 
 export function CategorySummaries() {
   const router = useRouter();
@@ -123,17 +70,24 @@ export function CategorySummaries() {
   const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:category-summaries:timeframe', '1m');
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+  } = useDateWindow('finance:category-summaries:timeframe', 'finance:category-summaries:windowEnd', '1m');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('categorySummaries');
   const [showFilters, setShowFilters] = useState(false);
 
   const queryParams = useMemo(() => {
-    const range = getMonthRange(timeframe);
+    const range = getMonthRange(timeframe, windowEnd);
     if (timeframe === '1m') {
       return `month=${range.start}`;
     }
     return `startMonth=${range.start}&endMonth=${range.end}`;
-  }, [timeframe]);
+  }, [timeframe, windowEnd]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -189,7 +143,7 @@ export function CategorySummaries() {
   );
 
   const handleCategoryClick = (categoryId: string) => {
-    const range = getMonthRange(timeframe);
+    const range = getMonthRange(timeframe, windowEnd);
     const startDate = `${range.start}-01`;
     const [endYear, endMonthStr] = range.end.split('-').map(Number);
     const lastDay = new Date(endYear, endMonthStr, 0).getDate();
@@ -351,7 +305,7 @@ export function CategorySummaries() {
               <List className="w-4 h-4 text-primary" /> Category Breakdown
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5 font-normal">
-              Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{formatRange(timeframe)}</span>
+              Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{windowLabel}</span>
             </p>
           </div>
         }
@@ -367,6 +321,19 @@ export function CategorySummaries() {
                   {timeframe.toUpperCase()}
                 </span>
               </div>
+            }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
