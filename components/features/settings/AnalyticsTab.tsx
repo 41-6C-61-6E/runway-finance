@@ -128,7 +128,7 @@ export default function AnalyticsTab() {
   return (
     <div>
       {/* Sub-Tabs */}
-      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-6">
+      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-6 overflow-hidden">
         {([
           { key: 'general' as const, label: 'General' },
           { key: 'data' as const, label: 'Data Sources' },
