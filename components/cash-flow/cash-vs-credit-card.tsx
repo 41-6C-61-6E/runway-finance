@@ -461,7 +461,6 @@ export function CashVsCreditCard() {
                           stroke="var(--color-primary)"
                           strokeWidth={2}
                           dot={false}
-                          strokeDasharray="4 3"
                           activeDot={{ r: 4 }}
                         />
                       </ComposedChart>
