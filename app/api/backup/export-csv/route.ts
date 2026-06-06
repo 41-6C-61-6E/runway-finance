@@ -19,6 +19,9 @@ import {
 
   simplifinConnections,
   aiProviders,
+  tags,
+  importLog,
+  paystubs,
 } from '@/lib/db/schema';
 import archiver from 'archiver';
 
@@ -68,6 +71,85 @@ export async function GET() {
   const db = getDb();
   const dek = await getSessionDEK();
 
+  // Load lookup tables to decode IDs
+  const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, userId));
+  const decryptedAccounts = await Promise.all(
+    accountsRaw.map((row) => decryptRow('accounts', row as Record<string, unknown>, dek)),
+  );
+  const accountMap = new Map<string, string>(
+    decryptedAccounts.map((a) => [a.id as string, a.name as string]),
+  );
+
+  const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, userId));
+  const decryptedCategories = await Promise.all(
+    categoriesRaw.map((row) => decryptRow('categories', row as Record<string, unknown>, dek)),
+  );
+  const categoryMap = new Map<string, string>(
+    decryptedCategories.map((c) => [c.id as string, c.name as string]),
+  );
+
+  const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, userId));
+  const connectionMap = new Map<string, string>(
+    connectionsRaw.map((c) => [c.id as string, c.label as string]),
+  );
+
+  const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, userId));
+  const importMap = new Map<string, string>(
+    importsRaw.map((i) => [i.id as string, i.fileName as string]),
+  );
+
+  const tagsRaw = await db.select().from(tags).where(eq(tags.userId, userId));
+  const decryptedTags = await Promise.all(
+    tagsRaw.map((row) => decryptRow('tags', row as Record<string, unknown>, dek)),
+  );
+  const tagMap = new Map<string, string>(
+    decryptedTags.map((t) => [t.id as string, t.name as string]),
+  );
+
+  const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, userId));
+  const paystubMap = new Map<string, string>(
+    paystubsRaw.map((p) => [p.id as string, `${p.employerName} (${p.checkDate})`]),
+  );
+
+  const ID_DECODERS: Record<string, Array<{ key: string; decodeKey: string; map: Map<string, string> }>> = {
+    accounts: [
+      { key: 'connectionId', decodeKey: 'connectionLabel', map: connectionMap },
+    ],
+    categories: [
+      { key: 'parentId', decodeKey: 'parentCategoryName', map: categoryMap },
+      { key: 'expenseParentId', decodeKey: 'expenseParentCategoryName', map: categoryMap },
+    ],
+    transactions: [
+      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+      { key: 'importId', decodeKey: 'importFileName', map: importMap },
+      { key: 'paystubId', decodeKey: 'paystubDescription', map: paystubMap },
+    ],
+    category_rules: [
+      { key: 'setCategoryId', decodeKey: 'setCategoryName', map: categoryMap },
+      { key: 'setTagId', decodeKey: 'setTagName', map: tagMap },
+    ],
+    budgets: [
+      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+      { key: 'fundingAccountId', decodeKey: 'fundingAccountName', map: accountMap },
+    ],
+    financial_goals: [
+      { key: 'linkedAccountId', decodeKey: 'linkedAccountName', map: accountMap },
+    ],
+    account_snapshots: [
+      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+      { key: 'importId', decodeKey: 'importFileName', map: importMap },
+    ],
+    category_spending_summary: [
+      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+    ],
+    category_income_summary: [
+      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+    ],
+  };
+
   const archive = archiver('zip', { zlib: { level: 6 } });
   const chunks: Buffer[] = [];
 
@@ -83,7 +165,22 @@ export async function GET() {
     const decrypted = await Promise.all(
       rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
     );
-    const csv = toCsv(decrypted);
+
+    const decoders = ID_DECODERS[dbName] || [];
+    const enriched = decrypted.map((row) => {
+      const newRow: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        newRow[k] = v;
+        const decoder = decoders.find((d) => d.key === k);
+        if (decoder) {
+          const idVal = String(v ?? '');
+          newRow[decoder.decodeKey] = idVal ? (decoder.map.get(idVal) ?? '') : '';
+        }
+      }
+      return newRow;
+    });
+
+    const csv = toCsv(enriched);
     if (csv) {
       archive.append(csv, { name: `${label}.csv` });
     }
