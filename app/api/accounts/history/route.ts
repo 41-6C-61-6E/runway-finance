@@ -284,7 +284,9 @@ export async function GET(request: Request) {
     // Generate full list of dates in the range
     const datesInRange: string[] = [];
     const curr = new Date(startStr + 'T00:00:00Z');
-    const stop = new Date(endStr + 'T00:00:00Z');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const actualEndStr = endStr < todayStr ? endStr : todayStr;
+    const stop = new Date(actualEndStr + 'T00:00:00Z');
     while (curr <= stop) {
       datesInRange.push(curr.toISOString().split('T')[0]);
       curr.setUTCDate(curr.getUTCDate() + 1);
