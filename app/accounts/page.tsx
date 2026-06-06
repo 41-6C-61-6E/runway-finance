@@ -1056,7 +1056,8 @@ export default function AccountsPage() {
     if (timeframe === 'all') return [0, rechartsData.length - 1];
     // Find indices corresponding to the month range window
     const startStr = windowMonthRange.start + '-01';
-    const endStr = windowMonthRange.end + '-01';
+    const [ey, em] = windowMonthRange.end.split('-').map(Number);
+    const endStr = windowMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
     let sIdx = rechartsData.findIndex((d: any) => d.date >= startStr);
     if (sIdx === -1) sIdx = 0;
     let eIdx = rechartsData.length - 1;
