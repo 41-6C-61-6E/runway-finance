@@ -175,9 +175,10 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
-            </h3>
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
+              <span>Income vs Expenses</span>
+            </div>
           }
         />
         {!isCollapsed && <LoadingSpinner category="chart" className="h-[320px] m-5" />}
@@ -192,9 +193,10 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
-            </h3>
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
+              <span>Income vs Expenses</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -213,9 +215,10 @@ export function IncomeExpenseChart() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
-            </h3>
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
+              <span>Income vs Expenses</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -233,9 +236,10 @@ export function IncomeExpenseChart() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-primary" /> Income vs Expenses
-          </h3>
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
+            <span>Income vs Expenses</span>
+          </div>
         }
       />
       {!isCollapsed && (

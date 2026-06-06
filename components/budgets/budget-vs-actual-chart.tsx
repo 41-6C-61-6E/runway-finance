@@ -146,9 +146,10 @@ export function BudgetVsActualChart() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Scale className="w-4 h-4 text-primary" /> Budget vs Actual
-          </h3>
+          <div className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-primary shrink-0" />
+            <span>Budget vs Actual</span>
+          </div>
         }
       />
       {!isCollapsed && (

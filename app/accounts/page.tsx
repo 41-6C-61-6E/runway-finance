@@ -223,9 +223,10 @@ interface AccountTransactionsProps {
   accountId: string;
   historyData: any[];
   isLiability: boolean;
+  hierarchyTimeframe: TimeRange;
 }
 
-function AccountTransactions({ accountId, historyData, isLiability }: AccountTransactionsProps) {
+function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe }: AccountTransactionsProps) {
   const {
     timeframe, setTimeframe,
     windowEnd, setWindowEnd,
@@ -235,9 +236,10 @@ function AccountTransactions({ accountId, historyData, isLiability }: AccountTra
     showWindowNav,
     monthRange: txMonthRange,
   } = useDateWindow(
-    `finance:account-tx:${accountId}:timeframe`,
+    null,
     `finance:account-tx:${accountId}:windowEnd`,
-    '1m'
+    hierarchyTimeframe,
+    hierarchyTimeframe
   );
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId],
@@ -1451,9 +1453,10 @@ export default function AccountsPage() {
                 isCollapsed={isCollapsed}
                 onToggle={setIsCollapsed}
                 title={
-                  <h3 className="text-base font-normal text-foreground flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-primary" /> Balance History
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-primary shrink-0" />
+                    <span>Balance History</span>
+                  </div>
                 }
               />
               {!isCollapsed && (
@@ -2272,9 +2275,10 @@ export default function AccountsPage() {
                 isCollapsed={hierarchyCollapsed}
                 onToggle={setHierarchyCollapsed}
                 title={
-                  <h3 className="text-base font-normal text-foreground flex items-center gap-2">
-                    <Landmark className="w-4 h-4 text-primary" /> Accounts
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-primary shrink-0" />
+                    <span>Accounts</span>
+                  </div>
                 }
               />
               {!hierarchyCollapsed && (
@@ -2850,6 +2854,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                                 accountId={acc.id} 
                                                 historyData={historyData}
                                                 isLiability={isLiabilityAccount(acc.type)}
+                                                hierarchyTimeframe={hierarchyTimeframe}
                                               />
                                             )}
                                           </Fragment>
@@ -2946,6 +2951,7 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         accountId={acc.id} 
                                         historyData={historyData}
                                         isLiability={isLiabilityAccount(acc.type)}
+                                        hierarchyTimeframe={hierarchyTimeframe}
                                       />
                                     )}
                                   </Fragment>

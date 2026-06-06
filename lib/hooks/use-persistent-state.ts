@@ -31,6 +31,10 @@ export function usePersistentState<T>(
   const lastDbSavedRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    if (!key) {
+      setIsLoaded(true);
+      return;
+    }
     // Wait until the settings context has finished loading
     if (!context || context.loading) return;
 
@@ -85,6 +89,8 @@ export function usePersistentState<T>(
 
     stateRef.current = newValue;
     setState(newValue);
+
+    if (!key) return;
 
     // 1. Persist to localStorage
     try {

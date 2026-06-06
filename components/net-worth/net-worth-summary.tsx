@@ -183,9 +183,10 @@ export function NetWorthSummary() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
-            </h3>
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary shrink-0" />
+              <span>Net Worth Summary</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -212,9 +213,10 @@ export function NetWorthSummary() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
-            </h3>
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary shrink-0" />
+              <span>Net Worth Summary</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -232,9 +234,10 @@ export function NetWorthSummary() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-primary" /> Net Worth Summary
-          </h3>
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-primary shrink-0" />
+            <span>Net Worth Summary</span>
+          </div>
         }
       />
       {!isCollapsed && (
