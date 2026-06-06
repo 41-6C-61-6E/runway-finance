@@ -135,8 +135,8 @@ function getAccountIcon(account: ManualAccount): string {
 
 function getBadgeClasses(type: string): string {
   const lowerType = type.toLowerCase();
-  if (lowerType === 'vehicle') return 'bg-chart-4/20 text-chart-4';
-  if (lowerType === 'metals') return 'bg-chart-5/20 text-chart-5';
+  if (lowerType === 'vehicle') return 'bg-chart-4 text-white';
+  if (lowerType === 'metals') return 'bg-chart-1 text-white';
   
   const hierarchy = TYPE_HIERARCHY[lowerType];
   const group = hierarchy?.group ?? 'Other';
@@ -144,15 +144,15 @@ function getBadgeClasses(type: string): string {
   switch (group) {
     case 'Banking':
     case 'Assets':
-      return 'bg-status-positive/20 text-status-positive';
+      return 'bg-status-positive text-white';
     case 'Credit':
     case 'Loans':
     case 'Liabilities':
-      return 'bg-destructive/20 text-destructive';
+      return 'bg-destructive text-white';
     case 'Investments':
-      return 'bg-chart-1/20 text-chart-1';
+      return 'bg-chart-1 text-white';
     case 'Real Estate':
-      return 'bg-chart-3/20 text-chart-3';
+      return 'bg-chart-3 text-white';
     default:
       return 'bg-muted text-muted-foreground';
   }
@@ -951,26 +951,26 @@ export default function ManualAccountsSection() {
             return (
               <div
                 key={account.id}
-                className="p-4 bg-muted/30 border border-border rounded-lg space-y-2"
+                className="p-4 bg-muted/30 border border-border rounded-lg"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{getAccountIcon(account)}</span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getBadgeClasses(account.type)}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm shrink-0">{getAccountIcon(account)}</span>
+                      <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${getBadgeClasses(account.type)}`}>
                         {getSubTypeLabel(account)}
                       </span>
-                      {isLiability && <span className="text-[10px] text-destructive font-medium">Liability</span>}
-                      {isSimpleFin && <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>}
+                      {isLiability && <span className="text-[10px] text-chart-5 font-medium">Liability</span>}
+                      {isSimpleFin && <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-foreground font-medium text-sm truncate max-w-[200px] sm:max-w-xs">{account.name}</span>
+                      <span className="text-foreground font-medium text-sm truncate max-w-[160px] sm:max-w-xs">{account.name}</span>
                       {account.tags && account.tags.length > 0 && (
-                        <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap">
                           {account.tags.map((tag) => (
                             <span
                               key={tag.id}
-                              className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                              className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
                               style={{
                                 backgroundColor: `${tag.color}15`,
                                 color: tag.color,
@@ -984,63 +984,74 @@ export default function ManualAccountsSection() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="text-right">
-                      <div className={`font-mono text-sm font-semibold blur-number ${isLiability ? 'text-destructive' : 'text-muted-foreground'}`}>
-                        {fmt.sign}{fmt.text}
-                      </div>
-                      <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono text-sm font-semibold text-foreground blur-number">
+                      {fmt.sign}{fmt.text}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {canSync(account) && (
-                        <button
-                          onClick={() => handleSync(account.id)}
-                          disabled={syncingId === account.id}
-                          className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {syncingId === account.id ? 'Syncing...' : 'Sync'}
-                        </button>
-                      )}
-                      {canAdjust(account) && (
-                        <button
-                          onClick={() => {
-                            setAdjustAccount(account);
-                            const meta = account.metadata ?? {};
-                            setAdjustValue(
-                              account.type === 'metals'
-                                ? String((meta as Record<string, unknown>).amountOz ?? '0')
-                                : account.balance
-                            );
-                            setAdjustDate(new Date().toISOString().split('T')[0]);
-                            setAdjustNote('');
-                          }}
-                          className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                        >
-                          Add Snapshot
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openEdit(account)}
-                        className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteAccount(account)}
-                        className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <div className="text-xs text-muted-foreground/60">{account.currency}</div>
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Last updated: {formatRelativeTime(account.balanceDate)}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                  <div className="text-xs text-muted-foreground">
+                    Updated {formatRelativeTime(account.balanceDate)}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {canSync(account) && (
+                      <button
+                        onClick={() => handleSync(account.id)}
+                        disabled={syncingId === account.id}
+                        className="px-2 py-1 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {syncingId === account.id ? '...' : 'Sync'}
+                      </button>
+                    )}
+                    {canAdjust(account) && (
+                      <button
+                        onClick={() => {
+                          setAdjustAccount(account);
+                          const meta = account.metadata ?? {};
+                          setAdjustValue(
+                            account.type === 'metals'
+                              ? String((meta as Record<string, unknown>).amountOz ?? '0')
+                              : account.balance
+                          );
+                          setAdjustDate(new Date().toISOString().split('T')[0]);
+                          setAdjustNote('');
+                        }}
+                        className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                      >
+                        Adjust
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openEdit(account)}
+                      className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteAccount(account)}
+                      className="px-2 py-1 text-[10px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
                 {canSync(account) && (
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-border/50">
+                    <div className="text-xs text-muted-foreground">
+                      {syncingId === account.id ? (
+                        <span className="text-chart-1 animate-pulse">Syncing...</span>
+                      ) : syncFrequency === 'manual' ? (
+                        <span>Not scheduled</span>
+                      ) : nextSync && nextSync.getTime() > Date.now() ? (
+                        <span>Next: {formatTimeUntil(nextSync)}</span>
+                      ) : (
+                        <span className="text-chart-3">Overdue</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground">Sync frequency:</label>
+                      <label className="text-xs text-muted-foreground">Sync:</label>
                       <select
                         value={syncFrequency}
                         onChange={(e) => handleSyncFrequencyChange(account.id, e.target.value)}
@@ -1051,17 +1062,6 @@ export default function ManualAccountsSection() {
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
                       </select>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {syncingId === account.id ? (
-                        <span className="text-chart-1 animate-pulse">Syncing...</span>
-                      ) : syncFrequency === 'manual' ? (
-                        <span>Not scheduled</span>
-                      ) : nextSync && nextSync.getTime() > Date.now() ? (
-                        <span>Next sync: {formatTimeUntil(nextSync)}</span>
-                      ) : (
-                        <span className="text-chart-3">Next sync: Overdue</span>
-                      )}
                     </div>
                   </div>
                 )}
