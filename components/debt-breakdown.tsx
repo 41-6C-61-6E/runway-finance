@@ -173,9 +173,10 @@ export function DebtBreakdown() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-primary" /> Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-primary shrink-0" />
+              <span>Breakdown</span>
+            </div>
           }
         />
         <div className="p-5 animate-pulse">
@@ -196,9 +197,10 @@ export function DebtBreakdown() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-primary" /> Breakdown
-          </h3>
+          <div className="flex items-center gap-2">
+            <TrendingDown className="w-4 h-4 text-primary shrink-0" />
+            <span>Breakdown</span>
+          </div>
         }
       />
       {!isCollapsed && (

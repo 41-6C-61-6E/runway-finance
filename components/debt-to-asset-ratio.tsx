@@ -104,9 +104,10 @@ export function DebtToAssetRatio() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <Percent className="w-4 h-4 text-primary" /> Debt to Asset Ratio
-            </h3>
+            <div className="flex items-center gap-2">
+              <Percent className="w-4 h-4 text-primary shrink-0" />
+              <span>Debt to Asset Ratio</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -130,9 +131,10 @@ export function DebtToAssetRatio() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <Percent className="w-4 h-4 text-primary" /> Debt to Asset Ratio
-            </h3>
+            <div className="flex items-center gap-2">
+              <Percent className="w-4 h-4 text-primary shrink-0" />
+              <span>Debt to Asset Ratio</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -151,9 +153,10 @@ export function DebtToAssetRatio() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <Percent className="w-4 h-4 text-primary" /> Debt to Asset Ratio
-            </h3>
+            <div className="flex items-center gap-2">
+              <Percent className="w-4 h-4 text-primary shrink-0" />
+              <span>Debt to Asset Ratio</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -171,9 +174,10 @@ export function DebtToAssetRatio() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-            <Percent className="w-4 h-4 text-primary" /> Debt to Asset Ratio
-          </h3>
+          <div className="flex items-center gap-2">
+            <Percent className="w-4 h-4 text-primary shrink-0" />
+            <span>Debt to Asset Ratio</span>
+          </div>
         }
       />
       {!isCollapsed && (

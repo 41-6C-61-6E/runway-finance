@@ -158,9 +158,10 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <List className="w-4 h-4 text-primary" /> Category Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <List className="w-4 h-4 text-primary shrink-0" />
+              <span>Category Breakdown</span>
+            </div>
           }
         />
         {!isCollapsed && <LoadingSpinner category="chart" className="h-[350px] m-5" />}
@@ -175,9 +176,10 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <List className="w-4 h-4 text-primary" /> Category Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <List className="w-4 h-4 text-primary shrink-0" />
+              <span>Category Breakdown</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -196,9 +198,10 @@ export function CategorySummaries() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <List className="w-4 h-4 text-primary" /> Category Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <List className="w-4 h-4 text-primary shrink-0" />
+              <span>Category Breakdown</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -301,9 +304,10 @@ export function CategorySummaries() {
         onToggle={setIsCollapsed}
         title={
           <div className="flex flex-col">
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <List className="w-4 h-4 text-primary" /> Category Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <List className="w-4 h-4 text-primary shrink-0" />
+              <span>Category Breakdown</span>
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5 font-normal">
               Analyze your income and expenses by category <span className="mx-1 text-muted-foreground/30">•</span> <span className="font-medium text-foreground">{windowLabel}</span>
             </p>
