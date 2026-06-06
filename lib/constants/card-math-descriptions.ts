@@ -38,6 +38,11 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
     description:
       'Net Income = Total Income − Total Expenses, plotted as a trend over the selected time period.',
   },
+  cashVsCredit: {
+    title: 'Cash vs Credit',
+    description:
+      'Cash on Hand = sum of reportable accounts with type checking, savings, or other. Credit Card Debt = sum of absolute balances of reportable accounts with type credit. Net Position = Cash on Hand − Credit Card Debt. Coverage Ratio = Cash on Hand / Credit Card Debt (shows how many times over cash can cover credit debt). Period-over-period change compares the first and last snapshot values in the selected history timeframe: (current − previous) / |previous| × 100.',
+  },
   spendingBreakdown: {
     title: 'Spending Breakdown',
     description:
