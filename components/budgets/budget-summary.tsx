@@ -112,9 +112,10 @@ export function BudgetSummary() {
           isCollapsed={collapsed}
           onToggle={setCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-primary" /> Budget Overview
-            </h3>
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-primary shrink-0" />
+              <span>Budget Overview</span>
+            </div>
           }
         />
         {!collapsed && (

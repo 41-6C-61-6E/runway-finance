@@ -1016,9 +1016,10 @@ export function CashFlowSankey() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <GitMerge className="w-4 h-4 text-primary" /> Cash Flow Sankey
-          </h3>
+          <div className="flex items-center gap-2">
+            <GitMerge className="w-4 h-4 text-primary shrink-0" />
+            <span>Cash Flow Sankey</span>
+          </div>
         }
       />
 

@@ -226,9 +226,10 @@ export function SpendingBreakdown() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary shrink-0" />
+              <span>Spending Breakdown</span>
+            </div>
           }
         />
         {!isCollapsed && <LoadingSpinner category="chart" className="h-[380px]" />}
@@ -243,9 +244,10 @@ export function SpendingBreakdown() {
           isCollapsed={isCollapsed}
           onToggle={setIsCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
-            </h3>
+            <div className="flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary shrink-0" />
+              <span>Spending Breakdown</span>
+            </div>
           }
         />
         {!isCollapsed && (
@@ -270,9 +272,10 @@ export function SpendingBreakdown() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-            <PieIcon className="w-4 h-4 text-primary" /> Spending Breakdown
-          </h3>
+          <div className="flex items-center gap-2">
+            <PieIcon className="w-4 h-4 text-primary shrink-0" />
+            <span>Spending Breakdown</span>
+          </div>
         }
       />
 

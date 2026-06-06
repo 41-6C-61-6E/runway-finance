@@ -154,9 +154,10 @@ export function GoalsSummary() {
           isCollapsed={collapsed}
           onToggle={setCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary" /> Goals Summary
-            </h3>
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary shrink-0" />
+              <span>Goals Summary</span>
+            </div>
           }
           actions={
             <div className="flex items-center gap-1.5 text-xs sm:text-sm">
