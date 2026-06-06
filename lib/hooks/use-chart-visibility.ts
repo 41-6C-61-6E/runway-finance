@@ -25,6 +25,7 @@ export const CHARTS = {
   spending: {
     label: 'Spending',
     charts: {
+      cashVsCredit: 'Cash vs Credit',
       spendingBreakdown: 'Spending Breakdown',
       categorySummaries: 'Category Breakdown',
       categoryIncome: 'Income Section',

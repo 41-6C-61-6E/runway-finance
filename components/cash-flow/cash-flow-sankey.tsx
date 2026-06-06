@@ -10,10 +10,12 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { GitMerge } from 'lucide-react';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { getMonthRange } from '@/lib/utils/date-window';
 
 interface CategoryData {
   categoryId: string;
@@ -62,46 +64,6 @@ interface SankeyLink {
 interface SankeyData {
   nodes: SankeyNode[];
   links: SankeyLink[];
-}
-
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getMonthRange(timeframe: TimeRange, selectedMonth?: string): { start: string; end: string } {
-  const now = new Date();
-  const currentYm = getCurrentMonth();
-
-  if (timeframe === '1m') {
-    return { start: selectedMonth || currentYm, end: selectedMonth || currentYm };
-  }
-
-  let start: Date;
-  switch (timeframe) {
-    case '3m':
-      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      break;
-    case '6m':
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      break;
-    case '1y':
-      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-      break;
-    case 'ytd':
-      start = new Date(now.getFullYear(), 0, 1);
-      break;
-    case 'all':
-      start = new Date(2000, 0, 1);
-      break;
-    default:
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  return {
-    start: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
-    end: currentYm,
-  };
 }
 
 const VIBRANT_COLORS = [
@@ -647,9 +609,14 @@ export function CashFlowSankey() {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashFlowSankey');
   const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
-  const currentMonth = getCurrentMonth();
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:sankey:timeframe', '1m');
-  const [month, setMonth] = usePersistentState<string>('finance:sankey:month', currentMonth);
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+  } = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -730,7 +697,7 @@ export function CashFlowSankey() {
         setLoading(true);
         setError(null);
 
-        const range = getMonthRange(timeframe, month);
+        const range = getMonthRange(timeframe, windowEnd);
         const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
 
         let categories: CategoryData[];
@@ -744,7 +711,7 @@ export function CashFlowSankey() {
           if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
           categories = await categoriesRes.json();
         } else {
-          const range2 = getMonthRange(timeframe, month);
+          const range2 = getMonthRange(timeframe, windowEnd);
           const res = await fetch(`/api/cash-flow/categories?startMonth=${range2.start}&endMonth=${range2.end}${acctParam}`);
           if (!res.ok) throw new Error('Failed to fetch sankey data');
           categories = await res.json();
@@ -771,7 +738,7 @@ export function CashFlowSankey() {
     if (allCategoryInfo.length > 0 || allAccounts.length >= 0) {
       fetchData();
     }
-  }, [timeframe, month, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
+  }, [timeframe, windowEnd, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
 
   const toggleAccount = (accountId: string) => {
     setExcludedAccountIds((prev) => {
@@ -789,7 +756,7 @@ export function CashFlowSankey() {
     })();
 
   const navigateToTransactions = (categoryIds: string) => {
-    const range = getMonthRange(timeframe, month);
+    const range = getMonthRange(timeframe, windowEnd);
     const startDate = `${range.start}-01`;
     const [ey, em] = range.end.split('-').map(Number);
     const lastDay = new Date(ey, em, 0).getDate();
@@ -801,39 +768,14 @@ export function CashFlowSankey() {
     if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) navigateToTransactions(categoryId);
-  }, [sankeyData, timeframe, month]);
+  }, [sankeyData, timeframe, windowEnd]);
 
   const handleLinkClick = useCallback((sourceId: string, targetId: string) => {
     const s = getNodeCategoryId(sourceId);
     const t = getNodeCategoryId(targetId);
     const ids = [s, t].filter(Boolean).join(',');
     if (ids) navigateToTransactions(ids);
-  }, [sankeyData, timeframe, month]);
-
-  const prevMonth = () => {
-    const [y, m] = month.split('-').map(Number);
-    const d = new Date(y, m - 1, 1);
-    d.setMonth(d.getMonth() - 1);
-    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const nextMonth = () => {
-    const [y, m] = month.split('-').map(Number);
-    const next = new Date(y, m - 1, 1);
-    next.setMonth(next.getMonth() + 1);
-    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-    if (nextStr <= currentMonth) setMonth(nextStr);
-  };
-
-  const isNextDisabled = (() => {
-    const [y, m] = month.split('-').map(Number);
-    const next = new Date(y, m - 1, 1);
-    next.setMonth(next.getMonth() + 1);
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}` > currentMonth;
-  })();
-
-  const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const showMonthNav = timeframe === '1m';
+  }, [sankeyData, timeframe, windowEnd]);
 
   // Convert named-id links → index-based links that Recharts Sankey requires
   const processedData = useMemo(() => {
@@ -1088,7 +1030,7 @@ export function CashFlowSankey() {
             feedback={
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {timeframe.toUpperCase()}{timeframe !== 'all' ? ` (${monthLabel})` : ''}
+                  {timeframe.toUpperCase()}
                 </span>
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                   {showPercentages ? '%' : '$'}
@@ -1105,10 +1047,23 @@ export function CashFlowSankey() {
                 )}
               </div>
             }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
+            }
           >
             <div className="space-y-4">
-              {/* Row 1: Time Range and Navigation */}
-              <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
+              {/* Row 1: Time Range */}
+              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
                   <TimeRangeFilter
@@ -1121,29 +1076,9 @@ export function CashFlowSankey() {
                       { label: 'YTD', value: 'ytd' },
                       { label: 'All', value: 'all' },
                     ]}
-                    onChange={(tf) => setTimeframe(tf)}
+                    onChange={setTimeframe}
                   />
                 </div>
-                {showMonthNav && (
-                  <div className="flex items-center gap-2">
-                    <button onClick={prevMonth} className="px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
-                      &larr;
-                    </button>
-                    <span className="text-xs font-medium text-foreground min-w-[120px] text-center">{monthLabel}</span>
-                    <button
-                      onClick={nextMonth}
-                      disabled={isNextDisabled}
-                      className={`px-2 py-0.5 rounded-md text-xs transition-all ${
-                        isNextDisabled
-                          ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
-                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
-                      type="button"
-                    >
-                      &rarr;
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Row 2: Metric Toggle and Accounts Selection */}

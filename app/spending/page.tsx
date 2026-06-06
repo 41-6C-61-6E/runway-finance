@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
 import { CategorySummaries } from '@/components/cash-flow/category-summaries';
+import { CashVsCreditCard } from '@/components/cash-flow/cash-vs-credit-card';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { DollarSign } from 'lucide-react';
@@ -17,7 +18,18 @@ function SpendingContent() {
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
       <PageHeader title="Spending" icon={DollarSign} />
-      <PageContent>
+      <PageContent className="space-y-5 sm:space-y-6">
+        {isVisible('cashVsCredit') && (
+          <div>
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <div>
+                <CashVsCreditCard />
+                <MathDescription chartId="cashVsCredit" />
+              </div>
+            </Suspense>
+          </div>
+        )}
+
         {isVisible('spendingBreakdown') && (
           <div>
             <Suspense fallback={<LoadingSpinner category="chart" />}>
@@ -30,7 +42,7 @@ function SpendingContent() {
         )}
 
         {isVisible('categorySummaries') && (
-          <div className="mt-5 sm:mt-6">
+          <div>
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
                 <CategorySummaries />

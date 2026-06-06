@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   ComposedChart,
@@ -28,6 +27,8 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { ArrowRightLeft } from 'lucide-react';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 
 interface MonthlyData {
   yearMonth: string;
@@ -50,8 +51,15 @@ const typeOptions = [
 export function IncomeExpenseChart() {
   const router = useRouter();
   const [allData, setAllData] = useState<MonthlyData[]>([]);
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:income-expense:timeframe', '1y');
-  const [chartType, setChartType] = usePersistentState<ChartType>('finance:income-expense:chartType', 'bar');
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+  } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
+  const [chartType, setChartType] = useState<ChartType>('bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
@@ -76,7 +84,14 @@ export function IncomeExpenseChart() {
   }, []);
 
   const numMonths = MONTH_MAP[timeframe] || 12;
-  const data = allData.slice(-numMonths).map((d) => ({
+  const effectiveEndIdx = useMemo(() => {
+    if (timeframe === 'all') return allData.length;
+    const idx = allData.findIndex((d) => d.yearMonth > windowEnd);
+    return idx === -1 ? allData.length : idx;
+  }, [allData, windowEnd, timeframe]);
+  const startIdx = Math.max(0, effectiveEndIdx - numMonths);
+  const windowedData = timeframe === 'all' ? allData : allData.slice(startIdx, effectiveEndIdx);
+  const data = windowedData.map((d) => ({
     month: formatSafeUTCDate(d.yearMonth + '-01', { month: 'short', year: '2-digit' }),
     income: d.income,
     expenses: d.expenses,
@@ -237,6 +252,19 @@ export function IncomeExpenseChart() {
                   {chartType.toUpperCase()}
                 </span>
               </div>
+            }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
