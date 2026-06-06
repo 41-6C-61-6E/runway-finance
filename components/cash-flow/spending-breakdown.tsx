@@ -10,6 +10,9 @@ import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-typ
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { getMonthRange } from '@/lib/utils/date-window';
+import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useTheme } from 'next-themes';
 import { Search, Check, X, PieChart as PieIcon } from 'lucide-react';
@@ -61,62 +64,7 @@ function getThemeAdaptedColor(hex: string, theme: string | undefined): string {
   return `#${((pr << 16) | (pg << 8) | pb).toString(16).padStart(6, '0')}`;
 }
 
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
-function getMonthRange(timeframe: TimeRange): { start: string; end: string } {
-  const now = new Date();
-  const currentYm = getCurrentMonth();
-
-  if (timeframe === '1m') {
-    return { start: currentYm, end: currentYm };
-  }
-
-  let start: Date;
-  switch (timeframe) {
-    case '3m':
-      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      break;
-    case '6m':
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      break;
-    case '1y':
-      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-      break;
-    case '5y':
-      start = new Date(now.getFullYear() - 5, now.getMonth() + 1, 1);
-      break;
-    case 'ytd':
-      start = new Date(now.getFullYear(), 0, 1);
-      break;
-    case 'all':
-      start = new Date(2000, 0, 1);
-      break;
-    default:
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  return {
-    start: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
-    end: currentYm,
-  };
-}
-
-function formatMonth(ym: string): string {
-  const [year, month] = ym.split('-').map(Number);
-  const date = new Date(year, month - 1, 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-function formatRange(timeframe: TimeRange): string {
-  const { start, end } = getMonthRange(timeframe);
-  if (start === end) {
-    return formatMonth(start);
-  }
-  return `${formatMonth(start)} - ${formatMonth(end)}`;
-}
 
 const typeOptions = [
   { value: 'pie' as ChartType, label: 'Pie' },
@@ -143,8 +91,15 @@ export function SpendingBreakdown() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
+  const {
+    timeframe, setTimeframe,
+    windowEnd, setWindowEnd,
+    prevWindow, nextWindow, isNextDisabled,
+    windowLabel,
+    periodOptions,
+    showWindowNav,
+  } = useDateWindow('finance:spending-breakdown:timeframe', 'finance:spending-breakdown:windowEnd', '1m');
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:spending-breakdown:chartType', 'pie');
-  const [timeframe, setTimeframe] = usePersistentState<TimeRange>('finance:spending-breakdown:timeframe', '1m');
   const [excludedCategoryIds, setExcludedCategoryIds] = usePersistentState<Set<string>>(
     'finance:spending-breakdown:excludedCategoryIds',
     new Set(),
@@ -157,12 +112,12 @@ export function SpendingBreakdown() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const queryParams = useMemo(() => {
-    const range = getMonthRange(timeframe);
+    const range = getMonthRange(timeframe, windowEnd);
     if (timeframe === '1m') {
       return `month=${range.start}`;
     }
     return `startMonth=${range.start}&endMonth=${range.end}`;
-  }, [timeframe]);
+  }, [timeframe, windowEnd]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -252,7 +207,7 @@ export function SpendingBreakdown() {
   };
 
   const handleClick = (categoryId: string) => {
-    const range = getMonthRange(timeframe);
+    const range = getMonthRange(timeframe, windowEnd);
     const startDate = `${range.start}-01`;
     const [endYear, endMonthStr] = range.end.split('-').map(Number);
     const lastDay = new Date(endYear, endMonthStr, 0).getDate();
@@ -336,6 +291,19 @@ export function SpendingBreakdown() {
                   {chartType.toUpperCase()}
                 </span>
               </div>
+            }
+            rightActions={
+              showWindowNav && (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                />
+              )
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
