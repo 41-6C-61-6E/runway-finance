@@ -60,20 +60,34 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
+  const startMonth = searchParams.get('startMonth');
+  const endMonth = searchParams.get('endMonth');
 
-  let [startDate, endDate] = getDateRange(timeframe);
-  if (timeframe === 'all') {
-    const earliestSnap = await getDb()
-      .select({ snapshotDate: accountSnapshots.snapshotDate })
-      .from(accountSnapshots)
-      .where(eq(accountSnapshots.userId, dataUserId))
-      .orderBy(accountSnapshots.snapshotDate)
-      .limit(1);
-    if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
-      startDate = new Date(earliestSnap[0].snapshotDate + 'T00:00:00Z');
-    } else {
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
+  let startDate: Date;
+  let endDate: Date;
+
+  if (startMonth && endMonth) {
+    const [sy, sm] = startMonth.split('-').map(Number);
+    startDate = new Date(Date.UTC(sy, sm - 1, 1));
+    const [ey, em] = endMonth.split('-').map(Number);
+    endDate = new Date(Date.UTC(ey, em, 0)); // last day of the month
+  } else {
+    const [s, e] = getDateRange(timeframe);
+    startDate = s;
+    endDate = e;
+    if (timeframe === 'all') {
+      const earliestSnap = await getDb()
+        .select({ snapshotDate: accountSnapshots.snapshotDate })
+        .from(accountSnapshots)
+        .where(eq(accountSnapshots.userId, dataUserId))
+        .orderBy(accountSnapshots.snapshotDate)
+        .limit(1);
+      if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
+        startDate = new Date(earliestSnap[0].snapshotDate + 'T00:00:00Z');
+      } else {
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+      }
     }
   }
   const startStr = startDate.toISOString().split('T')[0];
@@ -191,7 +205,9 @@ export async function GET(request: Request) {
 
     const datesInRange: string[] = [];
     const curr = new Date(startStr + 'T00:00:00Z');
-    const stop = new Date(endStr + 'T00:00:00Z');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const actualEndStr = endStr < todayStr ? endStr : todayStr;
+    const stop = new Date(actualEndStr + 'T00:00:00Z');
     while (curr <= stop) {
       datesInRange.push(curr.toISOString().split('T')[0]);
       curr.setUTCDate(curr.getUTCDate() + 1);

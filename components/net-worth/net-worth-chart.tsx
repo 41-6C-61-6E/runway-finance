@@ -296,6 +296,12 @@ export function NetWorthChart() {
     return rawMax / (rawMax - rawMin);
   }, [processedData]);
 
+  const baseValue = useMemo(() => {
+    if (areaGradientOffset === 1) return areaYDomain[0];
+    if (areaGradientOffset === 0) return areaYDomain[1];
+    return 0;
+  }, [areaGradientOffset, areaYDomain]);
+
   const ActiveDot = useCallback((props: any) => {
     const { cx, cy, payload } = props;
     if (!cx || !cy || !payload) return null;
@@ -515,18 +521,18 @@ export function NetWorthChart() {
                         {areaGradientOffset === 1 ? (
                           <>
                             <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                            <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0} />
                           </>
                         ) : areaGradientOffset === 0 ? (
                           <>
-                            <stop offset="0%" stopColor="var(--color-chart-5)" stopOpacity={0.05} />
+                            <stop offset="0%" stopColor="var(--color-chart-5)" stopOpacity={0} />
                             <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
                           </>
                         ) : (
                           <>
                             <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0.05} />
-                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0.05} />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0} />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0} />
                             <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
                           </>
                         )}
@@ -571,7 +577,7 @@ export function NetWorthChart() {
                       stroke="url(#netWorthStrokeGrad)"
                       strokeWidth={2}
                       fill="url(#netWorthGrad)"
-                      baseValue={0}
+                      baseValue={baseValue}
                       dot={false}
                       activeDot={<ActiveDot />}
                     />

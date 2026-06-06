@@ -25,6 +25,7 @@ import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Landmark, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { getMonthRange } from '@/lib/utils/date-window';
 
 interface HistoryPoint {
   date: string;
@@ -58,27 +59,28 @@ function formatRatio(ratio: number): string {
   return `${ratio.toFixed(1)}x`;
 }
 
-function StatBox({ label, value, change, changePercent, color, icon }: {
+function StatBox({ label, value, change, changePercent, color, icon, className }: {
   label: string;
   value: string;
   change: number | null;
   changePercent: number | null;
-  color: string;
+  color?: string;
   icon?: React.ReactNode;
+  className?: string;
 }) {
   const isPositive = change !== null && change >= 0;
   const isNegative = change !== null && change < 0;
   const hasChange = change !== null;
 
   return (
-    <div className="p-3 rounded-xl border border-border/60 bg-card/50 flex flex-col gap-0.5 min-w-0">
+    <div className={`flex flex-col gap-0.5 min-w-0 ${className ?? ''}`}>
       <div className="flex items-center gap-1.5">
         {icon}
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {label}
         </span>
       </div>
-      <div className="text-lg font-bold tabular-nums truncate" style={{ color }}>
+      <div className="text-xl sm:text-2xl font-bold tabular-nums truncate" style={color ? { color } : undefined}>
         {value}
       </div>
       {hasChange && (
@@ -111,12 +113,20 @@ export function CashVsCreditCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const queryParams = useMemo(() => {
+    const range = getMonthRange(timeframe, windowEnd);
+    if (timeframe === 'all') {
+      return 'timeframe=all';
+    }
+    return `startMonth=${range.start}&endMonth=${range.end}`;
+  }, [timeframe, windowEnd]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`/api/cash-flow/cash-vs-credit?timeframe=${timeframe}`, { credentials: 'include' });
+        const res = await fetch(`/api/cash-flow/cash-vs-credit?${queryParams}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch cash vs credit data');
         const json: ResponseData = await res.json();
         setResponseData(json);
@@ -127,7 +137,7 @@ export function CashVsCreditCard() {
       }
     };
     fetchData();
-  }, [timeframe]);
+  }, [queryParams]);
 
   const chartData = useMemo(() => {
     if (!responseData?.history) return [];
@@ -337,35 +347,35 @@ export function CashVsCreditCard() {
           </CollapsibleFilterPanel>
 
           <div className="px-5 pt-2 pb-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 mb-6 border-b border-border/40 pb-6">
               <StatBox
                 label="Cash on Hand"
                 value={formatCurrency(current?.cashOnHand ?? 0)}
                 change={cashChange}
                 changePercent={cashChangePercent}
-                color="var(--color-chart-1)"
+                className="pr-4 pb-4 border-r border-b border-border/40 sm:pr-6 sm:pb-0 sm:border-b-0"
               />
               <StatBox
                 label="Credit Card Debt"
                 value={formatCurrency(current?.creditCardDebt ?? 0)}
                 change={creditChange !== null ? -creditChange : null}
                 changePercent={creditChangePercent !== null ? -creditChangePercent : null}
-                color="var(--color-destructive)"
+                className="pl-4 pb-4 border-b border-border/40 sm:px-6 sm:pb-0 sm:border-b-0 sm:border-r sm:border-border/40"
               />
               <StatBox
                 label="Net Position"
                 value={formatCurrency(current?.netPosition ?? 0)}
                 change={netChange}
                 changePercent={netChangePercent}
-                color={current && current.netPosition >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                className="pr-4 pt-4 border-r border-border/40 sm:px-6 sm:pt-0 sm:border-r sm:border-border/40"
               />
-              <div className="p-3 rounded-xl border border-border/60 bg-card/50 flex flex-col gap-0.5 min-w-0">
+              <div className="pl-4 pt-4 sm:pl-6 sm:pt-0 flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
                     Coverage Ratio
                   </span>
                 </div>
-                <div className="text-lg font-bold tabular-nums" style={{ color: 'var(--color-primary)' }}>
+                <div className="text-xl sm:text-2xl font-bold tabular-nums" style={{ color: 'var(--color-primary)' }}>
                   {current && current.coverageRatio > 0
                     ? (Number.isFinite(current.coverageRatio) ? formatRatio(current.coverageRatio) : '∞')
                     : '0x'}

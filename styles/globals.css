@@ -125,3 +125,12 @@ body,
   visibility: hidden !important;
 }
 
+/* Remove focus highlight outline from charts */
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+.financial-chart:focus,
+.financial-chart *:focus,
+.recharts-wrapper *:focus {
+  outline: none !important;
+}
+
