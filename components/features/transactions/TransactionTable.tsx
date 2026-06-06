@@ -1972,22 +1972,24 @@ export default function TransactionTable({
               </div>
             </div>
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>No thanks</AlertDialogCancel>
-            <button
-              onClick={handleCreateRule}
-              disabled={creatingAndRunningRule}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              Create Rule
-            </button>
-            <button
-              onClick={handleCreateAndRunRule}
-              disabled={creatingAndRunningRule}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              {creatingAndRunningRule ? "Running..." : "Add and Run Now"}
-            </button>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:justify-between sm:items-end">
+            <AlertDialogCancel className="w-full sm:w-auto">No thanks</AlertDialogCancel>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleCreateRule}
+                disabled={creatingAndRunningRule}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors w-full sm:w-auto disabled:opacity-50"
+              >
+                Create Rule
+              </button>
+              <button
+                onClick={handleCreateAndRunRule}
+                disabled={creatingAndRunningRule}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity w-full sm:w-auto disabled:opacity-50"
+              >
+                {creatingAndRunningRule ? "Running..." : "Create and Run Now"}
+              </button>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

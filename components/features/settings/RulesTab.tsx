@@ -696,7 +696,7 @@ export default function RulesTab() {
       </div>
 
       {/* Sub-Tabs */}
-      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-3">
+      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-3 overflow-hidden">
         {([
           { key: 'my' as const, label: 'My Rules', count: rules.filter((r) => !r.isSystem && !r.createdByAi).length },
           { key: 'system' as const, label: 'System Rules', count: systemRules.length },
