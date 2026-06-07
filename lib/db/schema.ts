@@ -602,3 +602,63 @@ export const paystubAutoGenerateSettings = pgTable(
   },
   (t) => [unique().on(t.userId, t.mappingId)]
 );
+
+// ── Investment Holdings ──────────────────────────────────────────────────────
+export const investmentHoldings = pgTable('investment_holdings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  ticker: text('ticker').notNull(),
+  shares: numeric('shares').notNull(),
+  costBasis: numeric('cost_basis').notNull(),
+  purchaseDate: date('purchase_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Investment Transactions ──────────────────────────────────────────────────
+export const investmentTransactions = pgTable('investment_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  ticker: text('ticker').notNull(),
+  type: text('type').notNull(), // 'buy' | 'sell' | 'dividend' | 'split'
+  shares: numeric('shares').notNull(), // Positive for buy/dividend/split, negative for sell
+  pricePerShare: numeric('price_per_share').notNull(),
+  commission: numeric('commission').default('0'),
+  transactionDate: date('transaction_date').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Security Prices Cache ────────────────────────────────────────────────────
+export const securityPrices = pgTable('security_prices', {
+  ticker: text('ticker').primaryKey(),
+  name: text('name').notNull(),
+  currentPrice: numeric('current_price').notNull(),
+  dailyChange: numeric('daily_change'),
+  dailyChangePercent: numeric('daily_change_percent'),
+  sector: text('sector'),
+  assetClass: text('asset_class'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Security Price History Cache ─────────────────────────────────────────────
+export const securityPriceHistory = pgTable(
+  'security_price_history',
+  {
+    ticker: text('ticker')
+      .notNull()
+      .references(() => securityPrices.ticker, { onDelete: 'cascade' }),
+    priceDate: date('price_date').notNull(),
+    closePrice: numeric('close_price').notNull(),
+  },
+  (t) => [unique().on(t.ticker, t.priceDate)]
+);
+
