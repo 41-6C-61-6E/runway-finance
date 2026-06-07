@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ChartSpline, Receipt, TrendingUp, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard } from 'lucide-react'
+import { ChartSpline, Receipt, TrendingUp, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard, Briefcase } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'

@@ -17,6 +17,7 @@ import {
   Database,
   Sparkles,
   LayoutDashboard,
+  Briefcase,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
