@@ -12,7 +12,6 @@ export const HIDDEN_PAGE_KEYS = [
   'goals',
   'spending',
   'financialLogic',
-  'investments',
 ] as const;
 
 // Pages that only appear in the nav when developer mode is enabled
