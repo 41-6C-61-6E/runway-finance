@@ -138,6 +138,7 @@ export const userSettings = pgTable('user_settings', {
   defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),
+  cardlessMode: boolean('cardless_mode').notNull().default(false),
   hideAccountSubheadings: boolean('hide_account_subheadings').notNull().default(false),
   hideAccountsSidebarByDefault: boolean('hide_accounts_sidebar_by_default').notNull().default(true),
   chartSelections: jsonb('chart_selections').default({}),

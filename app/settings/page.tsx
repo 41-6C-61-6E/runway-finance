@@ -44,6 +44,7 @@ import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-
 import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
+import { useCardlessMode } from '@/lib/hooks/use-cardless-mode';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -157,6 +158,7 @@ function SettingsPageBody() {
   const { isHidden, updateHidden } = useHiddenPages();
   const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
+  const { cardlessMode, toggleCardlessMode, loading: cardlessModeLoading } = useCardlessMode();
 
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
@@ -711,6 +713,19 @@ function SettingsPageBody() {
                 <Switch
                   checked={reduceTransparency}
                   onCheckedChange={updateReduceTransparency}
+                />
+              </div>
+
+              {/* Cardless Mode */}
+              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-foreground">Cardless Mode</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Strip card backgrounds and borders for a cleaner, flatter interface</p>
+                </div>
+                <Switch
+                  checked={cardlessMode}
+                  onCheckedChange={toggleCardlessMode}
+                  disabled={cardlessModeLoading}
                 />
               </div>
 

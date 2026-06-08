@@ -89,6 +89,87 @@ body,
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* ── Cardless Mode ──────────────────────────────────────────────────────────── */
+html.cardless-mode .bg-card,
+html.cardless-mode [class*="bg-card/"] {
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+html.cardless-mode .shadow-sm {
+  box-shadow: none !important;
+}
+
+html.cardless-mode .bg-card.border-border,
+html.cardless-mode [class*="bg-card/"].border-border {
+  border-color: transparent !important;
+}
+
+html.cardless-mode .bg-card.rounded-xl,
+html.cardless-mode .bg-card.rounded-lg {
+  border-radius: 0 !important;
+}
+
+html.cardless-mode .bg-card .p-4,
+html.cardless-mode .bg-card .p-5 {
+  padding: 0.25rem !important;
+}
+
+html.cardless-mode .bg-card .p-6 {
+  padding: 0.5rem !important;
+}
+
+html.cardless-mode .bg-card .px-4,
+html.cardless-mode .bg-card .px-6 {
+  padding-left: 0.375rem !important;
+  padding-right: 0.375rem !important;
+}
+
+/* Keep dropdown/popover menus solid — they use bg-card + z-50, page cards don't have z-index */
+html.cardless-mode .bg-card.z-50 {
+  background: var(--card) !important;
+  backdrop-filter: none !important;
+}
+html.cardless-mode .bg-card.z-50.border-border {
+  border-color: var(--border) !important;
+}
+html.cardless-mode .bg-card.z-50.rounded-xl,
+html.cardless-mode .bg-card.z-50.rounded-lg {
+  border-radius: var(--radius) !important;
+}
+
+/* Hide section dividers (directional borders used as separators) */
+html.cardless-mode [class*="border-b"][class*="border-border"],
+html.cardless-mode [class*="border-t"][class*="border-border"],
+html.cardless-mode [class*="border-r"][class*="border-border"],
+html.cardless-mode [class*="border-l"][class*="border-border"] {
+  border-color: transparent !important;
+}
+
+/* Non-card container borders (bg-muted panels, info boxes, etc.) */
+html.cardless-mode [class*="bg-muted/1"][class*="border-border"],
+html.cardless-mode [class*="bg-muted/2"][class*="border-border"],
+html.cardless-mode [class*="bg-muted/3"][class*="border-border"],
+html.cardless-mode [class*="bg-muted/4"][class*="border-border"],
+html.cardless-mode [class*="bg-muted/5"][class*="border-border"] {
+  border-color: transparent !important;
+}
+
+/* PageHeader / filter bar gradients and backgrounds */
+html.cardless-mode [class*="from-card"],
+html.cardless-mode [class*="to-card"] {
+  --tw-gradient-from: transparent !important;
+  --tw-gradient-to: transparent !important;
+}
+
+html.cardless-mode [class*="bg-muted/1"],
+html.cardless-mode [class*="bg-muted/2"],
+html.cardless-mode [class*="bg-muted/3"],
+html.cardless-mode [class*="bg-muted/4"],
+html.cardless-mode [class*="bg-muted/5"] {
+  background: transparent !important;
+}
+
 /* ── Privacy Mode ─────────────────────────────────────────────────────────── */
 .privacy-mode-active .financial-value {
   filter: blur(18px);
