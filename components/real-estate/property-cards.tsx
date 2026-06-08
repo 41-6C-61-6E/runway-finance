@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { PropertyCard } from './property-card';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils/format';
@@ -326,48 +327,48 @@ export function PropertyCards() {
       </div>
 
       {/* Link Mortgage Modal */}
-      {linkingPropertyId && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-card border border-border rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Link Mortgage</h3>
-            {availableMortgages.length === 0 ? (
-              <p className="text-xs text-muted-foreground mb-4">No unlinked mortgage accounts available.</p>
-            ) : (
-              <select
-                value={selectedMortgageId}
-                onChange={(e) => setSelectedMortgageId(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm mb-4"
-              >
-                <option value="">Select a mortgage...</option>
-                {availableMortgages.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            )}
-            <div className="flex items-center justify-end gap-2">
+      <Dialog open={!!linkingPropertyId} onOpenChange={(o) => { if (!o) { setLinkingPropertyId(null); setSelectedMortgageId(''); } }}>
+        <DialogContent className="max-w-sm p-5">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Link Mortgage</DialogTitle>
+          </DialogHeader>
+          {availableMortgages.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No unlinked mortgage accounts available.</p>
+          ) : (
+            <select
+              value={selectedMortgageId}
+              onChange={(e) => setSelectedMortgageId(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm"
+            >
+              <option value="">Select a mortgage...</option>
+              {availableMortgages.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          )}
+          <DialogFooter className="flex-row justify-end gap-2">
+            <button
+              onClick={() => { setLinkingPropertyId(null); setSelectedMortgageId(''); }}
+              className="px-3 py-1.5 text-xs text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            {availableMortgages.length > 0 && (
               <button
-                onClick={() => { setLinkingPropertyId(null); setSelectedMortgageId(''); }}
-                className="px-3 py-1.5 text-xs text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+                onClick={handleLinkMortgage}
+                disabled={!selectedMortgageId}
+                className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
-                Cancel
+                Link Mortgage
               </button>
-              {availableMortgages.length > 0 && (
-                <button
-                  onClick={handleLinkMortgage}
-                  disabled={!selectedMortgageId}
-                  className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-                >
-                  Link Mortgage
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Mortgage Attributes Sheet */}
       <Sheet open={!!editingMortgage} onOpenChange={(open) => { if (!open) setEditingMortgage(null); }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+        <SheetContent side="right" className="overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Mortgage Attributes</SheetTitle>
             <SheetDescription>
@@ -409,7 +410,7 @@ export function PropertyCards() {
 
       {/* Edit Property Details Sheet */}
       <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); setSelectedMortgageIds([]); } }}>
-        <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+        <SheetContent side="right" className="overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Property Details</SheetTitle>
             <SheetDescription>Update details for {editingProperty?.name}.</SheetDescription>

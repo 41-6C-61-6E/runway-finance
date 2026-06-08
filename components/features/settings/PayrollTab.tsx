@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { addFrequencyInterval } from '@/lib/utils/paystub';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -173,9 +174,40 @@ export default function PayrollTab() {
   const [autoGenBasePaystubId, setAutoGenBasePaystubId] = useState('');
   const [autoGenEnabled, setAutoGenEnabled] = useState(false);
   const [autoGenSaving, setAutoGenSaving] = useState(false);
+  const [generatingNow, setGeneratingNow] = useState(false);
+  const [genResult, setGenResult] = useState<string | null>(null);
+  const [deleteAutoGenId, setDeleteAutoGenId] = useState<string | null>(null);
+  const [deleteAutoGenLoading, setDeleteAutoGenLoading] = useState(false);
+
+  // ── Manual Add State ──
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualAddSaving, setManualAddSaving] = useState(false);
+  const [manualAddError, setManualAddError] = useState('');
+  const [manualAddForm, setManualAddForm] = useState({
+    employerName: '',
+    employeeName: '',
+    payPeriodStart: '',
+    payPeriodEnd: '',
+    checkDate: '',
+    grossCurrent: '',
+    taxesCurrent: '',
+    deductionsCurrent: '',
+    netCurrent: '',
+  });
+  const [manualAddMappingId, setManualAddMappingId] = useState('');
+  const [manualAddLineItems, setManualAddLineItems] = useState<Array<{
+    section: string;
+    description: string;
+    amount: string;
+    mappingAction: string;
+    categoryId: string | null;
+  }>>([]);
 
   // ── Paystub View ──
   const [viewingPaystub, setViewingPaystub] = useState<any>(null);
+  const [editingPaystub, setEditingPaystub] = useState(false);
+  const [editLineItems, setEditLineItems] = useState<Array<{ id: string; amount: string }>>([]);
+  const [editSaving, setEditSaving] = useState(false);
   const [paystubFilter, setPaystubFilter] = useState<'all' | 'imported' | 'auto'>('all');
 
   // ── Delete State ──
@@ -574,14 +606,161 @@ export default function PayrollTab() {
     setAutoGenSaving(false);
   };
 
+  const handleGenerateNow = async () => {
+    setGeneratingNow(true);
+    setGenResult(null);
+    try {
+      const res = await fetch('/api/paystubs/auto-generate?force=true', {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.generated > 0) {
+        setGenResult(`Generated ${data.generated} paystub${data.generated !== 1 ? 's' : ''}`);
+      } else {
+        setGenResult('No paystub to generate — check that a template paystub exists and the setting is enabled');
+      }
+      fetchPaystubs();
+      fetchAutoGenSettings();
+    } catch {
+      setGenResult('Failed to generate. Check console for details.');
+    }
+    setGeneratingNow(false);
+  };
+
+  const handleDeleteAutoGen = async () => {
+    if (!deleteAutoGenId) return;
+    setDeleteAutoGenLoading(true);
+    try {
+      await fetch(`/api/paystubs/auto-generate?id=${deleteAutoGenId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      setDeleteAutoGenId(null);
+      fetchAutoGenSettings();
+    } catch {}
+    setDeleteAutoGenLoading(false);
+  };
+
+  // ── Manual Add ──
+
+  const handleManualAdd = async () => {
+    setManualAddSaving(true);
+    setManualAddError('');
+    try {
+      const lineItems = manualAddLineItems
+        .filter((li) => li.amount && parseFloat(li.amount) !== 0)
+        .map((li) => ({
+          ...li,
+          amount: li.amount,
+        }));
+
+      const res = await fetch('/api/paystubs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          employerName: manualAddForm.employerName,
+          employeeName: manualAddForm.employeeName || null,
+          payPeriodStart: manualAddForm.payPeriodStart,
+          payPeriodEnd: manualAddForm.payPeriodEnd,
+          checkDate: manualAddForm.checkDate,
+          grossCurrent: manualAddForm.grossCurrent || '0',
+          taxesCurrent: manualAddForm.taxesCurrent || '0',
+          deductionsCurrent: manualAddForm.deductionsCurrent || '0',
+          netCurrent: manualAddForm.netCurrent || '0',
+          mappingId: manualAddMappingId || null,
+          lineItems,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Request failed (${res.status})`);
+      }
+      setShowManualAdd(false);
+      setManualAddError('');
+      setManualAddForm({
+        employerName: '',
+        employeeName: '',
+        payPeriodStart: '',
+        payPeriodEnd: '',
+        checkDate: '',
+        grossCurrent: '',
+        taxesCurrent: '',
+        deductionsCurrent: '',
+        netCurrent: '',
+      });
+      setManualAddMappingId('');
+      setManualAddLineItems([]);
+      fetchPaystubs();
+    } catch (err) {
+      setManualAddError(err instanceof Error ? err.message : 'Failed to create paystub');
+    }
+    setManualAddSaving(false);
+  };
+
   // ── Paystub View ──
 
   const handleViewPaystub = async (id: string) => {
+    setEditingPaystub(false);
+    setEditLineItems([]);
     try {
       const res = await fetch(`/api/paystubs/${id}`, { credentials: 'include' });
       const data = await res.json();
       setViewingPaystub(data);
     } catch {}
+  };
+
+  const handleEditPaystubFromList = async (id: string) => {
+    setEditingPaystub(true);
+    try {
+      const res = await fetch(`/api/paystubs/${id}`, { credentials: 'include' });
+      const data = await res.json();
+      setViewingPaystub(data);
+      if (data.lineItems) {
+        setEditLineItems(data.lineItems.map((li: any) => ({ id: li.id, amount: li.amount })));
+      }
+    } catch {
+      setEditingPaystub(false);
+    }
+  };
+
+  const handleStartEdit = () => {
+    if (!viewingPaystub?.lineItems) return;
+    setEditLineItems(
+      viewingPaystub.lineItems.map((li: any) => ({ id: li.id, amount: li.amount }))
+    );
+    setEditingPaystub(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPaystub(false);
+    setEditLineItems([]);
+  };
+
+  const handleEditLineItemAmount = (lineItemId: string, amount: string) => {
+    setEditLineItems((prev) =>
+      prev.map((item) => (item.id === lineItemId ? { ...item, amount } : item))
+    );
+  };
+
+  const handleSaveEdit = async () => {
+    if (!viewingPaystub) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/paystubs/${viewingPaystub.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ lineItems: editLineItems }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      const updated = await res.json();
+      setViewingPaystub(updated);
+      setEditingPaystub(false);
+      fetchPaystubs();
+    } catch {}
+    setEditSaving(false);
   };
 
   // ── Paystub Delete ──
@@ -661,6 +840,63 @@ export default function PayrollTab() {
     const cat = categories.find((c) => c.id === id);
     return cat?.name ?? '—';
   };
+
+  // ── Upcoming Auto-Generate Schedule ──
+
+  const upcomingSchedule = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+
+    return autoGenSettings
+      .filter((s) => s.isEnabled)
+      .map((ags) => {
+        const mapping = mappings.find((m) => m.id === ags.mappingId);
+
+        // Resolve the template paystub
+        let templatePaystub: Paystub | undefined;
+        if (ags.basePaystubId) {
+          templatePaystub = paystubs.find((p) => p.id === ags.basePaystubId);
+        }
+        if (!templatePaystub) {
+          templatePaystub = paystubs
+            .filter((p) => !p.isAutoGenerated)
+            .sort((a, b) => b.checkDate.localeCompare(a.checkDate))[0];
+        }
+        if (!templatePaystub) return null;
+
+        // Resolve the reference date for computing the next expected date
+        let refDate = ags.lastGeneratedDate || templatePaystub.checkDate;
+
+        const entries: Array<{ date: string; gross: string; net: string; status: 'overdue' | 'today' | 'upcoming'; daysUntil: number }> = [];
+        let cursor = addFrequencyInterval(refDate, ags.frequency);
+
+        for (let i = 0; i < 4; i++) {
+          const dateMs = new Date(cursor + 'T00:00:00Z').getTime();
+          const todayMs = new Date(today + 'T00:00:00Z').getTime();
+          const diffDays = Math.round((dateMs - todayMs) / 86400000);
+
+          let status: 'overdue' | 'today' | 'upcoming';
+          if (diffDays < 0) status = 'overdue';
+          else if (diffDays === 0) status = 'today';
+          else status = 'upcoming';
+
+          entries.push({
+            date: cursor,
+            gross: templatePaystub.grossCurrent,
+            net: templatePaystub.netCurrent,
+            status,
+            daysUntil: diffDays,
+          });
+          cursor = addFrequencyInterval(cursor, ags.frequency);
+        }
+
+        return {
+          mappingId: ags.mappingId,
+          mappingName: mapping?.name || 'Unknown Mapping',
+          entries,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [autoGenSettings, paystubs, mappings]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -989,7 +1225,30 @@ export default function PayrollTab() {
               Auto-generated stubs are clearly marked and separate from imported data.
             </p>
           </div>
+          {autoGenSettings.some((s) => s.isEnabled) && upcomingSchedule.some((g) => g.entries.some((e) => e.status === 'overdue')) && (
+            <button
+              onClick={handleGenerateNow}
+              disabled={generatingNow}
+              className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-1.5"
+            >
+              {generatingNow ? (
+                <>Generating...</>
+              ) : (
+                <>Generate Overdue</>
+              )}
+            </button>
+          )}
         </div>
+
+        {genResult && (
+          <div className={`mb-3 px-3 py-2 text-xs rounded-lg ${
+            genResult.startsWith('Generated')
+              ? 'bg-chart-1/20 text-chart-1'
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            {genResult}
+          </div>
+        )}
 
         {autoGenSettings.length > 0 ? (
           <div className="space-y-2">
@@ -1015,18 +1274,26 @@ export default function PayrollTab() {
                       Frequency: {ags.frequency} · Last generated: {ags.lastGeneratedDate ? formatDate(ags.lastGeneratedDate) : 'Never'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setAutoGenMappingId(ags.mappingId);
-                      setAutoGenFrequency(ags.frequency);
-                      setAutoGenBasePaystubId(ags.basePaystubId || '');
-                      setAutoGenEnabled(ags.isEnabled);
-                      setShowAutoGenEditor(true);
-                    }}
-                    className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                  >
-                    Edit
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDeleteAutoGenId(ags.id)}
+                      className="px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAutoGenMappingId(ags.mappingId);
+                        setAutoGenFrequency(ags.frequency);
+                        setAutoGenBasePaystubId(ags.basePaystubId || '');
+                        setAutoGenEnabled(ags.isEnabled);
+                        setShowAutoGenEditor(true);
+                      }}
+                      className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1045,6 +1312,40 @@ export default function PayrollTab() {
           >
             + Set Up Auto-Generate
           </button>
+        )}
+
+        {/* Upcoming Schedule */}
+        {autoGenSettings.some((s) => s.isEnabled) && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <h3 className="text-xs font-semibold text-foreground mb-2">Upcoming Schedule</h3>
+            {upcomingSchedule.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingSchedule.map((group) => (
+                  <div key={group.mappingId}>
+                    <p className="text-[11px] text-muted-foreground mb-1">{group.mappingName}</p>
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-xs">
+                    <div className="text-muted-foreground font-medium">Date</div>
+                    <div className="text-muted-foreground font-medium text-right">Gross</div>
+                    <div className="text-muted-foreground font-medium text-right">Net</div>
+                    <div className="text-muted-foreground font-medium text-right">Status</div>
+                    {group.entries.map((e) => (
+                      <React.Fragment key={e.date}>
+                        <div className="text-foreground">{formatDate(e.date)}</div>
+                        <div className="text-foreground text-right">{formatCurrency(e.gross)}</div>
+                        <div className="text-foreground text-right">{formatCurrency(e.net)}</div>
+                        <div className={`text-right font-medium ${e.status === 'overdue' ? 'text-destructive' : e.status === 'today' ? 'text-chart-1' : 'text-muted-foreground'}`}>
+                          {e.status === 'overdue' ? 'Overdue' : e.status === 'today' ? 'Today' : e.daysUntil <= 1 ? 'Tomorrow' : `In ${e.daysUntil} days`}
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No template paystub available. Import a paystub and ensure auto-generate is enabled with a base template.</p>
+          )}
+          </div>
         )}
       </div>
 
@@ -1073,6 +1374,12 @@ export default function PayrollTab() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setShowManualAdd(true)}
+              className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/30 rounded-lg transition-colors"
+            >
+              + Add Paystub
+            </button>
             {filteredPaystubs.length > 0 && (
               <button
                 onClick={() => setShowDeleteAllConfirm(true)}
@@ -1115,6 +1422,12 @@ export default function PayrollTab() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditPaystubFromList(p.id); }}
+                    className="px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded transition-colors"
+                  >
+                    Edit
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeletePaystub(p); }}
                     className="px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 rounded transition-colors"
@@ -1451,8 +1764,253 @@ export default function PayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Delete Auto-Gen Setting Confirmation ── */}
+      <AlertDialog open={!!deleteAutoGenId} onOpenChange={(open) => !open && setDeleteAutoGenId(null)}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Auto-Generate Setting</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this auto-generate configuration? Existing auto-generated paystubs will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleDeleteAutoGen}
+              disabled={deleteAutoGenLoading}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {deleteAutoGenLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Manual Add Dialog ── */}
+      <Dialog open={showManualAdd} onOpenChange={(open) => {
+        if (!open) {
+          setManualAddMappingId('');
+          setManualAddLineItems([]);
+        }
+        setShowManualAdd(open);
+      }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Paystub Manually</DialogTitle>
+            <DialogDescription>
+              Enter the details from your paystub. Select a field mapping to pre-populate line items.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Employer Name</label>
+                <Input
+                  value={manualAddForm.employerName}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, employerName: e.target.value }))}
+                  placeholder="e.g., Acme Corp"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Employee Name</label>
+                <Input
+                  value={manualAddForm.employeeName}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, employeeName: e.target.value }))}
+                  placeholder="e.g., John Doe"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Period Start</label>
+                <Input
+                  type="date"
+                  value={manualAddForm.payPeriodStart}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, payPeriodStart: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Period End</label>
+                <Input
+                  type="date"
+                  value={manualAddForm.payPeriodEnd}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, payPeriodEnd: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Check Date</label>
+                <Input
+                  type="date"
+                  value={manualAddForm.checkDate}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, checkDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Gross</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualAddForm.grossCurrent}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, grossCurrent: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Taxes</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualAddForm.taxesCurrent}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, taxesCurrent: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Deductions</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualAddForm.deductionsCurrent}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, deductionsCurrent: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Net</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={manualAddForm.netCurrent}
+                  onChange={(e) => setManualAddForm((f) => ({ ...f, netCurrent: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Field Mapping Selector */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Field Mapping (optional)</label>
+              <select
+                value={manualAddMappingId}
+                onChange={(e) => {
+                  const mappingId = e.target.value;
+                  setManualAddMappingId(mappingId);
+                  const mapping = mappings.find((m) => m.id === mappingId);
+                  if (mapping) {
+                    setManualAddForm((f) => ({
+                      ...f,
+                      employerName: f.employerName || mapping.employerName || '',
+                    }));
+                    const items = Object.entries(mapping.mappings)
+                      .filter(([, v]) => v.action === 'import')
+                      .map(([key, v]) => {
+                        const colonIdx = key.indexOf(':');
+                        const section = key.slice(0, colonIdx);
+                        const description = key.slice(colonIdx + 1);
+                        return {
+                          section,
+                          description,
+                          amount: '',
+                          mappingAction: 'import',
+                          categoryId: v.categoryId,
+                        };
+                      });
+                    setManualAddLineItems(items);
+                  } else {
+                    setManualAddLineItems([]);
+                  }
+                }}
+                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">No mapping (line items optional)</option>
+                {mappings.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} {m.employerName ? `(${m.employerName})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {manualAddError && (
+              <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
+                <p className="text-destructive text-sm">{manualAddError}</p>
+              </div>
+            )}
+
+            {/* Line Items */}
+            {manualAddLineItems.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">
+                  Line Items ({manualAddLineItems.length})
+                </label>
+                <div className="max-h-60 overflow-y-auto space-y-1.5">
+                  {manualAddLineItems.map((item, idx) => (
+                    <div key={`${item.section}:${item.description}`} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg border border-border/50">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-muted-foreground truncate">{sectionLabel(`${item.section}:`)} — {item.description}</div>
+                        {item.categoryId && (
+                          <div className="text-[10px] text-primary/60 truncate">{getCategoryName(item.categoryId)}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.amount}
+                          onChange={(e) => {
+                            setManualAddLineItems((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], amount: e.target.value };
+                              return next;
+                            });
+                          }}
+                          placeholder="0.00"
+                          className="w-24 text-xs"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowManualAdd(false);
+                setManualAddMappingId('');
+                setManualAddLineItems([]);
+              }}
+              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleManualAdd}
+              disabled={manualAddSaving || !manualAddForm.employerName || !manualAddForm.checkDate}
+              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {manualAddSaving ? 'Saving...' : 'Add Paystub'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Paystub Detail Dialog ── */}
-      <Dialog open={!!viewingPaystub} onOpenChange={(open) => !open && setViewingPaystub(null)}>
+      <Dialog open={!!viewingPaystub} onOpenChange={(open) => {
+        if (!open) {
+          setViewingPaystub(null);
+          setEditingPaystub(false);
+          setEditLineItems([]);
+        }
+      }}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Paystub Details</DialogTitle>
@@ -1505,22 +2063,38 @@ export default function PayrollTab() {
                           {sectionLabel(`${section}:`)}
                         </h4>
                         <div className="space-y-0.5">
-                          {items.map((li: any) => (
-                            <div key={li.id} className="flex items-center justify-between py-1 px-2 bg-muted/20 rounded">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                  li.mappingAction === 'import' ? 'bg-chart-1' : 'bg-muted-foreground/30'
-                                }`} />
-                                <span className="text-xs text-foreground truncate">{li.description}</span>
-                                {li.mappingAction === 'import' && li.categoryId && (
-                                  <span className="text-[10px] text-primary/70 flex-shrink-0">→ {getCategoryName(li.categoryId)}</span>
+                          {items.map((li: any) => {
+                            const editItem = editingPaystub ? editLineItems.find((e) => e.id === li.id) : null;
+                            return (
+                              <div key={li.id} className="flex items-center justify-between py-1 px-2 bg-muted/20 rounded">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                    li.mappingAction === 'import' ? 'bg-chart-1' : 'bg-muted-foreground/30'
+                                  }`} />
+                                  <span className="text-xs text-foreground truncate">{li.description}</span>
+                                  {li.mappingAction === 'import' && li.categoryId && (
+                                    <span className="text-[10px] text-primary/70 flex-shrink-0">→ {getCategoryName(li.categoryId)}</span>
+                                  )}
+                                </div>
+                                {editingPaystub && editItem ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-muted-foreground">$</span>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editItem.amount}
+                                      onChange={(e) => handleEditLineItemAmount(li.id, e.target.value)}
+                                      className="w-24 text-xs h-7"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-xs font-mono text-foreground blur-number flex-shrink-0">
+                                    {formatCurrency(li.amount)}
+                                  </span>
                                 )}
                               </div>
-                              <span className="text-xs font-mono text-foreground blur-number flex-shrink-0">
-                                {formatCurrency(li.amount)}
-                              </span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -1531,12 +2105,42 @@ export default function PayrollTab() {
           )}
 
           <DialogFooter>
-            <button
-              onClick={() => setViewingPaystub(null)}
-              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-            >
-              Close
-            </button>
+            {editingPaystub ? (
+              <>
+                <button
+                  onClick={handleCancelEdit}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={editSaving}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+                >
+                  {editSaving ? 'Saving...' : 'Save'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleStartEdit}
+                  className="px-4 py-2 text-sm font-medium text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setViewingPaystub(null);
+                    setEditingPaystub(false);
+                    setEditLineItems([]);
+                  }}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

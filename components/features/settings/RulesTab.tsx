@@ -958,7 +958,7 @@ export default function RulesTab() {
 
       {/* Add/Edit Drawer */}
       <Sheet open={drawerOpen} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="right" className="w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+        <SheetContent side="right" className="bg-card border-l border-border p-6 overflow-y-auto">
           <SheetHeader className="mb-6">
             <SheetTitle>
               {editingRule ? 'Edit Rule' : 'Add Rule'}
