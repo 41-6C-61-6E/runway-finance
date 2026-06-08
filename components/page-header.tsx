@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
+import { useCardlessMode } from '@/lib/hooks/use-cardless-mode';
 import { useSidebar } from '@/components/sidebar-context';
 import SettingsDropdown from '@/components/settings-dropdown';
 import UserDropdown from '@/components/user-dropdown';
@@ -15,6 +16,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeaderProps) {
   const { reduceTransparency } = useReduceTransparency();
+  const { cardlessMode } = useCardlessMode();
   const { sidebarWidth } = useSidebar();
 
   return (
@@ -27,11 +29,11 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       {/* Gradient-masked glassmorphic background panel */}
       <div 
         className={`absolute inset-0 -z-10 transition-all duration-200 ${
-          reduceTransparency 
-            ? 'bg-background' 
+          reduceTransparency || cardlessMode
+            ? 'bg-background'
             : 'bg-card/15 backdrop-blur-md'
         }`}
-        style={!reduceTransparency ? {
+        style={!reduceTransparency && !cardlessMode ? {
           WebkitMaskImage: 'linear-gradient(to bottom, black 75%, rgba(0, 0, 0, 0.9) 85%, transparent 100%)',
           maskImage: 'linear-gradient(to bottom, black 75%, rgba(0, 0, 0, 0.9) 85%, transparent 100%)',
         } : {}}
