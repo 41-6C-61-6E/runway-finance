@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ContentWrapper from '@/components/content-wrapper';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { PageHeader } from '@/components/page-header';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
@@ -1249,40 +1250,33 @@ export default function AiSuggestionsPage() {
         )}
 
         {/* Confirmation Modal */}
-        {showConfirmModal && confirmModalConfig && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowConfirmModal(false)}>
-            <div
-              className="bg-card border border-border rounded-xl p-6 max-w-sm w-full shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-base font-semibold text-foreground mb-2">
-                {confirmModalConfig.title}
-              </h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                {confirmModalConfig.description}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 px-3 py-2 text-sm font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowConfirmModal(false);
-                    confirmModalConfig.onConfirm();
-                  }}
-                  className={`flex-1 px-3 py-2 text-sm font-medium text-white rounded-lg transition-all ${
-                    confirmModalConfig.isDestructive ? 'bg-destructive hover:opacity-90' : 'bg-primary hover:opacity-90'
-                  }`}
-                >
-                  {confirmModalConfig.actionLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <Dialog open={showConfirmModal} onOpenChange={(o) => { if (!o) setShowConfirmModal(false); }}>
+          <DialogContent className="max-w-sm p-6">
+            <DialogHeader>
+              <DialogTitle className="text-base">{confirmModalConfig?.title}</DialogTitle>
+              <DialogDescription className="text-sm">{confirmModalConfig?.description}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-3 sm:justify-end">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-3 py-2 text-sm font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  confirmModalConfig?.onConfirm();
+                }}
+                className={`flex-1 px-3 py-2 text-sm font-medium text-white rounded-lg transition-all ${
+                  confirmModalConfig?.isDestructive ? 'bg-destructive hover:opacity-90' : 'bg-primary hover:opacity-90'
+                }`}
+              >
+                {confirmModalConfig?.actionLabel}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ContentWrapper>
     </div>

@@ -314,7 +314,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+      <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle>Account Details</SheetTitle>
         </SheetHeader>

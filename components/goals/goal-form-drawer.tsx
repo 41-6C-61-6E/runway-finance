@@ -194,7 +194,7 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
+      <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader className="pb-4">
           <SheetTitle>{editGoal ? 'Edit Goal' : 'Create New Goal'}</SheetTitle>
         </SheetHeader>
