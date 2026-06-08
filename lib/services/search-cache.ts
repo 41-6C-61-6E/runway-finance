@@ -4,6 +4,8 @@ import { eq, and, or, sql } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
+const CACHE_TTL_MS = 1 * 60 * 60 * 1000;
+
 // Global-safe caches to survive Next.js dev server hot reloads
 const globalForSearchCache = globalThis as unknown as {
   searchCache?: Map<string, Map<string, {
@@ -21,6 +23,7 @@ const globalForSearchCache = globalThis as unknown as {
 }>>;
   searchCacheStatus?: Map<string, 'uninitialized' | 'hydrating' | 'ready'>;
   searchCachePromises?: Map<string, Promise<void>>;
+  searchCacheTouchedAt?: Map<string, number>;
 };
 
 const searchCache = globalForSearchCache.searchCache ?? new Map<string, Map<string, {
@@ -38,11 +41,13 @@ const searchCache = globalForSearchCache.searchCache ?? new Map<string, Map<stri
 }>>();
 const searchCacheStatus = globalForSearchCache.searchCacheStatus ?? new Map<string, 'uninitialized' | 'hydrating' | 'ready'>();
 const searchCachePromises = globalForSearchCache.searchCachePromises ?? new Map<string, Promise<void>>();
+const searchCacheTouchedAt = globalForSearchCache.searchCacheTouchedAt ?? new Map<string, number>();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForSearchCache.searchCache = searchCache;
   globalForSearchCache.searchCacheStatus = searchCacheStatus;
   globalForSearchCache.searchCachePromises = searchCachePromises;
+  globalForSearchCache.searchCacheTouchedAt = searchCacheTouchedAt;
 }
 
 /**
@@ -50,7 +55,12 @@ if (process.env.NODE_ENV !== 'production') {
  */
 export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): Promise<void> {
   const status = searchCacheStatus.get(userId) ?? 'uninitialized';
-  if (status === 'ready') return;
+
+  if (status === 'ready') {
+    const lastTouched = searchCacheTouchedAt.get(userId) ?? 0;
+    if (Date.now() - lastTouched < CACHE_TTL_MS) return;
+    searchCacheStatus.set(userId, 'uninitialized');
+  }
 
   if (status === 'hydrating') {
     const promise = searchCachePromises.get(userId);
@@ -137,6 +147,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
 
       searchCache.set(userId, userCache);
       searchCacheStatus.set(userId, 'ready');
+      searchCacheTouchedAt.set(userId, Date.now());
       logger.info('Search cache hydrated successfully', { userId, count: userCache.size });
     } catch (err) {
       logger.error('Failed to hydrate search cache', { userId, error: err });
@@ -157,6 +168,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
 export function invalidateUserSearchCache(userId: string): void {
   searchCache.delete(userId);
   searchCacheStatus.set(userId, 'uninitialized');
+  searchCacheTouchedAt.delete(userId);
   logger.info('Invalidated search cache for user', { userId });
 }
 

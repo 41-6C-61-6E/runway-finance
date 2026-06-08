@@ -1073,7 +1073,7 @@ export default function ManualAccountsSection() {
 
       {/* Create Drawer */}
       <Sheet open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); if (open) { setTagIds([]); setTagSearch(''); setShowTagDropdown(false); } }}>
-        <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
+        <SheetContent side="right" className="overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Add Manual Account</SheetTitle>
             <SheetDescription>Track assets or mortgages that aren't connected through SimpleFIN.</SheetDescription>
@@ -1281,7 +1281,7 @@ export default function ManualAccountsSection() {
 
       {/* Edit Drawer */}
       <Sheet open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null); setError(''); }}>
-        <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
+        <SheetContent side="right" className="overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Account</SheetTitle>
             <SheetDescription>Update the details for {editAccount?.name}.</SheetDescription>
