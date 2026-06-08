@@ -7,6 +7,7 @@ import { useSidebar, SidebarProvider, COLLAPSED_WIDTH } from '@/components/sideb
 import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
+import { CardlessModeProvider } from '@/components/cardless-mode-provider';
 import { UserSettingsProvider } from '@/components/user-settings-provider';
 import { MobileNav } from '@/components/mobile-nav';
 import { ReactNode, useState, useEffect } from 'react';
@@ -26,6 +27,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
       <SidebarProvider>
         <PrivacyModeProvider>
           <ReduceTransparencyProvider>
+          <CardlessModeProvider>
           <AccountSubheadingsProvider>
             <>
               <ResizableSidebar />
@@ -36,6 +38,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
               <MobileNav />
             </>
           </AccountSubheadingsProvider>
+          </CardlessModeProvider>
           </ReduceTransparencyProvider>
         </PrivacyModeProvider>
       </SidebarProvider>
