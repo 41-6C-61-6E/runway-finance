@@ -82,6 +82,7 @@ export async function POST(request: Request) {
     grossYtd,
     taxesYtd,
     deductionsYtd,
+    mappingId,
     lineItems,
   } = body;
 
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
       taxesYtd: taxesYtd != null ? String(taxesYtd) : null,
       deductionsYtd: deductionsYtd != null ? String(deductionsYtd) : null,
       source: 'manual',
+      mappingId: mappingId || null,
     })
     .returning();
 

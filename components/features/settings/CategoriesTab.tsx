@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CATEGORY_COLORS } from '@/lib/colors/palette';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
@@ -602,7 +603,7 @@ export default function CategoriesTab() {
 
       {/* Add/Edit Drawer */}
       <Sheet open={isAdding || editing !== null || cloning !== null} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="right" className="w-full max-w-md bg-card border-l border-border p-6 overflow-y-auto">
+        <SheetContent side="right" className="bg-card border-l border-border p-6 overflow-y-auto">
           <SheetHeader className="mb-6">
             <SheetTitle>
               {editing ? 'Edit Category' : cloning ? 'Clone Category' : 'Add Category'}
@@ -781,24 +782,28 @@ export default function CategoriesTab() {
       </AlertDialog>
 
       {/* Reset Result */}
-      {resetResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/15" onClick={() => setResetResult(null)}>
-          <div className="bg-card border border-border rounded-xl shadow-lg p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground mb-3">Categories Refreshed</h3>
+      <Dialog open={!!resetResult} onOpenChange={(o) => { if (!o) setResetResult(null); }}>
+        <DialogContent className="max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle>Categories Refreshed</DialogTitle>
+          </DialogHeader>
+          {resetResult && (
             <div className="space-y-2 text-sm text-foreground/80">
               <p><strong className="text-foreground">{resetResult.kept}</strong> existing categories preserved</p>
               <p><strong className="text-foreground">{resetResult.deleted}</strong> unused categories removed</p>
               <p><strong className="text-foreground">{resetResult.created}</strong> new default categories created</p>
             </div>
+          )}
+          <DialogFooter>
             <button
               onClick={() => setResetResult(null)}
-              className="mt-4 w-full px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
+              className="w-full px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity"
             >
               Done
             </button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Check, X, Zap } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 type StageName = 'config' | 'connecting' | 'sending' | 'receiving';
 
@@ -168,11 +169,8 @@ export default function AiTestProgress({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div
-        className="bg-card border border-border rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg p-6">
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-base font-semibold text-foreground">{title}</h2>
@@ -282,7 +280,7 @@ export default function AiTestProgress({
             </button>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
