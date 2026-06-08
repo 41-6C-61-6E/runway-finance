@@ -10,6 +10,7 @@ export const GENERAL_DEFAULTS = {
   dateFormat: 'MM/DD/YYYY',
   privacyMode: false,
   reduceTransparency: false,
+  cardlessMode: false,
   hideAccountSubheadings: false,
   hideAccountsSidebarByDefault: true,
   chartSelections: {},

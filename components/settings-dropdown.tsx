@@ -70,7 +70,7 @@ export default function SettingsDropdown() {
         <TooltipContent side="bottom">Settings</TooltipContent>
       </Tooltip>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 py-1 bg-card border border-border rounded-lg shadow-lg z-50">
+        <div className="absolute right-0 top-full mt-1 w-48 py-1 bg-popover border border-border rounded-lg shadow-lg z-50">
           {settingsSections.map((section) => {
             const Icon = section.icon;
             return (
