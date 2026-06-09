@@ -300,7 +300,8 @@ function buildSankeyData(
 
   // Hub node
   if (incomeCategories.length > 0 || expenseCategories.length > 0 || totalIncome > 0 || totalExpenses > 0) {
-    nodes.push({ id: hubId, label: 'Available Funds', color: VIBRANT_COLORS[2], value: totalIncome, percentage: 100 });
+    const hubColor = totalIncome >= totalExpenses ? VIBRANT_COLORS[1] : VIBRANT_COLORS[3];
+    nodes.push({ id: hubId, label: 'Cash Flow', color: hubColor, value: totalIncome, percentage: 100 });
   }
 
   // ── Expense side ─────────────────────────────────────────────────────────
@@ -452,10 +453,7 @@ const SankeyCustomNode = ({
   const colIndex = columnMetrics?.columns[nodeIdx] ?? -1;
   const offset = colIndex >= 0 ? (columnOffsets[colIndex] ?? 0) : 0;
   
-  // Clamp shiftedY to stay within usable height bounds to prevent clipping at top/bottom
-  const minY = margin.top;
-  const maxY = margin.top + usableHeight - height;
-  const shiftedY = Math.max(minY, Math.min(y + offset, maxY));
+  const shiftedY = y + offset;
 
   // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
@@ -490,7 +488,7 @@ const SankeyCustomNode = ({
       {/* Name label */}
       <text
         x={isRightSide ? x - 8 : x + width + 8}
-        y={shiftedY + height / 2 - (valueLabel ? 6 : 0)}
+        y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
         textAnchor={isRightSide ? 'end' : 'start'}
         dominantBaseline="central"
         fontSize={isMobileSize ? 8 : 10}
@@ -505,7 +503,7 @@ const SankeyCustomNode = ({
       {valueLabel && (
         <text
           x={isRightSide ? x - 8 : x + width + 8}
-          y={shiftedY + height / 2 + 7}
+          y={shiftedY + height / 2 + 5}
           textAnchor={isRightSide ? 'end' : 'start'}
           dominantBaseline="central"
           fontSize={isMobileSize ? 7 : 9}
@@ -553,20 +551,9 @@ const SankeyCustomLink = ({
   const sourceOffset = sourceCol >= 0 ? (columnOffsets[sourceCol] ?? 0) : 0;
   const targetOffset = targetCol >= 0 ? (columnOffsets[targetCol] ?? 0) : 0;
 
-  // Replicate clamped shiftedY calculation for source node to align link connection
-  const sourceNodeY = payload.source.y !== undefined ? payload.source.y : 0;
-  const sourceNodeHeight = payload.source.dy !== undefined ? payload.source.dy : (payload.source.height !== undefined ? payload.source.height : 0);
-  const clampedSourceNodeY = Math.max(margin.top, Math.min(sourceNodeY + sourceOffset, margin.top + usableHeight - sourceNodeHeight));
-  const sourceShift = clampedSourceNodeY - sourceNodeY;
-
-  // Replicate clamped shiftedY calculation for target node to align link connection
-  const targetNodeY = payload.target.y !== undefined ? payload.target.y : 0;
-  const targetNodeHeight = payload.target.dy !== undefined ? payload.target.dy : (payload.target.height !== undefined ? payload.target.height : 0);
-  const clampedTargetNodeY = Math.max(margin.top, Math.min(targetNodeY + targetOffset, margin.top + usableHeight - targetNodeHeight));
-  const targetShift = clampedTargetNodeY - targetNodeY;
-
-  const shiftedSourceY = sourceY + sourceShift;
-  const shiftedTargetY = targetY + targetShift;
+  // Use the same y + offset formula as the node renderer (no clamping)
+  const shiftedSourceY = sourceY + sourceOffset;
+  const shiftedTargetY = targetY + targetOffset;
 
   // Cubic bezier: control points at 1/2 x distance for smooth S-curve
   const midX = (sourceX + targetX) / 2;

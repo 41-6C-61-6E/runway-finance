@@ -152,7 +152,7 @@
 }
 
 [data-chart-scheme="vashon"] {
-  --chart-1: oklch(0.662 0.064 124.7);
+  --chart-1: oklch(0.82 0.12 135);
   --chart-2: oklch(0.5 0.085 333);
   --chart-3: oklch(0.799 0.098 188.8);
   --chart-4: oklch(0.891 0.1 92.7);

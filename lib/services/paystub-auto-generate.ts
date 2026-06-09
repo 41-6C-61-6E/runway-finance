@@ -123,6 +123,9 @@ export async function runAutoGenerate(
       })
       .returning();
 
+    // Apply field mapping rules to determine mappingAction and categoryId
+    const mappingsJson: Record<string, { action: string; categoryId: string | null }> = mapping?.mappings || {};
+
     const clonedLineItems: Array<{
       id: string;
       section: string;
@@ -133,6 +136,14 @@ export async function runAutoGenerate(
     }> = [];
 
     for (const baseItem of baseLineItems) {
+      // Look up the line item in the field mapping rules
+      const lookupKey = `${baseItem.section}:${baseItem.description}`;
+      const mappingEntry = mappingsJson[lookupKey];
+
+      // Use mapping rules if available, otherwise fall back to base item values
+      const mappingAction = mappingEntry?.action || baseItem.mappingAction || 'import';
+      const categoryId = mappingEntry?.categoryId ?? baseItem.categoryId;
+
       const [cloned] = await db
         .insert(paystubLineItems)
         .values({
@@ -145,8 +156,8 @@ export async function runAutoGenerate(
           hours: baseItem.hours,
           rate: baseItem.rate,
           ytdHours: null,
-          mappingAction: baseItem.mappingAction,
-          categoryId: baseItem.categoryId,
+          mappingAction: mappingAction,
+          categoryId: categoryId,
         })
         .returning();
 
