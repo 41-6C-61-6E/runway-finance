@@ -711,8 +711,7 @@ export function CashFlowSankey() {
           if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
           categories = await categoriesRes.json();
         } else {
-          const range2 = getMonthRange(timeframe, windowEnd);
-          const res = await fetch(`/api/cash-flow/categories?startMonth=${range2.start}&endMonth=${range2.end}${acctParam}`);
+          const res = await fetch(`/api/cash-flow/categories?startMonth=${range.start}&endMonth=${range.end}${acctParam}`);
           if (!res.ok) throw new Error('Failed to fetch sankey data');
           categories = await res.json();
         }
