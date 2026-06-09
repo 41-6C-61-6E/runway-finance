@@ -33,8 +33,17 @@ export function formatPercent(
 
 /**
  * Format date consistently across the app
+ * If date is a string, appends T00:00:00 to ensure it's parsed as local time
+ * (not UTC), which prevents off-by-one-day issues in different timezones.
  */
 export function formatDate(date: Date | string, locale = 'en-US'): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  let d: Date;
+  if (typeof date === 'string') {
+    // Append T00:00:00 to parse as local time, not UTC
+    // This prevents toLocaleDateString() from shifting the date by a timezone offset
+    d = new Date(date + 'T00:00:00');
+  } else {
+    d = date;
+  }
   return d.toLocaleDateString(locale);
 }
