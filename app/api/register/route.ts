@@ -71,7 +71,6 @@ export async function POST(request: Request) {
         defaultChartTimeRange: DEFAULTS.defaultChartTimeRange,
         defaultChartType: DEFAULTS.defaultChartType,
         reduceTransparency: DEFAULTS.reduceTransparency,
-        cardlessMode: DEFAULTS.cardlessMode,
         hideAccountSubheadings: DEFAULTS.hideAccountSubheadings,
         hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
         chartSelections: DEFAULTS.chartSelections,

@@ -330,13 +330,6 @@
       "when": 1780330000002,
       "tag": "0046_add_sharing",
       "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1780330000003,
-      "tag": "0047_add_cardless_mode",
-      "breakpoints": true
     }
   ]
 }

@@ -299,7 +299,7 @@ export default function AccountsSidebar() {
     return (
       <>
         <aside 
-          className="fixed top-0 h-screen bg-card border-r border-border flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
+          className="fixed top-0 h-screen bg-sidebar border-r border-border flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
           style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
         >
           <div className="flex items-center justify-between">
@@ -333,7 +333,7 @@ export default function AccountsSidebar() {
   return (
     <>
       <aside 
-        className="fixed top-0 h-screen bg-card border-r border-border flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
+        className="fixed top-0 h-screen bg-sidebar border-r border-border flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
         style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
       >
         {/* Net Worth Header */}

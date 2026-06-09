@@ -44,7 +44,6 @@ export async function GET() {
       defaultChartTimeRange: created?.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: created?.reduceTransparency ?? DEFAULTS.reduceTransparency,
-      cardlessMode: created?.cardlessMode ?? DEFAULTS.cardlessMode,
       hideAccountSubheadings: created?.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
@@ -86,7 +85,7 @@ export async function GET() {
     defaultChartTimeRange: settings[0].defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
     defaultChartType: settings[0].defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: settings[0].reduceTransparency ?? DEFAULTS.reduceTransparency,
-    cardlessMode: settings[0].cardlessMode ?? DEFAULTS.cardlessMode,
+
     hideAccountSubheadings: settings[0].hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
     hideAccountsSidebarByDefault: settings[0].hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: settings[0].chartSelections ?? DEFAULTS.chartSelections,
@@ -124,7 +123,6 @@ export async function PATCH(request: Request) {
   const defaultChartTimeRange = body.defaultChartTimeRange;
   const defaultChartType = body.defaultChartType;
   const reduceTransparency = body.reduceTransparency;
-  const cardlessMode = body.cardlessMode;
   const hideAccountSubheadings = body.hideAccountSubheadings;
   const hideAccountsSidebarByDefault = body.hideAccountsSidebarByDefault;
   const chartSelections = body.chartSelections;
@@ -212,10 +210,6 @@ export async function PATCH(request: Request) {
 
   if (reduceTransparency !== undefined && typeof reduceTransparency !== 'boolean') {
     return Response.json({ error: 'Invalid reduceTransparency value' }, { status: 400 });
-  }
-
-  if (cardlessMode !== undefined && typeof cardlessMode !== 'boolean') {
-    return Response.json({ error: 'Invalid cardlessMode value' }, { status: 400 });
   }
 
   if (hideAccountSubheadings !== undefined && typeof hideAccountSubheadings !== 'boolean') {
@@ -344,7 +338,6 @@ export async function PATCH(request: Request) {
   if (defaultChartTimeRange !== undefined) updates.defaultChartTimeRange = defaultChartTimeRange;
   if (defaultChartType !== undefined) updates.defaultChartType = defaultChartType;
   if (reduceTransparency !== undefined) updates.reduceTransparency = reduceTransparency;
-  if (cardlessMode !== undefined) updates.cardlessMode = cardlessMode;
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
   if (hideAccountsSidebarByDefault !== undefined) updates.hideAccountsSidebarByDefault = hideAccountsSidebarByDefault;
   if (chartSelections !== undefined) {
@@ -408,7 +401,6 @@ export async function PATCH(request: Request) {
       defaultChartTimeRange: updated.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: updated.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: updated.reduceTransparency ?? DEFAULTS.reduceTransparency,
-      cardlessMode: updated.cardlessMode ?? DEFAULTS.cardlessMode,
       hideAccountSubheadings: updated.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
       hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
