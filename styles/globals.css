@@ -173,7 +173,7 @@ body,
 }
 
 /* ── Light theme: swap page bg and nav bar colors ──────────────────────────── */
-:root {
+[data-theme="light"] {
   --background: oklch(1.0 0 0);
   --sidebar: oklch(0.96 0.01 25);
   --card: oklch(0.96 0.01 25);
@@ -181,22 +181,32 @@ body,
 
 /* ── Privacy Mode ─────────────────────────────────────────────────────────── */
 .privacy-mode-active .financial-value {
-  filter: blur(18px);
+  filter: blur(8px);
   user-select: none;
   -webkit-user-select: none;
 }
 
 .privacy-mode-active .blur-number {
-  filter: blur(18px);
+  filter: blur(8px);
   pointer-events: none;
   user-select: none;
 }
 
-.privacy-mode-active .financial-chart {
-  filter: blur(18px);
+/* Charts: blur axis tick labels & legends, keep lines/bars/areas visible */
+.privacy-mode-active .recharts-xAxis-axis .recharts-cartesian-axis-tick-value,
+.privacy-mode-active .recharts-yAxis-axis .recharts-cartesian-axis-tick-value,
+.privacy-mode-active .recharts-cartesian-axis-tick-value {
+  filter: blur(6px) !important;
+  opacity: 0.2 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.privacy-mode-active .recharts-legend-item-text {
+  filter: blur(6px);
   user-select: none;
   -webkit-user-select: none;
 }
+
 
 
 
@@ -218,8 +228,6 @@ body,
 /* Remove focus highlight outline from charts */
 .recharts-wrapper:focus,
 .recharts-surface:focus,
-.financial-chart:focus,
-.financial-chart *:focus,
 .recharts-wrapper *:focus {
   outline: none !important;
 }

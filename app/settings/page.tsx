@@ -39,10 +39,8 @@ import PayrollTab from '@/components/features/settings/PayrollTab';
 import TagsTab from '@/components/features/settings/TagsTab';
 import SharingTab from '@/components/features/settings/SharingTab';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
-import { useCardStyle } from '@/lib/hooks/use-card-style';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
-import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
@@ -110,7 +108,7 @@ function SettingsPageBody() {
   const router = useRouter();
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
-  const { sidebarWidth, hideAccountsSidebarByDefault, updateHideAccountsSidebarByDefault } = useSidebar();
+  const { sidebarWidth } = useSidebar();
   const [setupToken, setSetupToken] = useState('');
   const [label, setLabel] = useState('');
   const [loading, setLoading] = useState(false);
@@ -154,9 +152,7 @@ function SettingsPageBody() {
   const [savingLabel, setSavingLabel] = useState(false);
 
   const { scheme: chartScheme, updateScheme: updateChartScheme } = useChartColorScheme();
-  const { cardStyle, updateCardStyle } = useCardStyle();
   const { isHidden, updateHidden } = useHiddenPages();
-  const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
@@ -654,41 +650,6 @@ function SettingsPageBody() {
                 </div>
               </div>
 
-              {/* Card Style */}
-              <div className="pb-5 border-b border-border">
-                <div className="mb-3">
-                  <h3 className="text-sm font-medium text-foreground">Card Style</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Adjust the corner radius of cards throughout the app</p>
-                </div>
-                <div className="flex gap-2">
-                  {([
-                    { id: 'rounded' as const, label: 'More Round', radius: 'rounded-full' },
-                    { id: 'default' as const, label: 'Default', radius: 'rounded-md' },
-                    { id: 'square' as const, label: 'More Square', radius: 'rounded-none' },
-                  ]).map((option) => {
-                    const isActive = cardStyle === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => updateCardStyle(option.id)}
-                        className={`flex-1 flex items-center justify-center gap-2 p-2 border transition-all ${
-                          isActive
-                            ? 'border-foreground bg-muted/50'
-                            : 'border-border hover:border-foreground/30 hover:bg-muted/20'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 border-2 border-foreground/40 ${option.radius}`} />
-                        <span className="text-xs text-foreground">{option.label}</span>
-                        {isActive && (
-                          <Check className="w-3 h-3 text-primary" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Privacy Mode */}
               <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
                 <div className="flex-1 min-w-0">
@@ -699,18 +660,6 @@ function SettingsPageBody() {
                   checked={privacyMode ?? false}
                   onCheckedChange={togglePrivacyMode}
                   disabled={privacyModeLoading}
-                />
-              </div>
-
-              {/* Reduce Transparency */}
-              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground">Reduce Transparency</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Use solid backgrounds for the sidebar instead of glass/transparent</p>
-                </div>
-                <Switch
-                  checked={reduceTransparency}
-                  onCheckedChange={updateReduceTransparency}
                 />
               </div>
 
@@ -726,22 +675,10 @@ function SettingsPageBody() {
                 />
               </div>
 
-              {/* Hide Accounts Sidebar by Default */}
-              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground">Hide Accounts Sidebar by Default</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Start with the accounts sidebar collapsed on all pages</p>
-                </div>
-                <Switch
-                  checked={hideAccountsSidebarByDefault}
-                  onCheckedChange={updateHideAccountsSidebarByDefault}
-                />
-              </div>
-
               {/* Dev Mode */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground">Developer Mode</h3>
+                  <h3 className="text-sm font-medium text-foreground">Developer Tools</h3>
                   <p className="text-xs text-muted-foreground mt-1">Enable developer tools such as the Financial Logic and Data Explorer pages</p>
                 </div>
                 <Switch

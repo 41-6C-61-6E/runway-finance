@@ -333,7 +333,7 @@ export function SpendingBreakdown() {
                 }
               />
             ) : (
-              <div className="financial-chart h-full w-full relative">
+              <div className="h-full w-full relative">
                 {chartType === 'bar' ? (() => {
                   const maxLabelLen = pieData.length > 0
                     ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))

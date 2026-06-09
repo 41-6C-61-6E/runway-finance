@@ -510,7 +510,7 @@ const SankeyCustomNode = ({
           dominantBaseline="central"
           fontSize={isMobileSize ? 7 : 9}
           fill="currentColor"
-          className="fill-muted-foreground select-none"
+          className="fill-muted-foreground select-none blur-number"
           style={{ opacity: isDimmed ? 0.3 : 0.75 }}
         >
           {valueLabel}
@@ -1193,7 +1193,7 @@ export function CashFlowSankey() {
 
           {/* Chart */}
           <div style={{ height: chartHeight }} className="w-full">
-            <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+            <div className="h-full w-full overflow-x-auto overflow-y-hidden">
               <div className="min-w-max h-full px-2 pb-2">
                 {processedData.nodes.length > 0 && processedData.links.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>

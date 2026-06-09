@@ -283,7 +283,7 @@ export function IncomeExpenseChart() {
             </div>
           </CollapsibleFilterPanel>
           <div className="h-[320px]">
-            <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+            <div className="h-full w-full overflow-x-auto overflow-y-hidden">
               <div className="min-w-max h-full px-2 pb-2">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               {chartType === 'bar' ? (
