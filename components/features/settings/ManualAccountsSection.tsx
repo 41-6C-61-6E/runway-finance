@@ -938,7 +938,7 @@ export default function ManualAccountsSection() {
           No manual accounts yet. Add your first asset or mortgage to track it.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-border">
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = isLiabilityAccount(account.type);
@@ -947,11 +947,10 @@ export default function ManualAccountsSection() {
               ? String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')
               : 'manual';
             const nextSync = computeNextSync(syncFrequency, account.balanceDate);
-            const isSyncOverdue = nextSync && nextSync.getTime() <= Date.now();
             return (
               <div
                 key={account.id}
-                className="p-4 bg-muted/30 border border-border rounded-lg"
+                className="px-4 py-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -983,73 +982,62 @@ export default function ManualAccountsSection() {
                         </div>
                       )}
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono text-sm font-semibold text-foreground blur-number">
-                      {fmt.sign}{fmt.text}
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Updated {formatRelativeTime(account.balanceDate)}
                     </div>
-                    <div className="text-xs text-muted-foreground/60">{account.currency}</div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                  <div className="text-xs text-muted-foreground">
-                    Updated {formatRelativeTime(account.balanceDate)}
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {canSync(account) && (
+                  <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <div className="text-right">
+                      <div className="font-mono text-sm font-semibold text-foreground blur-number">
+                        {fmt.sign}{fmt.text}
+                      </div>
+                      <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {canSync(account) && (
+                        <button
+                          onClick={() => handleSync(account.id)}
+                          disabled={syncingId === account.id}
+                          className="px-2 py-1 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {syncingId === account.id ? '...' : 'Sync'}
+                        </button>
+                      )}
+                      {canAdjust(account) && (
+                        <button
+                          onClick={() => {
+                            setAdjustAccount(account);
+                            const meta = account.metadata ?? {};
+                            setAdjustValue(
+                              account.type === 'metals'
+                                ? String((meta as Record<string, unknown>).amountOz ?? '0')
+                                : account.balance
+                            );
+                            setAdjustDate(new Date().toISOString().split('T')[0]);
+                            setAdjustNote('');
+                          }}
+                          className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
+                        >
+                          Adjust
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleSync(account.id)}
-                        disabled={syncingId === account.id}
-                        className="px-2 py-1 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {syncingId === account.id ? '...' : 'Sync'}
-                      </button>
-                    )}
-                    {canAdjust(account) && (
-                      <button
-                        onClick={() => {
-                          setAdjustAccount(account);
-                          const meta = account.metadata ?? {};
-                          setAdjustValue(
-                            account.type === 'metals'
-                              ? String((meta as Record<string, unknown>).amountOz ?? '0')
-                              : account.balance
-                          );
-                          setAdjustDate(new Date().toISOString().split('T')[0]);
-                          setAdjustNote('');
-                        }}
+                        onClick={() => openEdit(account)}
                         className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
                       >
-                        Adjust
+                        Edit
                       </button>
-                    )}
-                    <button
-                      onClick={() => openEdit(account)}
-                      className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteAccount(account)}
-                      className="px-2 py-1 text-[10px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
-                    >
-                      Delete
-                    </button>
+                      <button
+                        onClick={() => setDeleteAccount(account)}
+                        className="px-2 py-1 text-[10px] font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 rounded-lg transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
                 {canSync(account) && (
-                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-border/50">
-                    <div className="text-xs text-muted-foreground">
-                      {syncingId === account.id ? (
-                        <span className="text-chart-1 animate-pulse">Syncing...</span>
-                      ) : syncFrequency === 'manual' ? (
-                        <span>Not scheduled</span>
-                      ) : nextSync && nextSync.getTime() > Date.now() ? (
-                        <span>Next: {formatTimeUntil(nextSync)}</span>
-                      ) : (
-                        <span className="text-chart-3">Overdue</span>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-start mt-2">
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-muted-foreground">Sync:</label>
                       <select
