@@ -1331,8 +1331,8 @@ export default function PayrollTab() {
                     {group.entries.map((e) => (
                       <React.Fragment key={e.date}>
                         <div className="text-foreground">{formatDate(e.date)}</div>
-                        <div className="text-foreground text-right">{formatCurrency(e.gross)}</div>
-                        <div className="text-foreground text-right">{formatCurrency(e.net)}</div>
+                        <div className="text-foreground text-right blur-number">{formatCurrency(e.gross)}</div>
+                        <div className="text-foreground text-right blur-number">{formatCurrency(e.net)}</div>
                         <div className={`text-right font-medium ${e.status === 'overdue' ? 'text-destructive' : e.status === 'today' ? 'text-chart-1' : 'text-muted-foreground'}`}>
                           {e.status === 'overdue' ? 'Overdue' : e.status === 'today' ? 'Today' : e.daysUntil <= 1 ? 'Tomorrow' : `In ${e.daysUntil} days`}
                         </div>

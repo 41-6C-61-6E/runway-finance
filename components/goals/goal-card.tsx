@@ -164,8 +164,8 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
         <GoalProgressRing progress={progress} size={72} strokeWidth={5} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-lg font-bold text-foreground">{formatCurrency(current)}</span>
-            <span className="text-sm text-muted-foreground">/ {formatCurrency(target)}</span>
+            <span className="text-lg font-bold text-foreground blur-number">{formatCurrency(current)}</span>
+            <span className="text-sm text-muted-foreground blur-number">/ {formatCurrency(target)}</span>
           </div>
           <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
             <div
@@ -218,7 +218,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span>Save {formatCurrency(monthlySavings)}/mo</span>
+          <span className="blur-number">Save {formatCurrency(monthlySavings)}/mo</span>
         </div>
       )}
 
@@ -231,7 +231,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
             </svg>
             <span>Linked account</span>
             {linkedAccountBalance !== null && (
-              <span className="text-foreground font-medium ml-auto">{formatCurrency(linkedAccountBalance)}</span>
+              <span className="text-foreground font-medium ml-auto blur-number">{formatCurrency(linkedAccountBalance)}</span>
             )}
           </div>
           {percentage !== undefined && (
@@ -241,7 +241,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
           )}
           {reserve !== undefined && (
             <div className="flex items-center gap-2 pl-5.5">
-              <span className="text-muted-foreground">{formatCurrency(reserve)} reserve</span>
+              <span className="text-muted-foreground blur-number">{formatCurrency(reserve)} reserve</span>
             </div>
           )}
         </div>
