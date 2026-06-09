@@ -124,7 +124,7 @@ export async function runAutoGenerate(
       .returning();
 
     // Apply field mapping rules to determine mappingAction and categoryId
-    const mappingsJson: Record<string, { action: string; categoryId: string | null }> = mapping?.mappings || {};
+    const mappingsJson: Record<string, { action: string; categoryId: string | null }> = (mapping?.mappings as Record<string, { action: string; categoryId: string | null }>) || {};
 
     const clonedLineItems: Array<{
       id: string;
