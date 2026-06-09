@@ -954,7 +954,7 @@ export default function PayrollTab() {
             )}
 
             {showGuidance && (
-              <div className="mt-4 p-5 bg-muted/30 border border-border rounded-xl space-y-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="mt-4 p-5 bg-muted/50 border border-border rounded-xl space-y-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="space-y-1">
                   <h3 className="font-semibold text-foreground">Getting Started Guide</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1179,7 +1179,7 @@ export default function PayrollTab() {
             {mappings.map((m) => (
               <div
                 key={m.id}
-                className="p-3 bg-muted/30 border border-border rounded-lg flex items-center justify-between"
+                className="p-3 bg-muted/50 border border-border rounded-lg flex items-center justify-between"
               >
                 <div>
                   <div className="flex items-center gap-2">
@@ -1257,7 +1257,7 @@ export default function PayrollTab() {
               return (
                 <div
                   key={ags.id}
-                  className="p-3 bg-muted/30 border border-border rounded-lg flex items-center justify-between"
+                  className="p-3 bg-muted/50 border border-border rounded-lg flex items-center justify-between"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -1400,7 +1400,7 @@ export default function PayrollTab() {
             {filteredPaystubs.map((p) => (
               <div
                 key={p.id}
-                className="p-3 bg-muted/30 border border-border rounded-lg flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer"
+                className="p-3 bg-muted/50 border border-border rounded-lg flex items-center justify-between hover:bg-muted/70 transition-colors cursor-pointer"
                 onClick={() => handleViewPaystub(p.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -1504,7 +1504,7 @@ export default function PayrollTab() {
               </div>
             </div>
 
-            <div className="p-3 bg-muted/40 border border-border rounded-lg text-xs space-y-1.5 leading-normal">
+            <div className="p-3 bg-muted/60 border border-border rounded-lg text-xs space-y-1.5 leading-normal">
               <p className="font-semibold text-foreground">💡 Target Account &amp; Duplicate Prevention Info:</p>
               <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                 <li>
@@ -1563,7 +1563,7 @@ export default function PayrollTab() {
                   {keys.map((key) => {
                     const field = mappingEditorFields[key];
                     return (
-                      <div key={key} className="flex flex-col gap-2 p-2.5 bg-muted/30 rounded-lg border border-border/50">
+                      <div key={key} className="flex flex-col gap-2 p-2.5 bg-muted/50 rounded-lg border border-border">
                         <div className="flex items-center justify-between min-w-0">
                           <span className="text-xs font-medium text-foreground truncate flex-1 pr-2">
                             {descriptionLabel(key)}
@@ -1950,7 +1950,7 @@ export default function PayrollTab() {
                 </label>
                 <div className="max-h-60 overflow-y-auto space-y-1.5">
                   {manualAddLineItems.map((item, idx) => (
-                    <div key={`${item.section}:${item.description}`} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg border border-border/50">
+                    <div key={`${item.section}:${item.description}`} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-border">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-muted-foreground truncate">{sectionLabel(`${item.section}:`)} — {item.description}</div>
                         {item.categoryId && (
@@ -2029,19 +2029,19 @@ export default function PayrollTab() {
             <div className="space-y-4">
               {/* Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="p-3 bg-muted/50 rounded-lg">
                   <div className="text-xs text-muted-foreground">Gross</div>
                   <div className="text-sm font-medium text-foreground blur-number">{formatCurrency(viewingPaystub.grossCurrent)}</div>
                 </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="p-3 bg-muted/50 rounded-lg">
                   <div className="text-xs text-muted-foreground">Net</div>
                   <div className="text-sm font-medium text-foreground blur-number">{formatCurrency(viewingPaystub.netCurrent)}</div>
                 </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="p-3 bg-muted/50 rounded-lg">
                   <div className="text-xs text-muted-foreground">Taxes</div>
                   <div className="text-sm font-medium text-foreground blur-number">{formatCurrency(viewingPaystub.taxesCurrent)}</div>
                 </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="p-3 bg-muted/50 rounded-lg">
                   <div className="text-xs text-muted-foreground">Deductions</div>
                   <div className="text-sm font-medium text-foreground blur-number">{formatCurrency(viewingPaystub.deductionsCurrent)}</div>
                 </div>
@@ -2066,7 +2066,7 @@ export default function PayrollTab() {
                           {items.map((li: any) => {
                             const editItem = editingPaystub ? editLineItems.find((e) => e.id === li.id) : null;
                             return (
-                              <div key={li.id} className="flex items-center justify-between py-1 px-2 bg-muted/20 rounded">
+                              <div key={li.id} className="flex items-center justify-between py-1 px-2 bg-muted/40 rounded">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                                     li.mappingAction === 'import' ? 'bg-chart-1' : 'bg-muted-foreground/30'
