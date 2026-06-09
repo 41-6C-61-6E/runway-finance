@@ -448,7 +448,7 @@ export default function ImportTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => handleChooseType('transactions')}
-                className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted transition-colors text-left"
+                className="p-4 rounded-lg border border-input bg-muted/30 hover:bg-muted transition-colors text-left"
               >
                 <FileText className="w-5 h-5 text-primary mb-2" />
                 <div className="text-sm font-medium text-foreground">Transactions</div>
@@ -458,7 +458,7 @@ export default function ImportTab() {
               </button>
               <button
                 onClick={() => handleChooseType('account_snapshots')}
-                className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted transition-colors text-left"
+                className="p-4 rounded-lg border border-input bg-muted/30 hover:bg-muted transition-colors text-left"
               >
                 <FileText className="w-5 h-5 text-primary mb-2" />
                 <div className="text-sm font-medium text-foreground">Account Snapshots</div>
@@ -473,14 +473,14 @@ export default function ImportTab() {
                 <a
                   href="/templates/transactions-template.csv"
                   download
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/30 hover:bg-muted transition-colors text-xs text-foreground"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input bg-muted/30 hover:bg-muted transition-colors text-xs text-foreground"
                 >
                   <Download className="w-3.5 h-3.5" /> Transactions CSV
                 </a>
                 <a
                   href="/templates/snapshots-template.csv"
                   download
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/30 hover:bg-muted transition-colors text-xs text-foreground"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input bg-muted/30 hover:bg-muted transition-colors text-xs text-foreground"
                 >
                   <Download className="w-3.5 h-3.5" /> Snapshots CSV
                 </a>

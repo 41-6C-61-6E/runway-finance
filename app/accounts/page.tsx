@@ -354,7 +354,9 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
           </div>
 
           <div className="h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
-            {accountHistory.length < 2 ? (
+            {visibleMiniData.length === 0 ? (
+              <span className="text-[10px] text-muted-foreground/60 italic">No data for this time period</span>
+            ) : visibleMiniData.length < 2 ? (
               <span className="text-[10px] text-muted-foreground/60 italic">Insufficient historical data for this account</span>
             ) : (
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
@@ -1060,8 +1062,8 @@ export default function AccountsPage() {
     const startStr = windowMonthRange.start + '-01';
     const [ey, em] = windowMonthRange.end.split('-').map(Number);
     const endStr = windowMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
-    let sIdx = rechartsData.findIndex((d: any) => d.date >= startStr);
-    if (sIdx === -1) sIdx = 0;
+    const sIdx = rechartsData.findIndex((d: any) => d.date >= startStr);
+    if (sIdx === -1) return [0, -1];
     let eIdx = rechartsData.length - 1;
     for (let i = rechartsData.length - 1; i >= 0; i--) {
       if (rechartsData[i].date <= endStr) { eIdx = i; break; }
@@ -1983,6 +1985,8 @@ export default function AccountsPage() {
                         <div className="absolute inset-0 flex items-center justify-center bg-muted/10 border border-dashed border-border/40 rounded-xl">
                           <p className="text-xs text-muted-foreground">Select one or more filters above to render the chart.</p>
                         </div>
+                      ) : visibleData.length === 0 ? (
+                        <ChartEmptyState variant="empty" title="No data for this period" description="No account data exists for the selected time range. Try a different date range or adjust your filters." />
                       ) : (
                         <div className="flex flex-col md:flex-row gap-4 h-full w-full">
                           {/* Chart Area */}

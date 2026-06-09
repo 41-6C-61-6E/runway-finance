@@ -416,6 +416,27 @@ export function EquityOverTimeChart() {
     );
   }
 
+  if (activeTimeline.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-xl shadow-sm">
+        <CollapsibleCardHeader
+          isCollapsed={isCollapsed}
+          onToggle={setIsCollapsed}
+          title={
+            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
+            </h3>
+          }
+        />
+        {!isCollapsed && (
+          <div className="p-5">
+            <ChartEmptyState variant="empty" description="No data available for the selected time period." />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const hasEstimated = showSynth && activeTimeline.some((pt) => pt.isSynthetic);
   const maxVal = Math.max(...activeTimeline.map((pt) => pt.homeValue), 1);
 

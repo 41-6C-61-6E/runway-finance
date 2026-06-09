@@ -1,0 +1,141 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - img [ref=e10]
+          - heading "Settings" [level=1] [ref=e13]
+        - generic [ref=e14]:
+          - button "Settings" [ref=e16]:
+            - img [ref=e17]
+          - button "User menu" [ref=e21]: A
+      - generic [ref=e23]:
+        - generic [ref=e25]:
+          - button "General" [ref=e26]:
+            - img [ref=e27]
+            - text: General
+          - button "Accounts" [ref=e30]:
+            - img [ref=e31]
+            - text: Accounts
+          - button "Categories" [ref=e33]:
+            - img [ref=e34]
+            - text: Categories
+          - button "Rules" [ref=e39]:
+            - img [ref=e40]
+            - text: Rules
+          - button "Tags" [ref=e44]:
+            - img [ref=e45]
+            - text: Tags
+          - button "Analytics" [ref=e48]:
+            - img [ref=e49]
+            - text: Analytics
+          - button "AI Suggestions" [ref=e51]:
+            - img [ref=e52]
+            - text: AI Suggestions
+          - button "Import" [ref=e55]:
+            - img [ref=e56]
+            - text: Import
+          - button "Payroll" [ref=e59]:
+            - img [ref=e60]
+            - text: Payroll
+          - button "Sharing" [ref=e63]:
+            - img [ref=e64]
+            - text: Sharing
+          - button "Advanced" [ref=e68]:
+            - img [ref=e69]
+            - text: Advanced
+        - main [ref=e72]:
+          - generic [ref=e73]:
+            - button "Automatic Accounts" [ref=e74]
+            - button "Manual Accounts" [ref=e75]
+          - generic [ref=e76]:
+            - heading "Add SimpleFIN Connection" [level=2] [ref=e77]
+            - generic [ref=e78]:
+              - heading "How to get your SimpleFIN API key / setup token:" [level=3] [ref=e79]
+              - list [ref=e80]:
+                - listitem [ref=e81]:
+                  - generic [ref=e82]: "1."
+                  - generic [ref=e83]:
+                    - text: Sign up for a SimpleFIN Bridge account at
+                    - link "https://beta-bridge.simplefin.org" [ref=e84] [cursor=pointer]:
+                      - /url: https://beta-bridge.simplefin.org
+                - listitem [ref=e85]:
+                  - generic [ref=e86]: "2."
+                  - generic [ref=e87]: After signing in, go My Account, Apps
+                - listitem [ref=e88]:
+                  - generic [ref=e89]: "3."
+                  - generic [ref=e90]: Generate a new SimpleFIN API key or setup token by clicking New App Connection.
+                - listitem [ref=e91]:
+                  - generic [ref=e92]: "4."
+                  - generic [ref=e93]: Paste the token below and click "Add Connection"
+            - generic [ref=e94]:
+              - generic [ref=e95]:
+                - generic [ref=e96]: SimpleFIN API Key / Setup Token
+                - textbox "SimpleFIN API Key / Setup Token" [ref=e97]:
+                  - /placeholder: Paste your SimpleFIN API key or setup token here...
+              - generic [ref=e98]:
+                - generic [ref=e99]: Label (optional)
+                - textbox "Label (optional)" [ref=e100]:
+                  - /placeholder: e.g., SimpleFIN Bridge
+              - button "Add Connection" [ref=e101]
+    - navigation [ref=e102]:
+      - link "Net Worth" [ref=e103] [cursor=pointer]:
+        - /url: /
+        - img [ref=e105]
+        - generic [ref=e108]: Net Worth
+      - link "Accounts" [ref=e109] [cursor=pointer]:
+        - /url: /accounts
+        - img [ref=e111]
+        - generic [ref=e113]: Accounts
+      - link "Transactions" [ref=e114] [cursor=pointer]:
+        - /url: /transactions
+        - img [ref=e116]
+        - generic [ref=e119]: Transactions
+      - link "Cash Flow" [ref=e120] [cursor=pointer]:
+        - /url: /cash-flow
+        - img [ref=e122]
+        - generic [ref=e125]: Cash Flow
+      - button "Menu" [ref=e126]:
+        - img [ref=e128]
+        - generic [ref=e129]: Menu
+    - generic:
+      - generic:
+        - button:
+          - img
+      - generic: Finances
+      - generic:
+        - link "Spending":
+          - /url: /spending
+          - generic:
+            - img
+          - generic: Spending
+        - link "Budgets":
+          - /url: /budgets
+          - generic:
+            - img
+          - generic: Budgets
+        - link "Real Estate":
+          - /url: /real-estate
+          - generic:
+            - img
+          - generic: Real Estate
+        - link "Goals":
+          - /url: /goals
+          - generic:
+            - img
+          - generic: Goals
+        - link "Suggestions":
+          - /url: /ai-suggestions
+          - generic:
+            - img
+          - generic: Suggestions
+      - generic: Planning
+      - generic:
+        - link "Plans":
+          - /url: /plans
+          - generic:
+            - img
+          - generic: Plans
+  - button "Open Next.js Dev Tools" [ref=e135] [cursor=pointer]:
+    - img [ref=e136]
+  - alert [ref=e139]
