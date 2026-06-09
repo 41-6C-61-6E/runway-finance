@@ -320,7 +320,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     if (!active || !payload || !payload.length) return null;
     const point = payload[0].payload;
     return (
-      <div className="bg-card/95 border border-border/80 px-2.5 py-1.5 rounded-lg shadow-lg text-[10px] space-y-0.5 backdrop-blur-sm">
+      <div className="bg-popover/95 border border-border/80 px-2.5 py-1.5 rounded-lg shadow-lg text-[10px] space-y-0.5 backdrop-blur-sm">
         <p className="font-semibold text-muted-foreground">{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
         <p className="font-mono font-bold text-foreground blur-number">{formatCurrency(point.balance)}</p>
       </div>
