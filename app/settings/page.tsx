@@ -44,7 +44,7 @@ import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-
 import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
-import { useCardlessMode } from '@/lib/hooks/use-cardless-mode';
+
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -158,8 +158,6 @@ function SettingsPageBody() {
   const { isHidden, updateHidden } = useHiddenPages();
   const { reduceTransparency, updateReduceTransparency } = useReduceTransparency();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
-  const { cardlessMode, toggleCardlessMode, loading: cardlessModeLoading } = useCardlessMode();
-
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
   const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'sharing', 'advanced'].includes(urlTab)
@@ -553,7 +551,7 @@ function SettingsPageBody() {
           <div className="flex flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full">
 
             {/* Desktop Navigation Sidebar */}
-            <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-card/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
+            <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-sidebar/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
               <div className="px-2 pb-1.5 border-b border-border/60">
                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Settings Navigation</h3>
               </div>
@@ -713,19 +711,6 @@ function SettingsPageBody() {
                 <Switch
                   checked={reduceTransparency}
                   onCheckedChange={updateReduceTransparency}
-                />
-              </div>
-
-              {/* Cardless Mode */}
-              <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground">Cardless Mode</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Strip card backgrounds and borders for a cleaner, flatter interface</p>
-                </div>
-                <Switch
-                  checked={cardlessMode}
-                  onCheckedChange={toggleCardlessMode}
-                  disabled={cardlessModeLoading}
                 />
               </div>
 

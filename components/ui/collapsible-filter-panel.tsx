@@ -24,7 +24,7 @@ export function CollapsibleFilterPanel({
   rightActions
 }: CollapsibleFilterPanelProps) {
   return (
-    <div className={cn("border-b border-border bg-muted/10 px-5 py-2.5 transition-colors", className)}>
+    <div className={cn("border-b border-border bg-muted/10 px-5 py-1 transition-colors", className)}>
       <div className="flex items-center justify-between gap-4 min-h-[32px] w-full">
         {/* Left Side: Options toggle, Actions, and Feedback (Selected Options Indicators) */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -64,7 +64,7 @@ export function CollapsibleFilterPanel({
 
       {/* Collapsible Content */}
       {isOpen && (
-        <div className="mt-2.5 p-4 bg-background/50 border border-border/40 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-1.5 p-4 bg-background/50 border border-border/40 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
           {children}
         </div>
       )}
