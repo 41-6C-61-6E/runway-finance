@@ -48,7 +48,7 @@ export function TooltipRow({ label, value, color }: TooltipRowProps) {
         />
       )}
       <span style={{ color: 'var(--color-muted-foreground)' }}>{label}:</span>
-      <span style={{ fontWeight: 600 }}>{value}</span>
+      <span className="blur-number" style={{ fontWeight: 600 }}>{value}</span>
     </div>
   );
 }

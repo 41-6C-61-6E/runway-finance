@@ -153,7 +153,7 @@ export function PortfolioAllocationChart() {
       {!isCollapsed && (
         <>
           <div className="h-[300px] px-2 pb-2">
-            <div className="financial-chart h-full">
+            <div className="h-full">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <PieChart>
                   <defs>

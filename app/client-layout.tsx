@@ -8,7 +8,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { PWARegister } from '@/components/pwa-register';
 import { Analytics } from '@vercel/analytics/next';
 import { ChartColorSchemeInitializer } from '@/components/chart-color-scheme-initializer';
-import { CardStyleInitializer } from '@/components/card-style-initializer';
 import { ClientErrorReporter } from '@/components/client-error-reporter';
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
@@ -19,7 +18,6 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
           <TooltipProvider delayDuration={300}>
             <ClientErrorReporter>
               <ChartColorSchemeInitializer />
-              <CardStyleInitializer />
               <div className="min-h-[100dvh] flex flex-col">
                 <Suspense fallback={null}>
                   <main className="flex-1">{children}</main>

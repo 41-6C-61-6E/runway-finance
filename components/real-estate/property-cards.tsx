@@ -524,7 +524,7 @@ export function PropertyCards() {
                           />
                           <div className="flex flex-col gap-0.5">
                             <span className="font-semibold">{m.name}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">
+                            <span className="text-[10px] text-muted-foreground font-mono blur-number">
                               Current Balance: {formatCurrency(Math.abs(parseFloat(m.balance)))}
                             </span>
                           </div>

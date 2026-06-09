@@ -12,7 +12,6 @@ type DirtyMap = Record<string, true>;
 
 const STRING_OPTIONS: Record<string, string[]> = {
   theme: ['light', 'moonlight', 'dark'],
-  cardStyle: ['rounded', 'default', 'square'],
   chartColorScheme: ['fauntleroy', 'kingston', 'seattle', 'vashon'],
   forecastMode: ['historical', 'budget', 'hybrid'],
   defaultChartTimeRange: ['1m', '3m', '6m', '1y', '5y', 'ytd', 'all'],

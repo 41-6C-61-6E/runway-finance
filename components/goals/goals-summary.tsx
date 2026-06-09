@@ -260,8 +260,8 @@ export function GoalsSummary() {
                             />
                           </div>
                           <div className="flex justify-between mt-0.5">
-                            <span className="text-[10px] text-muted-foreground">{formatCurrency(td.current)}</span>
-                            <span className="text-[10px] text-muted-foreground">{formatCurrency(td.target)}</span>
+                            <span className="text-[10px] text-muted-foreground blur-number">{formatCurrency(td.current)}</span>
+                            <span className="text-[10px] text-muted-foreground blur-number">{formatCurrency(td.target)}</span>
                           </div>
                         </div>
                       </div>

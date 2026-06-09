@@ -305,7 +305,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-muted-foreground">Interest saved:</span>
-                        <span className="font-medium text-chart-2">{formatCurrency(acceleratedSummary.interestSaved)}</span>
+                        <span className="font-medium text-chart-2 blur-number">{formatCurrency(acceleratedSummary.interestSaved)}</span>
                         <span className="text-muted-foreground">| {acceleratedSummary.monthsSaved}mo sooner</span>
                       </div>
                     </div>
@@ -326,7 +326,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
       {/* Chart */}
       {chartDataPoints.length > 0 ? (
         <div className="h-[250px]">
-          <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+          <div className="h-full w-full overflow-x-auto overflow-y-hidden">
             <div className="min-w-max h-full">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <LineChart
