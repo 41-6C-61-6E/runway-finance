@@ -87,13 +87,13 @@ export function AssetAllocation() {
               <span className="w-2.5 h-2.5 rounded-full bg-chart-1" />
               <span className="text-xs text-muted-foreground">Assets:</span>
               <span className="text-xs font-semibold text-foreground tabular-nums">{assetPct.toFixed(0)}%</span>
-              <span className="text-xs text-muted-foreground tabular-nums">({formatCurrency(totals.totalAssets)})</span>
+              <span className="text-xs text-muted-foreground tabular-nums financial-value">({formatCurrency(totals.totalAssets)})</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
               <span className="text-xs text-muted-foreground">Liabilities:</span>
               <span className="text-xs font-semibold text-foreground tabular-nums">{liabilityPct.toFixed(0)}%</span>
-              <span className="text-xs text-muted-foreground tabular-nums">({formatCurrency(totals.totalLiabilities)})</span>
+              <span className="text-xs text-muted-foreground tabular-nums financial-value">({formatCurrency(totals.totalLiabilities)})</span>
             </div>
           </div>
         </div>

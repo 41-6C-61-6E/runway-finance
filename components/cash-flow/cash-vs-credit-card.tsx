@@ -80,7 +80,7 @@ function StatBox({ label, value, change, changePercent, color, icon, className }
           {label}
         </span>
       </div>
-      <div className="text-xl sm:text-2xl font-bold tabular-nums truncate" style={color ? { color } : undefined}>
+      <div className="text-xl sm:text-2xl font-bold tabular-nums truncate blur-number" style={color ? { color } : undefined}>
         {value}
       </div>
       {hasChange && (
@@ -375,7 +375,7 @@ export function CashVsCreditCard() {
                     Coverage Ratio
                   </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold tabular-nums" style={{ color: 'var(--color-primary)' }}>
+                <div className="text-xl sm:text-2xl font-bold tabular-nums blur-number" style={{ color: 'var(--color-primary)' }}>
                   {current && current.coverageRatio > 0
                     ? (Number.isFinite(current.coverageRatio) ? formatRatio(current.coverageRatio) : '∞')
                     : '0x'}
@@ -392,7 +392,7 @@ export function CashVsCreditCard() {
               <ChartEmptyState variant="nodata" description="Historical data will appear once account snapshots are available for the selected period" />
             ) : (
               <div className="h-[260px]">
-                <div className="financial-chart h-full w-full overflow-x-auto overflow-y-hidden">
+                <div className="h-full w-full overflow-x-auto overflow-y-hidden">
                   <div className="min-w-max h-full px-2 pb-2">
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                       <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>

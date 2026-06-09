@@ -48,6 +48,7 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 
 import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
@@ -321,7 +322,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     return (
       <div className="bg-card/95 border border-border/80 px-2.5 py-1.5 rounded-lg shadow-lg text-[10px] space-y-0.5 backdrop-blur-sm">
         <p className="font-semibold text-muted-foreground">{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-        <p className="font-mono font-bold text-foreground">{formatCurrency(point.balance)}</p>
+        <p className="font-mono font-bold text-foreground blur-number">{formatCurrency(point.balance)}</p>
       </div>
     );
   }, []);
@@ -447,7 +448,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
                           )}
                         </div>
                       </div>
-                      <span className="font-mono text-[11px] font-semibold text-foreground">
+                      <span className="font-mono text-[11px] font-semibold text-foreground blur-number">
                         {text}
                       </span>
                     </div>
@@ -509,6 +510,7 @@ export default function AccountsPage() {
   const { data: session } = useSession();
   const settingsContext = useUserSettings();
   const showLegendTags = settingsContext?.settings?.accountTagVisibility?.legend !== false;
+  const { hideSubheadings } = useAccountSubheadings();
   const { isEnabled } = useSyntheticData();
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
@@ -2721,243 +2723,337 @@ export default function AccountsPage() {
                           {/* ── Subgroups / Nested Accounts (Flat divide-y container) ── */}
                           {isGroupExpanded && (
                             <div className="divide-y divide-border/10 bg-card/5">
-                              {Array.from(subMap.entries()).map(([subgroup, accs]) => {
-                                const isLiabSub = accs[0] ? isLiabilityAccount(accs[0].type) : false;
-                                const subStats = getTrendStats(accs);
+                              {(() => {
+                                if (hideSubheadings) {
+                                  const flatAccs: Array<{ acc: Account; subgroup: string }> = [];
+                                  for (const [subgroup, accs] of subMap.entries()) {
+                                    for (const acc of accs) {
+                                      flatAccs.push({ acc, subgroup });
+                                    }
+                                  }
+                                  return flatAccs.map(({ acc, subgroup }) => {
+                                    const isLiabSub = isLiabilityAccount(acc.type);
+                                    const accStats = getTrendStats([acc]);
+                                    const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
+                                    const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                    return (
+                                      <Fragment key={acc.id}>
+                                        <div 
+onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
+                                          className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
+                                            isAccExpanded 
+                                              ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
+                                              : 'hover:bg-muted/10'
+                                          } ${
+                                            acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
+                                            <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
+                                                {acc.isHidden && (
+                                                  <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                                )}
+                                                {acc.isExcludedFromNetWorth && (
+                                                  <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                                )}
+                                                {acc.tags && acc.tags.length > 0 && (
+                                                  <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                                    {acc.tags.map((tag) => (
+                                                      <span
+                                                        key={tag.id}
+                                                        className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                                        style={{
+                                                          backgroundColor: `${tag.color}15`,
+                                                          color: tag.color,
+                                                          borderColor: `${tag.color}30`
+                                                        }}
+                                                      >
+                                                        #{tag.name}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <span className="text-[10px] text-muted-foreground truncate block">
+                                                {acc.institution || 'Unknown Institution'} · {subgroup}
+                                              </span>
+                                            </div>
+                                          </div>
 
-                                // If subgroup has more than 1 account: collapsible subgroup header
-                                if (accs.length > 1) {
-                                  const subKey = `${group}::${subgroup}`;
-                                  const isSubExpanded = expandedSubgroups[subKey] ?? true;
-                                  const subChange = formatChange(subStats.change, subStats.percentChange, isLiabSub);
-
-                                  return (
-                                    <Fragment key={subgroup}>
-                                      {/* Subgroup Header */}
-                                      <div
-                                        onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
-                                        className="w-full flex items-center justify-between px-0 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
-                                      >
-                                        <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                          <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                            {isSubExpanded ? (
-                                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
-                                            ) : (
-                                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
+                                          <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                            {!isAccExpanded && (
+                                            <Sparkline 
+                                              data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
+                                              isPositive={accStats.isPositive} 
+                                              width={90}
+                                              height={20}
+                                            />
                                             )}
                                           </div>
-                                          <span className="text-xs font-semibold text-muted-foreground truncate">{subgroup}</span>
-                                          <span className="text-[10px] text-muted-foreground/50 ml-1">({accs.length})</span>
-                                        </div>
 
-                                        <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                          <Sparkline 
-                                            data={subStats.historyPoints} 
-                                            isPositive={subStats.isPositive} 
-                                            width={90}
-                                            height={20}
-                                          />
-                                        </div>
-
-                            <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                          <p className="font-mono text-xs font-bold text-muted-foreground blur-number">
-                                            {formatCurrency(subStats.current)}
-                                          </p>
-                                          <span className={`text-[9px] font-medium ${
-                                            subChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                          }`}>
-                                            {subChange.text}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Nested Accounts inside Subgroup */}
-                                      {isSubExpanded && accs.map((acc) => {
-                                        const accStats = getTrendStats([acc]);
-                                        const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
-                                        const isAccExpanded = expandedAccounts[acc.id] ?? false;
-
-                                        return (
-                                          <Fragment key={acc.id}>
-                                            <div 
-onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
-                                              className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
-                                        isAccExpanded 
-                                          ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
-                                          : 'hover:bg-muted/10'
-                                    } ${
-                                      acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                    }`}
-                                                >
-                                                  <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-12">
-                                                <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
-                                                    {acc.isHidden && (
-                                                      <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
-                                                    )}
-                                                    {acc.isExcludedFromNetWorth && (
-                                                      <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
-                                                    )}
-                                                    {acc.tags && acc.tags.length > 0 && (
-                                                      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                                                        {acc.tags.map((tag) => (
-                                                          <span
-                                                            key={tag.id}
-                                                            className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
-                                                            style={{
-                                                              backgroundColor: `${tag.color}15`,
-                                                              color: tag.color,
-                                                              borderColor: `${tag.color}30`
-                                                            }}
-                                                          >
-                                                            #{tag.name}
-                                                          </span>
-                                                        ))}
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                  <span className="text-[10px] text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
-                                                </div>
-                                              </div>
-
-                                              <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                                {!isAccExpanded && (
-                                                <Sparkline 
-                                                  data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                                  isPositive={accStats.isPositive} 
-                                                  width={90}
-                                                  height={20}
-                                                />
-                                                )}
-                                              </div>
-
-                                              <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                                <p className="font-mono text-xs font-bold text-foreground blur-number">
-                                                  {formatCurrency(acc.balance)}
-                                                </p>
-                                                {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                                  <span className={`text-[9px] ${
-                                                    accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                                  }`}>
-                                                    {accChange.text}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-
-                                            {/* Inline Transactions Drawer */}
-                                            {isAccExpanded && (
-                                              <AccountTransactions 
-                                                accountId={acc.id} 
-                                                historyData={historyData}
-                                                isLiability={isLiabilityAccount(acc.type)}
-                                                hierarchyTimeframe={hierarchyTimeframe}
-                                              />
+                                          <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                                            <p className="font-mono text-xs font-bold text-foreground blur-number">
+                                              {formatCurrency(acc.balance)}
+                                            </p>
+                                            {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
+                                              <span className={`text-[9px] ${
+                                                accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
+                                              }`}>
+                                                {accChange.text}
+                                              </span>
                                             )}
-                                          </Fragment>
-                                        );
-                                      })}
-                                    </Fragment>
-                                  );
+                                          </div>
+                                        </div>
+
+                                        {isAccExpanded && (
+                                          <AccountTransactions 
+                                            accountId={acc.id} 
+                                            historyData={historyData}
+                                            isLiability={isLiabilityAccount(acc.type)}
+                                            hierarchyTimeframe={hierarchyTimeframe}
+                                          />
+                                        )}
+                                      </Fragment>
+                                    );
+                                  });
                                 }
 
-                                // Single account inside subgroup: render directly inline under Group
-                                const acc = accs[0];
-                                const accStats = getTrendStats([acc]);
-                                const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
-                                const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                return Array.from(subMap.entries()).map(([subgroup, accs]) => {
+                                  const isLiabSub = accs[0] ? isLiabilityAccount(accs[0].type) : false;
+                                  const subStats = getTrendStats(accs);
 
-                                return (
-                                  <Fragment key={acc.id}>
-                                    <div 
+                                  if (accs.length > 1) {
+                                    const subKey = `${group}::${subgroup}`;
+                                    const isSubExpanded = expandedSubgroups[subKey] ?? true;
+                                    const subChange = formatChange(subStats.change, subStats.percentChange, isLiabSub);
+
+                                    return (
+                                      <Fragment key={subgroup}>
+                                        <div
+                                          onClick={() => setExpandedSubgroups(prev => ({ ...prev, [subKey]: !isSubExpanded }))}
+                                          className="w-full flex items-center justify-between px-0 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
+                                        >
+                                          <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
+                                            <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                              {isSubExpanded ? (
+                                                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
+                                              ) : (
+                                                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/80 flex-shrink-0" />
+                                              )}
+                                            </div>
+                                            <span className="text-xs font-semibold text-muted-foreground truncate">{subgroup}</span>
+                                            <span className="text-[10px] text-muted-foreground/50 ml-1">({accs.length})</span>
+                                          </div>
+
+                                          <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                            <Sparkline 
+                                              data={subStats.historyPoints} 
+                                              isPositive={subStats.isPositive} 
+                                              width={90}
+                                              height={20}
+                                            />
+                                          </div>
+
+                                          <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                                            <p className="font-mono text-xs font-bold text-muted-foreground blur-number">
+                                              {formatCurrency(subStats.current)}
+                                            </p>
+                                            <span className={`text-[9px] font-medium ${
+                                              subChange.isPositive ? 'text-chart-1' : 'text-chart-5'
+                                            }`}>
+                                              {subChange.text}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        {isSubExpanded && accs.map((acc) => {
+                                          const accStats = getTrendStats([acc]);
+                                          const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
+                                          const isAccExpanded = expandedAccounts[acc.id] ?? false;
+
+                                          return (
+                                            <Fragment key={acc.id}>
+                                              <div 
+onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
+                                                className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
+                                                  isAccExpanded 
+                                                    ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
+                                                    : 'hover:bg-muted/10'
+                                                } ${
+                                                  acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                                }`}
+                                              >
+                                                <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-12">
+                                                  <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                                                  </div>
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                      <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
+                                                      {acc.isHidden && (
+                                                        <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                                      )}
+                                                      {acc.isExcludedFromNetWorth && (
+                                                        <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                                      )}
+                                                      {acc.tags && acc.tags.length > 0 && (
+                                                        <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                                          {acc.tags.map((tag) => (
+                                                            <span
+                                                              key={tag.id}
+                                                              className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                                              style={{
+                                                                backgroundColor: `${tag.color}15`,
+                                                                color: tag.color,
+                                                                borderColor: `${tag.color}30`
+                                                              }}
+                                                            >
+                                                              #{tag.name}
+                                                            </span>
+                                                          ))}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
+                                                  </div>
+                                                </div>
+
+                                                <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                                  {!isAccExpanded && (
+                                                  <Sparkline 
+                                                    data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
+                                                    isPositive={accStats.isPositive} 
+                                                    width={90}
+                                                    height={20}
+                                                  />
+                                                  )}
+                                                </div>
+
+                                                <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                                                  <p className="font-mono text-xs font-bold text-foreground blur-number">
+                                                    {formatCurrency(acc.balance)}
+                                                  </p>
+                                                  {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
+                                                    <span className={`text-[9px] ${
+                                                      accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
+                                                    }`}>
+                                                      {accChange.text}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+
+                                              {isAccExpanded && (
+                                                <AccountTransactions 
+                                                  accountId={acc.id} 
+                                                  historyData={historyData}
+                                                  isLiability={isLiabilityAccount(acc.type)}
+                                                  hierarchyTimeframe={hierarchyTimeframe}
+                                                />
+                                              )}
+                                            </Fragment>
+                                          );
+                                        })}
+                                      </Fragment>
+                                    );
+                                  }
+
+                                  const acc = accs[0];
+                                  const accStats = getTrendStats([acc]);
+                                  const accChange = formatChange(accStats.change, accStats.percentChange, isLiabSub);
+                                  const isAccExpanded = expandedAccounts[acc.id] ?? false;
+
+                                  return (
+                                    <Fragment key={acc.id}>
+                                      <div 
 onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                           isAccExpanded 
                                             ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
                                             : 'hover:bg-muted/10'
                                         } ${
-                                        acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                      }`}
-                                                  >
-                                                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                        <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
-                                            {acc.isHidden && (
-                                              <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
-                                            )}
-                                            {acc.isExcludedFromNetWorth && (
-                                              <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
-                                            )}
-                                            {acc.tags && acc.tags.length > 0 && (
-                                              <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                                                {acc.tags.map((tag) => (
-                                                  <span
-                                                    key={tag.id}
-                                                    className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
-                                                    style={{
-                                                      backgroundColor: `${tag.color}15`,
-                                                      color: tag.color,
-                                                      borderColor: `${tag.color}30`
-                                                    }}
-                                                  >
-                                                    #{tag.name}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            )}
+                                          acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                        }`}
+                                      >
+                                        <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
+                                          <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                           </div>
-                                          <span className="text-[10px] text-muted-foreground truncate block">
-                                            {acc.institution || 'Unknown Institution'} · {subgroup}
-                                          </span>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
+                                              {acc.isHidden && (
+                                                <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                              )}
+                                              {acc.isExcludedFromNetWorth && (
+                                                <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                              )}
+                                              {acc.tags && acc.tags.length > 0 && (
+                                                <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                                  {acc.tags.map((tag) => (
+                                                    <span
+                                                      key={tag.id}
+                                                      className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                                                      style={{
+                                                        backgroundColor: `${tag.color}15`,
+                                                        color: tag.color,
+                                                        borderColor: `${tag.color}30`
+                                                      }}
+                                                    >
+                                                      #{tag.name}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground truncate block">
+                                              {acc.institution || 'Unknown Institution'} · {subgroup}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                          {!isAccExpanded && (
+                                          <Sparkline 
+                                            data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
+                                            isPositive={accStats.isPositive} 
+                                            width={90}
+                                            height={20}
+                                          />
+                                          )}
+                                        </div>
+
+                                        <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                                          <p className="font-mono text-xs font-bold text-foreground blur-number">
+                                            {formatCurrency(acc.balance)}
+                                          </p>
+                                          {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
+                                            <span className={`text-[9px] ${
+                                              accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
+                                            }`}>
+                                              {accChange.text}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
 
-                                      {/* Sparkline for single account */}
-                                      <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                        {!isAccExpanded && (
-                                        <Sparkline 
-                                          data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                          isPositive={accStats.isPositive} 
-                                          width={90}
-                                          height={20}
+                                      {isAccExpanded && (
+                                        <AccountTransactions 
+                                          accountId={acc.id} 
+                                          historyData={historyData}
+                                          isLiability={isLiabilityAccount(acc.type)}
+                                          hierarchyTimeframe={hierarchyTimeframe}
                                         />
-                                        )}
-                                      </div>
-
-                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                        <p className="font-mono text-xs font-bold text-foreground blur-number">
-                                          {formatCurrency(acc.balance)}
-                                        </p>
-                                        {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                          <span className={`text-[9px] ${
-                                            accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                          }`}>
-                                            {accChange.text}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Inline Transactions Drawer */}
-                                    {isAccExpanded && (
-                                      <AccountTransactions 
-                                        accountId={acc.id} 
-                                        historyData={historyData}
-                                        isLiability={isLiabilityAccount(acc.type)}
-                                        hierarchyTimeframe={hierarchyTimeframe}
-                                      />
-                                    )}
-                                  </Fragment>
-                                );
-                              })}
+                                      )}
+                                    </Fragment>
+                                  );
+                                });
+                              })()}
                             </div>
                           )}
                         </div>

@@ -39,7 +39,6 @@ export async function GET() {
       forecastMode: created?.forecastMode ?? DEFAULTS.forecastMode,
       forecastLookbackMonths: created?.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
       hiddenPages: created?.hiddenPages ?? DEFAULTS.hiddenPages,
-      cardStyle: created?.cardStyle ?? DEFAULTS.cardStyle,
       showSyntheticData: created?.showSyntheticData ?? DEFAULTS.showSyntheticData,
       defaultChartTimeRange: created?.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
@@ -79,7 +78,6 @@ export async function GET() {
     forecastMode: settings[0].forecastMode ?? DEFAULTS.forecastMode,
     forecastLookbackMonths: settings[0].forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
     hiddenPages: settings[0].hiddenPages ?? DEFAULTS.hiddenPages,
-    cardStyle: settings[0].cardStyle ?? DEFAULTS.cardStyle,
     showSyntheticData: settings[0].showSyntheticData ?? DEFAULTS.showSyntheticData,
     showImportedData: settings[0].showImportedData ?? DEFAULTS.showImportedData,
     defaultChartTimeRange: settings[0].defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
@@ -118,7 +116,6 @@ export async function PATCH(request: Request) {
   const forecastMode = body.forecastMode;
   const forecastLookbackMonths = body.forecastLookbackMonths;
   const hiddenPages = body.hiddenPages;
-  const cardStyle = body.cardStyle;
   const showSyntheticData = body.showSyntheticData;
   const defaultChartTimeRange = body.defaultChartTimeRange;
   const defaultChartType = body.defaultChartType;
@@ -167,11 +164,6 @@ export async function PATCH(request: Request) {
 
   if (hiddenPages !== undefined && (typeof hiddenPages !== 'object' || hiddenPages === null)) {
     return Response.json({ error: 'Invalid hiddenPages value' }, { status: 400 });
-  }
-
-  const VALID_CARD_STYLES = ['rounded', 'default', 'square'];
-  if (cardStyle !== undefined && !VALID_CARD_STYLES.includes(cardStyle)) {
-    return Response.json({ error: 'Invalid cardStyle value' }, { status: 400 });
   }
 
   const VALID_SYNTHETIC_KEYS = ['global', 'netWorth', 'realEstate', 'cashFlowProjections'];
@@ -308,7 +300,6 @@ export async function PATCH(request: Request) {
       forecastMode: created?.forecastMode ?? DEFAULTS.forecastMode,
       forecastLookbackMonths: created?.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
       hiddenPages: created?.hiddenPages ?? DEFAULTS.hiddenPages,
-      cardStyle: created?.cardStyle ?? DEFAULTS.cardStyle,
       showSyntheticData: created?.showSyntheticData ?? DEFAULTS.showSyntheticData,
       defaultChartTimeRange: created?.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
@@ -332,7 +323,6 @@ export async function PATCH(request: Request) {
   if (forecastMode !== undefined) updates.forecastMode = forecastMode;
   if (forecastLookbackMonths !== undefined) updates.forecastLookbackMonths = forecastLookbackMonths;
   if (hiddenPages !== undefined) updates.hiddenPages = hiddenPages;
-  if (cardStyle !== undefined) updates.cardStyle = cardStyle;
   if (showSyntheticData !== undefined) updates.showSyntheticData = showSyntheticData;
   if (showImportedData !== undefined) updates.showImportedData = showImportedData;
   if (defaultChartTimeRange !== undefined) updates.defaultChartTimeRange = defaultChartTimeRange;
@@ -395,7 +385,6 @@ export async function PATCH(request: Request) {
       forecastMode: updated.forecastMode ?? DEFAULTS.forecastMode,
       forecastLookbackMonths: updated.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
       hiddenPages: updated.hiddenPages ?? DEFAULTS.hiddenPages,
-      cardStyle: updated.cardStyle ?? DEFAULTS.cardStyle,
       showSyntheticData: updated.showSyntheticData ?? DEFAULTS.showSyntheticData,
       showImportedData: updated.showImportedData ?? DEFAULTS.showImportedData,
       defaultChartTimeRange: updated.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,

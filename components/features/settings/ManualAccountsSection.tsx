@@ -926,7 +926,7 @@ export default function ManualAccountsSection() {
           <p className={`text-xs font-medium ${syncResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
             {syncResult.status === 'success'
               ? syncResult.changed
-                ? `Value updated: ${formatCurrency(syncResult.oldBalance, 'USD').text} → ${formatCurrency(syncResult.newBalance, 'USD').text}`
+                ? <>Value updated: <span className="blur-number">{formatCurrency(syncResult.oldBalance, 'USD').text}</span> → <span className="blur-number">{formatCurrency(syncResult.newBalance, 'USD').text}</span></>
                 : 'Value unchanged'
               : `Sync failed${syncResult.errorMessage ? `: ${syncResult.errorMessage}` : ''}`}
           </p>
