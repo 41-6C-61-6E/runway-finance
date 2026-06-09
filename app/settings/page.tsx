@@ -267,25 +267,6 @@ function SettingsPageBody() {
     [accounts]
   );
 
-  const handleToggleAccountField = useCallback(
-    (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => {
-      const account = accounts.find((a) => a.id === accountId);
-      if (!account) return;
-      const originalValue = account[field];
-      const newValue = !originalValue;
-      setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: newValue } : a)));
-      fetch(`/api/accounts/${accountId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ [field]: newValue }),
-      }).catch(() => {
-        setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: originalValue } : a)));
-      });
-    },
-    [accounts]
-  );
-
   const handleOpenAccountDrawer = useCallback((account: Account) => {
     setSelectedAccount(account);
     setAccountDrawerOpen(true);
@@ -604,7 +585,7 @@ function SettingsPageBody() {
           <>
 
           {/* Combined Settings */}
-          <div className="p-5 bg-card border border-border rounded-xl">
+          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
             <div className="space-y-5 sm:space-y-6">
               {/* Theme */}
               <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
@@ -716,7 +697,7 @@ function SettingsPageBody() {
           </div>
 
           {/* Navigation Visibility */}
-          <div className="p-5 bg-card border border-border rounded-xl">
+          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
             <div className="space-y-5 sm:space-y-6">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Navigation</h2>
@@ -761,13 +742,13 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'categories' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <CategoriesTab />
         </div>
       )}
 
       {activeTab === 'tags' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <TagsTab />
         </div>
       )}
@@ -821,7 +802,7 @@ function SettingsPageBody() {
           )}
           {/* Existing Connections */}
           {hasConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
               <h2 className="text-base font-semibold text-foreground mb-4">SimpleFIN Bridge Connection</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
@@ -1062,7 +1043,7 @@ function SettingsPageBody() {
           {/* Add Connection Form - shown when no bridge is connected */}
           {/* Add Connection Form - shown when no bridge is connected for this user */}
           {!hasMyConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
               <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
 
               {sharingGroup && (
@@ -1148,29 +1129,27 @@ function SettingsPageBody() {
 
           {/* Account Management - only shown when a connection exists */}
           {hasConnection && (
-            <div className="p-5 bg-card border border-border rounded-xl">
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
               <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
                 <strong> Exclude</strong> removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible here in the automatic accounts list to allow configuration.
               </p>
 
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex rounded-lg bg-muted border border-border">
-                  {(['all', 'hidden', 'excluded'] as const).map((filter) => (
-                    <button
-                      key={filter}
-                      onClick={() => setAccountFilter(filter)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-colors shrink-0 border ${
-                        accountFilter === filter
-                          ? 'bg-primary text-primary-foreground border-primary/30'
-                          : 'text-muted-foreground hover:text-foreground border-border/50'
-                      }`}
-                    >
+              <div className="flex flex-wrap gap-2 mb-4">
+                {(['all', 'hidden', 'excluded'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setAccountFilter(filter)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors rounded-lg border ${
+                      accountFilter === filter
+                        ? 'bg-primary text-primary-foreground border-primary/30'
+                        : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/50'
+                    }`}
+                  >
                       {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
                     </button>
                   ))}
-                </div>
               </div>
 
               {accountsLoading ? (
@@ -1208,13 +1187,13 @@ function SettingsPageBody() {
                         return (
                           <div
                             key={account.id}
-                            className={`px-4 py-5 cursor-pointer group hover:bg-muted/30 transition-colors ${
-                              account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
-                            }`}
+                            className={`px-3 sm:px-4 py-4 sm:py-5 cursor-pointer group hover:bg-muted/30 transition-colors`}
                             onClick={() => handleOpenAccountDrawer(account)}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2 sm:gap-3">
+                              <div className={`min-w-0 flex-1 ${
+                                account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
+                              }`}>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
                                     account.type === 'checking' ? 'bg-chart-4 text-white' :
@@ -1228,14 +1207,14 @@ function SettingsPageBody() {
                                     {account.type}
                                   </span>
                                   {account.isHidden && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Hidden</span>
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 font-medium">Hidden</span>
                                   )}
                                   {account.isExcludedFromNetWorth && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">Excluded</span>
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-destructive/15 text-destructive border border-destructive/25 font-medium">Excluded</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                  <span className="text-foreground font-medium text-sm truncate max-w-[160px] sm:max-w-xs">{account.name}</span>
+                                  <span className="text-foreground font-medium text-sm truncate max-w-[120px] sm:max-w-xs">{account.name}</span>
                                   {account.tags && account.tags.length > 0 && (
                                     <div className="flex items-center gap-1 flex-wrap">
                                       {account.tags.map((tag) => (
@@ -1258,36 +1237,20 @@ function SettingsPageBody() {
                                   <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
                                 )}
                               </div>
-                              <div className="shrink-0 flex flex-col items-end gap-1.5">
+                              <div className="shrink-0 flex flex-col items-end gap-1 sm:gap-1.5">
                                 <div className="text-right">
-                                  <div className="font-mono text-sm text-foreground blur-number">{formatted}</div>
-                                  <div className="text-xs text-muted-foreground/60">{account.currency}</div>
+                                  <div className="font-mono text-[11px] sm:text-sm text-foreground blur-number">{formatted}</div>
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground/60">{account.currency}</div>
                                 </div>
-                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                  <div className="flex items-center gap-1">
-                                    <Switch
-                                      checked={account.isHidden}
-                                      onCheckedChange={() => handleToggleAccountField(account.id, 'isHidden')}
-                                    />
-                                    <span className="text-[10px] text-muted-foreground">{account.isHidden ? 'Hide' : 'Show'}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Switch
-                                      checked={account.isExcludedFromNetWorth}
-                                      onCheckedChange={() => handleToggleAccountField(account.id, 'isExcludedFromNetWorth')}
-                                    />
-                                    <span className="text-[10px] text-muted-foreground">{account.isExcludedFromNetWorth ? 'Exclude' : 'Include'}</span>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenAccountDrawer(account);
-                                    }}
-                                    className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAccountDrawer(account);
+                                  }}
+                                  className="px-2 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  Edit
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1317,13 +1280,13 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'analytics' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AnalyticsTab />
         </div>
       )}
 
       {activeTab === 'sharing' && (
-        <div className="p-4 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <SharingTab />
         </div>
       )}
@@ -1335,7 +1298,7 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'ai' && (
-        <div className="p-5 bg-card border border-border rounded-xl min-h-[400px]">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AiTab />
         </div>
       )}
