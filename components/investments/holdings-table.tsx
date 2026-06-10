@@ -2,8 +2,19 @@
 
 import { useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { Search, ChevronDown, ChevronUp, ChevronsUpDown, Info, Landmark } from 'lucide-react';
+import {
+  Search,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Info,
+  Landmark,
+  Eye,
+  EyeOff,
+  RefreshCw,
+} from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { QuoteData } from '@/app/api/investments/quotes/route';
 
 interface Holding {
   accountId: string;
@@ -26,21 +37,106 @@ interface Account {
   id: string;
   name: string;
   institution: string | null;
+  updatedAt?: string;
 }
 
 interface HoldingsTableProps {
   holdings: Holding[];
   accounts: Account[];
+  quotes?: QuoteData[];
 }
 
-type SortField = 'security' | 'account' | 'value' | 'gainLoss' | 'weight';
+type SortField = 'security' | 'account' | 'value' | 'gainLoss' | 'weight' | 'dayChange';
 type SortDirection = 'asc' | 'desc';
 
-export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
+// Ticker heuristics for Asset Class/Type
+function getAssetType(ticker: string | null, name: string): 'Stock' | 'ETF' | 'Mutual Fund' | 'Cash' | 'Other' {
+  if (!ticker) return 'Other';
+  const t = ticker.toUpperCase();
+  if (t === 'CASH' || t.includes('USD') || name.toLowerCase().includes('cash') || name.toLowerCase().includes('money market')) {
+    return 'Cash';
+  }
+  if (t.length === 5 && t.endsWith('X')) {
+    return 'Mutual Fund';
+  }
+  const knownETFs = ['SPY', 'VOO', 'VTI', 'QQQ', 'IWM', 'BND', 'VXUS', 'VEA', 'VWO', 'AGG', 'SCHD', 'JEPI', 'VUG', 'VYM', 'IEFA', 'IJR'];
+  if (knownETFs.includes(t)) {
+    return 'ETF';
+  }
+  if (name.toLowerCase().includes('etf') || name.toLowerCase().includes('trust') || name.toLowerCase().includes('index') || name.toLowerCase().includes('s&p 500')) {
+    return 'ETF';
+  }
+  return 'Stock';
+}
+
+// Ticker heuristics for Sector
+function getSector(ticker: string | null): string {
+  if (!ticker) return '—';
+  const t = ticker.toUpperCase();
+  
+  const tech = ['AAPL', 'MSFT', 'GOOG', 'GOOGL', 'NVDA', 'AMD', 'CRM', 'INTC', 'CSCO', 'ADBE', 'ORCL', 'QCOM', 'ASML', 'AVGO'];
+  const consumerCyc = ['AMZN', 'TSLA', 'HD', 'NKE', 'MCD', 'SBUX', 'LOW', 'TJX', 'F', 'GM'];
+  const financial = ['JPM', 'BAC', 'WFC', 'MS', 'GS', 'C', 'AXP', 'V', 'MA', 'BLK', 'BRK.B', 'BRK.A', 'SCHW'];
+  const health = ['JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR', 'BMY', 'GILD', 'AMGN'];
+  const energy = ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX'];
+  const consumerDef = ['PG', 'KO', 'PEP', 'WMT', 'COST', 'PM', 'MO', 'TGT', 'EL', 'CL'];
+  const ind = ['CAT', 'HON', 'GE', 'UNP', 'UPS', 'FDX', 'LMT', 'RTX', 'BA', 'DE'];
+  const utilities = ['NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC'];
+  const realEstate = ['PLD', 'AMT', 'CCI', 'EQIX', 'O', 'WY'];
+  const telecom = ['T', 'VZ', 'TMUS', 'CMCSA'];
+  
+  if (tech.includes(t)) return 'Technology';
+  if (consumerCyc.includes(t)) return 'Consumer Cyclical';
+  if (financial.includes(t)) return 'Financial Services';
+  if (health.includes(t)) return 'Healthcare';
+  if (energy.includes(t)) return 'Energy';
+  if (consumerDef.includes(t)) return 'Consumer Defensive';
+  if (ind.includes(t)) return 'Industrials';
+  if (utilities.includes(t)) return 'Utilities';
+  if (realEstate.includes(t)) return 'Real Estate';
+  if (telecom.includes(t)) return 'Communication';
+  
+  const indexTickers = ['SPY', 'VOO', 'VTI', 'QQQ', 'IWM', 'VXUS', 'VEA', 'VWO', 'AGG', 'BND', 'SCHD', 'SCHF', 'IVV'];
+  if (indexTickers.includes(t)) return 'Broad Index';
+  
+  return '—';
+}
+
+function formatRelativeTime(dateStr?: string) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const diffMs = Date.now() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  } catch {
+    return '';
+  }
+}
+
+export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTableProps) {
   const [search, setSearch] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('all');
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [showSector, setShowSector] = useState(false);
+
+  // Map quotes for easy lookup
+  const quotesMap = useMemo(() => {
+    const map = new Map<string, QuoteData>();
+    for (const q of quotes) {
+      if (q.ticker) {
+        map.set(q.ticker.toUpperCase(), q);
+      }
+    }
+    return map;
+  }, [quotes]);
 
   // Filter accounts that actually have holdings to keep the filter clean
   const accountsWithHoldings = useMemo(() => {
@@ -91,10 +187,16 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
           valB = b.portfolioWeight;
           break;
         case 'gainLoss':
-          // Handle null cost basis (sort them to the bottom)
           valA = a.unrealizedGainLoss !== null ? a.unrealizedGainLoss : -Infinity;
           valB = b.unrealizedGainLoss !== null ? b.unrealizedGainLoss : -Infinity;
           break;
+        case 'dayChange': {
+          const qA = a.ticker ? quotesMap.get(a.ticker.toUpperCase()) : null;
+          const qB = b.ticker ? quotesMap.get(b.ticker.toUpperCase()) : null;
+          valA = qA?.changePercent !== undefined && qA?.changePercent !== null ? qA.changePercent : -9999;
+          valB = qB?.changePercent !== undefined && qB?.changePercent !== null ? qB.changePercent : -9999;
+          break;
+        }
       }
 
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
@@ -102,14 +204,14 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
       return 0;
     });
     return sorted;
-  }, [filteredHoldings, sortField, sortDirection]);
+  }, [filteredHoldings, sortField, sortDirection, quotesMap]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection('desc'); // Default to desc for values
+      setSortDirection('desc'); // Default to desc
     }
   };
 
@@ -118,19 +220,19 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
     return (
       <button
         onClick={() => handleSort(field)}
-        className={`flex items-center gap-1.5 font-semibold hover:text-foreground transition-colors focus:outline-none py-2 select-none w-full ${
+        className={`flex items-center gap-1 font-semibold hover:text-foreground transition-colors focus:outline-none py-1 select-none w-full ${
           align === 'right' ? 'justify-end text-right' : 'justify-start text-left'
         }`}
       >
         <span>{label}</span>
         {isCurrent ? (
           sortDirection === 'asc' ? (
-            <ChevronUp className="w-3.5 h-3.5 text-primary shrink-0" />
+            <ChevronUp className="w-3 h-3 text-primary shrink-0" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-primary shrink-0" />
+            <ChevronDown className="w-3 h-3 text-primary shrink-0" />
           )
         ) : (
-          <ChevronsUpDown className="w-3 h-3 text-muted-foreground/40 shrink-0" />
+          <ChevronsUpDown className="w-3 h-3 text-muted-foreground/30 shrink-0" />
         )}
       </button>
     );
@@ -139,9 +241,9 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
   return (
     <div className="space-y-4">
       {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
         {/* Search */}
-        <div className="relative w-full sm:max-w-xs">
+        <div className="relative w-full md:max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground/60 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -152,46 +254,79 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
           />
         </div>
 
-        {/* Account Filter */}
-        {accountsWithHoldings.length > 0 && (
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <span className="text-xs text-muted-foreground shrink-0">Account:</span>
-            <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary max-w-[200px]"
-            >
-              <option value="all">All Accounts</option>
+        {/* Account Tabs and Sector Toggle */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          {/* Segmented Account Filter */}
+          {accountsWithHoldings.length > 0 && (
+            <div className="flex bg-muted/65 border border-border rounded-lg p-0.5 max-w-full overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setSelectedAccountId('all')}
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedAccountId === 'all'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                All Accounts
+              </button>
               {accountsWithHoldings.map((acc) => (
-                <option key={acc.id} value={acc.id}>
+                <button
+                  key={acc.id}
+                  onClick={() => setSelectedAccountId(acc.id)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                    selectedAccountId === acc.id
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
                   {acc.institution ? `${acc.institution} - ${acc.name}` : acc.name}
-                </option>
+                </button>
               ))}
-            </select>
-          </div>
-        )}
+            </div>
+          )}
+
+          {/* Toggle Sector Column Button */}
+          <button
+            onClick={() => setShowSector(!showSector)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
+          >
+            {showSector ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span>{showSector ? 'Hide Sector' : 'Show Sector'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto border border-border/40 rounded-xl">
+      <div className="overflow-x-auto border border-border/40 rounded-xl bg-card">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="bg-muted/15 border-b border-border/40 text-muted-foreground/80">
-              <th className="p-3 font-semibold w-[24%]">
+              <th className="p-3 font-semibold min-w-[150px]">
                 <SortHeader field="security" label="Asset / Security" />
               </th>
-              <th className="p-3 font-semibold w-[22%]">
+              {showSector && (
+                <th className="p-3 font-semibold text-left w-[12%]">
+                  <span className="text-muted-foreground font-semibold">Sector</span>
+                </th>
+              )}
+              <th className="p-3 font-semibold min-w-[140px]">
                 <SortHeader field="account" label="Brokerage Account" />
               </th>
-              <th className="p-3 font-semibold text-right w-[11%]">Price / Qty</th>
-              <th className="p-3 font-semibold text-right w-[13%]">
-                <SortHeader field="value" label="Current Value" align="right" />
+              <th className="p-3 font-semibold text-right w-[10%]">Price / Qty</th>
+              <th className="p-3 font-semibold text-right w-[10%]">
+                <SortHeader field="dayChange" label="Today" align="right" />
               </th>
-              <th className="p-3 font-semibold text-right w-[18%]">
-                <SortHeader field="gainLoss" label="Unrealized Return" align="right" />
+              <th className="p-3 font-semibold text-center w-[12%] min-w-[90px]">
+                <span className="text-muted-foreground font-semibold">52w Range</span>
               </th>
               <th className="p-3 font-semibold text-right w-[12%]">
-                <SortHeader field="weight" label="Portfolio %" align="right" />
+                <SortHeader field="value" label="Value" align="right" />
+              </th>
+              <th className="p-3 font-semibold text-right w-[15%]">
+                <SortHeader field="gainLoss" label="Return" align="right" />
+              </th>
+              <th className="p-3 font-semibold text-right w-[8%]">
+                <SortHeader field="weight" label="Weight" align="right" />
               </th>
             </tr>
           </thead>
@@ -200,53 +335,135 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
               sortedHoldings.map((h, idx) => {
                 const hasReturn = h.unrealizedGainLoss !== null && h.costBasis !== null && h.costBasis > 0;
                 const isReturnPositive = h.unrealizedGainLoss ? h.unrealizedGainLoss >= 0 : false;
+                const assetType = getAssetType(h.ticker, h.name);
+                const sector = getSector(h.ticker);
+
+                // Fetch live quote day change and 52-week stats
+                const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+                const price = quote?.price ?? h.price;
+                const value = quote?.price ? quote.price * h.quantity : h.value;
+                const dayChangePct = quote?.changePercent;
+                const dayChangeVal = quote?.change;
+                const high52 = quote?.high52;
+                const low52 = quote?.low52;
+
+                const isDayChangePositive = dayChangePct != null ? dayChangePct >= 0 : null;
+
+                // Find corresponding account for sync time
+                const acc = accounts.find((a) => a.id === h.accountId);
+                const relativeSync = acc?.updatedAt ? formatRelativeTime(acc.updatedAt) : '';
+
+                // Calculate where current price sits in 52-week range
+                let rangePct = 50;
+                if (high52 && low52 && high52 > low52 && price) {
+                  rangePct = ((price - low52) / (high52 - low52)) * 100;
+                  rangePct = Math.max(0, Math.min(100, rangePct));
+                }
 
                 return (
                   <tr key={`${h.accountId}-${h.securityId}-${idx}`} className="hover:bg-muted/10 transition-colors">
                     {/* Ticker / Name */}
                     <td className="p-3">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {h.ticker && (
-                            <span className="px-1.5 py-0.5 font-mono text-[10px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
+                            <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
                               {h.ticker}
                             </span>
                           )}
-                          <span className="font-semibold text-foreground truncate max-w-[140px]" title={h.name}>
+                          <span className="font-semibold text-foreground truncate max-w-[130px] sm:max-w-[160px]" title={h.name}>
                             {h.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] px-1 py-0.5 bg-muted/60 text-muted-foreground rounded border border-border/40 font-medium">
+                            {assetType}
                           </span>
                         </div>
                       </div>
                     </td>
 
+                    {/* Sector */}
+                    {showSector && (
+                      <td className="p-3 text-muted-foreground font-medium text-[11px]">
+                        {sector}
+                      </td>
+                    )}
+
                     {/* Account */}
                     <td className="p-3 text-muted-foreground">
-                      <div className="flex items-center gap-1.5 truncate max-w-[150px]">
-                        <Landmark className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                        <span className="truncate" title={`${h.institutionName} - ${h.accountName}`}>
-                          {h.institutionName ? `${h.institutionName} - ${h.accountName}` : h.accountName}
-                        </span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 truncate max-w-[140px]">
+                          <Landmark className="w-3.5 h-3.5 opacity-60 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-[11px]" title={`${h.institutionName} - ${h.accountName}`}>
+                            {h.institutionName ? `${h.institutionName} - ${h.accountName}` : h.accountName}
+                          </span>
+                        </div>
+                        {relativeSync && (
+                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
+                            <RefreshCw className="w-2.5 h-2.5 opacity-70 shrink-0 animate-none" />
+                            <span>Synced {relativeSync}</span>
+                          </div>
+                        )}
                       </div>
                     </td>
 
                     {/* Price / Qty */}
                     <td className="p-3 text-right text-muted-foreground font-mono">
                       <div className="flex flex-col">
-                        <span className="text-foreground blur-number">{formatCurrency(h.price)}</span>
+                        <span className="text-foreground blur-number font-semibold">{formatCurrency(price)}</span>
                         <span className="text-[10px] tabular-nums">× {h.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
                       </div>
                     </td>
 
+                    {/* Today Day Change */}
+                    <td className="p-3 text-right font-mono">
+                      {dayChangePct != null ? (
+                        <div className="flex flex-col items-end">
+                          <span className={`font-semibold text-[11px] ${isDayChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
+                            {isDayChangePositive ? '+' : ''}
+                            {dayChangePct.toFixed(2)}%
+                          </span>
+                          <span className={`text-[9px] text-muted-foreground/65`}>
+                            {isDayChangePositive ? '+' : ''}
+                            {formatCurrency(dayChangeVal ?? 0)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+
+                    {/* 52-week range bar */}
+                    <td className="p-3 text-center vertical-middle">
+                      {low52 && high52 ? (
+                        <div className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
+                          <div className="relative w-full h-1 bg-muted rounded-full">
+                            <div
+                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-sm"
+                              style={{ left: `calc(${rangePct}% - 4px)` }}
+                            />
+                          </div>
+                          <div className="flex justify-between w-full text-[9px] text-muted-foreground/60 font-mono">
+                            <span className="blur-number">${low52.toFixed(0)}</span>
+                            <span className="blur-number">${high52.toFixed(0)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+
                     {/* Value */}
                     <td className="p-3 text-right font-mono font-bold text-foreground blur-number">
-                      {formatCurrency(h.value)}
+                      {formatCurrency(value)}
                     </td>
 
                     {/* Return */}
                     <td className="p-3 text-right font-mono">
                       {hasReturn ? (
                         <div className="flex flex-col items-end">
-                          <span className={`font-semibold blur-number ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
+                          <span className={`font-semibold text-[11px] blur-number ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
                             {isReturnPositive ? '+' : ''}
                             {formatCurrency(h.unrealizedGainLoss!)}
                           </span>
@@ -283,7 +500,7 @@ export function HoldingsTable({ holdings, accounts }: HoldingsTableProps) {
               })
             ) : (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-muted-foreground/60 italic">
+                <td colSpan={showSector ? 9 : 8} className="p-8 text-center text-muted-foreground/60 italic">
                   {holdings.length === 0 
                     ? 'No holdings synced for these investment accounts.' 
                     : 'No holdings match the active search or filter criteria.'}

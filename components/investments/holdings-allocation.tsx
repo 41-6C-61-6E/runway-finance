@@ -39,7 +39,28 @@ interface HoldingsAllocationProps {
   accounts: Account[];
 }
 
-type GroupByOption = 'security' | 'account' | 'taxCategory';
+type GroupByOption = 'security' | 'account' | 'taxCategory' | 'assetClass';
+
+// Classify tickers into broad asset classes by name/ticker heuristics
+const getAssetClass = (ticker: string | null, name: string): string => {
+  const t = (ticker ?? '').toLowerCase();
+  const n = name.toLowerCase();
+  if (['bnd', 'agg', 'shy', 'iei', 'tlt', 'tips', 'lqd', 'hyg', 'mub'].includes(t) ||
+      n.includes('bond') || n.includes('treasury') || n.includes('fixed income') || n.includes('income fund')) {
+    return 'Fixed Income';
+  }
+  if (n.includes('real estate') || n.includes('reit') || t === 'vnq' || t === 'o') {
+    return 'Real Estate';
+  }
+  if (n.includes('commodity') || n.includes('gold') || n.includes('oil') || t === 'gld' || t === 'slv') {
+    return 'Commodities';
+  }
+  if (n.includes('cash') || n.includes('money market') || n.includes('settlement') || n.includes('sweep')) {
+    return 'Cash';
+  }
+  // Default: equities
+  return 'Equities';
+};
 
 interface ChartItem {
   name: string;
@@ -66,6 +87,7 @@ const getTaxCategory = (type: string): string => {
 export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('holdingsAllocationChart');
   const [groupBy, setGroupBy] = useState<GroupByOption>('security');
+  const [showAll, setShowAll] = useState(false);
 
   const accountTypeMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -93,6 +115,8 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       } else if (groupBy === 'taxCategory') {
         const type = accountTypeMap.get(h.accountId) || 'investment';
         key = getTaxCategory(type);
+      } else if (groupBy === 'assetClass') {
+        key = getAssetClass(h.ticker, h.name);
       }
 
       groupedValues[key] = (groupedValues[key] || 0) + h.value;
@@ -108,14 +132,15 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
     // Sort descending
     items.sort((a, b) => b.value - a.value);
 
-    // Limit to 5 items, group rest into "Other" if grouping by security or account
+    // For security/account grouping: show top items only unless showAll
     let finalItems: typeof items = [];
-    if (items.length > 6 && groupBy !== 'taxCategory') {
-      finalItems = items.slice(0, 5);
-      const otherValue = items.slice(5).reduce((sum, item) => sum + item.value, 0);
+    const INITIAL_LIMIT = 6;
+    if (items.length > INITIAL_LIMIT + 1 && groupBy !== 'taxCategory' && groupBy !== 'assetClass' && !showAll) {
+      finalItems = items.slice(0, INITIAL_LIMIT);
+      const otherValue = items.slice(INITIAL_LIMIT).reduce((sum, item) => sum + item.value, 0);
       const otherPct = (otherValue / totalPortfolioValue) * 100;
       finalItems.push({
-        name: 'Other Assets',
+        name: `+${items.length - INITIAL_LIMIT} more`,
         value: otherValue,
         percentage: otherPct,
         color: '',
@@ -160,6 +185,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
   const groupOptions: { value: GroupByOption; label: string }[] = [
     { value: 'security', label: 'By Asset' },
     { value: 'account', label: 'By Account' },
+    { value: 'assetClass', label: 'By Asset Class' },
     { value: 'taxCategory', label: 'By Tax Category' },
   ];
 
@@ -195,9 +221,20 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
             ))}
           </div>
 
-          <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[220px]">
-            {/* Donut Chart */}
-            <div className="w-40 h-40 shrink-0 relative">
+          <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[240px]">
+            {/* Donut Chart — larger with center label */}
+            <div className="w-52 h-52 shrink-0 relative">
+              {/* Center label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
+                <span className="text-sm font-bold text-foreground blur-number">
+                  {totalValue >= 1_000_000
+                    ? `$${(totalValue / 1_000_000).toFixed(1)}M`
+                    : totalValue >= 1_000
+                    ? `$${(totalValue / 1_000).toFixed(0)}K`
+                    : `$${totalValue.toFixed(0)}`}
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -252,6 +289,17 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                   </div>
                 </div>
               ))}
+              {/* Show all toggle */}
+              {groupBy === 'security' || groupBy === 'account' ? (
+                holdings.length > 7 && (
+                  <button
+                    onClick={() => setShowAll(!showAll)}
+                    className="mt-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors w-full text-center py-1"
+                  >
+                    {showAll ? 'Show less' : `Show all ${holdings.length} holdings`}
+                  </button>
+                )
+              ) : null}
             </div>
           </div>
         </div>
