@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { getTypesByGroup, ACCOUNT_TYPE_LABELS, TYPE_HIERARCHY } from '@/lib/constants/account-types';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
+import { getBadgeClasses } from '@/lib/utils/account-badge';
 
 type ManualAccount = {
   id: string;
@@ -133,30 +134,6 @@ function getAccountIcon(account: ManualAccount): string {
   return ASSET_TYPE_ICONS[account.type] ?? '📦';
 }
 
-function getBadgeClasses(type: string): string {
-  const lowerType = type.toLowerCase();
-  if (lowerType === 'vehicle') return 'bg-chart-4/15 text-chart-4';
-  if (lowerType === 'metals') return 'bg-chart-1/15 text-chart-1';
-  
-  const hierarchy = TYPE_HIERARCHY[lowerType];
-  const group = hierarchy?.group ?? 'Other';
-  
-  switch (group) {
-    case 'Banking':
-    case 'Assets':
-      return 'bg-status-positive/15 text-status-positive';
-    case 'Credit':
-    case 'Loans':
-    case 'Liabilities':
-      return 'bg-destructive/15 text-destructive';
-    case 'Investments':
-      return 'bg-chart-1/15 text-chart-1';
-    case 'Real Estate':
-      return 'bg-chart-3/15 text-chart-3';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-}
 
 const getGroupedOptions = () => {
   const groups = getTypesByGroup();
@@ -956,7 +933,7 @@ export default function ManualAccountsSection() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm shrink-0">{getAccountIcon(account)}</span>
-                      <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${getBadgeClasses(account.type)}`}>
+                      <span className={getBadgeClasses(account.type)}>
                         {getSubTypeLabel(account)}
                       </span>
                       {isLiability && <span className="text-[10px] text-chart-5 font-medium">Liability</span>}

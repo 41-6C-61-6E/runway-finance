@@ -95,11 +95,16 @@ export async function syncPlaidConnection(
       .where(eq(plaidConnections.id, connectionId))
       .limit(1);
 
-    if (!connection || connection.userId !== userId) {
-      throw new Error('Plaid connection not found or unauthorized');
+    if (!connection) {
+      throw new Error('Plaid connection not found');
     }
 
-    const client = await getPlaidClient(userId, dek);
+    const connectionDataUserId = await resolveDataUserId(connection.userId);
+    if (connectionDataUserId !== dataUserId) {
+      throw new Error('Plaid connection unauthorized');
+    }
+
+    const client = await getPlaidClient(dataUserId, dek);
     const accessToken = await decryptField(connection.accessTokenEncrypted, dek);
 
     // Pre-seed category configurations
