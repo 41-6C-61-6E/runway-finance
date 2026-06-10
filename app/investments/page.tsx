@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -8,10 +8,14 @@ import { MathDescription } from '@/components/features/settings/math-description
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { InvestmentsSummary } from '@/components/investments/investments-summary';
 import { PerformanceChart } from '@/components/investments/performance-chart';
+import { TaxBreakdown } from '@/components/investments/tax-breakdown';
+import { HoldingSparklineCards } from '@/components/investments/holding-sparkline-cards';
 import { HoldingsAllocation } from '@/components/investments/holdings-allocation';
-import { HoldingsTable } from '@/components/investments/holdings-table';
+import { IncomeDividendsPanel } from '@/components/investments/income-dividends-panel';
 import { RecentActivity } from '@/components/investments/recent-activity';
-import { Briefcase, Landmark, ShieldCheck, ArrowRight } from 'lucide-react';
+import { HoldingsTable } from '@/components/investments/holdings-table';
+import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
+import type { QuoteData } from '@/app/api/investments/quotes/route';
 
 interface InvestmentsData {
   accounts: any[];
@@ -29,18 +33,57 @@ interface InvestmentsData {
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
   const [data, setData] = useState<InvestmentsData | null>(null);
+  const [incomeData, setIncomeData] = useState<{ monthlyIncome: any[]; totalAnnual: number; transactions: any[] } | null>(null);
+  const [portfolioHistory, setPortfolioHistory] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<QuoteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchInvestments = async () => {
+    const fetchAllData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/investments', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch investments data');
-        const json: InvestmentsData = await res.json();
-        setData(json);
+
+        // Fetch investments data, classified income, and 1m history in parallel
+        const [investmentsRes, incomeRes, historyRes] = await Promise.all([
+          fetch('/api/investments', { credentials: 'include' }),
+          fetch('/api/investments/income', { credentials: 'include' }),
+          fetch('/api/investments/history?timeframe=1m', { credentials: 'include' }),
+        ]);
+
+        if (!investmentsRes.ok) {
+          throw new Error('Failed to fetch investments data');
+        }
+        
+        const investmentsJson: InvestmentsData = await investmentsRes.json();
+        setData(investmentsJson);
+
+        if (incomeRes.ok) {
+          const incomeJson = await incomeRes.json();
+          setIncomeData(incomeJson);
+        }
+
+        if (historyRes.ok) {
+          const historyJson = await historyRes.json();
+          setPortfolioHistory(historyJson.data || []);
+        }
+
+        // Fetch live quotes if holdings have tickers
+        const tickers = investmentsJson.holdings
+          ?.map((h) => h.ticker)
+          .filter((t): t is string => !!t && typeof t === 'string' && t.trim().length > 0);
+
+        if (tickers && tickers.length > 0) {
+          const uniqueTickers = Array.from(new Set(tickers));
+          const quotesRes = await fetch(`/api/investments/quotes?tickers=${uniqueTickers.join(',')}`, {
+            credentials: 'include',
+          });
+          if (quotesRes.ok) {
+            const quotesJson = await quotesRes.json();
+            setQuotes(quotesJson.quotes || []);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -48,13 +91,13 @@ export default function InvestmentsPage() {
       }
     };
 
-    fetchInvestments();
+    fetchAllData();
   }, []);
 
   if (loading) {
     return (
       <div className="min-h-screen w-full">
-        <PageHeader title="Investments" icon={Briefcase} />
+        <PageHeader title="Investments" icon={CandlestickChart} />
         <PageContent>
           <LoadingSpinner category="default" className="min-h-[400px]" />
         </PageContent>
@@ -65,7 +108,7 @@ export default function InvestmentsPage() {
   if (error) {
     return (
       <div className="min-h-screen w-full">
-        <PageHeader title="Investments" icon={Briefcase} />
+        <PageHeader title="Investments" icon={CandlestickChart} />
         <PageContent>
           <div className="p-6 border border-destructive/20 bg-destructive/10 rounded-xl max-w-xl mx-auto text-center space-y-3">
             <h3 className="text-base font-semibold text-destructive">Error Loading Dashboard</h3>
@@ -80,45 +123,80 @@ export default function InvestmentsPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <PageHeader title="Investments" icon={Briefcase} />
+      <PageHeader title="Investments" icon={CandlestickChart} />
       <PageContent>
         {hasAccounts && data ? (
           <div className="space-y-5 sm:space-y-6">
             {/* ── Summary Metrics ── */}
             {isVisible('investmentsSummary') && (
               <div>
-                <InvestmentsSummary summary={data.summary} />
+                <InvestmentsSummary
+                  summary={data.summary}
+                  accounts={data.accounts}
+                  holdings={data.holdings}
+                  totalAnnualIncome={incomeData?.totalAnnual}
+                  portfolioHistory={portfolioHistory}
+                  quotes={quotes}
+                />
                 <MathDescription chartId="investmentsSummary" />
               </div>
             )}
 
-            {/* ── Performance Value Chart ── */}
-            {isVisible('performanceChart') && (
-              <div>
-                <PerformanceChart />
-                <MathDescription chartId="performanceChart" />
+            {/* ── Performance & Tax Wrapper Grid ── */}
+            {(isVisible('performanceChart') || isVisible('taxBreakdown')) && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
+                {isVisible('performanceChart') && (
+                  <div className="lg:col-span-2">
+                    <PerformanceChart />
+                    <MathDescription chartId="performanceChart" />
+                  </div>
+                )}
+                {isVisible('taxBreakdown') && (
+                  <div className="lg:col-span-1">
+                    <TaxBreakdown accounts={data.accounts} />
+                    <MathDescription chartId="taxBreakdown" />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ── Allocation & Activity Grid ── */}
-            {(isVisible('holdingsAllocationChart') || isVisible('recentActivity')) && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
+            {/* ── Individual Holdings Sparkline Cards ── */}
+            {isVisible('topHoldings') && (
+              <div>
+                <HoldingSparklineCards holdings={data.holdings} quotes={quotes} />
+                <MathDescription chartId="topHoldings" />
+              </div>
+            )}
+
+            {/* ── Allocation, Income & Recent Activity Grid ── */}
+            {(isVisible('holdingsAllocationChart') || isVisible('incomeDividends') || isVisible('recentActivity')) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
                 {isVisible('holdingsAllocationChart') && (
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-1">
                     <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
                     <MathDescription chartId="holdingsAllocationChart" />
                   </div>
                 )}
+                {isVisible('incomeDividends') && (
+                  <div className="lg:col-span-1">
+                    <IncomeDividendsPanel
+                      monthlyIncome={incomeData?.monthlyIncome || []}
+                      totalAnnualIncome={incomeData?.totalAnnual || 0}
+                      loading={loading}
+                    />
+                    <MathDescription chartId="incomeDividends" />
+                  </div>
+                )}
                 {isVisible('recentActivity') && (
                   <div className="lg:col-span-1">
-                    <RecentActivity transactions={data.recentTransactions} />
+                    <RecentActivity transactions={incomeData?.transactions || []} />
                     <MathDescription chartId="recentActivity" />
                   </div>
                 )}
               </div>
             )}
 
-            {/* ── Holdings Table ── */}
+            {/* ── Enhanced Holdings Table ── */}
             {isVisible('holdingsTable') && (
               <div>
                 <div className="bg-card border border-border rounded-xl shadow-sm p-4 sm:p-5">
@@ -128,7 +206,7 @@ export default function InvestmentsPage() {
                       A list of all securities and cash assets currently held across your linked accounts.
                     </p>
                   </div>
-                  <HoldingsTable holdings={data.holdings} accounts={data.accounts} />
+                  <HoldingsTable holdings={data.holdings} accounts={data.accounts} quotes={quotes} />
                 </div>
                 <MathDescription chartId="holdingsTable" />
               </div>
@@ -138,7 +216,7 @@ export default function InvestmentsPage() {
           /* Onboarding/Empty State */
           <div className="max-w-2xl mx-auto py-10 sm:py-16 text-center space-y-6">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto text-primary animate-pulse">
-              <Briefcase className="w-8 h-8" />
+              <CandlestickChart className="w-8 h-8" />
             </div>
 
             <div className="space-y-2">
