@@ -70,7 +70,11 @@ export function CalculationTraceOverlay({ trace }: { trace: CalculationTrace }) 
               <div className="text-foreground/60 mb-1">Account Types Included ({trace.typesIncluded.length})</div>
               <div className="flex flex-wrap gap-1">
                 {trace.typesIncluded.map((t) => (
-                  <span key={t} className="px-1.5 py-0.5 bg-chart-1/10 text-chart-1 rounded text-[10px] font-medium">
+                  <span 
+                    key={t} 
+                    className="goal-pill px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    style={{ '--goal-color': 'var(--chart-1)' } as React.CSSProperties}
+                  >
                     {t}
                   </span>
                 ))}
@@ -80,7 +84,11 @@ export function CalculationTraceOverlay({ trace }: { trace: CalculationTrace }) 
               <div className="text-foreground/60 mb-1">Account Types Excluded ({trace.typesExcluded.length})</div>
               <div className="flex flex-wrap gap-1">
                 {trace.typesExcluded.map((t) => (
-                  <span key={t} className="px-1.5 py-0.5 bg-destructive/10 text-destructive rounded text-[10px] font-medium">
+                  <span 
+                    key={t} 
+                    className="goal-pill px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    style={{ '--goal-color': 'var(--destructive)' } as React.CSSProperties}
+                  >
                     {t}
                   </span>
                 ))}

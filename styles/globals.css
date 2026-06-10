@@ -246,24 +246,144 @@ body,
 /* ── Tag / Badge Pill Utilities ────────────────────────────────────────────── */
 
 .tag-pill {
-  background-color: color-mix(in srgb, var(--tag-color) 13%, transparent);
-  color: var(--tag-color);
-  border-color: color-mix(in srgb, var(--tag-color) 25%, transparent);
+  background-color: color-mix(in srgb, var(--tag-color) 15%, transparent);
+  color: color-mix(in srgb, var(--tag-color) 35%, black);
+  border: 1px solid color-mix(in srgb, var(--tag-color) 25%, transparent);
 }
 
 [data-theme=dark] .tag-pill,
 [data-theme=moonlight] .tag-pill {
-  color: color-mix(in srgb, var(--tag-color) 82%, white 18%);
+  color: color-mix(in srgb, var(--tag-color) 70%, white);
 }
 
 /* Category pill (higher tint for category names on tint bg) */
 .category-pill {
   background-color: color-mix(in srgb, var(--tag-color) 15%, transparent);
-  color: var(--tag-color);
+  color: color-mix(in srgb, var(--tag-color) 35%, black);
 }
 
 [data-theme=dark] .category-pill,
 [data-theme=moonlight] .category-pill {
-  color: color-mix(in srgb, var(--tag-color) 82%, white 18%);
+  color: color-mix(in srgb, var(--tag-color) 70%, white);
 }
+
+/* Goal pill (theme-aware scaling for goal type and status badges) */
+.goal-pill {
+  background-color: color-mix(in srgb, var(--goal-color) 12%, transparent);
+  color: color-mix(in srgb, var(--goal-color) 25%, black);
+  border: 1px solid color-mix(in srgb, var(--goal-color) 15%, transparent);
+}
+
+[data-theme=dark] .goal-pill,
+[data-theme=moonlight] .goal-pill {
+  color: color-mix(in srgb, var(--goal-color) 60%, white);
+}
+
+/* Unified Badge Pill Styles */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem; /* px-2 py-0.5 */
+  font-size: 0.75rem; /* text-xs */
+  font-weight: 500; /* font-medium */
+  border-radius: 9999px; /* rounded-full */
+  border: 1px solid transparent;
+}
+
+.badge-banking,
+.badge-assets {
+  background-color: color-mix(in srgb, var(--status-positive) 15%, transparent);
+  color: color-mix(in srgb, var(--status-positive) 35%, black);
+}
+[data-theme=dark] .badge-banking,
+[data-theme=dark] .badge-assets,
+[data-theme=moonlight] .badge-banking,
+[data-theme=moonlight] .badge-assets {
+  color: color-mix(in srgb, var(--status-positive) 70%, white);
+}
+
+.badge-credit,
+.badge-loans,
+.badge-liabilities,
+.badge-excluded {
+  background-color: color-mix(in srgb, var(--destructive) 15%, transparent);
+  color: color-mix(in srgb, var(--destructive) 35%, black);
+}
+[data-theme=dark] .badge-credit,
+[data-theme=dark] .badge-loans,
+[data-theme=dark] .badge-liabilities,
+[data-theme=dark] .badge-excluded,
+[data-theme=moonlight] .badge-credit,
+[data-theme=moonlight] .badge-loans,
+[data-theme=moonlight] .badge-liabilities,
+[data-theme=moonlight] .badge-excluded {
+  color: color-mix(in srgb, var(--destructive) 70%, white);
+}
+
+.badge-investments,
+.badge-metals {
+  background-color: color-mix(in srgb, var(--chart-1) 15%, transparent);
+  color: color-mix(in srgb, var(--chart-1) 35%, black);
+}
+[data-theme=dark] .badge-investments,
+[data-theme=dark] .badge-metals,
+[data-theme=moonlight] .badge-investments,
+[data-theme=moonlight] .badge-metals {
+  color: color-mix(in srgb, var(--chart-1) 70%, white);
+}
+
+.badge-realestate {
+  background-color: color-mix(in srgb, var(--chart-3) 15%, transparent);
+  color: color-mix(in srgb, var(--chart-3) 35%, black);
+}
+[data-theme=dark] .badge-realestate,
+[data-theme=moonlight] .badge-realestate {
+  color: color-mix(in srgb, var(--chart-3) 70%, white);
+}
+
+.badge-vehicle {
+  background-color: color-mix(in srgb, var(--chart-4) 15%, transparent);
+  color: color-mix(in srgb, var(--chart-4) 35%, black);
+}
+[data-theme=dark] .badge-vehicle,
+[data-theme=moonlight] .badge-vehicle {
+  color: color-mix(in srgb, var(--chart-4) 70%, white);
+}
+
+.badge-plaid {
+  background-color: color-mix(in srgb, var(--chart-2) 15%, transparent);
+  color: color-mix(in srgb, var(--chart-2) 35%, black);
+  border-color: color-mix(in srgb, var(--chart-2) 25%, transparent);
+}
+[data-theme=dark] .badge-plaid,
+[data-theme=moonlight] .badge-plaid {
+  color: color-mix(in srgb, var(--chart-2) 70%, white);
+}
+
+.badge-simplefin {
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: color-mix(in srgb, var(--primary) 35%, black);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+[data-theme=dark] .badge-simplefin,
+[data-theme=moonlight] .badge-simplefin {
+  color: color-mix(in srgb, var(--primary) 70%, white);
+}
+
+.badge-hidden {
+  background-color: color-mix(in srgb, var(--status-warning) 15%, transparent);
+  color: color-mix(in srgb, var(--status-warning) 35%, black);
+  border-color: color-mix(in srgb, var(--status-warning) 25%, transparent);
+}
+[data-theme=dark] .badge-hidden,
+[data-theme=moonlight] .badge-hidden {
+  color: color-mix(in srgb, var(--status-warning) 70%, white);
+}
+
+.badge-other {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
 

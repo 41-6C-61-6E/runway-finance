@@ -579,8 +579,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(simplifinConnections.id, connectionId))
       .limit(1);
 
-    if (!connection || connection.userId !== userId) {
-      throw new Error('Connection not found or unauthorized');
+    if (!connection) {
+      throw new Error('Connection not found');
+    }
+
+    const connectionDataUserId = await resolveDataUserId(connection.userId);
+    if (connectionDataUserId !== dataUserId) {
+      throw new Error('Connection unauthorized');
     }
 
     const accessUrl = await decryptField(

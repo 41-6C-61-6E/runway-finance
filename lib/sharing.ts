@@ -23,6 +23,7 @@ import {
   accountSharingInvitations,
   userEncryptionKeys,
   simplifinConnections,
+  plaidConnections,
   accounts,
   syncLogs,
 } from './db/schema';
@@ -380,6 +381,38 @@ export async function removeMember(
     await db
       .delete(simplifinConnections)
       .where(eq(simplifinConnections.userId, memberUserId));
+  }
+
+  // Delete the leaving member's Plaid connections from the shared group
+  // but disconnect their accounts first so they are kept for the primary user.
+  const memberPlaidConnections = await db
+    .select({ id: plaidConnections.id })
+    .from(plaidConnections)
+    .where(eq(plaidConnections.userId, memberUserId));
+
+  for (const conn of memberPlaidConnections) {
+    // Disconnect accounts from this connection so they survive deletion for the primary user
+    await db
+      .update(accounts)
+      .set({ plaidConnectionId: null })
+      .where(eq(accounts.plaidConnectionId, conn.id));
+
+    // Remove dependent sync logs
+    await db.delete(syncLogs).where(eq(syncLogs.plaidConnectionId, conn.id));
+
+    // Cancel any scheduled sync
+    try {
+      const { syncScheduler } = await import('@/lib/services/sync-scheduler');
+      syncScheduler.cancel(conn.id);
+    } catch (e) {
+      logger.warn('[sharing] Failed to cancel sync scheduler for removed member Plaid connection', { connectionId: conn.id, error: e });
+    }
+  }
+
+  if (memberPlaidConnections.length > 0) {
+    await db
+      .delete(plaidConnections)
+      .where(eq(plaidConnections.userId, memberUserId));
   }
 
   logger.info('[sharing] Member removed', { primaryUserId, memberUserId, removedBy: requestingUserId });

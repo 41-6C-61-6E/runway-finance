@@ -384,12 +384,10 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                       {transaction.accountTags.map((tag) => (
                         <span
                           key={tag.id}
-                          className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border"
+                          className="tag-pill px-1.5 py-0.2 rounded-full text-[8px] font-medium"
                           style={{
-                            backgroundColor: `${tag.color}15`,
-                            color: tag.color,
-                            borderColor: `${tag.color}30`
-                          }}
+                            '--tag-color': tag.color
+                          } as React.CSSProperties}
                         >
                           #{tag.name}
                         </span>
@@ -622,8 +620,8 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                   return (
                     <span
                       key={tagId}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{ backgroundColor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                      className="tag-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                      style={{ '--tag-color': tag.color } as React.CSSProperties}
                     >
                       #{tag.name}
                       <button

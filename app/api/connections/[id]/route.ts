@@ -42,7 +42,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  if (connection.userId !== userId) {
+  const { resolveDataUserId } = await import('@/lib/sharing');
+  const requestingDataUserId = await resolveDataUserId(userId);
+  const connectionDataUserId = await resolveDataUserId(connection.userId);
+
+  if (connectionDataUserId !== requestingDataUserId) {
     return NextResponse.json(
       { error: 'forbidden', message: 'You do not own this connection' },
       { status: 403 }
@@ -148,7 +152,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  if (connection.userId !== userId) {
+  const { resolveDataUserId } = await import('@/lib/sharing');
+  const requestingDataUserId = await resolveDataUserId(userId);
+  const connectionDataUserId = await resolveDataUserId(connection.userId);
+
+  if (connectionDataUserId !== requestingDataUserId) {
     return NextResponse.json(
       { error: 'forbidden', message: 'You do not own this connection' },
       { status: 403 }

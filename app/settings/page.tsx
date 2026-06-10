@@ -33,6 +33,7 @@ import { useSidebar } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
+import { getBadgeClasses } from '@/lib/utils/account-badge';
 import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
 import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
@@ -1540,7 +1541,7 @@ function SettingsPageBody() {
                       {conn.lastSyncError && (
                         <div className="text-xs text-destructive truncate">{conn.lastSyncError}</div>
                       )}
-                      <div className="flex items-center justify-between pt-2 border-t border-border">
+                      <div className="flex items-center justify-between pt-1.5">
                         <div className="flex items-center gap-2">
                           <label className="text-xs text-muted-foreground">Sync frequency:</label>
                           <select
@@ -1781,28 +1782,20 @@ function SettingsPageBody() {
                                 account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
                               }`}>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
-                                    account.type === 'checking' ? 'bg-chart-4/15 text-chart-4' :
-                                    account.type === 'savings' ? 'bg-chart-1/15 text-chart-1' :
-                                    account.type === 'credit' ? 'bg-chart-2/15 text-chart-2' :
-                                    isInvestmentAccount(account.type) ? 'bg-chart-3/15 text-chart-3' :
-                                    account.type === 'loan' ? 'bg-chart-5/15 text-chart-5' :
-                                    account.type === 'mortgage' ? 'bg-chart-5/15 text-chart-5' :
-                                    'bg-muted text-muted-foreground'
-                                  }`}>
+                                  <span className={getBadgeClasses(account.type)}>
                                     {account.type}
                                   </span>
                                   {account.plaidConnectionId && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-chart-2/15 text-chart-2 border border-chart-2/25 font-medium">Plaid</span>
+                                    <span className="badge-pill badge-plaid">Plaid</span>
                                   )}
                                   {account.connectionId && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-primary/15 text-primary border border-primary/25 font-medium">SimpleFIN</span>
+                                    <span className="badge-pill badge-simplefin">SimpleFIN</span>
                                   )}
                                   {account.isHidden && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 font-medium">Hidden</span>
+                                    <span className="badge-pill badge-hidden">Hidden</span>
                                   )}
                                   {account.isExcludedFromNetWorth && (
-                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-destructive/15 text-destructive border border-destructive/25 font-medium">Excluded</span>
+                                    <span className="badge-pill badge-excluded">Excluded</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 flex-wrap">

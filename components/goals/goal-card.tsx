@@ -40,13 +40,38 @@ interface GoalCardProps {
 function getStatusBadge(status: string) {
   switch (status) {
     case 'completed':
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-positive/20 text-status-positive uppercase">Done</span>;
+      return (
+        <span 
+          className="goal-pill px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+          style={{ '--goal-color': 'var(--status-positive)' } as React.CSSProperties}
+        >
+          Done
+        </span>
+      );
     case 'paused':
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase">Paused</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground border border-border/50 uppercase">
+          Paused
+        </span>
+      );
     case 'pending':
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-chart-2/20 text-chart-2 uppercase">Pending</span>;
+      return (
+        <span 
+          className="goal-pill px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+          style={{ '--goal-color': 'var(--chart-2)' } as React.CSSProperties}
+        >
+          Pending
+        </span>
+      );
     default:
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-chart-3/20 text-chart-3 uppercase">Active</span>;
+      return (
+        <span 
+          className="goal-pill px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+          style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
+        >
+          Active
+        </span>
+      );
   }
 }
 
@@ -195,7 +220,7 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve }: GoalCa
             </div>
             <div className="flex items-center justify-between text-xs mt-1">
               <span className="text-muted-foreground">Allocated to this goal:</span>
-              <span className="font-medium text-chart-1 blur-number">{formatCurrency(current)}</span>
+              <span className="font-medium text-status-positive blur-number">{formatCurrency(current)}</span>
             </div>
             {goal['isReleased'] && (
               <div className="flex items-center justify-between text-xs mt-1">
