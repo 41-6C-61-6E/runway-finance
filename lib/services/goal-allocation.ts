@@ -12,6 +12,7 @@ export interface GoalAllocation {
   accountBalance: number;
   percentage: number;
   reserve: number;
+  targetAmount: number;
   desiredAllocation: number;
   allocatedAmount: number;
   remainingOnAccount: number;
@@ -150,10 +151,11 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
     for (const goal of sortedGoals) {
       const percentage = parseFloat(goal.percentage) || 100;
       const reserve = parseFloat(goal.reserve) || 0;
+      const goalTarget = parseFloat(goal.targetAmount) || 0;
       activeReserves.push(reserve);
       const availableBalance = Math.max(0, accountBalance - sharedReservesByAccount.get(accountId)!);
       const desiredAllocation = availableBalance * (percentage / 100);
-      const allocatedAmount = Math.min(desiredAllocation, remaining);
+      const allocatedAmount = Math.min(desiredAllocation, remaining, Math.max(0, goalTarget));
       
       // Round to 2 decimal places
       const allocated = Math.round(allocatedAmount * 100) / 100;
@@ -172,10 +174,11 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
         accountBalance,
         percentage,
         reserve: reserve,
+        targetAmount: goalTarget,
         desiredAllocation: desired,
         allocatedAmount: allocated,
         remainingOnAccount: remaining,
-        isUnderfunded: allocated < desired,
+        isUnderfunded: allocated < desired && allocated < goalTarget,
         sortOrder: goal.sortOrder,
         status: goal.status,
       });
@@ -219,7 +222,8 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
       for (const goal of underfundedGoals) {
         if (remainingReleased <= 0) break;
         
-        const shortfall = goal.desiredAllocation - goal.allocatedAmount;
+        const cap = Math.min(goal.desiredAllocation, goal.targetAmount);
+        const shortfall = Math.max(0, cap - goal.allocatedAmount);
         const additional = Math.min(shortfall, remainingReleased);
         const additionalRounded = Math.round(additional * 100) / 100;
         
