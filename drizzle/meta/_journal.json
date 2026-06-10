@@ -337,6 +337,20 @@
       "when": 1782500000000,
       "tag": "0047_drop_card_style",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1782600000000,
+      "tag": "0048_add_goal_order_and_allocation",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1782600000001,
+      "tag": "0049_add_goal_allocation_history",
+      "breakpoints": true
     }
   ]
 }

@@ -523,8 +523,29 @@ export const financialGoals = pgTable('financial_goals', {
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   percentage: text('percentage').notNull(),
   reserve: text('reserve').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  allocatedAmount: text('allocated_amount').notNull().default('0'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Goal Allocation History ────────────────────────────────────────────────────
+// Tracks allocation snapshots over time for historical analysis
+export const goalAllocationHistory = pgTable('goal_allocation_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
+  accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'set null' }),
+  snapshotDate: date('snapshot_date').notNull().defaultNow(),
+  accountBalance: text('account_balance').notNull(),
+  allocatedAmount: text('allocated_amount').notNull().default('0'),
+  desiredAmount: text('desired_amount').notNull().default('0'),
+  percentage: text('percentage').notNull().default('100'),
+  priority: integer('priority').notNull().default(0),
+  sortOrder: integer('sort_order').notNull().default(0),
+  isUnderfunded: boolean('is_underfunded').notNull().default(false),
+  remainingOnAccount: text('remaining_on_account').notNull().default('0'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ── Paystubs ─────────────────────────────────────────────────────────────────
