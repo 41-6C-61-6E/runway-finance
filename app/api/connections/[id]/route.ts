@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
-import { simplifinConnections, accounts, syncLogs } from '@/lib/db/schema';
+import { simplifinConnections, plaidConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
@@ -17,11 +17,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const userId = session.user.id;
 
-  const [connection] = await getDb()
+  // Check SimpleFIN connections first
+  let isSimplefin = true;
+  let [connection] = await getDb()
     .select()
     .from(simplifinConnections)
     .where(eq(simplifinConnections.id, id))
     .limit(1);
+
+  if (!connection) {
+    isSimplefin = false;
+    const [plaidConn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, id))
+      .limit(1);
+    connection = plaidConn as any;
+  }
 
   if (!connection) {
     return NextResponse.json(
@@ -70,13 +82,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     updateData.syncFrequency = body.syncFrequency;
   }
 
-  const [updated] = await getDb()
-    .update(simplifinConnections)
-    .set(updateData)
-    .where(eq(simplifinConnections.id, id))
-    .returning();
+  let updated: any;
+  if (isSimplefin) {
+    [updated] = await getDb()
+      .update(simplifinConnections)
+      .set(updateData)
+      .where(eq(simplifinConnections.id, id))
+      .returning();
+  } else {
+    [updated] = await getDb()
+      .update(plaidConnections)
+      .set(updateData)
+      .where(eq(plaidConnections.id, id))
+      .returning();
+  }
 
-  logger.info('Connection updated', { connectionId: id, updateData });
+  logger.info('Connection updated', { connectionId: id, updateData, isSimplefin });
   syncScheduler.schedule(id, updated.syncFrequency, updated.lastSyncAt);
   return NextResponse.json(updated);
 }
@@ -99,15 +120,26 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const body = await request.json();
     keepData = body.keepData === true;
   } catch {
-    // No body or invalid JSON — default to delete all (current behavior)
+    // No body or invalid JSON — default to delete all
   }
 
-  // Find the connection
-  const [connection] = await getDb()
+  // Find connection
+  let isSimplefin = true;
+  let [connection] = await getDb()
     .select()
     .from(simplifinConnections)
     .where(eq(simplifinConnections.id, id))
     .limit(1);
+
+  if (!connection) {
+    isSimplefin = false;
+    const [plaidConn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, id))
+      .limit(1);
+    connection = plaidConn as any;
+  }
 
   if (!connection) {
     return NextResponse.json(
@@ -123,19 +155,27 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  if (keepData) {
-    // Disconnect accounts from this connection so they survive deletion
-    await getDb()
-      .update(accounts)
-      .set({ connectionId: null })
-      .where(eq(accounts.connectionId, id));
+  if (isSimplefin) {
+    if (keepData) {
+      await getDb()
+        .update(accounts)
+        .set({ connectionId: null })
+        .where(eq(accounts.connectionId, id));
+    }
+    await getDb().delete(syncLogs).where(eq(syncLogs.connectionId, id));
+    await getDb().delete(simplifinConnections).where(eq(simplifinConnections.id, id));
+  } else {
+    if (keepData) {
+      await getDb()
+        .update(accounts)
+        .set({ plaidConnectionId: null })
+        .where(eq(accounts.plaidConnectionId, id));
+    }
+    await getDb().delete(syncLogs).where(eq(syncLogs.plaidConnectionId, id));
+    await getDb().delete(plaidConnections).where(eq(plaidConnections.id, id));
   }
 
-  // Remove dependent sync logs first because this table does not cascade on delete.
-  await getDb().delete(syncLogs).where(eq(syncLogs.connectionId, id));
-  await getDb().delete(simplifinConnections).where(eq(simplifinConnections.id, id));
-
   syncScheduler.cancel(id);
-  logger.info('Connection deleted', { connectionId: id, keepData });
+  logger.info('Connection deleted', { connectionId: id, keepData, isSimplefin });
   return new NextResponse(null, { status: 204 });
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { usePlaidLink } from 'react-plaid-link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
@@ -20,7 +21,12 @@ import {
   FileText, 
   ShieldAlert,
   AlertCircle,
-  Users2
+  Users2,
+  Info,
+  AlertTriangle,
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
@@ -57,6 +63,7 @@ type Connection = {
   createdAt: string;
   userId: string;
   accessUrlEncrypted?: string;
+  provider?: string;
 };
 
 const SYNC_INTERVALS: Record<string, number> = {
@@ -64,6 +71,7 @@ const SYNC_INTERVALS: Record<string, number> = {
   hourly: 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
+  margin: 0,
   monthly: 30 * 24 * 60 * 60 * 1000,
 };
 
@@ -83,6 +91,7 @@ type Account = {
   currency: string;
   institution: string | null;
   connectionId: string | null;
+  plaidConnectionId?: string | null;
   externalId?: string | null;
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
@@ -150,6 +159,159 @@ function SettingsPageBody() {
   const [editLabel, setEditLabel] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingLabel, setSavingLabel] = useState(false);
+
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidLoading, setPlaidLoading] = useState(false);
+  const [showSimpleFinForm, setShowSimpleFinForm] = useState(false);
+  const [isPlaidCredentialsDialogOpen, setIsPlaidCredentialsDialogOpen] = useState(false);
+  const [plaidClientId, setPlaidClientId] = useState('');
+  const [plaidSecret, setPlaidSecret] = useState('');
+  const [plaidEnvironment, setPlaidEnvironment] = useState('sandbox');
+  const [savingPlaidCredentials, setSavingPlaidCredentials] = useState(false);
+  const [dismissedPlaidHourlyWarnings, setDismissedPlaidHourlyWarnings] = useState<string[]>([]);
+  const [isPricingExpanded, setIsPricingExpanded] = useState(false);
+  const [isAddConnectionExpanded, setIsAddConnectionExpanded] = useState(true);
+  const [isSyncFeesExpanded, setIsSyncFeesExpanded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dismissed_plaid_hourly');
+      if (saved) {
+        try {
+          setDismissedPlaidHourlyWarnings(JSON.parse(saved));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const dismissPlaidHourlyWarning = (connId: string) => {
+    const updated = [...dismissedPlaidHourlyWarnings, connId];
+    setDismissedPlaidHourlyWarnings(updated);
+    localStorage.setItem('dismissed_plaid_hourly', JSON.stringify(updated));
+  };
+
+  const handleExchangePublicToken = async (publicToken: string, metadata: any) => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/plaid/exchange-public-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicToken,
+          institutionName: metadata.institution?.name || 'Plaid Bank',
+          institutionId: metadata.institution?.institution_id || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Successfully connected bank via Plaid!`);
+        await fetchConnections();
+        await fetchAccounts();
+      } else {
+        setError(data.message || 'Failed to exchange public token');
+      }
+    } catch {
+      setError('Failed to exchange public token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
+    token: plaidLinkToken,
+    onSuccess: (public_token, metadata) => {
+      handleExchangePublicToken(public_token, metadata);
+    },
+    onExit: () => {
+      setPlaidLinkToken(null);
+    },
+  });
+
+  useEffect(() => {
+    if (plaidLinkToken && plaidLinkReady) {
+      openPlaidLink();
+      setPlaidLinkToken(null);
+    }
+  }, [plaidLinkToken, plaidLinkReady, openPlaidLink]);
+
+  const handleConnectPlaid = async () => {
+    setPlaidLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/plaid/create-link-token', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.link_token) {
+        setPlaidLinkToken(data.link_token);
+      } else if (data.error === 'not_configured') {
+        try {
+          const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json();
+            setPlaidClientId(settingsData.apiKeys?.plaidClientId || '');
+            setPlaidSecret(settingsData.apiKeys?.plaidSecret || '');
+            setPlaidEnvironment(settingsData.apiKeys?.plaidEnvironment || 'sandbox');
+          }
+        } catch {}
+        setIsPlaidCredentialsDialogOpen(true);
+      } else {
+        setError(data.message || 'Failed to initialize Plaid Link.');
+      }
+    } catch {
+      setError('Failed to initialize Plaid Link');
+    } finally {
+      setPlaidLoading(false);
+    }
+  };
+
+  const handleSavePlaidCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingPlaidCredentials(true);
+    setError('');
+    setSuccess('');
+    try {
+      const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
+      if (!settingsRes.ok) throw new Error('Failed to retrieve current settings');
+      const settingsData = await settingsRes.json();
+
+      const currentApiKeys = settingsData.apiKeys || {};
+      const mergedApiKeys = {
+        ...currentApiKeys,
+        plaidClientId: plaidClientId.trim(),
+        plaidSecret: plaidSecret.trim(),
+        plaidEnvironment,
+      };
+
+      const saveRes = await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ apiKeys: mergedApiKeys }),
+      });
+
+      if (!saveRes.ok) {
+        const errorData = await saveRes.json();
+        throw new Error(errorData.error || 'Failed to save settings');
+      }
+
+      setIsPlaidCredentialsDialogOpen(false);
+      setSuccess('Plaid credentials saved successfully.');
+      
+      // Auto-retry Plaid Link initiation after dialog closes
+      setTimeout(() => {
+        handleConnectPlaid();
+      }, 300);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save Plaid credentials');
+    } finally {
+      setSavingPlaidCredentials(false);
+    }
+  };
 
   const { scheme: chartScheme, updateScheme: updateChartScheme } = useChartColorScheme();
   const { isHidden, updateHidden } = useHiddenPages();
@@ -485,6 +647,9 @@ function SettingsPageBody() {
   };
 
   const maskAccessUrl = (conn: Connection) => {
+    if (conn.provider === 'plaid') {
+      return 'Plaid Item (Encrypted Access Token)';
+    }
     try {
       const decoded = Buffer.from(conn.accessUrlEncrypted || '', 'base64').toString('utf8');
       if (decoded.startsWith('http')) {
@@ -497,10 +662,12 @@ function SettingsPageBody() {
 
   const hasConnection = connections.length > 0;
   const hasMyConnection = connections.some((conn) => conn.userId === currentUserId);
+  const hasMySimpleFin = connections.some((conn) => conn.userId === currentUserId && conn.provider === 'simplefin');
 
   const orphanedAccounts = accounts.filter(
     (a) =>
       !a.connectionId &&
+      !a.plaidConnectionId &&
       a.externalId &&
       a.type !== 'paystub' &&
       !a.externalId.startsWith('manual-') &&
@@ -508,7 +675,43 @@ function SettingsPageBody() {
       !a.externalId.startsWith('virtual-')
   );
 
-  const activeAutomaticAccounts = accounts.filter((a) => a.connectionId !== null);
+  const activeAutomaticAccounts = accounts.filter((a) => a.connectionId !== null || a.plaidConnectionId !== null);
+
+  const calculateConnectionCost = (conn: Connection) => {
+    if (conn.provider === 'simplefin') {
+      return {
+        baseFee: 1.50,
+        refreshCost: 0,
+        total: 1.50,
+      };
+    }
+
+    const hasInvestments = accounts.some(
+      (acc) => acc.plaidConnectionId === conn.id && isInvestmentAccount(acc.type)
+    );
+
+    const baseFee = 0.30 + (hasInvestments ? 0.30 : 0);
+
+    let refreshesPerMonth = 0;
+    if (conn.syncFrequency === 'hourly') {
+      refreshesPerMonth = 24 * 30;
+    } else if (conn.syncFrequency === 'daily') {
+      refreshesPerMonth = 1 * 30;
+    } else if (conn.syncFrequency === 'weekly') {
+      refreshesPerMonth = 4.3;
+    } else if (conn.syncFrequency === 'monthly') {
+      refreshesPerMonth = 1;
+    }
+
+    const refreshCost = refreshesPerMonth * 0.08;
+    const total = baseFee + refreshCost;
+
+    return {
+      baseFee,
+      refreshCost,
+      total,
+    };
+  };
 
   return (
     <div className="min-h-screen w-full">
@@ -717,6 +920,7 @@ function SettingsPageBody() {
                     pageKey === 'cashFlow' ? 'Cash Flow' :
                     pageKey === 'budgets' ? 'Budgets' :
                     pageKey === 'realEstate' ? 'Real Estate' :
+                    pageKey === 'investments' ? 'Investments' :
 
                     pageKey === 'dataExplorer' ? 'Data Explorer' :
                     pageKey === 'financialLogic' ? 'Financial Logic' :
@@ -800,10 +1004,336 @@ function SettingsPageBody() {
               </button>
             </div>
           )}
+
+          {/* Add Connection Options */}
+          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+            <button
+              type="button"
+              onClick={() => setIsAddConnectionExpanded(!isAddConnectionExpanded)}
+              className="w-full flex items-center justify-between text-base font-semibold text-foreground hover:text-primary transition-colors focus:outline-none"
+            >
+              <span>Add Bank Connection</span>
+              {isAddConnectionExpanded ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+
+            {isAddConnectionExpanded && (
+              <div className="mt-4 space-y-4 animate-in fade-in duration-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Option A: Plaid Link */}
+                  <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Link via Plaid</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Connect your bank accounts securely in seconds using Plaid. Supports most major institutions.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConnectPlaid}
+                      disabled={plaidLoading || loading}
+                      className="w-full px-4 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      {plaidLoading ? 'Initializing Plaid...' : 'Link Institution via Plaid'}
+                    </button>
+                  </div>
+
+                  {/* Option B: SimpleFIN Bridge */}
+                  <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Connect via SimpleFIN Bridge</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Import transactions from your bank using a SimpleFIN setup token/API key.
+                      </p>
+                    </div>
+                    {hasMySimpleFin ? (
+                      <div className="text-[11px] text-amber-500 font-medium bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg">
+                        SimpleFIN connection already linked. Delete it first if you need to reconnect.
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowSimpleFinForm(!showSimpleFinForm)}
+                        className="w-full px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
+                      >
+                        {showSimpleFinForm ? 'Hide SimpleFIN Form' : 'Connect via SimpleFIN Bridge'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sync Service Pricing Information */}
+                <div className="mt-5 pt-4 border-t border-border/65 space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsPricingExpanded(!isPricingExpanded)}
+                    className="w-full flex items-center justify-between text-xs font-semibold text-foreground hover:text-primary transition-colors focus:outline-none"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-primary" /> Sync Service Pricing & Cost Comparison
+                    </span>
+                    {isPricingExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+
+                  {isPricingExpanded && (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                        <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
+                          <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">SimpleFIN Bridge</h4>
+                          <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                            <li>Flat rate of <strong className="text-foreground">$1.50/mo</strong> or <strong className="text-foreground">$15.00/yr</strong></li>
+                            <li>Supports up to 25 linked accounts and apps</li>
+                            <li>Simple setup, no developer configuration required</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
+                          <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">Plaid (Self-Hosted Keys)</h4>
+                          <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                            <li><strong className="text-emerald-500 font-semibold">Free</strong> for the first 10 lifetime production institutions (Plaid "Items", not a rolling window)</li>
+                            <li>Billed per connected <strong className="text-foreground">Institution (Item)</strong>, not per individual account</li>
+                            <li>Pay-as-you-go Base: ~$0.30/mo for Transactions, ~$0.30/mo for Investments</li>
+                            <li>Pay-as-you-go Refresh: ~$0.08 per request (e.g., daily sync = ~$2.40/mo, hourly sync = ~$57.60/mo per institution)</li>
+                            <li>Requires registering your own Plaid developer credentials</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      {/* Item vs Account Explanation */}
+                      <div className="p-3 bg-muted/20 border border-border/40 rounded-lg text-[11px] leading-relaxed space-y-2">
+                        <div className="font-semibold text-foreground flex items-center gap-1">
+                          <span>💡 How Plaid Billing Works: "Items" vs. "Accounts"</span>
+                        </div>
+                        <p className="text-muted-foreground">
+                          Plaid bills subscription products (Transactions, Investments) per <strong className="text-foreground">institution login (Item)</strong>. 
+                          If you have 10 bank accounts under one login (e.g., Chase) and 10 brokerage accounts under another (e.g., Fidelity), 
+                          this counts as only <strong className="text-foreground">2 Items</strong>. Under the 10-Item limit (specifically, the first 10 unique Items ever linked, not a rolling window of 10 active items) in Plaid's Trial/Development tier, 
+                          this is <strong className="text-emerald-500 font-semibold">100% Free</strong>.
+                        </p>
+                      </div>
+
+                      {/* Example monthly cost breakdown */}
+                      <div className="p-3 bg-primary/[0.03] border border-primary/10 rounded-lg text-[11px] leading-relaxed">
+                        <span className="font-semibold text-foreground block mb-2">Example Cost Breakdown: 10 Bank & 10 Brokerage Accounts</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-2.5 bg-muted/30 border border-border/40 rounded space-y-1">
+                            <span className="text-emerald-500 block text-[9px] uppercase font-bold">Plaid Free Tier (Development)</span>
+                            <div className="text-[10px] text-muted-foreground">
+                              If these 20 accounts are under <strong className="text-foreground">10 or fewer institutions</strong> (and within the first 10 lifetime Items linked):
+                            </div>
+                            <div className="font-bold text-foreground text-xs mt-1">Cost: $0.00 / month (all refreshes are free)</div>
+                          </div>
+                          <div className="p-2.5 bg-muted/30 border border-border/40 rounded space-y-1">
+                            <span className="text-primary block text-[9px] uppercase font-bold">Plaid Pay-as-you-go (Over 10 Items)</span>
+                            <div className="text-[10px] text-muted-foreground">
+                              If you exceed the first 10 lifetime institutions linked (base fee + refreshes depending on sync frequency):
+                            </div>
+                            <div className="font-bold text-foreground text-xs mt-1">Cost: Base (~$0.30 - $0.60) + Refresh fee (~$2.40/mo for Daily, or ~$57.60/mo for Hourly) per extra institution</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-border/30 text-[10px] text-muted-foreground flex justify-between items-center">
+                          <span>Compared to SimpleFIN: <strong>$1.50/mo</strong> (Flat fee for up to 25 accounts/connections)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Collapsible SimpleFIN Form */}
+                {!hasMySimpleFin && showSimpleFinForm && (
+                  <div className="mt-4 p-4 border border-border/80 rounded-lg bg-muted/10 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {sharingGroup && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs rounded-lg font-medium flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block text-amber-700 dark:text-amber-300 font-semibold mb-0.5">Shared Visibility Warning</strong>
+                          Your SimpleFIN connection and its sync status will be visible to the primary user and other members of this shared account, but only you will be able to edit or delete it.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h3 className="text-xs font-semibold text-primary mb-1">How to get your SimpleFIN API key / setup token:</h3>
+                      <ol className="text-[11px] text-muted-foreground space-y-1">
+                        <li className="flex gap-1.5">
+                          <span className="text-primary font-bold">1.</span>
+                          <span>Sign up at <a href="https://beta-bridge.simplefin.org" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">https://beta-bridge.simplefin.org</a></span>
+                        </li>
+                        <li className="flex gap-1.5">
+                          <span className="text-primary font-bold">2.</span>
+                          <span>After signing in, go My Account → Apps</span>
+                        </li>
+                        <li className="flex gap-1.5">
+                          <span className="text-primary font-bold">3.</span>
+                          <span>Generate a token by clicking New App Connection.</span>
+                        </li>
+                        <li className="flex gap-1.5">
+                          <span className="text-primary font-bold">4.</span>
+                          <span>Paste the token below and click "Add Connection"</span>
+                        </li>
+                      </ol>
+                    </div>
+
+                    <form onSubmit={handleAddConnection} className="space-y-3">
+                      <div>
+                        <label htmlFor="setupToken" className="block text-xs font-medium text-foreground mb-1">
+                          SimpleFIN API Key / Setup Token
+                        </label>
+                        <Input
+                          id="setupToken"
+                          value={setupToken}
+                          onChange={(e) => setSetupToken(e.target.value)}
+                          placeholder="Paste your SimpleFIN API key or setup token here..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="label" className="block text-xs font-medium text-foreground mb-1">
+                          Label (optional)
+                        </label>
+                        <Input
+                          id="label"
+                          value={label}
+                          onChange={(e) => setLabel(e.target.value)}
+                          placeholder="e.g., SimpleFIN Bridge"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full px-4 py-2.5 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+                      >
+                        {loading ? 'Adding...' : 'Add Connection'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mt-4 p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
+                    <p className="text-destructive text-sm">{error}</p>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="mt-4 p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg">
+                    <p className="text-chart-1 text-sm">{success}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Estimated Sync Fees Section */}
+          {connections.length > 0 && (
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+              <button
+                type="button"
+                onClick={() => setIsSyncFeesExpanded(!isSyncFeesExpanded)}
+                className="w-full flex items-center justify-between text-base font-semibold text-foreground hover:text-primary transition-colors focus:outline-none"
+              >
+                <span className="flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-primary" /> Estimated Monthly Sync Fees (Pay-as-you-go)
+                </span>
+                {isSyncFeesExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+
+              {isSyncFeesExpanded && (
+                <div className="mt-4 space-y-3 animate-in fade-in duration-200">
+                  <p className="text-xs text-muted-foreground leading-normal">
+                    Based on your active connections and their configured sync frequencies, here is your estimated monthly Pay-as-you-go cost:
+                  </p>
+                  <div className="overflow-x-auto border border-border/40 rounded-lg">
+                    <table className="w-full text-[11px] text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/30 border-b border-border/40 text-[9px] uppercase tracking-wider text-muted-foreground">
+                          <th className="p-2 font-semibold">Connection</th>
+                          <th className="p-2 font-semibold text-center">Provider</th>
+                          <th className="p-2 font-semibold text-center">Frequency</th>
+                          <th className="p-2 font-semibold text-right">Base Sub</th>
+                          <th className="p-2 font-semibold text-right">Est. Refresh Cost</th>
+                          <th className="p-2 font-semibold text-right">Est. Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30 text-foreground">
+                        {(() => {
+                          let totalMonthlyCost = 0;
+                          let hasSimpleFin = false;
+                          
+                          const rows = connections.map((conn) => {
+                            const cost = calculateConnectionCost(conn);
+                            
+                            if (conn.provider === 'simplefin') {
+                              hasSimpleFin = true;
+                            } else {
+                              totalMonthlyCost += cost.total;
+                            }
+                            
+                            return (
+                              <tr key={conn.id} className="hover:bg-muted/10">
+                                <td className="p-2 font-medium truncate max-w-[150px]">{conn.label || 'Unnamed Connection'}</td>
+                                <td className="p-2 text-center capitalize">{conn.provider || 'Plaid'}</td>
+                                <td className="p-2 text-center capitalize">{conn.syncFrequency}</td>
+                                <td className="p-2 text-right">
+                                  {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.baseFee.toFixed(2)}`}
+                                </td>
+                                <td className="p-2 text-right">
+                                  {conn.provider === 'simplefin' ? '$0.00' : `$${cost.refreshCost.toFixed(2)}`}
+                                </td>
+                                <td className="p-2 text-right font-semibold">
+                                  {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.total.toFixed(2)}`}
+                                </td>
+                              </tr>
+                            );
+                          });
+
+                          // Add SimpleFIN flat fee to total exactly once (as it is a flat user subscription)
+                          if (hasSimpleFin) {
+                            totalMonthlyCost += 1.50;
+                          }
+
+                          return (
+                            <>
+                              {rows}
+                              <tr className="bg-muted/20 font-bold border-t border-border/50 text-foreground">
+                                <td colSpan={5} className="p-2 text-right">Total Est. Monthly Cost:</td>
+                                <td className="p-2 text-right text-xs text-primary">${totalMonthlyCost.toFixed(2)}/mo</td>
+                              </tr>
+                            </>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground leading-normal space-y-1.5 p-2.5 bg-muted/20 border border-border/40 rounded-lg">
+                    <div>
+                      * <strong>SimpleFIN Pricing Note</strong>: SimpleFIN charges a flat $1.50/mo subscription paid directly by you, which covers all your linked SimpleFIN connections (up to 25 accounts total).
+                    </div>
+                    <div className="p-3 bg-emerald-500/15 dark:bg-emerald-500/10 border border-emerald-500/35 dark:border-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs leading-relaxed font-medium">
+                      💡 <strong>Plaid Pricing Note</strong>: Plaid includes the <strong>first 10 unique connected institutions (Items) for free</strong> (lifetime limit, not a rolling window of 10 active items) in its Trial/Development tier. If you have linked fewer than 10 unique Plaid connections in total, your actual Plaid cost is <strong className="text-emerald-900 dark:text-emerald-100 font-extrabold underline decoration-emerald-500/50">$0.00</strong>. This estimate assumes Pay-as-you-go rates apply to all items.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Existing Connections */}
           {hasConnection && (
             <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
-              <h2 className="text-base font-semibold text-foreground mb-4">SimpleFIN Bridge Connection</h2>
+              <h2 className="text-base font-semibold text-foreground mb-4">Automatic Bank Connections</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
               ) : (
@@ -853,6 +1383,13 @@ function SettingsPageBody() {
                           )}
                           <span className="text-[10px] text-muted-foreground bg-muted border border-border px-1.5 py-0.5 rounded shrink-0 font-medium ml-1">
                             {conn.userId === currentUserId ? 'You' : conn.userId}
+                          </span>
+                          <span className={`text-[10px] border px-1.5 py-0.5 rounded shrink-0 font-semibold ml-1 ${
+                            conn.provider === 'plaid' 
+                              ? 'bg-chart-2/15 border-chart-2/30 text-chart-2' 
+                              : 'bg-primary/15 border-primary/30 text-primary'
+                          }`}>
+                            {conn.provider === 'plaid' ? 'Plaid' : 'SimpleFIN'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
@@ -923,6 +1460,22 @@ function SettingsPageBody() {
                           )}
                         </div>
                       </div>
+                      {conn.provider === 'plaid' && conn.syncFrequency === 'hourly' && !dismissedPlaidHourlyWarnings.includes(conn.id) && (
+                        <div className="mt-2.5 p-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg text-[10px] leading-normal flex items-start gap-2 pr-6 relative">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="font-semibold block mb-0.5 text-amber-700 dark:text-amber-300">Plaid Hourly Cost Warning</strong>
+                            Syncing Plaid hourly triggers frequent bank refreshes. On a Pay-as-you-go developer plan, these manual refreshes incur per-request fees (e.g. ~$0.08 per request) which can accumulate to <strong>$50+/month per connection</strong>. We recommend Daily or Manual syncs unless you are on a free trial tier or custom contract.
+                          </div>
+                          <button
+                            onClick={() => dismissPlaidHourlyWarning(conn.id)}
+                            className="absolute top-2 right-2 text-amber-500 hover:text-amber-600 dark:hover:text-amber-300 focus:outline-none"
+                            title="Dismiss warning"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     )
                   })}
@@ -1040,92 +1593,7 @@ function SettingsPageBody() {
             </div>
           )}
 
-          {/* Add Connection Form - shown when no bridge is connected */}
-          {/* Add Connection Form - shown when no bridge is connected for this user */}
-          {!hasMyConnection && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
-              <h2 className="text-base font-semibold text-foreground mb-4">Add SimpleFIN Connection</h2>
 
-              {sharingGroup && (
-                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs rounded-lg font-medium flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-amber-700 dark:text-amber-300 font-semibold mb-0.5">Shared Visibility Warning</strong>
-                    Your SimpleFIN connection and its sync status will be visible to the primary user and other members of this shared account, but only you will be able to edit or delete it.
-                  </div>
-                </div>
-              )}
-
-              <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                <h3 className="text-sm font-semibold text-primary mb-2">How to get your SimpleFIN API key / setup token:</h3>
-                <ol className="text-xs text-muted-foreground space-y-1.5">
-                  <li className="flex gap-2">
-                    <span className="text-primary font-bold">1.</span>
-                    <span>Sign up for a SimpleFIN Bridge account at <a href="https://beta-bridge.simplefin.org" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">https://beta-bridge.simplefin.org</a></span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary font-bold">2.</span>
-                    <span>After signing in, go My Account, Apps</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary font-bold">3.</span>
-                    <span>Generate a new SimpleFIN API key or setup token by clicking New App Connection.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary font-bold">4.</span>
-                    <span>Paste the token below and click "Add Connection"</span>
-                  </li>
-                </ol>
-              </div>
-
-              <form onSubmit={handleAddConnection} className="space-y-4">
-                <div>
-                  <label htmlFor="setupToken" className="block text-sm font-medium text-foreground mb-1">
-                    SimpleFIN API Key / Setup Token
-                  </label>
-                  <Input
-                    id="setupToken"
-                    value={setupToken}
-                    onChange={(e) => setSetupToken(e.target.value)}
-                    placeholder="Paste your SimpleFIN API key or setup token here..."
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="label" className="block text-sm font-medium text-foreground mb-1">
-                    Label (optional)
-                  </label>
-                  <Input
-                    id="label"
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    placeholder="e.g., SimpleFIN Bridge"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full px-5 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-                >
-                  {loading ? 'Adding...' : 'Add Connection'}
-                </button>
-              </form>
-
-              {error && (
-                <div className="mt-4 p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
-                  <p className="text-destructive text-sm">{error}</p>
-                </div>
-              )}
-
-              {success && (
-                <div className="mt-4 p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg">
-                  <p className="text-chart-1 text-sm">{success}</p>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Account Management - only shown when a connection exists */}
           {hasConnection && (
@@ -1158,13 +1626,13 @@ function SettingsPageBody() {
                 <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
               ) : (() => {
                   const filteredAccounts = accounts.filter((a) => {
-                    // Only show automatic accounts (have a connectionId)
-                    if (!a.connectionId) return false;
+                    // Only show automatic accounts (have a connectionId or plaidConnectionId)
+                    if (!a.connectionId && !a.plaidConnectionId) return false;
                     if (accountFilter === 'hidden') return a.isHidden;
                     if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
                     return true;
                   });
-                  const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
+                  const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId || a.plaidConnectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
 
                   if (filteredAccounts.length === 0 && accountFilter !== 'all') {
                     return (
@@ -1196,12 +1664,12 @@ function SettingsPageBody() {
                               }`}>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`shrink-0 px-2 py-0.5 text-xs rounded-full font-medium ${
-                                    account.type === 'checking' ? 'bg-chart-4 text-white' :
-                                    account.type === 'savings' ? 'bg-chart-1 text-white' :
-                                    account.type === 'credit' ? 'bg-chart-2 text-white' :
-                                    isInvestmentAccount(account.type) ? 'bg-chart-3 text-white' :
-                                    account.type === 'loan' ? 'bg-chart-5 text-white' :
-                                    account.type === 'mortgage' ? 'bg-chart-5 text-white' :
+                                    account.type === 'checking' ? 'bg-chart-4/15 text-chart-4' :
+                                    account.type === 'savings' ? 'bg-chart-1/15 text-chart-1' :
+                                    account.type === 'credit' ? 'bg-chart-2/15 text-chart-2' :
+                                    isInvestmentAccount(account.type) ? 'bg-chart-3/15 text-chart-3' :
+                                    account.type === 'loan' ? 'bg-chart-5/15 text-chart-5' :
+                                    account.type === 'mortgage' ? 'bg-chart-5/15 text-chart-5' :
                                     'bg-muted text-muted-foreground'
                                   }`}>
                                     {account.type}
@@ -1313,6 +1781,76 @@ function SettingsPageBody() {
 
             </main>
           </div>
+
+      {/* Plaid Credentials Dialog */}
+      <Dialog open={isPlaidCredentialsDialogOpen} onOpenChange={setIsPlaidCredentialsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure Plaid API Credentials</DialogTitle>
+            <DialogDescription>
+              Enter your Plaid API keys to link bank accounts securely. Credentials are encrypted at rest.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSavePlaidCredentials} className="space-y-4">
+            <div>
+              <label htmlFor="plaidClientId" className="block text-sm font-medium text-foreground mb-1">
+                Plaid Client ID
+              </label>
+              <Input
+                id="plaidClientId"
+                value={plaidClientId}
+                onChange={(e) => setPlaidClientId(e.target.value)}
+                placeholder="Enter Plaid Client ID..."
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="plaidSecret" className="block text-sm font-medium text-foreground mb-1">
+                Plaid Secret
+              </label>
+              <Input
+                id="plaidSecret"
+                type="password"
+                value={plaidSecret}
+                onChange={(e) => setPlaidSecret(e.target.value)}
+                placeholder="Enter Plaid Secret..."
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="plaidEnvironment" className="block text-sm font-medium text-foreground mb-1">
+                Plaid Environment
+              </label>
+              <select
+                id="plaidEnvironment"
+                value={plaidEnvironment}
+                onChange={(e) => setPlaidEnvironment(e.target.value)}
+                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="sandbox">Sandbox</option>
+                <option value="development">Development</option>
+                <option value="production">Production</option>
+              </select>
+            </div>
+            <DialogFooter className="gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPlaidCredentialsDialogOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingPlaidCredentials}
+                className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+              >
+                {savingPlaidCredentials ? 'Saving...' : 'Save & Link'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Connection Details Dialog */}
           <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
