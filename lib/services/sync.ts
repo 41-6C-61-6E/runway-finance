@@ -86,14 +86,13 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
 }
 
 export async function createAccountSnapshots(userId: string, dek: Uint8Array, snapshotDate: string) {
+  // Fetch ALL accounts regardless of hidden/excluded status — hidden and excluded
+  // accounts still need a today-snapshot as the anchor for the backward-pass
+  // balance reconstruction used by account history charts.
   const userAccounts = await getDb()
     .select()
     .from(accounts)
-    .where(and(
-      eq(accounts.userId, userId),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false)
-    ));
+    .where(eq(accounts.userId, userId));
 
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
