@@ -33,7 +33,8 @@ export async function POST(request: Request) {
         client_user_id: userId,
       },
       client_name: 'This App',
-      products: [Products.Transactions, Products.Investments],
+      products: [Products.Transactions],
+      optional_products: [Products.Investments],
       country_codes: [CountryCode.Us, CountryCode.Ca],
       language: 'en',
     };
