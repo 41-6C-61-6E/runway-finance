@@ -162,6 +162,8 @@ function SettingsPageBody() {
 
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
   const [plaidLoading, setPlaidLoading] = useState(false);
+  const [plaidLinkError, setPlaidLinkError] = useState('');
+  const [plaidLinkSuccess, setPlaidLinkSuccess] = useState('');
   const [showSimpleFinForm, setShowSimpleFinForm] = useState(false);
   const [isPlaidCredentialsDialogOpen, setIsPlaidCredentialsDialogOpen] = useState(false);
   const [plaidClientId, setPlaidClientId] = useState('');
@@ -192,8 +194,8 @@ function SettingsPageBody() {
 
   const handleExchangePublicToken = async (publicToken: string, metadata: any) => {
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setPlaidLinkError('');
+    setPlaidLinkSuccess('');
     try {
       const res = await fetch('/api/plaid/exchange-public-token', {
         method: 'POST',
@@ -206,14 +208,14 @@ function SettingsPageBody() {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess(`Successfully connected bank via Plaid!`);
+        setPlaidLinkSuccess(`Successfully connected bank via Plaid!`);
         await fetchConnections();
         await fetchAccounts();
       } else {
-        setError(data.message || 'Failed to exchange public token');
+        setPlaidLinkError(data.message || 'Failed to exchange public token');
       }
     } catch {
-      setError('Failed to exchange public token');
+      setPlaidLinkError('Failed to exchange public token');
     } finally {
       setLoading(false);
     }
@@ -238,8 +240,8 @@ function SettingsPageBody() {
 
   const handleConnectPlaid = async () => {
     setPlaidLoading(true);
-    setError('');
-    setSuccess('');
+    setPlaidLinkError('');
+    setPlaidLinkSuccess('');
     try {
       const res = await fetch('/api/plaid/create-link-token', {
         method: 'POST',
@@ -260,20 +262,35 @@ function SettingsPageBody() {
         } catch {}
         setIsPlaidCredentialsDialogOpen(true);
       } else {
-        setError(data.message || 'Failed to initialize Plaid Link.');
+        setPlaidLinkError(data.message || 'Failed to initialize Plaid Link.');
       }
     } catch {
-      setError('Failed to initialize Plaid Link');
+      setPlaidLinkError('Failed to initialize Plaid Link');
     } finally {
       setPlaidLoading(false);
     }
   };
 
+  const handleResetPlaidKeys = async () => {
+    setPlaidLinkError('');
+    setPlaidLinkSuccess('');
+    try {
+      const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        setPlaidClientId(settingsData.apiKeys?.plaidClientId || '');
+        setPlaidSecret(settingsData.apiKeys?.plaidSecret || '');
+        setPlaidEnvironment(settingsData.apiKeys?.plaidEnvironment || 'sandbox');
+      }
+    } catch {}
+    setIsPlaidCredentialsDialogOpen(true);
+  };
+
   const handleSavePlaidCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPlaidCredentials(true);
-    setError('');
-    setSuccess('');
+    setPlaidLinkError('');
+    setPlaidLinkSuccess('');
     try {
       const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
       if (!settingsRes.ok) throw new Error('Failed to retrieve current settings');
@@ -300,14 +317,14 @@ function SettingsPageBody() {
       }
 
       setIsPlaidCredentialsDialogOpen(false);
-      setSuccess('Plaid credentials saved successfully.');
+      setPlaidLinkSuccess('Plaid credentials saved successfully.');
       
       // Auto-retry Plaid Link initiation after dialog closes
       setTimeout(() => {
         handleConnectPlaid();
       }, 300);
     } catch (err: any) {
-      setError(err.message || 'Failed to save Plaid credentials');
+      setPlaidLinkError(err.message || 'Failed to save Plaid credentials');
     } finally {
       setSavingPlaidCredentials(false);
     }
@@ -1026,7 +1043,18 @@ function SettingsPageBody() {
                   {/* Option A: Plaid Link */}
                   <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-foreground">Link via Plaid</h3>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-foreground">Link via Plaid</h3>
+                        {connections.some((c) => c.provider === 'plaid') && (
+                          <button
+                            type="button"
+                            onClick={handleResetPlaidKeys}
+                            className="text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted px-2 py-0.5 rounded-md transition-colors flex-shrink-0"
+                          >
+                            Edit Keys
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Connect your bank accounts securely in seconds using Plaid. Supports most major institutions.
                       </p>
@@ -1058,6 +1086,20 @@ function SettingsPageBody() {
                           <p className="text-[9px] text-muted-foreground/80 italic mt-0.5">
                             * Clicking the link button below will prompt you to enter these keys securely.
                           </p>
+                        </div>
+                      )}
+
+                      {plaidLinkError && (
+                        <div className="mt-3 p-2.5 bg-destructive/15 border border-destructive/25 rounded-lg flex items-start gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-destructive leading-normal">{plaidLinkError}</p>
+                        </div>
+                      )}
+
+                      {plaidLinkSuccess && (
+                        <div className="mt-3 p-2.5 bg-chart-1/15 border border-chart-1/25 rounded-lg flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-chart-1 shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-chart-1 leading-normal">{plaidLinkSuccess}</p>
                         </div>
                       )}
                     </div>
@@ -1116,14 +1158,6 @@ function SettingsPageBody() {
                     <div className="space-y-4 animate-in fade-in duration-200">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                         <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
-                          <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">SimpleFIN Bridge</h4>
-                          <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                            <li>Flat rate of <strong className="text-foreground">$1.50/mo</strong> or <strong className="text-foreground">$15.00/yr</strong></li>
-                            <li>Supports up to 25 linked accounts and apps</li>
-                            <li>Simple setup, no developer configuration required</li>
-                          </ul>
-                        </div>
-                        <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
                           <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">Plaid (Self-Hosted Keys)</h4>
                           <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
                             <li><strong className="text-emerald-500 font-semibold">Free</strong> for the first 10 lifetime production institutions (Plaid "Items", not a rolling window).</li>
@@ -1132,6 +1166,14 @@ function SettingsPageBody() {
                             <li>Pay-as-you-go Refresh: ~$0.08 per request (e.g., daily sync = ~$2.40/mo, hourly sync = ~$57.60/mo per institution).</li>
                             <li><strong className="text-foreground">PAYG Account Conversion:</strong> Linking an 11th unique lifetime Item converts the entire developer account to Pay-as-you-go billing, making all Items (including the first 10) billable.</li>
                             <li>Requires registering your own Plaid developer credentials.</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
+                          <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">SimpleFIN Bridge</h4>
+                          <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+                            <li>Flat rate of <strong className="text-foreground">$1.50/mo</strong> or <strong className="text-foreground">$15.00/yr</strong></li>
+                            <li>Supports up to 25 linked accounts and apps</li>
+                            <li>Simple setup, no developer configuration required</li>
                           </ul>
                         </div>
                       </div>
@@ -1251,12 +1293,6 @@ function SettingsPageBody() {
                 {error && (
                   <div className="mt-4 p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
                     <p className="text-destructive text-sm">{error}</p>
-                  </div>
-                )}
-
-                {success && (
-                  <div className="mt-4 p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg">
-                    <p className="text-chart-1 text-sm">{success}</p>
                   </div>
                 )}
               </div>
@@ -1817,9 +1853,13 @@ function SettingsPageBody() {
       <Dialog open={isPlaidCredentialsDialogOpen} onOpenChange={setIsPlaidCredentialsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Configure Plaid API Credentials</DialogTitle>
+            <DialogTitle>
+              {connections.some((c) => c.provider === 'plaid') ? 'Update Plaid API Credentials' : 'Configure Plaid API Credentials'}
+            </DialogTitle>
             <DialogDescription>
-              Enter your Plaid API keys to link bank accounts securely. Credentials are encrypted at rest.
+              {connections.some((c) => c.provider === 'plaid')
+                ? 'Update your stored Plaid API keys. New credentials will be used for all future sync operations.'
+                : 'Enter your Plaid API keys to link bank accounts securely. Credentials are encrypted at rest.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSavePlaidCredentials} className="space-y-4">
@@ -1862,10 +1902,10 @@ function SettingsPageBody() {
                 className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="sandbox">Sandbox (Mock data)</option>
-                <option value="development">Development / Pay-as-you-go (Real bank connections)</option>
+                <option value="production">Production / Pay-as-you-go (Real bank connections)</option>
               </select>
               <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
-                Choose <strong>Development / Pay-as-you-go</strong> to connect your actual accounts. It includes 10 free connections, and can exceed this limit via pay-as-you-go billing. Sandbox is for simulated testing only.
+                Choose <strong>Production / Pay-as-you-go</strong> to connect your actual accounts. It includes 10 free connections, and can exceed this limit via pay-as-you-go billing. Sandbox is for simulated testing only.
               </p>
             </div>
             <DialogFooter className="gap-2">
@@ -1881,7 +1921,7 @@ function SettingsPageBody() {
                 disabled={savingPlaidCredentials}
                 className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
               >
-                {savingPlaidCredentials ? 'Saving...' : 'Save & Link'}
+                {savingPlaidCredentials ? 'Saving...' : connections.some((c) => c.provider === 'plaid') ? 'Save Keys' : 'Save & Link'}
               </button>
             </DialogFooter>
           </form>
