@@ -29,7 +29,12 @@ export async function getPlaidConfig(userId: string, dek: Uint8Array) {
 
   const clientId = keys.plaidClientId;
   const secret = keys.plaidSecret;
-  const env = keys.plaidEnvironment || 'sandbox';
+  let env = keys.plaidEnvironment || 'sandbox';
+
+  // Normalize legacy 'development' value — Plaid SDK only has 'production' and 'sandbox'
+  if (env === 'development') {
+    env = 'production';
+  }
 
   if (!clientId || !secret) {
     throw new Error('Plaid Client ID or Secret is missing. Please add them in Settings -> Advanced tab.');
@@ -41,7 +46,7 @@ export async function getPlaidConfig(userId: string, dek: Uint8Array) {
 export async function getPlaidClient(userId: string, dek: Uint8Array): Promise<PlaidApi> {
   const { clientId, secret, env } = await getPlaidConfig(userId, dek);
 
-  const environment = PlaidEnvironments[env as keyof typeof PlaidEnvironments] || PlaidEnvironments.sandbox;
+  const environment = PlaidEnvironments[env as keyof typeof PlaidEnvironments] ?? PlaidEnvironments.sandbox;
 
   const configuration = new Configuration({
     basePath: environment,

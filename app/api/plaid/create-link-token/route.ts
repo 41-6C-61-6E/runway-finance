@@ -41,10 +41,19 @@ export async function POST(request: Request) {
     const response = await client.linkTokenCreate(configs);
     return NextResponse.json({ link_token: response.data.link_token });
   } catch (error: any) {
-    logger.error(`${LOG_TAG} Error creating link token`, { error: error.message });
+    const plaidBody = error.response?.data;
+    logger.error(`${LOG_TAG} Error creating link token`, {
+      httpStatus: error.response?.status,
+      plaidErrorCode: plaidBody?.error_code,
+      plaidErrorType: plaidBody?.error_type,
+      plaidErrorMessage: plaidBody?.error_message,
+      plaidDisplayMessage: plaidBody?.display_message,
+      axiosMessage: error.message,
+    });
+    const userMessage = plaidBody?.error_message || plaidBody?.display_message || error.message || 'Failed to create Plaid Link Token';
     return NextResponse.json({
       error: 'internal_error',
-      message: error.response?.data?.error_message || error.message || 'Failed to create Plaid Link Token'
+      message: userMessage,
     }, { status: 500 });
   }
 }
