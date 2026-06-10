@@ -57,6 +57,16 @@ export const CHARTS = {
       goalsList: 'Goals List',
     },
   },
+  investments: {
+    label: 'Investments',
+    charts: {
+      investmentsSummary: 'Summary Cards',
+      performanceChart: 'Portfolio Value Over Time',
+      holdingsAllocationChart: 'Holdings Allocation Chart',
+      holdingsTable: 'Holdings Table',
+      recentActivity: 'Recent Activity',
+    },
+  },
 } as const;
 
 const defaultVisibility: Partial<Record<string, boolean>> = {};

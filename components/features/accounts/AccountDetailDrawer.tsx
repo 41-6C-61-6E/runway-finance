@@ -17,6 +17,7 @@ type Account = {
   balanceDate: string | null;
   metadata?: Record<string, unknown> | null;
   connectionId?: string | null;
+  plaidConnectionId?: string | null;
   tags?: { id: string; name: string; color: string }[];
 };
 
@@ -127,7 +128,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ connectionId: null }),
+        body: JSON.stringify({ connectionId: null, plaidConnectionId: null }),
       });
       if (!res.ok) {
         throw new Error('Failed to unlink account');
@@ -327,6 +328,9 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
               {account.connectionId && (
                 <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>
               )}
+              {account.plaidConnectionId && (
+                <span className="text-[10px] text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">Plaid synced</span>
+              )}
             </div>
             <div className={`font-mono text-2xl font-bold mt-1 text-foreground financial-value`}>{text}</div>
             <div className="text-xs text-muted-foreground mt-1">{account.currency}</div>
@@ -514,11 +518,11 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
               </div>
             </div>
 
-            {account.connectionId && (
+            {(account.connectionId || account.plaidConnectionId) && (
               <div className="pt-4 border-t border-border space-y-2">
                 <h4 className="text-sm font-semibold text-foreground">Unlink Sync Connection</h4>
                 <p className="text-[11px] text-muted-foreground leading-normal">
-                  Disconnect this account from the SimpleFIN bank sync. It will become a manual account. This allows you to permanently delete it, or re-map it to another active bank sync account to preserve history.
+                  Disconnect this account from bank sync. It will become a manual account. This allows you to permanently delete it, or re-map it to another active bank sync account to preserve history.
                 </p>
                 <button
                   type="button"
@@ -531,7 +535,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
               </div>
             )}
 
-            {!account.connectionId && (
+            {!account.connectionId && !account.plaidConnectionId && (
               <div className="pt-4 border-t border-border space-y-2">
                 <h4 className="text-sm font-semibold text-destructive">Delete Account</h4>
                 <p className="text-[11px] text-muted-foreground leading-normal">

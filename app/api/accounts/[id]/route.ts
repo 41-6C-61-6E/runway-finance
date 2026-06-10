@@ -121,6 +121,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.balance !== undefined) updateData.balance = String(body.balance);
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
   if (body.connectionId !== undefined) updateData.connectionId = body.connectionId;
+  if (body.plaidConnectionId !== undefined) updateData.plaidConnectionId = body.plaidConnectionId;
 
   const hasTagUpdate = body.tagIds !== undefined;
 

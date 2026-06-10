@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { simplifinConnections } from '@/lib/db/schema';
+import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
@@ -16,12 +16,23 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const userId = session.user.id;
 
-  // Verify ownership
-  const [connection] = await getDb()
+  // Verify ownership in SimpleFIN
+  let isSimplefin = true;
+  let [connection] = await getDb()
     .select()
     .from(simplifinConnections)
     .where(eq(simplifinConnections.id, id))
     .limit(1);
+
+  if (!connection) {
+    isSimplefin = false;
+    const [plaidConn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, id))
+      .limit(1);
+    connection = plaidConn as any;
+  }
 
   if (!connection) {
     return NextResponse.json(
@@ -37,22 +48,36 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  // Call sync service
-  const { syncConnection } = await import('@/lib/services/sync');
-  const result = await syncConnection(id, userId);
+  let result: any;
+  if (isSimplefin) {
+    const { syncConnection } = await import('@/lib/services/sync');
+    result = await syncConnection(id, userId);
+  } else {
+    const { syncPlaidConnection } = await import('@/lib/services/plaid-sync');
+    result = await syncPlaidConnection(id, userId);
+  }
 
   if (result.status === 'success') {
-    logger.info('Sync completed', { connectionId: id, userId, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew, transactionsUpdated: result.transactionsUpdated });
+    logger.info('Sync completed', { connectionId: id, userId, isSimplefin, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew });
   } else {
-    logger.error('Sync failed', { connectionId: id, userId, error: result.errorMessage });
+    logger.error('Sync failed', { connectionId: id, userId, isSimplefin, error: result.errorMessage });
   }
 
   // Reschedule the sync timer based on the updated lastSyncAt
-  const [refreshed] = await getDb()
-    .select({ syncFrequency: simplifinConnections.syncFrequency, lastSyncAt: simplifinConnections.lastSyncAt })
-    .from(simplifinConnections)
-    .where(eq(simplifinConnections.id, id))
-    .limit(1);
+  let refreshed: any;
+  if (isSimplefin) {
+    [refreshed] = await getDb()
+      .select({ syncFrequency: simplifinConnections.syncFrequency, lastSyncAt: simplifinConnections.lastSyncAt })
+      .from(simplifinConnections)
+      .where(eq(simplifinConnections.id, id))
+      .limit(1);
+  } else {
+    [refreshed] = await getDb()
+      .select({ syncFrequency: plaidConnections.syncFrequency, lastSyncAt: plaidConnections.lastSyncAt })
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, id))
+      .limit(1);
+  }
 
   if (refreshed) {
     syncScheduler.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt);

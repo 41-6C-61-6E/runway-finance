@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import { requireDeleteConfirmation } from '../../../lib/utils/require-auth';
 import { getDb } from '../../../lib/db';
-import { simplifinConnections } from '../../../lib/db/schema';
+import { simplifinConnections, plaidConnections } from '../../../lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { logger } from '../../../lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
@@ -18,7 +18,8 @@ export async function GET() {
   const group = await getShareGroup(userId);
   const userIds = group ? group.allUserIds : [userId];
 
-  const connections = await getDb()
+  // Fetch SimpleFIN connections
+  const sfConnections = await getDb()
     .select({
       id: simplifinConnections.id,
       label: simplifinConnections.label,
@@ -30,11 +31,30 @@ export async function GET() {
       userId: simplifinConnections.userId,
     })
     .from(simplifinConnections)
-    .where(inArray(simplifinConnections.userId, userIds))
-    .orderBy(simplifinConnections.createdAt);
+    .where(inArray(simplifinConnections.userId, userIds));
 
-  logger.info('Connections fetched', { count: connections.length });
-  return NextResponse.json(connections);
+  // Fetch Plaid connections
+  const pConnections = await getDb()
+    .select({
+      id: plaidConnections.id,
+      label: plaidConnections.label,
+      syncFrequency: plaidConnections.syncFrequency,
+      lastSyncAt: plaidConnections.lastSyncAt,
+      lastSyncStatus: plaidConnections.lastSyncStatus,
+      lastSyncError: plaidConnections.lastSyncError,
+      createdAt: plaidConnections.createdAt,
+      userId: plaidConnections.userId,
+    })
+    .from(plaidConnections)
+    .where(inArray(plaidConnections.userId, userIds));
+
+  const allConnections = [
+    ...sfConnections.map((c) => ({ ...c, provider: 'simplefin' })),
+    ...pConnections.map((c) => ({ ...c, provider: 'plaid' })),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  logger.info('Connections fetched', { count: allConnections.length });
+  return NextResponse.json(allConnections);
 }
 
 export async function POST(request: Request) {
