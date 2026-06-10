@@ -1023,7 +1023,7 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden mb-5 sm:mb-6">
+          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden mb-5 sm:mb-6 settings-accounts-toggle">
             <button
               onClick={() => {
                 setAccountSubTab('connections');
@@ -1068,7 +1068,7 @@ function SettingsPageBody() {
           {accountSubTab === 'automatic' && (
         <>
           {!hasConnection && (
-            <div className="p-8 text-center bg-card border border-border rounded-xl">
+            <div className="p-8 text-center">
               <Landmark className="w-10 h-10 text-muted-foreground/60 mx-auto mb-3" />
               <h3 className="text-sm font-semibold text-foreground">No Synced Accounts</h3>
               <p className="text-xs text-muted-foreground mt-1 mb-4">
@@ -1113,7 +1113,7 @@ function SettingsPageBody() {
 
           {/* Account Management - only shown when a connection exists */}
           {hasConnection && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
+            <div className="p-0">
               <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
@@ -1169,7 +1169,7 @@ function SettingsPageBody() {
                   }
 
                   return (
-                    <div className="divide-y divide-border">
+                    <div className="space-y-2">
                       {filteredAccounts.map((account) => {
                         const num = parseFloat(account.balance);
                         const formatted = new Intl.NumberFormat('en-US', {
@@ -1181,7 +1181,7 @@ function SettingsPageBody() {
                         return (
                           <div
                             key={account.id}
-                            className={`px-3 sm:px-4 py-4 sm:py-5 cursor-pointer group hover:bg-muted/30 transition-colors`}
+                            className={`px-3 sm:px-4 py-4 sm:py-5 cursor-pointer group bg-muted border border-border rounded-xl hover:opacity-90 transition-opacity`}
                             onClick={() => handleOpenAccountDrawer(account)}
                           >
                             <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -1290,7 +1290,7 @@ function SettingsPageBody() {
           )}
 
           {/* Add Connection Options */}
-          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
+          <div className="p-0">
             <button
               type="button"
               onClick={() => setIsAddConnectionExpanded(!isAddConnectionExpanded)}
@@ -1327,7 +1327,7 @@ function SettingsPageBody() {
                       </p>
                       
                       {!connections.some((c) => c.provider === 'plaid') && (
-                        <div className="mt-3 p-2.5 bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 text-[10px] leading-normal rounded-lg space-y-1.5">
+                        <div className="mt-3 p-2.5 bg-primary/5 border border-primary/15 text-primary text-[10px] leading-normal rounded-lg space-y-1.5">
                           <div className="font-semibold flex items-center gap-1">
                             <span>💡 Setting up Plaid Self-Hosted Keys:</span>
                           </div>
@@ -1338,7 +1338,7 @@ function SettingsPageBody() {
                                 href="https://dashboard.plaid.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-violet-600 dark:text-violet-400 hover:underline font-semibold"
+                                className="text-primary hover:underline font-semibold"
                               >
                                 dashboard.plaid.com
                               </a>.
@@ -1374,7 +1374,7 @@ function SettingsPageBody() {
                       type="button"
                       onClick={handleConnectPlaid}
                       disabled={plaidLoading || loading}
-                      className="w-full px-4 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 animate-shimmer"
+                      className="w-full px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 animate-shimmer"
                     >
                       {plaidLoading ? 'Initializing Plaid...' : 'Link Institution via Plaid'}
                     </button>
@@ -1389,7 +1389,7 @@ function SettingsPageBody() {
                       </p>
                     </div>
                     {hasMySimpleFin ? (
-                      <div className="text-[11px] text-amber-500 font-medium bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg">
+                      <div className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/50 px-2.5 py-1.5 rounded-lg">
                         SimpleFIN connection already linked. Delete it first if you need to reconnect.
                       </div>
                     ) : (
@@ -1666,7 +1666,7 @@ function SettingsPageBody() {
 
           {/* Existing Connections */}
           {hasConnection && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
+            <div className="p-0">
               <h2 className="text-base font-semibold text-foreground mb-4">Automatic Bank Connections</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
@@ -1678,7 +1678,7 @@ function SettingsPageBody() {
                     return (
                     <div
                       key={conn.id}
-                      className="p-4 bg-muted/30 border border-border rounded-lg space-y-2"
+                      className="p-4 bg-muted border border-border rounded-xl space-y-2"
                     >
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">

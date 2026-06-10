@@ -876,7 +876,7 @@ export default function ManualAccountsSection() {
   }
 
   return (
-    <div className="p-5 bg-card border border-border rounded-xl">
+    <div className="p-0">
       <div className="flex items-center justify-between gap-4 mb-4">
         <h2 className="text-base font-semibold text-foreground">Manual Assets & Mortgages</h2>
         <button
@@ -915,7 +915,7 @@ export default function ManualAccountsSection() {
           No manual accounts yet. Add your first asset or mortgage to track it.
         </p>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="space-y-2">
           {accounts.map((account) => {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = isLiabilityAccount(account.type);
@@ -927,7 +927,7 @@ export default function ManualAccountsSection() {
             return (
               <div
                 key={account.id}
-                className="px-4 py-5"
+                className="px-4 py-5 bg-muted border border-border rounded-xl"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">

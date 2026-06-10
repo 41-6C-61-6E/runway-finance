@@ -386,4 +386,9 @@ body,
   color: var(--muted-foreground);
 }
 
+/* Restore visible border for the sub-tab toggle wrapper */
+.settings-accounts-toggle {
+  border-color: var(--border) !important;
+}
+
 
