@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { GoalCard } from './goal-card';
-import { GoalFormDrawer } from './goal-form-drawer';
+import { GoalFormDialog } from './goal-form-drawer';
+import { WaterfallVisualization } from './waterfall-visualization';
+import { GoalReorder } from './goal-reorder';
 import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
 
 interface Goal {
@@ -14,24 +16,24 @@ interface Goal {
   currentAmount: string;
   targetDate: string | null;
   category: string | null;
-  priority: number;
   status: string;
   linkedAccountId: string | null;
   percentage: string;
   reserve: string;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'paused';
-type SortBy = 'priority' | 'targetDate' | 'name' | 'progress';
+type SortBy = 'sortOrder' | 'targetDate' | 'name' | 'progress';
 
 export function GoalsList() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('all');
-  const [sortBy, setSortBy] = useState<SortBy>('priority');
+  const [sortBy, setSortBy] = useState<SortBy>('sortOrder');
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -69,10 +71,10 @@ export function GoalsList() {
         const uniqueAccountIds = [...new Set(linkedGoalIds)];
         const balances: Record<string, number | null> = {};
 
-        for (const accountId of uniqueAccountIds) {
-          const acctRes = await fetch(`/api/accounts`, { credentials: 'include' });
-          if (acctRes.ok) {
-            const accounts: Array<{ id: string; balance: string }> = await acctRes.json();
+        const acctRes = await fetch(`/api/accounts`, { credentials: 'include' });
+        if (acctRes.ok) {
+          const accounts: Array<{ id: string; balance: string }> = await acctRes.json();
+          for (const accountId of uniqueAccountIds) {
             const acct = accounts.find((a) => a.id === accountId);
             if (acct) {
               balances[accountId] = parseFloat(acct.balance);
@@ -144,8 +146,8 @@ export function GoalsList() {
   // Sort goals
   const sortedGoals = [...filteredGoals].sort((a, b) => {
     switch (sortBy) {
-      case 'priority':
-        return b.priority - a.priority;
+      case 'sortOrder':
+        return a.sortOrder - b.sortOrder;
       case 'targetDate':
         if (!a.targetDate && !b.targetDate) return 0;
         if (!a.targetDate) return 1;
@@ -236,7 +238,7 @@ export function GoalsList() {
             Create Your First Goal
           </button>
         </div>
-        <GoalFormDrawer
+        <GoalFormDialog
           open={showForm}
           onClose={handleCloseForm}
           onSuccess={handleSuccess}
@@ -275,7 +277,7 @@ export function GoalsList() {
             onChange={(e) => setSortBy(e.target.value as SortBy)}
             className="px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-medium"
           >
-            <option value="priority">Sort: Priority</option>
+            <option value="sortOrder">Sort: Order</option>
             <option value="targetDate">Sort: Deadline</option>
             <option value="name">Sort: Name</option>
             <option value="progress">Sort: Progress</option>
@@ -313,8 +315,25 @@ export function GoalsList() {
         </div>
       )}
 
-      {/* Form Drawer */}
-      <GoalFormDrawer
+      {/* Waterfall Visualization - show when there are shared accounts */}
+      {goals.some((g) => g.linkedAccountId) && (
+        <div className="mt-6">
+          <WaterfallVisualization />
+        </div>
+      )}
+
+      {/* Goal Reorder - show when there are multiple active goals */}
+      {goals.filter((g) => g.status === 'active').length > 1 && (
+        <div className="mt-4">
+          <GoalReorder
+            goals={goals.filter((g) => g.status === 'active')}
+            onReorder={fetchGoals}
+          />
+        </div>
+      )}
+
+      {/* Form Dialog */}
+      <GoalFormDialog
         open={showForm}
         onClose={handleCloseForm}
         onSuccess={handleSuccess}
@@ -327,11 +346,11 @@ export function GoalsList() {
           currentAmount: editingGoal.currentAmount,
           targetDate: editingGoal.targetDate,
           category: editingGoal.category,
-          priority: editingGoal.priority,
           status: editingGoal.status,
           linkedAccountId: editingGoal.linkedAccountId,
           percentage: editingGoal.percentage,
           reserve: editingGoal.reserve,
+          sortOrder: editingGoal.sortOrder,
         } : undefined}
       />
     </div>
