@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
       allocatedAmount: alloc?.allocatedAmount ?? parseFloat(goal.currentAmount),
       isUnderfunded: alloc?.isUnderfunded ?? false,
       accountBalance: alloc?.accountBalance ?? null,
+      accountName: alloc?.accountName ?? null,
       remainingOnAccount: alloc?.remainingOnAccount ?? null,
     };
   });
