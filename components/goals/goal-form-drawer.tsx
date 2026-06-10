@@ -59,6 +59,7 @@ const goalTypes = [
 const statuses = [
   { value: 'active', label: 'Active' },
   { value: 'paused', label: 'Paused' },
+  { value: 'pending', label: 'Pending' },
   { value: 'completed', label: 'Completed' },
 ];
 
