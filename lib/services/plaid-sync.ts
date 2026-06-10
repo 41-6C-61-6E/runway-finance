@@ -598,6 +598,9 @@ export async function syncPlaidConnection(
     await createAccountSnapshots(dataUserId, dek, today);
 
     // Historical snapshot generation
+    // Generate synthetic snapshots covering the full transaction history pulled from Plaid.
+    // No watermark — run the full two-pass reconstruction from earliestTx all the way to today.
+    // The anchor is the real snapshot written by createAccountSnapshots() above (today's balance).
     for (const plaidAcc of plaidAccountsList) {
       const accountId = externalIdToAccountId.get(plaidAcc.account_id);
       if (!accountId) continue;
@@ -610,14 +613,13 @@ export async function syncPlaidConnection(
       const toDateStr = toDate.toISOString().split('T')[0];
 
       if (earliestTx < toDateStr) {
-        const ninetyDaysAgo = new Date(startedAt - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         await generateHistoricalAccountSnapshots(
           accountId,
           dataUserId,
           earliestTx,
           toDateStr,
-          dek,
-          ninetyDaysAgo
+          dek
+          // No watermarkDate — generate the full range so all years of history are covered
         );
       }
     }
