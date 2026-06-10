@@ -6,7 +6,9 @@ import {
   syncLogs,
   categories,
   transactionTags,
-  userSettings
+  userSettings,
+  holdings,
+  holdingSnapshots,
 } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
@@ -319,9 +321,7 @@ export async function syncPlaidConnection(
       }
 
       const holdingsForAccount = accountHoldingsMap.get(plaidAcc.account_id);
-      if (holdingsForAccount !== undefined) {
-        currentMetadata.plaidHoldings = holdingsForAccount;
-      }
+      delete currentMetadata.plaidHoldings;
 
       const encryptedMetadata = Object.keys(currentMetadata).length > 0
         ? await encryptField(JSON.stringify(currentMetadata), dek)
@@ -374,6 +374,76 @@ export async function syncPlaidConnection(
       }
 
       externalIdToAccountId.set(plaidAcc.account_id, upserted.id);
+
+      if (holdingsForAccount !== undefined) {
+        await getDb()
+          .delete(holdings)
+          .where(eq(holdings.accountId, upserted.id));
+
+        if (holdingsForAccount.length > 0) {
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          for (const h of holdingsForAccount) {
+            const qty = String(h.quantity);
+            const price = String(h.institutionPrice ?? h.closePrice ?? '0');
+            const cost = h.costBasis != null ? String(h.costBasis) : null;
+            const val = String(h.institutionValue ?? (Number(qty) * Number(price)));
+            const nameVal = h.name || 'Unknown Security';
+
+            const encryptedName = await encryptField(nameVal, dek);
+            const encryptedQty = await encryptField(qty, dek);
+            const encryptedPrice = await encryptField(price, dek);
+            const encryptedCost = cost != null ? await encryptField(cost, dek) : null;
+            const encryptedValue = await encryptField(val, dek);
+
+            await getDb()
+              .insert(holdings)
+              .values({
+                userId: dataUserId,
+                accountId: upserted.id,
+                securityId: h.securityId,
+                ticker: h.ticker,
+                name: encryptedName,
+                quantity: encryptedQty,
+                price: encryptedPrice,
+                costBasis: encryptedCost,
+                value: encryptedValue,
+                currency: h.currency,
+              });
+
+            await getDb()
+              .insert(holdingSnapshots)
+              .values({
+                userId: dataUserId,
+                accountId: upserted.id,
+                snapshotDate: todayStr,
+                securityId: h.securityId,
+                ticker: h.ticker,
+                name: encryptedName,
+                quantity: encryptedQty,
+                price: encryptedPrice,
+                value: encryptedValue,
+                costBasis: encryptedCost,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  holdingSnapshots.userId,
+                  holdingSnapshots.accountId,
+                  holdingSnapshots.securityId,
+                  holdingSnapshots.snapshotDate,
+                ],
+                set: {
+                  name: encryptedName,
+                  quantity: encryptedQty,
+                  price: encryptedPrice,
+                  value: encryptedValue,
+                  costBasis: encryptedCost,
+                },
+              });
+          }
+        }
+      }
+
       accountsSynced++;
 
       const wasNewAccount = !orphanedAccount && !existingExternalIds.has(plaidAcc.account_id);

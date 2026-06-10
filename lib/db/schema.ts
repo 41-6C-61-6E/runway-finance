@@ -258,6 +258,55 @@ export const accounts = pgTable(
   ]
 );
 
+// ── Holdings ─────────────────────────────────────────────────────────────────
+export const holdings = pgTable(
+  'holdings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    securityId: text('security_id').notNull(),
+    ticker: text('ticker'),
+    name: text('name'),
+    quantity: text('quantity').notNull(),
+    price: text('price').notNull(),
+    costBasis: text('cost_basis'),
+    value: text('value').notNull(),
+    currency: text('currency').notNull().default('USD'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique().on(t.accountId, t.securityId),
+  ]
+);
+
+// ── Holding Snapshots ────────────────────────────────────────────────────────
+export const holdingSnapshots = pgTable(
+  'holding_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    securityId: text('security_id').notNull(),
+    ticker: text('ticker'),
+    name: text('name'),
+    quantity: text('quantity').notNull(),
+    price: text('price').notNull(),
+    value: text('value').notNull(),
+    costBasis: text('cost_basis'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique().on(t.userId, t.accountId, t.securityId, t.snapshotDate),
+  ]
+);
+
 // ── Categories ───────────────────────────────────────────────────────────────
 export const categories = pgTable('categories', {
   id: uuid('id').primaryKey().defaultRandom(),
