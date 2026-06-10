@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { syncPlaidConnection } from '@/lib/services/plaid-sync';
-import { plaidConnections, accounts, syncLogs, transactions, userSettings } from '@/lib/db/schema';
+import { plaidConnections, accounts, syncLogs, transactions, userSettings, holdings } from '@/lib/db/schema';
 
 let lastTableOrOperation: any = null;
+let insertedHoldings: any[] = [];
 
 class MockDbQueryBuilder {
   select(...args: any[]) {
@@ -28,6 +29,9 @@ class MockDbQueryBuilder {
   }
 
   values(data: any) {
+    if (lastTableOrOperation === holdings) {
+      insertedHoldings.push(data);
+    }
     return this;
   }
 
@@ -126,6 +130,7 @@ describe('Plaid Sync Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lastTableOrOperation = null;
+    insertedHoldings = [];
   });
 
   it('syncs investment transactions when investment accounts are present', async () => {
@@ -196,5 +201,81 @@ describe('Plaid Sync Service', () => {
     expect(mockPlaidClient.investmentsHoldingsGet).toHaveBeenCalled();
     expect(mockPlaidClient.investmentsTransactionsGet).toHaveBeenCalled();
     expect(result.transactionsFetched).toBe(1); // 1 investment transaction was mapped and fetched
+  });
+
+  it('aggregates duplicate holdings for the same security_id and syncs them', async () => {
+    const mockPlaidClient = {
+      transactionsSync: vi.fn().mockResolvedValue({
+        data: {
+          added: [],
+          modified: [],
+          removed: [],
+          next_cursor: 'cursor_abc',
+          has_more: false,
+          accounts: [
+            {
+              account_id: 'acct_brokerage',
+              name: 'Brokerage Account',
+              type: 'investment',
+              balances: { current: 15000 },
+            },
+          ],
+        },
+      }),
+      investmentsHoldingsGet: vi.fn().mockResolvedValue({
+        data: {
+          holdings: [
+            {
+              account_id: 'acct_brokerage',
+              security_id: 'sec_1',
+              institution_price: 150.25,
+              institution_value: 1502.5,
+              cost_basis: 1200,
+              quantity: 10,
+              iso_currency_code: 'USD',
+            },
+            {
+              account_id: 'acct_brokerage',
+              security_id: 'sec_1',
+              institution_price: 150.25,
+              institution_value: 751.25,
+              cost_basis: 600,
+              quantity: 5,
+              iso_currency_code: 'USD',
+            },
+          ],
+          securities: [
+            {
+              security_id: 'sec_1',
+              ticker_symbol: 'AAPL',
+              name: 'Apple Inc.',
+              close_price: 150.25,
+            },
+          ],
+        },
+      }),
+      investmentsTransactionsGet: vi.fn().mockResolvedValue({
+        data: {
+          investment_transactions: [],
+          total_investment_transactions: 0,
+        },
+      }),
+    };
+
+    (getPlaidClient as any).mockResolvedValue(mockPlaidClient);
+
+    const result = await syncPlaidConnection(mockConnectionId, mockUserId);
+
+    expect(result.status).toBe('success');
+    expect(insertedHoldings.length).toBe(1); // Duplicates should have been aggregated into one holding
+
+    // Verify aggregated values
+    const holding = insertedHoldings[0];
+    expect(holding.securityId).toBe('sec_1');
+    expect(holding.ticker).toBe('AAPL');
+    expect(holding.quantity).toBe('enc_15'); // 10 + 5 = 15
+    expect(holding.value).toBe('enc_2253.75'); // 1502.5 + 751.25 = 2253.75
+    expect(holding.costBasis).toBe('enc_1800'); // 1200 + 600 = 1800
+    expect(holding.price).toBe('enc_150.25'); // institutionPrice
   });
 });
