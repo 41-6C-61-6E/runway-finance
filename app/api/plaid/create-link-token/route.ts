@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       user: {
         client_user_id: userId,
       },
-      client_name: 'Runway Finance',
+      client_name: 'This App',
       products: [Products.Transactions, Products.Investments],
       country_codes: [CountryCode.Us, CountryCode.Ca],
       language: 'en',

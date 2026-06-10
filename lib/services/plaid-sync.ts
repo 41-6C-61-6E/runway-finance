@@ -378,7 +378,7 @@ export async function syncPlaidConnection(
       if (!accountId) continue;
 
       // In Plaid, positive values are debits (expenses), negative are credits (deposits/income).
-      // Runway Finance stores deposits as positive, and expenses as negative. So we negate the amount.
+      // THis app  stores deposits as positive, and expenses as negative. So we negate the amount.
       const appAmount = String(-pt.amount);
       const isPending = pt.pending ?? false;
 
