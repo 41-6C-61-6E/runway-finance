@@ -1049,10 +1049,10 @@ function SettingsPageBody() {
                               </a>.
                             </li>
                             <li>
-                              Go to <strong>Team Settings &gt; API Keys</strong>.
+                              Go to <strong>Platform &gt; Developers &gt; Keys</strong>.
                             </li>
                             <li>
-                              Copy your <strong>Client ID</strong> and <strong>Secret</strong> (Sandbox or Development).
+                              Copy your <strong>Client ID</strong> and the corresponding secret (use the <strong>Production Secret</strong> for your actual accounts, or <strong>Sandbox Secret</strong> for testing).
                             </li>
                           </ol>
                           <p className="text-[9px] text-muted-foreground/80 italic mt-0.5">
@@ -1847,6 +1847,9 @@ function SettingsPageBody() {
                 placeholder="Enter Plaid Secret..."
                 required
               />
+              <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                Use your Plaid <strong>Production Secret</strong> if linking actual bank accounts, or <strong>Sandbox Secret</strong> for testing.
+              </p>
             </div>
             <div>
               <label htmlFor="plaidEnvironment" className="block text-sm font-medium text-foreground mb-1">
@@ -1858,10 +1861,12 @@ function SettingsPageBody() {
                 onChange={(e) => setPlaidEnvironment(e.target.value)}
                 className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="sandbox">Sandbox</option>
-                <option value="development">Development</option>
-                <option value="production">Production</option>
+                <option value="sandbox">Sandbox (Mock data)</option>
+                <option value="development">Development / Pay-as-you-go (Real bank connections)</option>
               </select>
+              <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                Choose <strong>Development / Pay-as-you-go</strong> to connect your actual accounts. It includes 10 free connections, and can exceed this limit via pay-as-you-go billing. Sandbox is for simulated testing only.
+              </p>
             </div>
             <DialogFooter className="gap-2">
               <button
