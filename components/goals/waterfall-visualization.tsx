@@ -98,6 +98,8 @@ export function WaterfallVisualization() {
 }
 
 function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
   return (
     <div className="space-y-3">
       {/* Account Header */}
@@ -110,12 +112,18 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
       </div>
 
       {/* Released Funds Banner */}
-      {account.releasedFromCompleted > 0 && (
+      {account.releasedFromCompleted > 0 && !bannerDismissed && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
           <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-          <span className="text-xs text-green-500">
+          <span className="text-xs text-green-500 flex-1">
             ${account.releasedFromCompleted.toLocaleString()} released from completed goals
           </span>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            className="text-green-500/50 hover:text-green-500 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       )}
 

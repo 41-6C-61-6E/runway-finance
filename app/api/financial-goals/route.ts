@@ -6,7 +6,7 @@ import { financialGoals } from '@/lib/db/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
-import { computeGoalAllocations, findSharedAccounts } from '@/lib/services/goal-allocation';
+import { computeGoalAllocations, findSharedAccounts, getGoalAllocation } from '@/lib/services/goal-allocation';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -148,6 +148,18 @@ export async function PATCH(req: NextRequest) {
     if (updates.priority !== undefined) updateData.priority = updates.priority;
     if (updates.sortOrder !== undefined) updateData.sortOrder = Number(updates.sortOrder);
     if (updates.linkedAccountId !== undefined) updateData.linkedAccountId = updates.linkedAccountId || null;
+
+    // When marking as completed, persist the current allocation so the release logic can read it
+    if (updates.status === 'completed' && existing[0].linkedAccountId) {
+      try {
+        const currentAllocation = await getGoalAllocation(goalId, dataUserId);
+        if (currentAllocation) {
+          updateData.allocatedAmount = String(currentAllocation.allocatedAmount);
+        }
+      } catch {
+        // If allocation computation fails, continue without persisting
+      }
+    }
 
     const encrypted = await encryptRow('financial_goals', updateData, dek);
     const updated = await getDb()
