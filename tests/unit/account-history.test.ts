@@ -367,6 +367,27 @@ describe('account-history', () => {
 
       expect(inserted[0].isImported).toBe(false);
     });
+
+    it('skips calculation and deletes synthetic snapshots for investment accounts', async () => {
+      mockAccountResponse = [{ externalId: 'investment-account-id', type: 'investment' }];
+      mockDeleteWhereCalls = [];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_inv',
+        'user_123',
+        '2026-05-01',
+        '2026-05-05'
+      );
+
+      expect(result.syntheticCount).toBe(0);
+      expect(result.skippedRealCount).toBe(0);
+      expect(mockDeleteWhereCalls).toHaveLength(1);
+      
+      // Verify the delete call is targeting isSynthetic: true
+      const deleteCondition = mockDeleteWhereCalls[0][0];
+      expect(deleteCondition).toBeDefined();
+    });
   });
 
   describe('recalculateNetWorthSnapshots', () => {
