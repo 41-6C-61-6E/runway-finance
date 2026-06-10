@@ -388,7 +388,35 @@ export async function syncPlaidConnection(
         if (holdingsForAccount.length > 0) {
           const todayStr = new Date().toISOString().split('T')[0];
 
+          // Aggregate holdings by securityId to handle duplicate positions under the same security ID
+          const aggregatedHoldings = new Map<string, any>();
           for (const h of holdingsForAccount) {
+            const existing = aggregatedHoldings.get(h.securityId);
+            if (existing) {
+              const currentQty = existing.quantity || 0;
+              const newQty = h.quantity || 0;
+              existing.quantity = currentQty + newQty;
+
+              const currentValue = existing.institutionValue || (currentQty * (existing.institutionPrice ?? existing.closePrice ?? 0));
+              const newValue = h.institutionValue || (newQty * (h.institutionPrice ?? h.closePrice ?? 0));
+              existing.institutionValue = currentValue + newValue;
+
+              if (h.costBasis != null) {
+                existing.costBasis = (existing.costBasis || 0) + h.costBasis;
+              }
+
+              if (existing.quantity > 0) {
+                existing.institutionPrice = existing.institutionValue / existing.quantity;
+              }
+
+              if (!existing.name && h.name) existing.name = h.name;
+              if (!existing.ticker && h.ticker) existing.ticker = h.ticker;
+            } else {
+              aggregatedHoldings.set(h.securityId, { ...h });
+            }
+          }
+
+          for (const h of aggregatedHoldings.values()) {
             const qty = String(h.quantity);
             const price = String(h.institutionPrice ?? h.closePrice ?? '0');
             const cost = h.costBasis != null ? String(h.costBasis) : null;
@@ -414,6 +442,19 @@ export async function syncPlaidConnection(
                 costBasis: encryptedCost,
                 value: encryptedValue,
                 currency: h.currency,
+              })
+              .onConflictDoUpdate({
+                target: [holdings.accountId, holdings.securityId],
+                set: {
+                  ticker: h.ticker,
+                  name: encryptedName,
+                  quantity: encryptedQty,
+                  price: encryptedPrice,
+                  costBasis: encryptedCost,
+                  value: encryptedValue,
+                  currency: h.currency,
+                  updatedAt: new Date(),
+                },
               });
 
             await getDb()
