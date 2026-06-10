@@ -21,11 +21,12 @@ interface Goal {
   percentage: string;
   reserve: string;
   sortOrder: number;
+  priority: number;
   createdAt: string;
   updatedAt: string;
 }
 
-type FilterStatus = 'all' | 'active' | 'completed' | 'paused';
+type FilterStatus = 'all' | 'active' | 'completed' | 'paused' | 'pending';
 type SortBy = 'sortOrder' | 'targetDate' | 'name' | 'progress';
 
 export function GoalsList() {
@@ -36,8 +37,6 @@ export function GoalsList() {
   const [sortBy, setSortBy] = useState<SortBy>('sortOrder');
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [linkedBalances, setLinkedBalances] = useState<Record<string, number | null>>({});
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -57,56 +56,6 @@ export function GoalsList() {
   useEffect(() => {
     fetchGoals();
   }, [fetchGoals]);
-
-  // Fetch linked account balances
-  useEffect(() => {
-    const fetchBalances = async () => {
-      const linkedGoalIds = goals
-        .filter((g) => g.linkedAccountId)
-        .map((g) => g.linkedAccountId!);
-
-      if (linkedGoalIds.length === 0) return;
-
-      try {
-        const uniqueAccountIds = [...new Set(linkedGoalIds)];
-        const balances: Record<string, number | null> = {};
-
-        const acctRes = await fetch(`/api/accounts`, { credentials: 'include' });
-        if (acctRes.ok) {
-          const accounts: Array<{ id: string; balance: string }> = await acctRes.json();
-          for (const accountId of uniqueAccountIds) {
-            const acct = accounts.find((a) => a.id === accountId);
-            if (acct) {
-              balances[accountId] = parseFloat(acct.balance);
-            }
-          }
-        }
-
-        setLinkedBalances(balances);
-      } catch {}
-    };
-
-    fetchBalances();
-  }, [goals]);
-
-  const handleSync = async (goalId: string) => {
-    setSyncingId(goalId);
-    try {
-      const res = await fetch('/api/goals/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ goalId }),
-      });
-      if (res.ok) {
-        await fetchGoals();
-      }
-    } catch {
-      // ignore sync errors
-    } finally {
-      setSyncingId(null);
-    }
-  };
 
   const handleDelete = async (goalId: string) => {
     try {
@@ -308,9 +257,9 @@ export function GoalsList() {
               goal={goal}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onSync={handleSync}
-              linkedAccountBalance={goal.linkedAccountId ? linkedBalances[goal.linkedAccountId] : null}              percentage={parseFloat(goal.percentage)}
-              reserve={parseFloat(goal.reserve)}            />
+              percentage={parseFloat(goal.percentage)}
+              reserve={parseFloat(goal.reserve)}
+            />
           ))}
         </div>
       )}
