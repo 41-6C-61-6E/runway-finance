@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AlertTriangle } from 'lucide-react';
 
 interface GoalFormData {
   name: string;
@@ -13,14 +14,14 @@ interface GoalFormData {
   currentAmount: string;
   targetDate: string;
   category: string;
-  priority: number;
   status: string;
   linkedAccountId: string;
   percentage: string;
   reserve: string;
+  sortOrder: number;
 }
 
-interface GoalFormDrawerProps {
+interface GoalFormDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -33,11 +34,11 @@ interface GoalFormDrawerProps {
     currentAmount: string;
     targetDate: string | null;
     category: string | null;
-    priority: number;
     status: string;
     linkedAccountId: string | null;
     percentage: string;
     reserve: string;
+    sortOrder: number;
   };
 }
 
@@ -55,19 +56,13 @@ const goalTypes = [
   { value: 'other', label: 'Other' },
 ];
 
-const priorities = [
-  { value: 0, label: 'Low' },
-  { value: 1, label: 'Medium' },
-  { value: 2, label: 'High' },
-];
-
 const statuses = [
   { value: 'active', label: 'Active' },
   { value: 'paused', label: 'Paused' },
   { value: 'completed', label: 'Completed' },
 ];
 
-export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormDrawerProps) {
+export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormDialogProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [form, setForm] = useState<GoalFormData>({
     name: '',
@@ -77,14 +72,15 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
     currentAmount: '0',
     targetDate: '',
     category: '',
-    priority: 0,
     status: 'active',
     linkedAccountId: '',
     percentage: '100',
     reserve: '0',
+    sortOrder: 0,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [sharedAccountWarning, setSharedAccountWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -110,11 +106,11 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
         currentAmount: editGoal.currentAmount,
         targetDate: editGoal.targetDate || '',
         category: editGoal.category || '',
-        priority: editGoal.priority,
         status: editGoal.status,
         linkedAccountId: editGoal.linkedAccountId || '',
         percentage: editGoal.percentage || '100',
         reserve: editGoal.reserve || '0',
+        sortOrder: editGoal.sortOrder ?? 0,
       });
     } else {
       setForm({
@@ -125,15 +121,47 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
         currentAmount: '0',
         targetDate: '',
         category: '',
-        priority: 0,
         status: 'active',
         linkedAccountId: '',
         percentage: '100',
         reserve: '0',
+        sortOrder: 0,
       });
     }
     setError('');
+    setSharedAccountWarning(null);
   }, [open, editGoal]);
+
+  // Check for shared account when linked account changes
+  useEffect(() => {
+    if (!form.linkedAccountId || !open) {
+      setSharedAccountWarning(null);
+      return;
+    }
+
+    const checkSharedAccount = async () => {
+      try {
+        const res = await fetch('/api/goals/allocation', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          const shared = data.sharedAccounts?.find(
+            (s: { accountId: string }) => s.accountId === form.linkedAccountId
+          );
+          if (shared) {
+            setSharedAccountWarning(
+              `This account is linked to ${shared.goalCount} active goals. Funds will be allocated by order.`
+            );
+          } else {
+            setSharedAccountWarning(null);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    checkSharedAccount();
+  }, [form.linkedAccountId, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,18 +180,6 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
 
       const method = editGoal ? 'PATCH' : 'POST';
 
-      // Calculate currentAmount from linked account fields if applicable
-      let currentAmount = parseFloat(form.currentAmount) || 0;
-      if (form.linkedAccountId && form.percentage && form.reserve) {
-        const account = accounts.find(a => a.id === form.linkedAccountId);
-        if (account) {
-          const balance = parseFloat(account.balance);
-          const pct = parseFloat(form.percentage) / 100;
-          const reserve = parseFloat(form.reserve) || 0;
-          currentAmount = Math.max(0, balance * pct - reserve);
-        }
-      }
-
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -172,8 +188,8 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
           id: editGoal?.id,
           ...form,
           targetAmount: parseFloat(form.targetAmount),
-          currentAmount,
-          priority: Number(form.priority),
+          currentAmount: parseFloat(form.currentAmount) || 0,
+          sortOrder: Number(form.sortOrder),
           targetDate: form.targetDate || null,
           linkedAccountId: form.linkedAccountId || null,
         }),
@@ -193,11 +209,11 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
   };
 
   return (
-    <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="overflow-y-auto">
-        <SheetHeader className="pb-4">
-          <SheetTitle>{editGoal ? 'Edit Goal' : 'Create New Goal'}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{editGoal ? 'Edit Goal' : 'Create New Goal'}</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
@@ -291,21 +307,6 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
             />
           </div>
 
-          {/* Priority */}
-          <div className="space-y-1.5">
-            <Label htmlFor="goal-priority">Priority</Label>
-            <select
-              id="goal-priority"
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
-            >
-              {priorities.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
           {/* Status */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-status">Status</Label>
@@ -338,6 +339,36 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
               ))}
             </select>
           </div>
+
+          {/* Shared Account Warning */}
+          {form.linkedAccountId && sharedAccountWarning && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-500">{sharedAccountWarning}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Sort Order (shown when linked account selected) */}
+          {form.linkedAccountId && (
+            <div className="space-y-1.5">
+              <Label htmlFor="goal-order">Allocation Order</Label>
+              <Input
+                id="goal-order"
+                type="number"
+                step="1"
+                min="0"
+                value={form.sortOrder}
+                onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+                className="w-24"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Determines allocation order among goals on the same account. Lower numbers are funded first.
+              </p>
+            </div>
+          )}
 
           {/* Percentage of Account (shown when linked account selected) */}
           {form.linkedAccountId && (
@@ -394,26 +425,24 @@ export function GoalFormDrawer({ open, onClose, onSuccess, editGoal }: GoalFormD
           )}
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 pt-4">
-            <SheetClose asChild>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-            </SheetClose>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
             >
-              {saving ? 'Saving...' : editGoal ? 'Update Goal' : 'Create Goal'}
+              {saving ? 'Saving...' : editGoal ? 'Save Changes' : 'Create Goal'}
             </button>
-          </div>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

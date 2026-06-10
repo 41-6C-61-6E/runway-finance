@@ -12,9 +12,13 @@ interface Goal {
   type: string;
   targetAmount: string;
   currentAmount: string;
+  allocatedAmount?: number;
+  isUnderfunded?: boolean;
+  accountBalance?: number | null;
+  remainingOnAccount?: number | null;
+  sortOrder?: number;
   targetDate: string | null;
   category: string | null;
-  priority: number;
   status: string;
   linkedAccountId: string | null;
   percentage: string;
@@ -33,17 +37,6 @@ interface GoalCardProps {
   reserve?: number;
 }
 
-function getPriorityBadge(priority: number) {
-  switch (priority) {
-    case 2:
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-chart-5/20 text-chart-5 uppercase">High</span>;
-    case 1:
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-400 uppercase">Med</span>;
-    default:
-      return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase">Low</span>;
-  }
-}
-
 function getStatusBadge(status: string) {
   switch (status) {
     case 'completed':
@@ -60,8 +53,15 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const target = parseFloat(goal.targetAmount);
-  const current = parseFloat(goal.currentAmount);
+  // Use allocatedAmount for linked accounts (considers priority allocation), fall back to currentAmount
+  const current = parseFloat(goal.allocatedAmount?.toString() ?? goal.currentAmount);
   const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  const barColor = progress >= 75 ? 'bg-chart-1' :
+                   progress >= 50 ? 'bg-chart-3' :
+                   progress >= 25 ? 'bg-status-warning' : 'bg-destructive';
+  const barBg = progress >= 75 ? 'bg-chart-1/20' :
+                progress >= 50 ? 'bg-chart-3/20' :
+                progress >= 25 ? 'bg-status-warning/20' : 'bg-destructive/20';
   const remaining = Math.max(target - current, 0);
   const days = getDaysRemaining(goal.targetDate);
   const isOverdue = days !== null && days < 0 && goal.status === 'active';
@@ -90,7 +90,7 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
     >
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <div className="absolute inset-0 bg-card/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 p-4">
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 p-4">
           <div className="text-center">
             <p className="text-sm font-medium text-foreground mb-3">Delete this goal?</p>
             <p className="text-xs text-muted-foreground mb-4">This action cannot be undone.</p>
@@ -120,7 +120,6 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <GoalTypeIcon type={goal.type} />
-            {getPriorityBadge(goal.priority)}
             {getStatusBadge(goal.status)}
           </div>
         </div>
@@ -159,6 +158,38 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
         </div>
       </div>
 
+      {/* Allocation Info (when linked account exists) */}
+      {goal.linkedAccountId && (
+        <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Account Balance:</span>
+            <span className="font-medium text-foreground blur-number">
+              {formatCurrency(goal.accountBalance ?? 0)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs mt-1">
+            <span className="text-muted-foreground">Allocated to this goal:</span>
+            <span className="font-medium text-chart-1 blur-number">
+              {formatCurrency(current)}
+            </span>
+          </div>
+          {goal['isReleased'] && (
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span className="text-status-positive">✓ Funds released:</span>
+              <span className="text-status-positive font-medium blur-number">
+                {formatCurrency(goal['releasedFunds'] ?? 0)}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-xs mt-1">
+            <span className="text-muted-foreground">Remaining on account:</span>
+            <span className="font-medium text-foreground blur-number">
+              {formatCurrency(goal.remainingOnAccount ?? 0)}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Progress Ring + Details */}
       <div className="flex items-center gap-5 mb-4">
         <GoalProgressRing progress={progress} size={72} strokeWidth={5} />
@@ -167,13 +198,9 @@ export function GoalCard({ goal, onEdit, onDelete, onSync, linkedAccountBalance,
             <span className="text-lg font-bold text-foreground blur-number">{formatCurrency(current)}</span>
             <span className="text-sm text-muted-foreground blur-number">/ {formatCurrency(target)}</span>
           </div>
-          <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
+          <div className={`w-full ${barBg} rounded-full h-2 overflow-hidden`}>
             <div
-              className={`h-full rounded-full transition-all duration-700 ease-out ${
-                progress >= 75 ? 'bg-chart-1' :
-                progress >= 50 ? 'bg-chart-3' :
-                progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
-              }`}
+              className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
               style={{ width: `${progress}%` }}
             />
           </div>

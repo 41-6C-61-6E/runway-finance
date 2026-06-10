@@ -6,6 +6,7 @@ import { financialGoals } from '@/lib/db/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
+import { computeGoalAllocations, findSharedAccounts } from '@/lib/services/goal-allocation';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -26,11 +27,37 @@ export async function GET(req: NextRequest) {
     .select()
     .from(financialGoals)
     .where(and(...conditions))
-    .orderBy(asc(financialGoals.priority), desc(financialGoals.targetDate));
+    .orderBy(asc(financialGoals.sortOrder));
 
   const decrypted = await decryptRows('financial_goals', goals, dek);
-  logger.info('GET /api/financial-goals', { count: decrypted.length, status, type });
-  return NextResponse.json(decrypted);
+  
+  // Compute allocations for goals with linked accounts
+  const allocationMap = new Map<string, any>();
+  try {
+    const allocation = await computeGoalAllocations(dataUserId);
+    for (const account of allocation.accounts) {
+      for (const goal of account.goals) {
+        allocationMap.set(goal.goalId, goal);
+      }
+    }
+  } catch (err) {
+    logger.error('GET /api/financial-goals allocation', { error: err });
+  }
+
+  // Enrich goals with allocation data
+  const enriched = decrypted.map(goal => {
+    const alloc = allocationMap.get(goal.id);
+    return {
+      ...goal,
+      allocatedAmount: alloc?.allocatedAmount ?? parseFloat(goal.currentAmount),
+      isUnderfunded: alloc?.isUnderfunded ?? false,
+      accountBalance: alloc?.accountBalance ?? null,
+      remainingOnAccount: alloc?.remainingOnAccount ?? null,
+    };
+  });
+
+  logger.info('GET /api/financial-goals', { count: enriched.length, status, type });
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: NextRequest) {
@@ -42,7 +69,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const userId = session.user.id;
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-    const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve } = body;
+    const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve, sortOrder } = body;
 
     if (!name || !type || !targetAmount) {
       return NextResponse.json({ error: 'name, type, and targetAmount are required' }, { status: 400 });
@@ -62,6 +89,7 @@ export async function POST(req: NextRequest) {
       linkedAccountId: linkedAccountId || null,
       percentage: percentage != null ? String(percentage) : '100',
       reserve: reserve != null ? String(reserve) : '0',
+      sortOrder: sortOrder != null ? Number(sortOrder) : 0,
     }, dek);
 
     const goal = await getDb().insert(financialGoals).values(encryptedValues).returning();
@@ -117,6 +145,8 @@ export async function PATCH(req: NextRequest) {
     if (updates.reserve !== undefined) updateData.reserve = String(updates.reserve);
     if (updates.status !== undefined) updateData.status = updates.status;
     if (updates.priority !== undefined) updateData.priority = updates.priority;
+    if (updates.sortOrder !== undefined) updateData.sortOrder = Number(updates.sortOrder);
+    if (updates.linkedAccountId !== undefined) updateData.linkedAccountId = updates.linkedAccountId || null;
 
     const encrypted = await encryptRow('financial_goals', updateData, dek);
     const updated = await getDb()

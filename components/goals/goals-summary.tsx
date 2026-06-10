@@ -17,6 +17,7 @@ interface Goal {
   type: string;
   targetAmount: string;
   currentAmount: string;
+  allocatedAmount?: string;
   status: string;
 }
 
@@ -63,7 +64,8 @@ export function GoalsSummary() {
 
         goals.forEach((goal) => {
           const target = parseFloat(goal.targetAmount);
-          const current = parseFloat(goal.currentAmount);
+          // Use allocatedAmount if available (for linked accounts), otherwise fall back to currentAmount
+          const current = parseFloat(goal.allocatedAmount ?? goal.currentAmount);
           totalTarget += target;
           totalCurrent += current;
 
@@ -146,6 +148,7 @@ export function GoalsSummary() {
 
   const remaining = Math.max(0, data.totalTarget - data.totalCurrent);
   const progressPercent = data.overallProgress;
+  const overallBarColor = progressPercent >= 75 ? 'bg-chart-1' : progressPercent >= 50 ? 'bg-chart-3' : progressPercent >= 25 ? 'bg-status-warning' : 'bg-destructive';
 
   return (
     <div className="space-y-5">
@@ -208,16 +211,8 @@ export function GoalsSummary() {
                 <span className="text-xs sm:text-sm font-medium text-foreground">Overall Progress</span>
                 <span className="text-xs sm:text-sm font-bold text-foreground blur-number">{progressPercent.toFixed(1)}%</span>
               </div>
-              <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all duration-700',
-                    progressPercent >= 75 ? 'bg-chart-1' :
-                    progressPercent >= 50 ? 'bg-chart-3' :
-                    progressPercent >= 25 ? 'bg-status-warning' : 'bg-destructive'
-                  )}
-                  style={{ width: `${progressPercent}%` }}
-                />
+              <div className={`w-full ${overallBarColor}/20 rounded-full h-2 overflow-hidden`}>
+                <div className={`h-full rounded-full transition-all duration-700 ${overallBarColor}`} style={{ width: `${progressPercent}%` }} />
               </div>
             </div>
 
@@ -248,17 +243,14 @@ export function GoalsSummary() {
                             <span className="text-xs font-medium text-foreground capitalize">{type}</span>
                             <span className="text-xs text-muted-foreground">{td.count}</span>
                           </div>
-                          <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className={cn(
-                                'h-full rounded-full transition-all duration-500',
-                                td.progress >= 75 ? 'bg-chart-1' :
-                                td.progress >= 50 ? 'bg-chart-3' :
-                                td.progress >= 25 ? 'bg-status-warning' : 'bg-destructive'
-                              )}
-                              style={{ width: `${td.progress}%` }}
-                            />
-                          </div>
+                          {(() => {
+                            const bc = td.progress >= 75 ? 'bg-chart-1' : td.progress >= 50 ? 'bg-chart-3' : td.progress >= 25 ? 'bg-status-warning' : 'bg-destructive';
+                            return (
+                              <div className={`w-full ${bc}/20 rounded-full h-1.5 overflow-hidden`}>
+                                <div className={`h-full rounded-full transition-all duration-500 ${bc}`} style={{ width: `${td.progress}%` }} />
+                              </div>
+                            );
+                          })()}
                           <div className="flex justify-between mt-0.5">
                             <span className="text-[10px] text-muted-foreground blur-number">{formatCurrency(td.current)}</span>
                             <span className="text-[10px] text-muted-foreground blur-number">{formatCurrency(td.target)}</span>
