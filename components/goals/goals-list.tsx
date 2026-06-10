@@ -93,7 +93,7 @@ export function GoalsList() {
     : goals.filter((g) => g.status === filter);
 
   // Sort goals
-  const sortedGoals = [...filteredGoals].sort((a, b) => {
+  const sorter = (a: Goal, b: Goal) => {
     switch (sortBy) {
       case 'sortOrder':
         return a.sortOrder - b.sortOrder;
@@ -116,7 +116,11 @@ export function GoalsList() {
       default:
         return 0;
     }
-  });
+  };
+
+  const sortedGoals = [...filteredGoals].sort(sorter);
+  const activeGoals = sortedGoals.filter((g) => g.status !== 'completed').sort(sorter);
+  const completedGoals = sortedGoals.filter((g) => g.status === 'completed').sort(sorter);
 
   const filters: { key: FilterStatus; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: goals.length },
@@ -244,23 +248,70 @@ export function GoalsList() {
         </div>
       </div>
 
-      {/* Goals Grid */}
-      {sortedGoals.length === 0 ? (
+      {/* Active Goals Grid */}
+      {activeGoals.length > 0 && (
+        <>
+          {filter !== 'completed' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {activeGoals.map((goal) => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  percentage={parseFloat(goal.percentage)}
+                  reserve={parseFloat(goal.reserve)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Completed Goals Section */}
+      {completedGoals.length > 0 && (
+        <div className={activeGoals.length > 0 && filter !== 'completed' ? 'mt-10' : ''}>
+          {filter !== 'completed' && (
+            <div className="flex items-center gap-3 mb-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">History</h3>
+              <div className="h-px flex-1 bg-border/50" />
+            </div>
+          )}
+
+          {/* History Summary */}
+          {completedGoals.length >= 2 && (
+            <div className="flex items-center gap-6 mb-4 px-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Completed</span>
+                <span className="text-sm font-semibold text-foreground">{completedGoals.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Total saved</span>
+                <span className="text-sm font-semibold text-status-positive blur-number">
+                  {formatCurrency(completedGoals.reduce((sum, g) => sum + parseFloat(g.targetAmount), 0))}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {completedGoals.map((goal) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                percentage={parseFloat(goal.percentage)}
+                reserve={parseFloat(goal.reserve)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sortedGoals.length === 0 && (
         <div className="bg-card border border-border rounded-xl p-8 shadow-sm text-center">
           <p className="text-sm text-muted-foreground">No {filter !== 'all' ? filter : ''} goals to display.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {sortedGoals.map((goal) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              percentage={parseFloat(goal.percentage)}
-              reserve={parseFloat(goal.reserve)}
-            />
-          ))}
         </div>
       )}
 
