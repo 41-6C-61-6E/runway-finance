@@ -53,11 +53,14 @@ export function applyAccent(name: string) {
 
   // Preset name path
   const a = ACCENTS[name] ?? ACCENTS['violet'];
+  const primaryColor = typeof a.primary === 'string'
+    ? a.primary
+    : (isDark ? a.primary.dark : a.primary.light);
 
-  r.style.setProperty('--primary', a.primary);
-  r.style.setProperty('--ring', a.primary);
-  r.style.setProperty('--sidebar-primary', a.primary);
-  r.style.setProperty('--sidebar-ring', a.primary);
+  r.style.setProperty('--primary', primaryColor);
+  r.style.setProperty('--ring', primaryColor);
+  r.style.setProperty('--sidebar-primary', primaryColor);
+  r.style.setProperty('--sidebar-ring', primaryColor);
   r.style.setProperty('--accent', isDark ? a.accent.dark : a.accent.light);
   r.style.setProperty('--sidebar-accent', isDark ? a.accent.dark : a.accent.light);
 }

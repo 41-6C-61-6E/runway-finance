@@ -1028,7 +1028,10 @@ export function CashFlowSankey() {
                   </span>
                 )}
                 {excludedAccountIds.size > 0 && (
-                  <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  <span 
+                    className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
+                  >
                     {allAccounts.length - excludedAccountIds.size} ACCOUNTS
                   </span>
                 )}

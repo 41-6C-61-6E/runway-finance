@@ -16,10 +16,11 @@ export function EstimatePill({ className }: EstimatePillProps) {
 
   return (
     <span 
-      className={`${className || ''} inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chart-3/10 border border-chart-3/20 cursor-pointer hover:bg-chart-3/20 transition-colors`}
+      className={`${className || ''} goal-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full cursor-pointer hover:bg-chart-3/20 transition-colors`}
+      style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
       onClick={handleClick}
     >
-      <span className="text-[10px] text-chart-3 font-medium">Includes estimates</span>
+      <span className="text-[10px] font-medium">Includes estimates</span>
     </span>
   );
 }
