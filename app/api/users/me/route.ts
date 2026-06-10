@@ -6,6 +6,7 @@ import {
   userEncryptionKeys,
   aiProviders,
   simplifinConnections,
+  plaidConnections,
   accounts,
   categories,
   importLog,
@@ -60,6 +61,11 @@ export async function DELETE() {
       .from(simplifinConnections)
       .where(eq(simplifinConnections.userId, userId));
 
+    const plaidConnectionsToCancel = await db
+      .select({ id: plaidConnections.id })
+      .from(plaidConnections)
+      .where(eq(plaidConnections.userId, userId));
+
     const accountsToCancel = await db
       .select({ id: accounts.id })
       .from(accounts)
@@ -82,7 +88,18 @@ export async function DELETE() {
             or(...memberUserIds.map((mid) => eq(simplifinConnections.userId, mid)))
           )
         );
-      memberConnectionsToCancel = memberConnections.map((c) => c.id);
+      const memberPlaidConnections = await db
+        .select({ id: plaidConnections.id })
+        .from(plaidConnections)
+        .where(
+          and(
+            or(...memberUserIds.map((mid) => eq(plaidConnections.userId, mid)))
+          )
+        );
+      memberConnectionsToCancel = [
+        ...memberConnections.map((c) => c.id),
+        ...memberPlaidConnections.map((c) => c.id),
+      ];
     }
 
     // 3. Execute database deletions in transaction
@@ -146,6 +163,29 @@ export async function DELETE() {
               .delete(simplifinConnections)
               .where(eq(simplifinConnections.userId, memberUserId));
           }
+
+          // Get Plaid connections for this member to decouple
+          const memberPlaidConns = await tx
+            .select({ id: plaidConnections.id })
+            .from(plaidConnections)
+            .where(eq(plaidConnections.userId, memberUserId));
+
+          for (const conn of memberPlaidConns) {
+            // Decouple accounts so they remain under owner's shared financial data
+            await tx
+              .update(accounts)
+              .set({ plaidConnectionId: null })
+              .where(eq(accounts.plaidConnectionId, conn.id));
+
+            // Delete sync logs & connection
+            await tx.delete(syncLogs).where(eq(syncLogs.plaidConnectionId, conn.id));
+          }
+
+          if (memberPlaidConns.length > 0) {
+            await tx
+              .delete(plaidConnections)
+              .where(eq(plaidConnections.userId, memberUserId));
+          }
         }
 
         // Clean up owner's sharing invitations and members
@@ -192,6 +232,27 @@ export async function DELETE() {
             .delete(simplifinConnections)
             .where(eq(simplifinConnections.userId, userId));
         }
+
+        // Reset our Plaid connection references
+        const memberPlaidConns = await tx
+          .select({ id: plaidConnections.id })
+          .from(plaidConnections)
+          .where(eq(plaidConnections.userId, userId));
+
+        for (const conn of memberPlaidConns) {
+          await tx
+            .update(accounts)
+            .set({ plaidConnectionId: null })
+            .where(eq(accounts.plaidConnectionId, conn.id));
+
+          await tx.delete(syncLogs).where(eq(syncLogs.plaidConnectionId, conn.id));
+        }
+
+        if (memberPlaidConns.length > 0) {
+          await tx
+            .delete(plaidConnections)
+            .where(eq(plaidConnections.userId, userId));
+        }
       }
 
       // ── Clean Up Personal Configuration (All Users) ───────────────────────
@@ -211,6 +272,7 @@ export async function DELETE() {
         // Order is important to satisfy PostgreSQL foreign keys
         await tx.delete(syncLogs).where(eq(syncLogs.userId, userId));
         await tx.delete(simplifinConnections).where(eq(simplifinConnections.userId, userId));
+        await tx.delete(plaidConnections).where(eq(plaidConnections.userId, userId));
         await tx.delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
         await tx.delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
         await tx.delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
@@ -241,6 +303,9 @@ export async function DELETE() {
     logger.info('[delete-account] Transaction committed. Canceling scheduler timers.', { userId });
 
     for (const conn of connectionsToCancel) {
+      syncScheduler.cancel(conn.id);
+    }
+    for (const conn of plaidConnectionsToCancel) {
       syncScheduler.cancel(conn.id);
     }
     for (const acc of accountsToCancel) {

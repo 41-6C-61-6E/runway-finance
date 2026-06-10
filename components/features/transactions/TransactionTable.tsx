@@ -992,11 +992,10 @@ export default function TransactionTable({
               >
                 {tx.categoryName ? (
                   <span
-                    className="px-2 py-0.5 text-xs rounded-full font-medium inline-flex items-center gap-1 whitespace-nowrap truncate max-w-full"
+                    className="category-pill px-2 py-0.5 text-xs rounded-full font-medium inline-flex items-center gap-1 whitespace-nowrap truncate max-w-full"
                     style={{
-                      backgroundColor: `${tx.categoryColor}22`,
-                      color: tx.categoryColor || "var(--color-primary)",
-                    }}
+                      '--tag-color': tx.categoryColor || "var(--color-primary)",
+                    } as React.CSSProperties}
                   >
                     {tx.categorizedByAi && (
                       <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60" />
@@ -1306,12 +1305,10 @@ export default function TransactionTable({
               {txTags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+                  className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
                   style={{
-                    backgroundColor: `${tag.color}22`,
-                    color: tag.color,
-                    border: `1px solid ${tag.color}44`,
-                  }}
+                    '--tag-color': tag.color,
+                  } as React.CSSProperties}
                   title={tag.name}
                 >
                   #{tag.name}
@@ -1491,12 +1488,10 @@ export default function TransactionTable({
                             {txTags.map((tag) => (
                               <span
                                 key={tag.id}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
+                                className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
                                 style={{
-                                  backgroundColor: `${tag.color}22`,
-                                  color: tag.color,
-                                  border: `1px solid ${tag.color}44`,
-                                }}
+                                  '--tag-color': tag.color,
+                                } as React.CSSProperties}
                               >
                                 #{tag.name}
                               </span>
@@ -1544,11 +1539,10 @@ export default function TransactionTable({
                           >
                             {tx.categoryName ? (
                               <span
-                                className="px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
+                                className="category-pill px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
                                 style={{
-                                  backgroundColor: `${tx.categoryColor}22`,
-                                  color: tx.categoryColor || "var(--color-primary)",
-                                }}
+                                  '--tag-color': tx.categoryColor || "var(--color-primary)",
+                                } as React.CSSProperties}
                               >
                                 {tx.categorizedByAi && (
                                   <Sparkles className="h-2.5 w-2.5 shrink-0 opacity-60" />
@@ -1750,12 +1744,10 @@ export default function TransactionTable({
                             {tx.accountTags.map((tag) => (
                               <span
                                 key={tag.id}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
+                                className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
                                 style={{
-                                  backgroundColor: `${tag.color}22`,
-                                  color: tag.color,
-                                  border: `1px solid ${tag.color}44`,
-                                }}
+                                  '--tag-color': tag.color,
+                                } as React.CSSProperties}
                                 title={tag.name}
                               >
                                 #{tag.name}
