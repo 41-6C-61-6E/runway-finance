@@ -1030,12 +1030,42 @@ function SettingsPageBody() {
                       <p className="text-xs text-muted-foreground mt-1">
                         Connect your bank accounts securely in seconds using Plaid. Supports most major institutions.
                       </p>
+                      
+                      {!connections.some((c) => c.provider === 'plaid') && (
+                        <div className="mt-3 p-2.5 bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 text-[10px] leading-normal rounded-lg space-y-1.5">
+                          <div className="font-semibold flex items-center gap-1">
+                            <span>💡 Setting up Plaid Self-Hosted Keys:</span>
+                          </div>
+                          <ol className="list-decimal pl-3.5 space-y-1 text-muted-foreground">
+                            <li>
+                              Sign up for a free developer account at{' '}
+                              <a
+                                href="https://dashboard.plaid.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-violet-600 dark:text-violet-400 hover:underline font-semibold"
+                              >
+                                dashboard.plaid.com
+                              </a>.
+                            </li>
+                            <li>
+                              Go to <strong>Team Settings &gt; API Keys</strong>.
+                            </li>
+                            <li>
+                              Copy your <strong>Client ID</strong> and <strong>Secret</strong> (Sandbox or Development).
+                            </li>
+                          </ol>
+                          <p className="text-[9px] text-muted-foreground/80 italic mt-0.5">
+                            * Clicking the link button below will prompt you to enter these keys securely.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={handleConnectPlaid}
                       disabled={plaidLoading || loading}
-                      className="w-full px-4 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                      className="w-full px-4 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 animate-shimmer"
                     >
                       {plaidLoading ? 'Initializing Plaid...' : 'Link Institution via Plaid'}
                     </button>
@@ -1096,11 +1126,12 @@ function SettingsPageBody() {
                         <div className="space-y-1.5 p-3 bg-muted/10 border border-border/40 rounded-lg">
                           <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">Plaid (Self-Hosted Keys)</h4>
                           <ul className="text-muted-foreground list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                            <li><strong className="text-emerald-500 font-semibold">Free</strong> for the first 10 lifetime production institutions (Plaid "Items", not a rolling window)</li>
-                            <li>Billed per connected <strong className="text-foreground">Institution (Item)</strong>, not per individual account</li>
-                            <li>Pay-as-you-go Base: ~$0.30/mo for Transactions, ~$0.30/mo for Investments</li>
-                            <li>Pay-as-you-go Refresh: ~$0.08 per request (e.g., daily sync = ~$2.40/mo, hourly sync = ~$57.60/mo per institution)</li>
-                            <li>Requires registering your own Plaid developer credentials</li>
+                            <li><strong className="text-emerald-500 font-semibold">Free</strong> for the first 10 lifetime production institutions (Plaid "Items", not a rolling window).</li>
+                            <li>Billed per connected <strong className="text-foreground">Institution (Item)</strong>, not per individual account.</li>
+                            <li>Pay-as-you-go Base: ~$0.30/mo for Transactions, ~$0.30/mo for Investments.</li>
+                            <li>Pay-as-you-go Refresh: ~$0.08 per request (e.g., daily sync = ~$2.40/mo, hourly sync = ~$57.60/mo per institution).</li>
+                            <li><strong className="text-foreground">PAYG Account Conversion:</strong> Linking an 11th unique lifetime Item converts the entire developer account to Pay-as-you-go billing, making all Items (including the first 10) billable.</li>
+                            <li>Requires registering your own Plaid developer credentials.</li>
                           </ul>
                         </div>
                       </div>
@@ -1114,7 +1145,7 @@ function SettingsPageBody() {
                           Plaid bills subscription products (Transactions, Investments) per <strong className="text-foreground">institution login (Item)</strong>. 
                           If you have 10 bank accounts under one login (e.g., Chase) and 10 brokerage accounts under another (e.g., Fidelity), 
                           this counts as only <strong className="text-foreground">2 Items</strong>. Under the 10-Item limit (specifically, the first 10 unique Items ever linked, not a rolling window of 10 active items) in Plaid's Trial/Development tier, 
-                          this is <strong className="text-emerald-500 font-semibold">100% Free</strong>.
+                          this is <strong className="text-emerald-500 font-semibold">100% Free</strong>. <strong className="text-foreground">Note:</strong> Once you exceed 10 lifetime Items, your entire Plaid account converts to Pay-as-you-go billing, and all Items (including the first 10) will begin incurring fees.
                         </p>
                       </div>
 
@@ -1322,7 +1353,7 @@ function SettingsPageBody() {
                       * <strong>SimpleFIN Pricing Note</strong>: SimpleFIN charges a flat $1.50/mo subscription paid directly by you, which covers all your linked SimpleFIN connections (up to 25 accounts total).
                     </div>
                     <div className="p-3 bg-emerald-500/15 dark:bg-emerald-500/10 border border-emerald-500/35 dark:border-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs leading-relaxed font-medium">
-                      💡 <strong>Plaid Pricing Note</strong>: Plaid includes the <strong>first 10 unique connected institutions (Items) for free</strong> (lifetime limit, not a rolling window of 10 active items) in its Trial/Development tier. If you have linked fewer than 10 unique Plaid connections in total, your actual Plaid cost is <strong className="text-emerald-900 dark:text-emerald-100 font-extrabold underline decoration-emerald-500/50">$0.00</strong>. This estimate assumes Pay-as-you-go rates apply to all items.
+                      💡 <strong>Plaid Pricing Note</strong>: Plaid includes the <strong>first 10 unique connected institutions (Items) for free</strong> (lifetime limit, not a rolling window of 10 active items) in its Trial/Development tier. Linking an 11th unique lifetime Item converts the entire developer account to Pay-as-you-go billing, and all connections will incur fees. If your total lifetime Plaid connections is fewer than 10, your actual Plaid cost is <strong className="text-emerald-900 dark:text-emerald-100 font-extrabold underline decoration-emerald-500/50">$0.00</strong>. This estimate assumes Pay-as-you-go rates apply to all items.
                     </div>
                   </div>
                 </div>
