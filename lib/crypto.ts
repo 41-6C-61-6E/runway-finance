@@ -192,6 +192,8 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   category_spending_summary: ['amount', 'transactionCount'],
   category_income_summary: ['amount', 'transactionCount'],
   account_snapshots: ['balance'],
+  holdings: ['name', 'quantity', 'price', 'costBasis', 'value'],
+  holding_snapshots: ['name', 'quantity', 'price', 'value', 'costBasis'],
 
   simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
   plaid_connections: ['accessTokenEncrypted', 'accessTokenIv', 'accessTokenTag'],

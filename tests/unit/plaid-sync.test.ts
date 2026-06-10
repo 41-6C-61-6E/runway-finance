@@ -40,6 +40,11 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  delete(table: any) {
+    lastTableOrOperation = table;
+    return this;
+  }
+
   set(data: any) {
     return this;
   }

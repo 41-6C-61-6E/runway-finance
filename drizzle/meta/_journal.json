@@ -358,6 +358,13 @@
       "when": 1782600000002,
       "tag": "0050_add_plaid_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1782600000003,
+      "tag": "0051_add_holdings",
+      "breakpoints": true
     }
   ]
 }

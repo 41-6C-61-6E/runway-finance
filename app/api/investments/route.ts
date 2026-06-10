@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, transactions } from '@/lib/db/schema';
+import { accounts, transactions, holdings } from '@/lib/db/schema';
 import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -45,6 +45,16 @@ export async function GET(request: Request) {
       isInvestmentAccount(acc.type)
     );
 
+    const accountIds = investmentAccounts.map((acc) => acc.id);
+    const dbHoldings = accountIds.length > 0
+      ? await getDb()
+          .select()
+          .from(holdings)
+          .where(inArray(holdings.accountId, accountIds))
+      : [];
+
+    const decryptedHoldings = await decryptRows('holdings', dbHoldings, dek);
+
     const flatHoldings: any[] = [];
     let totalBalance = 0;
     let totalCostBasis = 0;
@@ -54,51 +64,48 @@ export async function GET(request: Request) {
     for (const acc of investmentAccounts) {
       const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
       totalBalance += balance || 0;
+    }
 
-      const metadata = typeof acc.metadata === 'string'
-        ? JSON.parse(acc.metadata)
-        : (acc.metadata as any);
-      const plaidHoldings = metadata?.plaidHoldings;
-      if (Array.isArray(plaidHoldings)) {
-        for (const holding of plaidHoldings) {
-          const qty = Number(holding.quantity) || 0;
-          const price = Number(holding.institutionPrice ?? holding.closePrice ?? 0);
-          const value = Number(holding.institutionValue ?? (qty * price));
-          const cost = holding.costBasis != null ? Number(holding.costBasis) : null;
-          
-          const securityId = holding.securityId || holding.ticker || holding.name || '';
-          if (securityId) {
-            uniqueSecurities.add(securityId);
-          }
+    for (const h of decryptedHoldings) {
+      const acc = investmentAccounts.find((a) => a.id === h.accountId);
+      if (!acc) continue;
 
-          let gainLoss = null;
-          let returnPct = null;
-
-          if (cost != null && cost > 0) {
-            gainLoss = value - cost;
-            returnPct = (gainLoss / cost) * 100;
-            
-            totalCostBasis += cost;
-            totalValueForCostBasis += value;
-          }
-
-          flatHoldings.push({
-            accountId: acc.id,
-            accountName: acc.name,
-            institutionName: acc.institution || 'Unknown Brokerage',
-            securityId,
-            ticker: holding.ticker,
-            name: holding.name || 'Unknown Security',
-            quantity: qty,
-            price,
-            value,
-            costBasis: cost,
-            unrealizedGainLoss: gainLoss,
-            unrealizedReturnPct: returnPct,
-            currency: holding.currency || 'USD',
-          });
-        }
+      const qty = Number(h.quantity) || 0;
+      const price = Number(h.price) || 0;
+      const value = Number(h.value) || (qty * price);
+      const cost = h.costBasis != null ? Number(h.costBasis) : null;
+      
+      const securityId = h.securityId || h.ticker || h.name || '';
+      if (securityId) {
+        uniqueSecurities.add(securityId);
       }
+
+      let gainLoss = null;
+      let returnPct = null;
+
+      if (cost != null && cost > 0) {
+        gainLoss = value - cost;
+        returnPct = (gainLoss / cost) * 100;
+        
+        totalCostBasis += cost;
+        totalValueForCostBasis += value;
+      }
+
+      flatHoldings.push({
+        accountId: h.accountId,
+        accountName: acc.name,
+        institutionName: acc.institution || 'Unknown Brokerage',
+        securityId,
+        ticker: h.ticker,
+        name: h.name || 'Unknown Security',
+        quantity: qty,
+        price,
+        value,
+        costBasis: cost,
+        unrealizedGainLoss: gainLoss,
+        unrealizedReturnPct: returnPct,
+        currency: h.currency || 'USD',
+      });
     }
 
     // Compute portfolio-level unrealized gains
@@ -114,7 +121,6 @@ export async function GET(request: Request) {
     }));
 
     // Get investment account IDs
-    const accountIds = investmentAccounts.map((acc) => acc.id);
 
     // Fetch recent investment transactions
     const recentTxns = accountIds.length > 0
