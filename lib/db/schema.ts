@@ -209,6 +209,25 @@ export const simplifinConnections = pgTable('simplefin_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Plaid Connections ────────────────────────────────────────────────────────
+export const plaidConnections = pgTable('plaid_connections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  accessTokenEncrypted: text('access_token_encrypted').notNull(),
+  accessTokenIv: text('access_token_iv').notNull().default(''),
+  accessTokenTag: text('access_token_tag').notNull().default(''),
+  itemId: text('item_id').notNull(),
+  institutionId: text('institution_id'),
+  institutionName: text('institution_name'),
+  cursor: text('cursor'),
+  label: text('label').notNull().default('Plaid Connection'),
+  syncFrequency: text('sync_frequency').notNull().default('manual'),
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  lastSyncStatus: text('last_sync_status').notNull().default('pending'),
+  lastSyncError: text('last_sync_error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Accounts ─────────────────────────────────────────────────────────────────
 export const accounts = pgTable(
   'accounts',
@@ -217,6 +236,8 @@ export const accounts = pgTable(
     userId: text('user_id').notNull(),
     connectionId: uuid('connection_id')
       .references(() => simplifinConnections.id, { onDelete: 'cascade' }),
+    plaidConnectionId: uuid('plaid_connection_id')
+      .references(() => plaidConnections.id, { onDelete: 'cascade' }),
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),
     currency: text('currency').notNull().default('USD'),
@@ -231,7 +252,10 @@ export const accounts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.connectionId, t.externalId)]
+  (t) => [
+    unique().on(t.connectionId, t.externalId),
+    unique().on(t.plaidConnectionId, t.externalId),
+  ]
 );
 
 // ── Categories ───────────────────────────────────────────────────────────────
@@ -310,6 +334,7 @@ export const syncLogs = pgTable('sync_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
   connectionId: uuid('connection_id').references(() => simplifinConnections.id),
+  plaidConnectionId: uuid('plaid_connection_id').references(() => plaidConnections.id),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   status: text('status').notNull(),

@@ -153,6 +153,7 @@ export async function POST(request: Request) {
         .update(accounts)
         .set({
           connectionId: targetAccount.connectionId,
+          plaidConnectionId: targetAccount.plaidConnectionId,
           externalId: targetAccount.externalId,
           balance: targetAccount.balance,
           balanceDate: targetAccount.balanceDate,
