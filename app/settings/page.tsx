@@ -350,7 +350,7 @@ function SettingsPageBody() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
-  const [accountFilter, setAccountFilter] = useState<'all' | 'hidden' | 'excluded'>('all');
+  const [accountFilter, setAccountFilter] = useState<'all' | 'visible' | 'included' | 'hidden' | 'excluded' | 'plaid' | 'simplefin'>('all');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
 
@@ -1713,7 +1713,7 @@ function SettingsPageBody() {
               </p>
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {(['all', 'hidden', 'excluded'] as const).map((filter) => (
+                {(['all', 'visible', 'included', 'hidden', 'excluded', 'plaid', 'simplefin'] as const).map((filter) => (
                   <button
                     key={filter}
                     onClick={() => setAccountFilter(filter)}
@@ -1723,7 +1723,13 @@ function SettingsPageBody() {
                         : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/50'
                     }`}
                   >
-                      {filter === 'all' ? 'All' : filter === 'hidden' ? 'Hidden' : 'Excluded'}
+                      {filter === 'all' ? 'All' :
+                       filter === 'visible' ? 'Visible' :
+                       filter === 'included' ? 'Included' :
+                       filter === 'hidden' ? 'Hidden' :
+                       filter === 'excluded' ? 'Excluded' :
+                       filter === 'plaid' ? 'Plaid' :
+                       'SimpleFIN'}
                     </button>
                   ))}
               </div>
@@ -1738,6 +1744,10 @@ function SettingsPageBody() {
                     if (!a.connectionId && !a.plaidConnectionId) return false;
                     if (accountFilter === 'hidden') return a.isHidden;
                     if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
+                    if (accountFilter === 'visible') return !a.isHidden;
+                    if (accountFilter === 'included') return !a.isExcludedFromNetWorth;
+                    if (accountFilter === 'plaid') return !!a.plaidConnectionId;
+                    if (accountFilter === 'simplefin') return !!a.connectionId;
                     return true;
                   });
                   const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId || a.plaidConnectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
@@ -1782,6 +1792,12 @@ function SettingsPageBody() {
                                   }`}>
                                     {account.type}
                                   </span>
+                                  {account.plaidConnectionId && (
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-chart-2/15 text-chart-2 border border-chart-2/25 font-medium">Plaid</span>
+                                  )}
+                                  {account.connectionId && (
+                                    <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-primary/15 text-primary border border-primary/25 font-medium">SimpleFIN</span>
+                                  )}
                                   {account.isHidden && (
                                     <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 font-medium">Hidden</span>
                                   )}

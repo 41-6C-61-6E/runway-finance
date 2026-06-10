@@ -2,7 +2,7 @@ import { getDb, getPool } from '@/lib/db';
 import { accountSnapshots, transactions, accounts, netWorthSnapshots } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql, inArray } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypto';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
 
 const LOG_TAG = '[account-history]';
@@ -232,7 +232,7 @@ export async function generateHistoricalAccountSnapshots(
   // Retroactively clean up transient zero-balance snapshots before recalculation
   await cleanupTransientZeroSnapshots(accountId, userId, dek);
 
-  // Fetch account to see if it is a mortgage
+  // Fetch account to see if it is a mortgage or investment
   const [account] = await getDb()
     .select({
       externalId: accounts.externalId,
@@ -247,6 +247,21 @@ export async function generateHistoricalAccountSnapshots(
       )
     )
     .limit(1);
+
+  if (account?.type && isInvestmentAccount(account.type)) {
+    // Delete any existing synthetic snapshots for this account
+    await getDb()
+      .delete(accountSnapshots)
+      .where(
+        and(
+          eq(accountSnapshots.accountId, accountId),
+          eq(accountSnapshots.userId, userId),
+          eq(accountSnapshots.isSynthetic, true)
+        )
+      );
+    logger.debug(`${LOG_TAG} Skipping historical snapshot generation for investment account`, { accountId });
+    return { syntheticCount: 0, skippedRealCount: 0 };
+  }
 
   const isAccountImported = account?.externalId?.startsWith('imported-') ?? false;
 
