@@ -106,6 +106,7 @@ export async function syncPlaidConnection(
 
     let hasMore = true;
     let currentCursor = connection.cursor || undefined;
+    const isFirstSync = !connection.cursor;
 
     let addedTxns: any[] = [];
     let modifiedTxns: any[] = [];
@@ -117,7 +118,13 @@ export async function syncPlaidConnection(
       const response = await client.transactionsSync({
         access_token: accessToken,
         cursor: currentCursor,
-        count: 100,
+        count: 500,
+        options: {
+          include_original_description: true,
+          include_personal_finance_category: true,
+          // On first sync, request the maximum 730 days of history
+          ...(isFirstSync && !currentCursor ? { days_requested: 730 } : {}),
+        },
       });
 
       addedTxns = addedTxns.concat(response.data.added);
@@ -188,9 +195,18 @@ export async function syncPlaidConnection(
       // 2. Fetch investment transactions
       logger.info(`${LOG_TAG} Fetching Plaid investment transactions`, { connectionId });
       const now = new Date();
-      const startDate = connection.lastSyncAt
-        ? new Date(connection.lastSyncAt.getTime() - 14 * 24 * 60 * 60 * 1000)
-        : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      // On first sync: pull max 2 years of investment history.
+      // On subsequent syncs: go back to connection creation date (or 60 days as a buffer), whichever is further.
+      let startDate: Date;
+      if (isFirstSync) {
+        startDate = new Date(now.getTime() - 730 * 24 * 60 * 60 * 1000);
+      } else if (connection.createdAt) {
+        // Use connection creation date minus a 14-day overlap buffer
+        startDate = new Date(connection.createdAt.getTime() - 14 * 24 * 60 * 60 * 1000);
+      } else {
+        startDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      }
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = now.toISOString().split('T')[0];
@@ -207,7 +223,7 @@ export async function syncPlaidConnection(
             end_date: endDateStr,
             options: {
               offset,
-              count: 100,
+              count: 500,
             },
           });
 
@@ -221,6 +237,9 @@ export async function syncPlaidConnection(
         logger.info(`${LOG_TAG} Fetched investment transactions`, {
           connectionId,
           count: invTransactions.length,
+          startDateStr,
+          endDateStr,
+          isFirstSync,
         });
 
         // Translate investment transactions to standard Plaid transactions format
@@ -389,16 +408,23 @@ export async function syncPlaidConnection(
         date: pt.date,
         postedDate: pt.authorized_date || null,
         amount: await encryptField(appAmount, dek),
-        description: await encryptField(pt.name || 'Plaid Transaction', dek),
+        description: await encryptField(
+          pt.original_description || pt.name || 'Plaid Transaction',
+          dek
+        ),
         payee: pt.merchant_name ? await encryptField(pt.merchant_name, dek) : null,
-        memo: pt.payment_meta?.reference_number ? await encryptField(pt.payment_meta.reference_number, dek) : null,
+        memo: pt.payment_meta?.reference_number
+          ? await encryptField(pt.payment_meta.reference_number, dek)
+          : pt.personal_finance_category?.primary
+            ? await encryptField(`[${pt.personal_finance_category.primary}]`, dek)
+            : null,
         pending: isPending,
       };
 
       rawTxData.push({
         externalId: pt.transaction_id,
         accountId,
-        description: pt.name || '',
+        description: pt.original_description || pt.name || '',
         payee: pt.merchant_name || null,
         memo: pt.payment_meta?.reference_number || null,
         amount: appAmount,
