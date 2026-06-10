@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Link2
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
@@ -102,7 +103,7 @@ type Account = {
 
 const SETTINGS_TABS = [
   { id: 'general' as const, label: 'General', description: 'Appearance, accent color, and layout preferences', icon: Settings },
-  { id: 'accounts' as const, label: 'Accounts', description: 'Linked bank credentials and manual accounts', icon: Landmark },
+  { id: 'accounts' as const, label: 'Accounts', description: 'Configure visible accounts, manual accounts, and bank connections', icon: Landmark },
   { id: 'categories' as const, label: 'Categories', description: 'Transaction category display and structure', icon: LayoutGrid },
   { id: 'rules' as const, label: 'Rules', description: 'Automatic transaction categorization rules', icon: GitBranch },
   { id: 'tags' as const, label: 'Tags', description: 'Labels for transactional tagging and filtering', icon: Tag },
@@ -342,12 +343,25 @@ function SettingsPageBody() {
     ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'sharing' | 'advanced')
     : 'general';
 
-  const goToTab = useCallback((tab: typeof activeTab) => {
+  const goToTab = useCallback((tab: typeof activeTab, subTab?: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
+    if (subTab) {
+      params.set('sub', subTab);
+    } else {
+      params.delete('sub');
+    }
     router.replace(`/settings?${params.toString()}`, { scroll: false });
   }, [searchParams, router]);
-  const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual'>('automatic');
+  const [accountSubTab, setAccountSubTab] = useState<'automatic' | 'manual' | 'connections'>('connections');
+
+  const urlSub = searchParams.get('sub');
+
+  useEffect(() => {
+    if (urlSub && ['automatic', 'manual', 'connections'].includes(urlSub)) {
+      setAccountSubTab(urlSub as 'automatic' | 'manual' | 'connections');
+    }
+  }, [urlSub]);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -1009,9 +1023,27 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden">
+          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden mb-5 sm:mb-6">
             <button
-              onClick={() => setAccountSubTab('automatic')}
+              onClick={() => {
+                setAccountSubTab('connections');
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('sub', 'connections');
+                router.replace(`/settings?${params.toString()}`, { scroll: false });
+              }}
+              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
+                accountSubTab === 'connections' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+              }`}
+            >
+              Connections
+            </button>
+            <button
+              onClick={() => {
+                setAccountSubTab('automatic');
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('sub', 'automatic');
+                router.replace(`/settings?${params.toString()}`, { scroll: false });
+              }}
               className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
                 accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
               }`}
@@ -1019,7 +1051,12 @@ function SettingsPageBody() {
               Automatic Accounts
             </button>
             <button
-              onClick={() => setAccountSubTab('manual')}
+              onClick={() => {
+                setAccountSubTab('manual');
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('sub', 'manual');
+                router.replace(`/settings?${params.toString()}`, { scroll: false });
+              }}
               className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
                 accountSubTab === 'manual' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
               }`}
@@ -1030,6 +1067,204 @@ function SettingsPageBody() {
 
           {accountSubTab === 'automatic' && (
         <>
+          {!hasConnection && (
+            <div className="p-8 text-center bg-card border border-border rounded-xl">
+              <Landmark className="w-10 h-10 text-muted-foreground/60 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-foreground">No Synced Accounts</h3>
+              <p className="text-xs text-muted-foreground mt-1 mb-4">
+                Connect your bank or investment accounts to automatically sync transactions and balances.
+              </p>
+              <button
+                onClick={() => {
+                  setAccountSubTab('connections');
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set('sub', 'connections');
+                  router.replace(`/settings?${params.toString()}`, { scroll: false });
+                }}
+                className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-95 transition-opacity"
+              >
+                Go to Connections
+              </button>
+            </div>
+          )}
+          {orphanedAccounts.length > 0 && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
+                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    You have {orphanedAccounts.length} automatic account{orphanedAccounts.length !== 1 ? 's' : ''} no longer linked to a bank connection. Re-map {orphanedAccounts.length === 1 ? 'it' : 'them'} to a currently active synced account to preserve its full history.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRemapSourceId(orphanedAccounts[0]?.id || '');
+                  setRemapTargetId(activeAutomaticAccounts[0]?.id || '');
+                  setIsRemapDialogOpen(true);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors flex-shrink-0"
+              >
+                Re-map Account
+              </button>
+            </div>
+          )}
+
+          {/* Account Management - only shown when a connection exists */}
+          {hasConnection && (
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
+              <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
+                <strong> Exclude</strong> removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible here in the automatic accounts list to allow configuration.
+              </p>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                {(['all', 'visible', 'included', 'hidden', 'excluded', 'plaid', 'simplefin'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setAccountFilter(filter)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors rounded-lg border ${
+                      accountFilter === filter
+                        ? 'bg-primary text-primary-foreground border-primary/30'
+                        : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/50'
+                    }`}
+                  >
+                      {filter === 'all' ? 'All' :
+                       filter === 'visible' ? 'Visible' :
+                       filter === 'included' ? 'Included' :
+                       filter === 'hidden' ? 'Hidden' :
+                       filter === 'excluded' ? 'Excluded' :
+                       filter === 'plaid' ? 'Plaid' :
+                       'SimpleFIN'}
+                    </button>
+                  ))}
+              </div>
+
+              {accountsLoading ? (
+                <div className="text-muted-foreground text-sm">Loading...</div>
+              ) : accounts.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
+              ) : (() => {
+                  const filteredAccounts = accounts.filter((a) => {
+                    // Only show automatic accounts (have a connectionId or plaidConnectionId)
+                    if (!a.connectionId && !a.plaidConnectionId) return false;
+                    if (accountFilter === 'hidden') return a.isHidden;
+                    if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
+                    if (accountFilter === 'visible') return !a.isHidden;
+                    if (accountFilter === 'included') return !a.isExcludedFromNetWorth;
+                    if (accountFilter === 'plaid') return !!a.plaidConnectionId;
+                    if (accountFilter === 'simplefin') return !!a.connectionId;
+                    return true;
+                  });
+                  const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId || a.plaidConnectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
+
+                  if (filteredAccounts.length === 0 && accountFilter !== 'all') {
+                    return (
+                      <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
+                        <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="divide-y divide-border">
+                      {filteredAccounts.map((account) => {
+                        const num = parseFloat(account.balance);
+                        const formatted = new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: account.currency || 'USD',
+                          minimumFractionDigits: 2,
+                        }).format(Math.abs(num));
+
+                        return (
+                          <div
+                            key={account.id}
+                            className={`px-3 sm:px-4 py-4 sm:py-5 cursor-pointer group hover:bg-muted/30 transition-colors`}
+                            onClick={() => handleOpenAccountDrawer(account)}
+                          >
+                            <div className="flex items-start justify-between gap-2 sm:gap-3">
+                              <div className={`min-w-0 flex-1 ${
+                                account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
+                              }`}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={getBadgeClasses(account.type)}>
+                                    {account.type}
+                                  </span>
+                                  {account.plaidConnectionId && (
+                                    <span className="badge-pill badge-plaid">Plaid</span>
+                                  )}
+                                  {account.connectionId && (
+                                    <span className="badge-pill badge-simplefin">SimpleFIN</span>
+                                  )}
+                                  {account.isHidden && (
+                                    <span className="badge-pill badge-hidden">Hidden</span>
+                                  )}
+                                  {account.isExcludedFromNetWorth && (
+                                    <span className="badge-pill badge-excluded">Excluded</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <span className="text-foreground font-medium text-sm truncate max-w-[120px] sm:max-w-xs">{account.name}</span>
+                                  {account.tags && account.tags.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {account.tags.map((tag) => (
+                                        <span
+                                          key={tag.id}
+                                          className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
+                                          style={{
+                                            backgroundColor: `${tag.color}15`,
+                                            color: tag.color,
+                                            borderColor: `${tag.color}30`
+                                          }}
+                                        >
+                                          #{tag.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {account.institution && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
+                                )}
+                              </div>
+                              <div className="shrink-0 flex flex-col items-end gap-1 sm:gap-1.5">
+                                <div className="text-right">
+                                  <div className="font-mono text-[11px] sm:text-sm text-foreground blur-number">{formatted}</div>
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground/60">{account.currency}</div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAccountDrawer(account);
+                                  }}
+                                  className="px-2 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {hasHiddenOrExcluded && (
+                        <p className="text-xs text-muted-foreground pt-3 px-4 pb-1">Some accounts are hidden or excluded. Use the tabs above to filter.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+            </div>
+          )}
+        </>
+        )}
+
+          {accountSubTab === 'manual' && (
+            <ManualAccountsSection />
+          )}
+
+          {accountSubTab === 'connections' && (
+        <div className="space-y-5 sm:space-y-6">
           {orphanedAccounts.length > 0 && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
@@ -1055,7 +1290,7 @@ function SettingsPageBody() {
           )}
 
           {/* Add Connection Options */}
-          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+          <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
             <button
               type="button"
               onClick={() => setIsAddConnectionExpanded(!isAddConnectionExpanded)}
@@ -1250,6 +1485,104 @@ function SettingsPageBody() {
                   )}
                 </div>
 
+                {/* Estimated Sync Fees Section */}
+                {connections.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border/65 space-y-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsSyncFeesExpanded(!isSyncFeesExpanded)}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-foreground hover:text-primary transition-colors focus:outline-none"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Estimated Monthly Sync Fees (Pay-as-you-go)
+                      </span>
+                      {isSyncFeesExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </button>
+
+                    {isSyncFeesExpanded && (
+                      <div className="mt-4 space-y-3 animate-in fade-in duration-200">
+                        <p className="text-xs text-muted-foreground leading-normal">
+                          Based on your active connections and their configured sync frequencies, here is your estimated monthly Pay-as-you-go cost:
+                        </p>
+                        <div className="overflow-x-auto border border-border/40 rounded-lg">
+                          <table className="w-full text-[11px] text-left border-collapse">
+                            <thead>
+                              <tr className="bg-muted/30 border-b border-border/40 text-[9px] uppercase tracking-wider text-muted-foreground">
+                                <th className="p-2 font-semibold">Connection</th>
+                                <th className="p-2 font-semibold text-center">Provider</th>
+                                <th className="p-2 font-semibold text-center">Frequency</th>
+                                <th className="p-2 font-semibold text-right">Base Sub</th>
+                                <th className="p-2 font-semibold text-right">Est. Refresh Cost</th>
+                                <th className="p-2 font-semibold text-right">Est. Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/30 text-foreground">
+                              {(() => {
+                                let totalMonthlyCost = 0;
+                                let hasSimpleFin = false;
+                                
+                                const rows = connections.map((conn) => {
+                                  const cost = calculateConnectionCost(conn);
+                                  
+                                  if (conn.provider === 'simplefin') {
+                                    hasSimpleFin = true;
+                                  } else {
+                                    totalMonthlyCost += cost.total;
+                                  }
+                                  
+                                  return (
+                                    <tr key={conn.id} className="hover:bg-muted/10">
+                                      <td className="p-2 font-medium truncate max-w-[150px]">{conn.label || 'Unnamed Connection'}</td>
+                                      <td className="p-2 text-center capitalize">{conn.provider || 'Plaid'}</td>
+                                      <td className="p-2 text-center capitalize">{conn.syncFrequency}</td>
+                                      <td className="p-2 text-right">
+                                        {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.baseFee.toFixed(2)}`}
+                                      </td>
+                                      <td className="p-2 text-right">
+                                        {conn.provider === 'simplefin' ? '$0.00' : `$${cost.refreshCost.toFixed(2)}`}
+                                      </td>
+                                      <td className="p-2 text-right font-semibold">
+                                        {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.total.toFixed(2)}`}
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+
+                                // Add SimpleFIN flat fee to total exactly once (as it is a flat user subscription)
+                                if (hasSimpleFin) {
+                                  totalMonthlyCost += 1.50;
+                                }
+
+                                return (
+                                  <>
+                                    {rows}
+                                    <tr className="bg-muted/20 font-bold border-t border-border/50 text-foreground">
+                                      <td colSpan={5} className="p-2 text-right">Total Est. Monthly Cost:</td>
+                                      <td className="p-2 text-right text-xs text-primary">${totalMonthlyCost.toFixed(2)}/mo</td>
+                                    </tr>
+                                  </>
+                                );
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground leading-normal space-y-1.5 p-2.5 bg-muted/20 border border-border/40 rounded-lg">
+                          <div>
+                            * <strong>SimpleFIN Pricing Note</strong>: SimpleFIN charges a flat $1.50/mo subscription paid directly by you, which covers all your linked SimpleFIN connections (up to 25 accounts total).
+                          </div>
+                          <div className="p-3 bg-emerald-500/15 dark:bg-emerald-500/10 border border-emerald-500/35 dark:border-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs leading-relaxed font-medium">
+                            💡 <strong>Plaid Pricing Note</strong>: Plaid includes the <strong>first 10 unique connected institutions (Items) for free</strong> (lifetime limit, not a rolling window of 10 active items) in its Trial/Development tier. Linking an 11th unique lifetime Item converts the entire developer account to Pay-as-you-go billing, and all connections will incur fees. If your total lifetime Plaid connections is fewer than 10, your actual Plaid cost is <strong className="text-emerald-900 dark:text-emerald-100 font-extrabold underline decoration-emerald-500/50">$0.00</strong>. This estimate assumes Pay-as-you-go rates apply to all items.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Collapsible SimpleFIN Form */}
                 {!hasMySimpleFin && showSimpleFinForm && (
                   <div className="mt-4 p-4 border border-border/80 rounded-lg bg-muted/10 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -1331,107 +1664,9 @@ function SettingsPageBody() {
             )}
           </div>
 
-          {/* Estimated Sync Fees Section */}
-          {connections.length > 0 && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
-              <button
-                type="button"
-                onClick={() => setIsSyncFeesExpanded(!isSyncFeesExpanded)}
-                className="w-full flex items-center justify-between text-base font-semibold text-foreground hover:text-primary transition-colors focus:outline-none"
-              >
-                <span className="flex items-center gap-1.5">
-                  <BarChart3 className="w-4 h-4 text-primary" /> Estimated Monthly Sync Fees (Pay-as-you-go)
-                </span>
-                {isSyncFeesExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                )}
-              </button>
-
-              {isSyncFeesExpanded && (
-                <div className="mt-4 space-y-3 animate-in fade-in duration-200">
-                  <p className="text-xs text-muted-foreground leading-normal">
-                    Based on your active connections and their configured sync frequencies, here is your estimated monthly Pay-as-you-go cost:
-                  </p>
-                  <div className="overflow-x-auto border border-border/40 rounded-lg">
-                    <table className="w-full text-[11px] text-left border-collapse">
-                      <thead>
-                        <tr className="bg-muted/30 border-b border-border/40 text-[9px] uppercase tracking-wider text-muted-foreground">
-                          <th className="p-2 font-semibold">Connection</th>
-                          <th className="p-2 font-semibold text-center">Provider</th>
-                          <th className="p-2 font-semibold text-center">Frequency</th>
-                          <th className="p-2 font-semibold text-right">Base Sub</th>
-                          <th className="p-2 font-semibold text-right">Est. Refresh Cost</th>
-                          <th className="p-2 font-semibold text-right">Est. Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/30 text-foreground">
-                        {(() => {
-                          let totalMonthlyCost = 0;
-                          let hasSimpleFin = false;
-                          
-                          const rows = connections.map((conn) => {
-                            const cost = calculateConnectionCost(conn);
-                            
-                            if (conn.provider === 'simplefin') {
-                              hasSimpleFin = true;
-                            } else {
-                              totalMonthlyCost += cost.total;
-                            }
-                            
-                            return (
-                              <tr key={conn.id} className="hover:bg-muted/10">
-                                <td className="p-2 font-medium truncate max-w-[150px]">{conn.label || 'Unnamed Connection'}</td>
-                                <td className="p-2 text-center capitalize">{conn.provider || 'Plaid'}</td>
-                                <td className="p-2 text-center capitalize">{conn.syncFrequency}</td>
-                                <td className="p-2 text-right">
-                                  {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.baseFee.toFixed(2)}`}
-                                </td>
-                                <td className="p-2 text-right">
-                                  {conn.provider === 'simplefin' ? '$0.00' : `$${cost.refreshCost.toFixed(2)}`}
-                                </td>
-                                <td className="p-2 text-right font-semibold">
-                                  {conn.provider === 'simplefin' ? '$1.50*' : `$${cost.total.toFixed(2)}`}
-                                </td>
-                              </tr>
-                            );
-                          });
-
-                          // Add SimpleFIN flat fee to total exactly once (as it is a flat user subscription)
-                          if (hasSimpleFin) {
-                            totalMonthlyCost += 1.50;
-                          }
-
-                          return (
-                            <>
-                              {rows}
-                              <tr className="bg-muted/20 font-bold border-t border-border/50 text-foreground">
-                                <td colSpan={5} className="p-2 text-right">Total Est. Monthly Cost:</td>
-                                <td className="p-2 text-right text-xs text-primary">${totalMonthlyCost.toFixed(2)}/mo</td>
-                              </tr>
-                            </>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground leading-normal space-y-1.5 p-2.5 bg-muted/20 border border-border/40 rounded-lg">
-                    <div>
-                      * <strong>SimpleFIN Pricing Note</strong>: SimpleFIN charges a flat $1.50/mo subscription paid directly by you, which covers all your linked SimpleFIN connections (up to 25 accounts total).
-                    </div>
-                    <div className="p-3 bg-emerald-500/15 dark:bg-emerald-500/10 border border-emerald-500/35 dark:border-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs leading-relaxed font-medium">
-                      💡 <strong>Plaid Pricing Note</strong>: Plaid includes the <strong>first 10 unique connected institutions (Items) for free</strong> (lifetime limit, not a rolling window of 10 active items) in its Trial/Development tier. Linking an 11th unique lifetime Item converts the entire developer account to Pay-as-you-go billing, and all connections will incur fees. If your total lifetime Plaid connections is fewer than 10, your actual Plaid cost is <strong className="text-emerald-900 dark:text-emerald-100 font-extrabold underline decoration-emerald-500/50">$0.00</strong>. This estimate assumes Pay-as-you-go rates apply to all items.
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Existing Connections */}
           {hasConnection && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl mb-5 sm:mb-6">
+            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
               <h2 className="text-base font-semibold text-foreground mb-4">Automatic Bank Connections</h2>
               {connectionsLoading ? (
                 <div className="text-muted-foreground text-sm">Loading...</div>
@@ -1581,7 +1816,7 @@ function SettingsPageBody() {
                             className="absolute top-2 right-2 text-amber-500 hover:text-amber-600 dark:hover:text-amber-300 focus:outline-none"
                             title="Dismiss warning"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}
@@ -1646,9 +1881,7 @@ function SettingsPageBody() {
 
                       {/* Per-account breakdown */}
                       {syncResult.status === 'success' && syncResult.details.length > 0 && (
-                        <div className={`space-y-1 ${
-                          syncResult.status === 'success' ? '' : ''
-                        }`}>
+                        <div className="space-y-1">
                           {syncResult.details.map((acct: any) => (
                             <div
                               key={acct.externalId}
@@ -1701,160 +1934,8 @@ function SettingsPageBody() {
               )}
             </div>
           )}
-
-
-
-          {/* Account Management - only shown when a connection exists */}
-          {hasConnection && (
-            <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
-              <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
-              <p className="text-xs text-muted-foreground mb-4">
-                <strong>Hide</strong> completely removes the account from lists, charts, and transaction histories. 
-                <strong> Exclude</strong> removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible here in the automatic accounts list to allow configuration.
-              </p>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                {(['all', 'visible', 'included', 'hidden', 'excluded', 'plaid', 'simplefin'] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => setAccountFilter(filter)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors rounded-lg border ${
-                      accountFilter === filter
-                        ? 'bg-primary text-primary-foreground border-primary/30'
-                        : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/50'
-                    }`}
-                  >
-                      {filter === 'all' ? 'All' :
-                       filter === 'visible' ? 'Visible' :
-                       filter === 'included' ? 'Included' :
-                       filter === 'hidden' ? 'Hidden' :
-                       filter === 'excluded' ? 'Excluded' :
-                       filter === 'plaid' ? 'Plaid' :
-                       'SimpleFIN'}
-                    </button>
-                  ))}
-              </div>
-
-              {accountsLoading ? (
-                <div className="text-muted-foreground text-sm">Loading...</div>
-              ) : accounts.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No accounts yet. Connect a financial institution first.</p>
-              ) : (() => {
-                  const filteredAccounts = accounts.filter((a) => {
-                    // Only show automatic accounts (have a connectionId or plaidConnectionId)
-                    if (!a.connectionId && !a.plaidConnectionId) return false;
-                    if (accountFilter === 'hidden') return a.isHidden;
-                    if (accountFilter === 'excluded') return a.isExcludedFromNetWorth;
-                    if (accountFilter === 'visible') return !a.isHidden;
-                    if (accountFilter === 'included') return !a.isExcludedFromNetWorth;
-                    if (accountFilter === 'plaid') return !!a.plaidConnectionId;
-                    if (accountFilter === 'simplefin') return !!a.connectionId;
-                    return true;
-                  });
-                  const hasHiddenOrExcluded = accounts.filter((a) => a.connectionId || a.plaidConnectionId).some((a) => a.isHidden || a.isExcludedFromNetWorth);
-
-                  if (filteredAccounts.length === 0 && accountFilter !== 'all') {
-                    return (
-                      <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
-                        <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="divide-y divide-border">
-                      {filteredAccounts.map((account) => {
-                        const num = parseFloat(account.balance);
-                        const formatted = new Intl.NumberFormat('en-US', {
-                          style: 'currency',
-                          currency: account.currency || 'USD',
-                          minimumFractionDigits: 2,
-                        }).format(Math.abs(num));
-
-                        return (
-                          <div
-                            key={account.id}
-                            className={`px-3 sm:px-4 py-4 sm:py-5 cursor-pointer group hover:bg-muted/30 transition-colors`}
-                            onClick={() => handleOpenAccountDrawer(account)}
-                          >
-                            <div className="flex items-start justify-between gap-2 sm:gap-3">
-                              <div className={`min-w-0 flex-1 ${
-                                account.isHidden || account.isExcludedFromNetWorth ? 'opacity-60' : ''
-                              }`}>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={getBadgeClasses(account.type)}>
-                                    {account.type}
-                                  </span>
-                                  {account.plaidConnectionId && (
-                                    <span className="badge-pill badge-plaid">Plaid</span>
-                                  )}
-                                  {account.connectionId && (
-                                    <span className="badge-pill badge-simplefin">SimpleFIN</span>
-                                  )}
-                                  {account.isHidden && (
-                                    <span className="badge-pill badge-hidden">Hidden</span>
-                                  )}
-                                  {account.isExcludedFromNetWorth && (
-                                    <span className="badge-pill badge-excluded">Excluded</span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                  <span className="text-foreground font-medium text-sm truncate max-w-[120px] sm:max-w-xs">{account.name}</span>
-                                  {account.tags && account.tags.length > 0 && (
-                                    <div className="flex items-center gap-1 flex-wrap">
-                                      {account.tags.map((tag) => (
-                                        <span
-                                          key={tag.id}
-                                          className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
-                                          style={{
-                                            backgroundColor: `${tag.color}15`,
-                                            color: tag.color,
-                                            borderColor: `${tag.color}30`
-                                          }}
-                                        >
-                                          #{tag.name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                {account.institution && (
-                                  <div className="text-xs text-muted-foreground mt-0.5">{account.institution}</div>
-                                )}
-                              </div>
-                              <div className="shrink-0 flex flex-col items-end gap-1 sm:gap-1.5">
-                                <div className="text-right">
-                                  <div className="font-mono text-[11px] sm:text-sm text-foreground blur-number">{formatted}</div>
-                                  <div className="text-[10px] sm:text-xs text-muted-foreground/60">{account.currency}</div>
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenAccountDrawer(account);
-                                  }}
-                                  className="px-2 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {hasHiddenOrExcluded && (
-                        <p className="text-xs text-muted-foreground pt-3 px-4 pb-1">Some accounts are hidden or excluded. Use the tabs above to filter.</p>
-                      )}
-                    </div>
-                  );
-                })()}
-            </div>
-          )}
-        </>
-          )}
-
-          {accountSubTab === 'manual' && (
-            <ManualAccountsSection />
-          )}
+        </div>
+      )}
         </>
       )}
 
