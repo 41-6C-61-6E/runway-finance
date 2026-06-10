@@ -43,7 +43,7 @@ export function RecentActivity({ transactions }: RecentActivityProps) {
               {/* Transactions List */}
               <div className="divide-y divide-border/20">
                 {transactions.map((tx) => {
-                  // In Runway, negative values are outflows (e.g., buying assets), positive are inflows (e.g., selling, dividends)
+                  // In this app, negative values are outflows (e.g., buying assets), positive are inflows (e.g., selling, dividends)
                   const isOutflow = tx.amount < 0;
                   const displayAmount = Math.abs(tx.amount);
 
