@@ -135,8 +135,8 @@ function getAccountIcon(account: ManualAccount): string {
 
 function getBadgeClasses(type: string): string {
   const lowerType = type.toLowerCase();
-  if (lowerType === 'vehicle') return 'bg-chart-4 text-white';
-  if (lowerType === 'metals') return 'bg-chart-1 text-white';
+  if (lowerType === 'vehicle') return 'bg-chart-4/15 text-chart-4';
+  if (lowerType === 'metals') return 'bg-chart-1/15 text-chart-1';
   
   const hierarchy = TYPE_HIERARCHY[lowerType];
   const group = hierarchy?.group ?? 'Other';
@@ -144,15 +144,15 @@ function getBadgeClasses(type: string): string {
   switch (group) {
     case 'Banking':
     case 'Assets':
-      return 'bg-status-positive text-white';
+      return 'bg-status-positive/15 text-status-positive';
     case 'Credit':
     case 'Loans':
     case 'Liabilities':
-      return 'bg-destructive text-white';
+      return 'bg-destructive/15 text-destructive';
     case 'Investments':
-      return 'bg-chart-1 text-white';
+      return 'bg-chart-1/15 text-chart-1';
     case 'Real Estate':
-      return 'bg-chart-3 text-white';
+      return 'bg-chart-3/15 text-chart-3';
     default:
       return 'bg-muted text-muted-foreground';
   }

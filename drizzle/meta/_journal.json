@@ -351,6 +351,13 @@
       "when": 1782600000001,
       "tag": "0049_add_goal_allocation_history",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1782600000002,
+      "tag": "0050_add_plaid_connections",
+      "breakpoints": true
     }
   ]
 }

@@ -74,6 +74,9 @@ export const API_KEY_DEFAULTS: Record<string, string> = {
   btcApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD',
   btcApiKey: '',
   btcXpubApiUrl: 'https://{host}/api/v2/xpub/{xpub}?details=basic',
+  plaidClientId: '',
+  plaidSecret: '',
+  plaidEnvironment: 'sandbox',
 };
 
 export const API_KEY_FIELD_KEYS = Object.keys(API_KEY_DEFAULTS);
@@ -207,6 +210,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'btcApiUrl', label: 'Bitcoin/Crypto API URL', description: 'Endpoint URL for BTC spot price', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.btcApiUrl },
   { key: 'btcApiKey', label: 'Bitcoin/Crypto API Key', description: 'API key for crypto price endpoint', type: 'password', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.btcApiKey },
   { key: 'btcXpubApiUrl', label: 'BTC Xpub API URL', description: 'Endpoint URL for BTC xpub wallet balance queries', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.btcXpubApiUrl },
+  { key: 'plaidClientId', label: 'Plaid Client ID', description: 'Your Plaid API Client ID', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.plaidClientId },
+  { key: 'plaidSecret', label: 'Plaid Secret', description: 'Your Plaid API Secret', type: 'password', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.plaidSecret },
+  { key: 'plaidEnvironment', label: 'Plaid Environment', description: 'Plaid API environment: sandbox, development, or production', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.plaidEnvironment },
 ];
 
 export type UserSettings = typeof DEFAULTS;

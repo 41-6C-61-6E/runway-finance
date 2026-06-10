@@ -125,4 +125,31 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
     description:
       'Per goal: Progress = current amount / target amount × 100, shown as a progress bar. Status indicates active, completed, or paused.',
   },
+
+  // ── Investments ───────────────────────────────────────────────
+  investmentsSummary: {
+    title: 'Portfolio Summary',
+    description:
+      'Portfolio Value = sum of current balances across all investment/brokerage accounts. Total Cost Basis = sum of the original acquisition cost of all security holdings (where reported by the institution). Unrealized Return = Portfolio Value − Total Cost Basis. Return % = Unrealized Return / Total Cost Basis × 100.',
+  },
+  performanceChart: {
+    title: 'Performance Chart',
+    description:
+      'Plots the total portfolio value over time by aggregating daily balance snapshots of all investment accounts. Missing dates are forward-filled. Period change compares ending value vs. starting value.',
+  },
+  holdingsAllocationChart: {
+    title: 'Holdings Allocation',
+    description:
+      'Visualizes the distribution of assets. Groupings sum the current value of holdings by ticker symbol/asset, by brokerage account, or by tax status (taxable vs. retirement/tax-advantaged).',
+  },
+  holdingsTable: {
+    title: 'Holdings Table',
+    description:
+      'Tabular view of all assets held. Gain/Loss per holding = (Price − Average Cost) × Quantity. Weight % represents the current asset value as a percentage of total portfolio value.',
+  },
+  recentActivity: {
+    title: 'Recent Activity',
+    description:
+      'Displays recent transactions (buys, sells, reinvestments, dividends) synced from Plaid for all investment accounts.',
+  },
 };

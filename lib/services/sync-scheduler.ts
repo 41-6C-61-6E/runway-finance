@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections, userEncryptionKeys } from '@/lib/db/schema';
+import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { syncConnection } from '@/lib/services/sync';
+import { syncPlaidConnection } from '@/lib/services/plaid-sync';
 import { getServerDEK } from '@/lib/crypto-context';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
@@ -35,7 +36,8 @@ class SyncScheduler {
   }
 
   async init(): Promise<void> {
-    const connections = await getDb()
+    // 1. Fetch SimpleFIN connections
+    const sfConnections = await getDb()
       .select({
         id: simplifinConnections.id,
         userId: simplifinConnections.userId,
@@ -44,13 +46,29 @@ class SyncScheduler {
       })
       .from(simplifinConnections);
 
+    // 2. Fetch Plaid connections
+    const pConnections = await getDb()
+      .select({
+        id: plaidConnections.id,
+        userId: plaidConnections.userId,
+        syncFrequency: plaidConnections.syncFrequency,
+        lastSyncAt: plaidConnections.lastSyncAt,
+      })
+      .from(plaidConnections);
+
+    const allConnections = [
+      ...sfConnections.map((c) => ({ ...c, type: 'simplefin' })),
+      ...pConnections.map((c) => ({ ...c, type: 'plaid' })),
+    ];
+
     let scheduled = 0;
     let skipped = 0;
-    for (const conn of connections) {
+    for (const conn of allConnections) {
       if (!(await canSyncUser(conn.userId))) {
         logger.warn(`${LOG_TAG} Skipping connection — server DEK unavailable`, {
           connectionId: conn.id,
           userId: conn.userId,
+          type: conn.type,
         });
         skipped++;
         continue;
@@ -61,7 +79,7 @@ class SyncScheduler {
     }
 
     this._isRunning = true;
-    logger.info(`${LOG_TAG} Scheduler initialized`, { total: connections.length, scheduled, skipped });
+    logger.info(`${LOG_TAG} Scheduler initialized`, { total: allConnections.length, scheduled, skipped });
   }
 
   schedule(
@@ -102,7 +120,7 @@ class SyncScheduler {
   }
 
   async scheduleForUser(userId: string): Promise<void> {
-    const connections = await getDb()
+    const sfConnections = await getDb()
       .select({
         id: simplifinConnections.id,
         syncFrequency: simplifinConnections.syncFrequency,
@@ -111,7 +129,18 @@ class SyncScheduler {
       .from(simplifinConnections)
       .where(eq(simplifinConnections.userId, userId));
 
-    for (const conn of connections) {
+    const pConnections = await getDb()
+      .select({
+        id: plaidConnections.id,
+        syncFrequency: plaidConnections.syncFrequency,
+        lastSyncAt: plaidConnections.lastSyncAt,
+      })
+      .from(plaidConnections)
+      .where(eq(plaidConnections.userId, userId));
+
+    const all = [...sfConnections, ...pConnections];
+
+    for (const conn of all) {
       this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt);
     }
   }
@@ -121,28 +150,47 @@ class SyncScheduler {
 
     let syncSuccess = false;
     let dekUnavailable = false;
+    let isSimplefin = true;
 
     try {
-      const [connection] = await getDb()
+      // Find the connection type
+      let [connection] = await getDb()
         .select({ userId: simplifinConnections.userId })
         .from(simplifinConnections)
         .where(eq(simplifinConnections.id, id))
         .limit(1);
 
       if (!connection) {
-        logger.info(`${LOG_TAG} Connection deleted, skipping`, { connectionId: id });
+        isSimplefin = false;
+        const [plaidConn] = await getDb()
+          .select({ userId: plaidConnections.userId })
+          .from(plaidConnections)
+          .where(eq(plaidConnections.id, id))
+          .limit(1);
+        connection = plaidConn;
+      }
+
+      if (!connection) {
+        logger.info(`${LOG_TAG} Connection deleted, skipping reschedule`, { connectionId: id });
         return;
       }
 
       const dek = await getServerDEK(connection.userId);
-      const result = await syncConnection(id, connection.userId, dek);
+      
+      let result: any;
+      if (isSimplefin) {
+        result = await syncConnection(id, connection.userId, dek);
+      } else {
+        result = await syncPlaidConnection(id, connection.userId, dek);
+      }
       syncSuccess = result.status === 'success';
 
       if (syncSuccess) {
-        logger.info(`${LOG_TAG} Auto-sync completed`, { connectionId: id });
+        logger.info(`${LOG_TAG} Auto-sync completed`, { connectionId: id, isSimplefin });
       } else {
         logger.error(`${LOG_TAG} Auto-sync failed`, {
           connectionId: id,
+          isSimplefin,
           error: result.errorMessage,
         });
       }
@@ -162,23 +210,35 @@ class SyncScheduler {
       }
     }
 
-    // Re-read current state to decide how to reschedule
+    // Re-read current state to reschedule
     try {
-      const [updated] = await getDb()
-        .select({
-          syncFrequency: simplifinConnections.syncFrequency,
-          lastSyncAt: simplifinConnections.lastSyncAt,
-        })
-        .from(simplifinConnections)
-        .where(eq(simplifinConnections.id, id))
-        .limit(1);
+      let refreshed: any;
+      if (isSimplefin) {
+        [refreshed] = await getDb()
+          .select({
+            syncFrequency: simplifinConnections.syncFrequency,
+            lastSyncAt: simplifinConnections.lastSyncAt,
+          })
+          .from(simplifinConnections)
+          .where(eq(simplifinConnections.id, id))
+          .limit(1);
+      } else {
+        [refreshed] = await getDb()
+          .select({
+            syncFrequency: plaidConnections.syncFrequency,
+            lastSyncAt: plaidConnections.lastSyncAt,
+          })
+          .from(plaidConnections)
+          .where(eq(plaidConnections.id, id))
+          .limit(1);
+      }
 
-      if (!updated || updated.syncFrequency === 'manual') return;
+      if (!refreshed || refreshed.syncFrequency === 'manual') return;
 
       if (dekUnavailable) return;
 
       if (syncSuccess) {
-        this.schedule(id, updated.syncFrequency, updated.lastSyncAt);
+        this.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt);
       } else {
         const timer = setTimeout(() => this.execute(id), RETRY_DELAY_MS);
         this.timers.set(id, timer);

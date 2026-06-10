@@ -53,6 +53,7 @@ body,
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -103,10 +104,16 @@ body,
   box-shadow: none !important;
 }
 
-/* Card borders transparent */
+/* Card borders transparent on light, subtle on dark themes */
 .bg-card.border-border,
 [class*="bg-card/"].border-border {
   border-color: transparent !important;
+}
+[data-theme=dark] .bg-card.border-border,
+[data-theme=dark] [class*="bg-card/"].border-border,
+[data-theme=moonlight] .bg-card.border-border,
+[data-theme=moonlight] [class*="bg-card/"].border-border {
+  border-color: color-mix(in srgb, var(--border) 40%, transparent) !important;
 }
 
 /* Card border-radius removed */
@@ -142,9 +149,13 @@ body,
   border-radius: var(--radius) !important;
 }
 
-/* Divide borders transparent */
+/* Divide borders transparent on light, subtle on dark themes */
 .divide-border > :not(:last-child) {
   border-color: transparent !important;
+}
+[data-theme=dark] .divide-border > :not(:last-child),
+[data-theme=moonlight] .divide-border > :not(:last-child) {
+  border-color: color-mix(in srgb, var(--border) 30%, transparent) !important;
 }
 
 /* bg-muted panel borders transparent */
@@ -230,5 +241,29 @@ body,
 .recharts-surface:focus,
 .recharts-wrapper *:focus {
   outline: none !important;
+}
+
+/* ── Tag / Badge Pill Utilities ────────────────────────────────────────────── */
+
+.tag-pill {
+  background-color: color-mix(in srgb, var(--tag-color) 13%, transparent);
+  color: var(--tag-color);
+  border-color: color-mix(in srgb, var(--tag-color) 25%, transparent);
+}
+
+[data-theme=dark] .tag-pill,
+[data-theme=moonlight] .tag-pill {
+  color: color-mix(in srgb, var(--tag-color) 82%, white 18%);
+}
+
+/* Category pill (higher tint for category names on tint bg) */
+.category-pill {
+  background-color: color-mix(in srgb, var(--tag-color) 15%, transparent);
+  color: var(--tag-color);
+}
+
+[data-theme=dark] .category-pill,
+[data-theme=moonlight] .category-pill {
+  color: color-mix(in srgb, var(--tag-color) 82%, white 18%);
 }
 
