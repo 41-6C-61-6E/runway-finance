@@ -17,7 +17,7 @@ import {
   Database,
   Sparkles,
   LayoutDashboard,
-  Briefcase,
+  CandlestickChart,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
@@ -32,7 +32,7 @@ const drawerItems = [
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
-  { href: '/investments', label: 'Investments', icon: Briefcase, pageKey: 'investments' },
+  { href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
   { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
