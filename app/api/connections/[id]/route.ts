@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  let body: { label?: string; syncFrequency?: string };
+  let body: { label?: string; syncFrequency?: string; disabledAccounts?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -86,6 +86,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     updateData.syncFrequency = body.syncFrequency;
   }
 
+  if ('disabledAccounts' in body && body.disabledAccounts !== undefined) {
+    if (!Array.isArray(body.disabledAccounts) || !body.disabledAccounts.every(item => typeof item === 'string')) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'Disabled accounts must be an array of strings' },
+        { status: 400 }
+      );
+    }
+    updateData.disabledAccounts = body.disabledAccounts;
+  }
+
   let updated: any;
   if (isSimplefin) {
     [updated] = await getDb()
@@ -93,6 +103,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .set(updateData)
       .where(eq(simplifinConnections.id, id))
       .returning();
+
+    // If disabledAccounts was updated, unlink any accounts under this connection that are now disabled
+    if ('disabledAccounts' in updateData && updateData.disabledAccounts.length > 0) {
+      const { and, inArray } = await import('drizzle-orm');
+      await getDb()
+        .update(accounts)
+        .set({ connectionId: null })
+        .where(
+          and(
+            eq(accounts.connectionId, id),
+            inArray(accounts.externalId, updateData.disabledAccounts)
+          )
+        );
+    }
   } else {
     [updated] = await getDb()
       .update(plaidConnections)

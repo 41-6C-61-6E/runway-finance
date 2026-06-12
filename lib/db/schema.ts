@@ -207,6 +207,7 @@ export const simplifinConnections = pgTable('simplefin_connections', {
   lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
   lastSyncStatus: text('last_sync_status').notNull().default('pending'),
   lastSyncError: text('last_sync_error'),
+  disabledAccounts: jsonb('disabled_accounts').default([]).$type<string[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
