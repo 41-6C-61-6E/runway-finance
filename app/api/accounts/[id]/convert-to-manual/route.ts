@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts } from '@/lib/db/schema';
+import { accounts, simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -48,6 +48,56 @@ export async function POST(
       { error: 'forbidden', message: 'You do not own this account' },
       { status: 403 }
     );
+  }
+
+  // If this account was connected to SimpleFIN, add the old externalId to the
+  // connection's disabledAccounts so future syncs don't auto-recreate it.
+  if (account.connectionId && account.externalId) {
+    const [conn] = await getDb()
+      .select()
+      .from(simplifinConnections)
+      .where(eq(simplifinConnections.id, account.connectionId))
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (!disabled.includes(account.externalId)) {
+        await getDb()
+          .update(simplifinConnections)
+          .set({ disabledAccounts: [...disabled, account.externalId] })
+          .where(eq(simplifinConnections.id, conn.id));
+        logger.info('Disabled sync for converted-to-manual SimpleFIN account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
+  }
+
+  // If this account was connected to Plaid, add the old externalId to the
+  // connection's disabledAccounts so future syncs don't auto-recreate it.
+  if (account.plaidConnectionId && account.externalId) {
+    const [conn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, account.plaidConnectionId))
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (!disabled.includes(account.externalId)) {
+        await getDb()
+          .update(plaidConnections)
+          .set({ disabledAccounts: [...disabled, account.externalId] })
+          .where(eq(plaidConnections.id, conn.id));
+        logger.info('Disabled sync for converted-to-manual Plaid account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
   }
 
   // Update the account to disconnect it and set a manual external ID

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, transactions, accountSnapshots } from '@/lib/db/schema';
+import { accounts, transactions, accountSnapshots, simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq, and, isNotNull, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -86,6 +86,49 @@ export async function POST(request: Request) {
         sourceName: sourceAccount.name,
         targetName: targetAccount.name,
       });
+
+      // 2b. For any account that was connected to SimpleFIN or Plaid, add its old
+      // externalId to that connection's disabledAccounts list so future syncs won't
+      // auto-recreate it. This covers both directions:
+      //   - SimpleFIN account remapped to Plaid  → disable old SF externalId
+      //   - Plaid account remapped to SimpleFIN  → disable old Plaid externalId
+      const sfToDisable: Array<{ connectionId: string; externalId: string }> = [];
+      const plaidToDisable: Array<{ connectionId: string; externalId: string }> = [];
+
+      if (sourceAccount.connectionId && sourceAccount.externalId) {
+        sfToDisable.push({ connectionId: sourceAccount.connectionId, externalId: sourceAccount.externalId });
+      }
+      if (targetAccount.connectionId && targetAccount.externalId && targetAccount.connectionId !== sourceAccount.connectionId) {
+        sfToDisable.push({ connectionId: targetAccount.connectionId, externalId: targetAccount.externalId });
+      }
+      if (sourceAccount.plaidConnectionId && sourceAccount.externalId) {
+        plaidToDisable.push({ connectionId: sourceAccount.plaidConnectionId, externalId: sourceAccount.externalId });
+      }
+      if (targetAccount.plaidConnectionId && targetAccount.externalId && targetAccount.plaidConnectionId !== sourceAccount.plaidConnectionId) {
+        plaidToDisable.push({ connectionId: targetAccount.plaidConnectionId, externalId: targetAccount.externalId });
+      }
+
+      for (const { connectionId, externalId } of sfToDisable) {
+        const [conn] = await tx.select().from(simplifinConnections).where(eq(simplifinConnections.id, connectionId)).limit(1);
+        if (conn) {
+          const disabled = conn.disabledAccounts || [];
+          if (!disabled.includes(externalId)) {
+            await tx.update(simplifinConnections).set({ disabledAccounts: [...disabled, externalId] }).where(eq(simplifinConnections.id, conn.id));
+            logger.info('Disabled SimpleFIN sync during remap', { connectionId: conn.id, externalId });
+          }
+        }
+      }
+
+      for (const { connectionId, externalId } of plaidToDisable) {
+        const [conn] = await tx.select().from(plaidConnections).where(eq(plaidConnections.id, connectionId)).limit(1);
+        if (conn) {
+          const disabled = conn.disabledAccounts || [];
+          if (!disabled.includes(externalId)) {
+            await tx.update(plaidConnections).set({ disabledAccounts: [...disabled, externalId] }).where(eq(plaidConnections.id, conn.id));
+            logger.info('Disabled Plaid sync during remap', { connectionId: conn.id, externalId });
+          }
+        }
+      }
 
       // 3. Prevent duplicate account snapshots by deleting conflicting dates from source
       const targetSnapshots = await tx

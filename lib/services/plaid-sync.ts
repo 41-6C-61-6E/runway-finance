@@ -290,8 +290,14 @@ export async function syncPlaidConnection(
     const accountDetails: any[] = [];
     const rawTxData: any[] = [];
 
+    const disabledAccounts = connection.disabledAccounts || [];
+
     // 1. Process and sync accounts
     for (const plaidAcc of plaidAccountsList) {
+      if (disabledAccounts.includes(plaidAcc.account_id)) {
+        logger.debug(`${LOG_TAG} Skipping sync-disabled Plaid account: ${plaidAcc.name} (${plaidAcc.account_id})`);
+        continue;
+      }
       const balance = plaidAcc.balances.current != null ? String(plaidAcc.balances.current) : '0';
       const balanceDate = new Date();
 
