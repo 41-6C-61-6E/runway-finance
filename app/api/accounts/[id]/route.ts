@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountTags, tags } from '@/lib/db/schema';
+import { accounts, accountTags, tags, simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -131,6 +131,54 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { error: 'validation_error', message: 'No valid fields to update' },
       { status: 400 }
     );
+  }
+
+  if (body.connectionId === null && account.connectionId) {
+    const [conn] = await getDb()
+      .select()
+      .from(simplifinConnections)
+      .where(eq(simplifinConnections.id, account.connectionId))
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (account.externalId && !disabled.includes(account.externalId)) {
+        const updatedDisabled = [...disabled, account.externalId];
+        await getDb()
+          .update(simplifinConnections)
+          .set({ disabledAccounts: updatedDisabled })
+          .where(eq(simplifinConnections.id, conn.id));
+        logger.info('Disabled sync for unlinked SimpleFIN account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
+  }
+
+  if (body.plaidConnectionId === null && account.plaidConnectionId) {
+    const [conn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, account.plaidConnectionId))
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (account.externalId && !disabled.includes(account.externalId)) {
+        const updatedDisabled = [...disabled, account.externalId];
+        await getDb()
+          .update(plaidConnections)
+          .set({ disabledAccounts: updatedDisabled })
+          .where(eq(plaidConnections.id, conn.id));
+        logger.info('Disabled sync for unlinked Plaid account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
   }
 
   let updated = account;
