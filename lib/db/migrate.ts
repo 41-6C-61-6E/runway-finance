@@ -79,6 +79,19 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
+    // 1b. Check if use_market_data_for_snapshots column exists on user_settings
+    const colCheck2 = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'user_settings' AND column_name = 'use_market_data_for_snapshots'
+    `);
+    if (colCheck2.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Adding missing use_market_data_for_snapshots column to user_settings...');
+      await client.query(`
+        ALTER TABLE user_settings
+        ADD COLUMN IF NOT EXISTS use_market_data_for_snapshots BOOLEAN NOT NULL DEFAULT FALSE
+      `);
+    }
+
     // 2. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

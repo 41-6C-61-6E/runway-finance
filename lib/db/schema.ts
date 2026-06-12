@@ -132,8 +132,9 @@ export const userSettings = pgTable('user_settings', {
   forecastLookbackMonths: integer('forecast_lookback_months').notNull().default(3),
 
   hiddenPages: jsonb('hidden_pages').default({}),
-  showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
-  showImportedData: jsonb('show_imported_data').default({ global: true, netWorth: true, realEstate: true, cashFlowProjections: true }),
+  showSyntheticData: jsonb('show_synthetic_data').default({ global: true, netWorth: true, investments: true, realEstate: true, cashFlowProjections: true }),
+  showImportedData: jsonb('show_imported_data').default({ global: true, netWorth: true, investments: true, realEstate: true, cashFlowProjections: true }),
+  useMarketDataForSnapshots: boolean('use_market_data_for_snapshots').notNull().default(false),
   defaultChartTimeRange: text('default_chart_time_range').notNull().default('1y'),
   defaultChartType: text('default_chart_type').notNull().default('line'),
   reduceTransparency: boolean('reduce_transparency').notNull().default(false),

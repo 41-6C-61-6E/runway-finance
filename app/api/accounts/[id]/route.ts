@@ -208,6 +208,35 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       } catch (err) {
         logger.warn(`Failed to regenerate history snapshots on PATCH for account ${id}: ${err instanceof Error ? err.message : String(err)}`);
       }
+    } else {
+      const { isInvestmentAccount } = await import('@/lib/utils/account-scope');
+      if (isInvestmentAccount(decrypted.type)) {
+        try {
+          const { userSettings } = await import('@/lib/db/schema');
+          const [settings] = await getDb()
+            .select({ showSyntheticData: userSettings.showSyntheticData })
+            .from(userSettings)
+            .where(eq(userSettings.userId, userId))
+            .limit(1);
+          const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
+          const investmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
+
+          if (investmentsEnabled) {
+            const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+            const today = new Date().toISOString().split('T')[0];
+            await generateHistoricalAccountSnapshots(
+              id,
+              dataUserId,
+              '2023-01-01',
+              today,
+              dek
+            );
+            await recalculateNetWorthSnapshots(dataUserId, dek);
+          }
+        } catch (err) {
+          logger.warn(`Failed to regenerate history snapshots on PATCH for investment account ${id}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
   }
 
