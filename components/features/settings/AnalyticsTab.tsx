@@ -6,6 +6,7 @@ import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useImportedData } from '@/lib/hooks/use-imported-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
+import { useMarketDataForSnapshots } from '@/lib/hooks/use-market-data-snapshots';
 import { Check, Calculator, Database } from 'lucide-react';
 import { useState } from 'react';
 
@@ -27,8 +28,13 @@ const CHART_TYPE_OPTIONS: { value: ChartTypeOption; label: string }[] = [
 const MODULES = [
   {
     key: 'netWorth' as const,
-    label: 'Net Worth & Accounts',
-    description: 'Estimated daily balance snapshots fill gaps between confirmed snapshots from your financial institution. Synthetic snapshots are generated from your transaction history and automatically backfilled during each sync. When enabled, estimated balances appear with dashed lines in net worth and account charts. Disabling hides estimated data points, showing only confirmed snapshots.',
+    label: 'Net Worth & Standard Accounts',
+    description: 'Estimated daily balance snapshots fill gaps between confirmed snapshots for depository (checking/savings) and credit card accounts. Synthetic snapshots are generated from your transaction history. Disabling hides estimated data points, showing only confirmed snapshots.',
+  },
+  {
+    key: 'investments' as const,
+    label: 'Investments',
+    description: 'Estimated daily balance snapshots fill gaps between confirmed snapshots for investment and brokerage accounts. Synthetic snapshots are generated from your transaction history. Disabling hides estimated data points, showing only confirmed snapshots.',
   },
   {
     key: 'realEstate' as const,
@@ -40,8 +46,13 @@ const MODULES = [
 const IMPORTED_MODULES = [
   {
     key: 'netWorth' as const,
-    label: 'Net Worth & Accounts',
-    description: 'Imported account snapshots and transactions included in net worth calculations. Disabling this hides imported balance data from net worth charts.',
+    label: 'Net Worth & Standard Accounts',
+    description: 'Imported account snapshots and transactions for depository and credit card accounts included in net worth calculations. Disabling this hides imported balance data from net worth charts.',
+  },
+  {
+    key: 'investments' as const,
+    label: 'Investments',
+    description: 'Imported account snapshots and transactions for investment and brokerage accounts. Disabling this hides imported balance data from investment charts.',
   },
   {
     key: 'realEstate' as const,
@@ -56,9 +67,10 @@ export default function AnalyticsTab() {
   const { settings: importSettings, loading: importLoading, isEnabled: isImportEnabled, updateSettings: updateImportSettings } = useImportedData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
+  const { enabled: useMarketDataEnabled, loading: marketDataLoading, updateEnabled: updateUseMarketData } = useMarketDataForSnapshots();
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'data' | 'charts'>('general');
 
-  const loading = visLoading || synthLoading || importLoading || defaultsLoading || mathLoading;
+  const loading = visLoading || synthLoading || importLoading || defaultsLoading || mathLoading || marketDataLoading;
 
   if (loading) {
     return <div className="text-muted-foreground py-4">Loading...</div>;
@@ -243,6 +255,20 @@ export default function AnalyticsTab() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Market-data estimation toggle */}
+            <div className="mt-4 p-3 bg-muted/30 border border-border rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-sm font-medium text-foreground">Estimate investment accounts using market data</span>
+                <Switch
+                  checked={useMarketDataEnabled}
+                  onCheckedChange={updateUseMarketData}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                When enabled, historical daily balances of investment accounts are estimated using available holdings positions and Yahoo Finance market price history. If disabled or when holdings are missing, the system falls back to transaction cash-flow balances.
+              </p>
             </div>
           </div>
 

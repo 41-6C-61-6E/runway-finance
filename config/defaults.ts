@@ -37,17 +37,20 @@ export const ANALYTICS_DEFAULTS = {
   showSyntheticData: {
     global: true,
     netWorth: true,
+    investments: true,
     realEstate: true,
     cashFlowProjections: true,
   },
   showImportedData: {
     global: true,
     netWorth: true,
+    investments: true,
     realEstate: true,
     cashFlowProjections: true,
   },
   defaultChartTimeRange: '1y',
   defaultChartType: 'line',
+  useMarketDataForSnapshots: false,
 } as const;
 
 // ── AI Settings ──────────────────────────────────────────────────────────────
@@ -188,8 +191,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'chartVisibility', label: 'Chart Visibility', description: 'Per-chart visibility toggles (JSON object of chartId → boolean)', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.chartVisibility },
   { key: 'forecastMode', label: 'Forecast Mode', description: 'Forecast calculation mode: historical, budget, or hybrid', type: 'string', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.forecastMode },
   { key: 'forecastLookbackMonths', label: 'Forecast Lookback Months', description: 'Number of months to look back for forecast (1-24)', type: 'number', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.forecastLookbackMonths },
-  { key: 'showSyntheticData', label: 'Synthetic & Estimated Data', description: 'Toggle synthetic data modules (JSON: {global, netWorth, realEstate, cashFlowProjections})', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.showSyntheticData },
-  { key: 'showImportedData', label: 'Imported Data', description: 'Toggle imported data visibility (JSON: {global, netWorth, realEstate, cashFlowProjections})', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.showImportedData },
+  { key: 'showSyntheticData', label: 'Synthetic & Estimated Data', description: 'Toggle synthetic data modules (JSON: {global, netWorth, investments, realEstate, cashFlowProjections})', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.showSyntheticData },
+  { key: 'showImportedData', label: 'Imported Data', description: 'Toggle imported data visibility (JSON: {global, netWorth, investments, realEstate, cashFlowProjections})', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.showImportedData },
 
   // ── AI ──
   { key: 'aiAutoAnalyze', label: 'Auto-analyze after sync', description: 'Run AI analysis automatically after each SimpleFIN sync', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoAnalyze },

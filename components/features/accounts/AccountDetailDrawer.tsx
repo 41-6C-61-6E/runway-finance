@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
+import { isInvestmentAccount } from '@/lib/utils/account-scope';
 
 type Account = {
   id: string;
@@ -107,6 +108,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [saving, setSaving] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [mortgageMeta, setMortgageMeta] = useState<Record<string, string>>({});
+  const [ignoreSettlementTransactions, setIgnoreSettlementTransactions] = useState(false);
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
   const [tagIds, setTagIds] = useState<string[]>(account?.tags?.map((t) => t.id) ?? []);
   const [allTags, setAllTags] = useState<TagItem[]>([]);
@@ -206,6 +208,13 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       setMortgageMeta({});
       setAllAccounts([]);
     }
+
+    if (isInvestmentAccount(account.type)) {
+      const meta = account.metadata ?? {};
+      setIgnoreSettlementTransactions(!!meta.ignoreSettlementTransactions);
+    } else {
+      setIgnoreSettlementTransactions(false);
+    }
   }, [account, open]);
 
   const handleSave = useCallback(async () => {
@@ -250,6 +259,13 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         if (['paid_off', 'refinanced'].includes(mortgageMeta.mortgageStatus)) {
           payload.balance = '0';
         }
+      } else if (isInvestmentAccount(type)) {
+        payload.metadata = {
+          ...(account.metadata || {}),
+          ignoreSettlementTransactions,
+        };
+      } else {
+        payload.metadata = account.metadata || null;
       }
 
       await fetch(`/api/accounts/${account.id}`, {
@@ -262,7 +278,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, onSuccess]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, onSuccess]);
 
   if (!account || !open) return null;
 
@@ -516,6 +532,21 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                   Removes the account from all dashboard pages, lists, and net worth calculations. It will only remain visible in the automatic accounts settings tab to allow configuration/re-inclusion.
                 </p>
               </div>
+
+              {isInvestmentAccount(type) && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground/80">Ignore settlement transactions</span>
+                    <Switch
+                      checked={ignoreSettlementTransactions}
+                      onCheckedChange={setIgnoreSettlementTransactions}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-normal">
+                    When generating daily estimated balance snapshots, ignore matching positive/negative transaction pairs on the same date (e.g. money market settlement sweeps).
+                  </p>
+                </div>
+              )}
             </div>
 
             {(account.connectionId || account.plaidConnectionId) && (
