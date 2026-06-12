@@ -209,9 +209,13 @@ export async function encryptRow<T extends Record<string, any>>(table: string, r
     const val = result[field];
     if (val != null && val !== '') {
       const encryptedStr = await encryptField(typeof val === 'object' ? JSON.stringify(val) : String(val), key);
-      try {
-        result[field] = JSON.parse(encryptedStr);
-      } catch {
+      if (table === 'category_rules' && field === 'conditions') {
+        try {
+          result[field] = JSON.parse(encryptedStr);
+        } catch {
+          result[field] = encryptedStr;
+        }
+      } else {
         result[field] = encryptedStr;
       }
     }
