@@ -1,10 +1,10 @@
 import { auth } from 'auth';
 import { getDb } from '@/lib/db';
-import { userSettings } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { userSettings, accounts, accountSnapshots } from '@/lib/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { ACCENT_NAMES } from '@/lib/utils/apply-accent';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptField, encryptField } from '@/lib/crypto';
+import { decryptField, encryptField, decryptRows } from '@/lib/crypto';
 import { DEFAULTS } from '@/config/defaults';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
@@ -56,6 +56,7 @@ export async function GET() {
       aiBatchSize: created?.aiBatchSize ?? DEFAULTS.aiBatchSize,
       aiAnalysisTimeoutSeconds: created?.aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
       showImportedData: created?.showImportedData ?? DEFAULTS.showImportedData,
+      useMarketDataForSnapshots: created?.useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
@@ -80,6 +81,7 @@ export async function GET() {
     hiddenPages: settings[0].hiddenPages ?? DEFAULTS.hiddenPages,
     showSyntheticData: settings[0].showSyntheticData ?? DEFAULTS.showSyntheticData,
     showImportedData: settings[0].showImportedData ?? DEFAULTS.showImportedData,
+    useMarketDataForSnapshots: settings[0].useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
     defaultChartTimeRange: settings[0].defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
     defaultChartType: settings[0].defaultChartType ?? DEFAULTS.defaultChartType,
     reduceTransparency: settings[0].reduceTransparency ?? DEFAULTS.reduceTransparency,
@@ -136,6 +138,7 @@ export async function PATCH(request: Request) {
 	const showImportedData = body.showImportedData;
 	const paystubEnabled = body.paystubEnabled;
 	const accountTagVisibility = body.accountTagVisibility;
+	const useMarketDataForSnapshots = body.useMarketDataForSnapshots;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -166,7 +169,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: 'Invalid hiddenPages value' }, { status: 400 });
   }
 
-  const VALID_SYNTHETIC_KEYS = ['global', 'netWorth', 'realEstate', 'cashFlowProjections'];
+  const VALID_SYNTHETIC_KEYS = ['global', 'netWorth', 'investments', 'realEstate', 'cashFlowProjections'];
   if (showSyntheticData !== undefined) {
     if (typeof showSyntheticData !== 'object' || showSyntheticData === null || Array.isArray(showSyntheticData)) {
       return Response.json({ error: 'Invalid showSyntheticData value' }, { status: 400 });
@@ -178,7 +181,7 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const VALID_IMPORTED_KEYS = ['global', 'netWorth', 'realEstate', 'cashFlowProjections'];
+  const VALID_IMPORTED_KEYS = ['global', 'netWorth', 'investments', 'realEstate', 'cashFlowProjections'];
   if (showImportedData !== undefined) {
     if (typeof showImportedData !== 'object' || showImportedData === null || Array.isArray(showImportedData)) {
       return Response.json({ error: 'Invalid showImportedData value' }, { status: 400 });
@@ -272,6 +275,10 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid aiActiveProviderId value' }, { status: 400 });
 	}
 
+	if (useMarketDataForSnapshots !== undefined && typeof useMarketDataForSnapshots !== 'boolean') {
+		return Response.json({ error: 'Invalid useMarketDataForSnapshots value' }, { status: 400 });
+	}
+
 	const db = getDb();
 
   let settings = await db
@@ -301,6 +308,7 @@ export async function PATCH(request: Request) {
       forecastLookbackMonths: created?.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
       hiddenPages: created?.hiddenPages ?? DEFAULTS.hiddenPages,
       showSyntheticData: created?.showSyntheticData ?? DEFAULTS.showSyntheticData,
+      useMarketDataForSnapshots: created?.useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
       defaultChartTimeRange: created?.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: created?.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: created?.reduceTransparency ?? DEFAULTS.reduceTransparency,
@@ -347,6 +355,7 @@ export async function PATCH(request: Request) {
 	if (aiBatchSize !== undefined) updates.aiBatchSize = aiBatchSize;
 	if (aiAnalysisTimeoutSeconds !== undefined) updates.aiAnalysisTimeoutSeconds = aiAnalysisTimeoutSeconds;
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
+	if (useMarketDataForSnapshots !== undefined) updates.useMarketDataForSnapshots = useMarketDataForSnapshots;
 	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
 	if (accountTagVisibility !== undefined) {
 		const existingVisibility = (settings[0].accountTagVisibility as Record<string, any>) || {};
@@ -359,6 +368,132 @@ export async function PATCH(request: Request) {
     .set(updates)
     .where(eq(userSettings.userId, session.user.id))
     .returning();
+
+  if (showSyntheticData !== undefined || useMarketDataForSnapshots !== undefined) {
+    const prevSynthetic = settings[0].showSyntheticData as Record<string, boolean> | null;
+    const nextSynthetic = showSyntheticData !== undefined ? (showSyntheticData as Record<string, boolean>) : (prevSynthetic || (DEFAULTS.showSyntheticData as Record<string, boolean>));
+
+    const prevUseMarketData = settings[0].useMarketDataForSnapshots;
+    const nextUseMarketData = useMarketDataForSnapshots !== undefined ? useMarketDataForSnapshots : prevUseMarketData;
+
+    const netWorthChanged = showSyntheticData !== undefined && (prevSynthetic?.netWorth !== false) !== (nextSynthetic.netWorth !== false);
+    const investmentsChanged = (showSyntheticData !== undefined && (prevSynthetic?.investments !== false) !== (nextSynthetic.investments !== false)) || (prevUseMarketData !== nextUseMarketData);
+    const realEstateChanged = showSyntheticData !== undefined && (prevSynthetic?.realEstate !== false) !== (nextSynthetic.realEstate !== false);
+
+    if (netWorthChanged || investmentsChanged || realEstateChanged) {
+      const today = new Date().toISOString().split('T')[0];
+      const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
+      (async () => {
+        const userAccounts = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.userId, dataUserId));
+        const decrypted = await decryptRows('accounts', userAccounts, dek);
+
+        const MODEL_SNAPSHOT_TYPES = [
+          'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+          'single-family', 'condo', 'townhouse', 'multi-family', 'other',
+          'vehicle', 'metals', 'mortgage'
+        ];
+
+        const { isInvestmentAccount } = await import('@/lib/utils/account-scope');
+        const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+        const { generateAssetHistorySnapshots } = await import('@/lib/services/asset-estimator');
+        const { readApiConfig } = await import('@/lib/services/manual-accounts');
+
+        // 1. Process Net Worth (Standard) accounts
+        if (netWorthChanged) {
+          const standardAccounts = decrypted.filter(acc =>
+            !isInvestmentAccount(acc.type) && !MODEL_SNAPSHOT_TYPES.includes(acc.type)
+          );
+          const standardIds = standardAccounts.map(a => a.id);
+
+          if (nextSynthetic.netWorth === false) {
+            if (standardIds.length > 0) {
+              await db.delete(accountSnapshots).where(
+                and(
+                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.isSynthetic, true),
+                  inArray(accountSnapshots.accountId, standardIds)
+                )
+              );
+            }
+          } else {
+            for (const acc of standardAccounts) {
+              try {
+                await generateHistoricalAccountSnapshots(acc.id, dataUserId, '2023-01-01', today, dek);
+              } catch (err) {
+                console.error(`Failed to recalculate synthetic netWorth snapshots for ${acc.id}:`, err);
+              }
+            }
+          }
+        }
+
+        // 2. Process Investments accounts
+        if (investmentsChanged) {
+          const investmentAccounts = decrypted.filter(acc => isInvestmentAccount(acc.type));
+          const investmentIds = investmentAccounts.map(a => a.id);
+
+          if (nextSynthetic.investments === false) {
+            if (investmentIds.length > 0) {
+              await db.delete(accountSnapshots).where(
+                and(
+                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.isSynthetic, true),
+                  inArray(accountSnapshots.accountId, investmentIds)
+                )
+              );
+            }
+          } else {
+            for (const acc of investmentAccounts) {
+              try {
+                await generateHistoricalAccountSnapshots(acc.id, dataUserId, '2023-01-01', today, dek);
+              } catch (err) {
+                console.error(`Failed to recalculate synthetic investments snapshots for ${acc.id}:`, err);
+              }
+            }
+          }
+        }
+
+        // 3. Process Real Estate (Model) accounts
+        if (realEstateChanged) {
+          const modelAccounts = decrypted.filter(acc => MODEL_SNAPSHOT_TYPES.includes(acc.type));
+          const modelIds = modelAccounts.map(a => a.id);
+
+          if (nextSynthetic.realEstate === false) {
+            if (modelIds.length > 0) {
+              await db.delete(accountSnapshots).where(
+                and(
+                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.isSynthetic, true),
+                  inArray(accountSnapshots.accountId, modelIds)
+                )
+              );
+            }
+          } else {
+            const apiConfig = await readApiConfig(session.user.id).catch(() => undefined);
+            for (const acc of modelAccounts) {
+              try {
+                const meta = typeof acc.metadata === 'string'
+                  ? JSON.parse(acc.metadata)
+                  : (typeof acc.metadata === 'object' && acc.metadata !== null ? acc.metadata : {});
+                await generateAssetHistorySnapshots(acc.id, dataUserId, acc.type, meta, apiConfig, dek);
+              } catch (err) {
+                console.error(`Failed to recalculate synthetic realEstate snapshots for ${acc.id}:`, err);
+              }
+            }
+          }
+        }
+
+        // 4. Rebuild Net Worth Snapshots
+        await recalculateNetWorthSnapshots(dataUserId, dek);
+
+      })().catch(e => {
+        console.error('Failed to update synthetic snapshots in background settings change:', e);
+      });
+    }
+  }
 
   if (paystubEnabled !== undefined) {
     Promise.all([
@@ -387,6 +522,7 @@ export async function PATCH(request: Request) {
       hiddenPages: updated.hiddenPages ?? DEFAULTS.hiddenPages,
       showSyntheticData: updated.showSyntheticData ?? DEFAULTS.showSyntheticData,
       showImportedData: updated.showImportedData ?? DEFAULTS.showImportedData,
+      useMarketDataForSnapshots: updated.useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
       defaultChartTimeRange: updated.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
       defaultChartType: updated.defaultChartType ?? DEFAULTS.defaultChartType,
       reduceTransparency: updated.reduceTransparency ?? DEFAULTS.reduceTransparency,
