@@ -67,6 +67,7 @@ type Connection = {
   userId: string;
   accessUrlEncrypted?: string;
   provider?: string;
+  disabledAccounts?: string[];
 };
 
 const SYNC_INTERVALS: Record<string, number> = {
@@ -377,6 +378,14 @@ function SettingsPageBody() {
   const [remapError, setRemapError] = useState('');
   const [remapSuccess, setRemapSuccess] = useState('');
 
+  const [isManageSyncDialogOpen, setIsManageSyncDialogOpen] = useState(false);
+  const [manageSyncConn, setManageSyncConn] = useState<Connection | null>(null);
+  const [manageSyncAccounts, setManageSyncAccounts] = useState<Array<{ id: string; name: string; institution: string; balance: string; currency: string }>>([]);
+  const [manageSyncLoading, setManageSyncLoading] = useState(false);
+  const [manageSyncSaving, setManageSyncSaving] = useState(false);
+  const [manageSyncError, setManageSyncError] = useState('');
+  const [tempDisabledAccounts, setTempDisabledAccounts] = useState<string[]>([]);
+
   const fetchConnections = useCallback(async () => {
     try {
       const res = await fetch('/api/connections', { credentials: 'include' });
@@ -442,6 +451,54 @@ function SettingsPageBody() {
     setRemapSourceId(remapTargetId);
     setRemapTargetId(temp);
   }, [remapSourceId, remapTargetId]);
+
+  const openManageSync = useCallback(async (conn: Connection) => {
+    setManageSyncConn(conn);
+    setIsManageSyncDialogOpen(true);
+    setManageSyncLoading(true);
+    setManageSyncError('');
+    setManageSyncAccounts([]);
+    setTempDisabledAccounts([]);
+    try {
+      const res = await fetch(`/api/connections/${conn.id}/accounts`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch accounts');
+      }
+      setManageSyncAccounts(data.accounts || []);
+      setTempDisabledAccounts(data.disabledAccounts || []);
+    } catch (err) {
+      setManageSyncError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setManageSyncLoading(false);
+    }
+  }, []);
+
+  const handleSaveDisabledAccounts = useCallback(async () => {
+    if (!manageSyncConn) return;
+    setManageSyncSaving(true);
+    setManageSyncError('');
+    try {
+      const res = await fetch(`/api/connections/${manageSyncConn.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          disabledAccounts: tempDisabledAccounts,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to save settings');
+      }
+      setIsManageSyncDialogOpen(false);
+      await fetchConnections();
+      await fetchAccounts();
+    } catch (err) {
+      setManageSyncError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setManageSyncSaving(false);
+    }
+  }, [manageSyncConn, tempDisabledAccounts, fetchConnections, fetchAccounts]);
 
   const handleToggleAccount = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
@@ -1760,6 +1817,15 @@ function SettingsPageBody() {
                               {fullResyncId === conn.id ? 'Re-syncing...' : 'Full Re-sync'}
                             </button>
                           )}
+                          {conn.provider === 'simplefin' && (
+                            <button
+                              onClick={() => openManageSync(conn)}
+                              disabled={syncingId === conn.id || (currentUserId !== undefined && conn.userId !== currentUserId)}
+                              className="px-2 py-1 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              Manage Sync
+                            </button>
+                          )}
                           <button
                             onClick={() => openDetails(conn)}
                             className="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
@@ -2365,6 +2431,98 @@ function SettingsPageBody() {
                   className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
                 >
                   {remapLoading ? 'Re-mapping...' : 'Re-map Account'}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Manage Sync Dialog */}
+          <Dialog open={isManageSyncDialogOpen} onOpenChange={setIsManageSyncDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Manage Sync Accounts</DialogTitle>
+                <DialogDescription>
+                  Configure which accounts retrieved from SimpleFIN are actively syncing data to this application.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="p-3 bg-muted/40 border border-border/80 rounded-lg text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-semibold text-foreground block mb-0.5">Sync Disabled vs. Exclude from Net Worth</span>
+                  Disabling sync blocks these accounts at the SimpleFIN integration level. No new transactions or balances will be fetched, and the account won't be auto-created. This is different from "Exclude from Net Worth", which keeps syncing data in the background but hides the account from your net worth totals.
+                </div>
+
+                {manageSyncError && (
+                  <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg text-sm text-destructive">
+                    {manageSyncError}
+                  </div>
+                )}
+
+                {manageSyncLoading ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">
+                    Fetching accounts from SimpleFIN...
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+                    {manageSyncAccounts.length === 0 ? (
+                      <div className="text-sm text-muted-foreground text-center py-4">
+                        No accounts found in this SimpleFIN connection.
+                      </div>
+                    ) : (
+                      manageSyncAccounts.map((acc) => {
+                        const isDisabled = tempDisabledAccounts.includes(acc.id);
+                        return (
+                          <label
+                            key={acc.id}
+                            className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer transition-colors bg-muted/30 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!isDisabled}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTempDisabledAccounts(prev => prev.filter(id => id !== acc.id));
+                                } else {
+                                  setTempDisabledAccounts(prev => [...prev, acc.id]);
+                                }
+                              }}
+                              className="mt-1 accent-primary"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium text-foreground block truncate">
+                                {acc.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground block truncate">
+                                {acc.institution} · {parseFloat(acc.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {acc.currency}
+                              </span>
+                              {isDisabled && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                                  ⚠️ Sync disabled. This account will be unlinked locally and won't sync.
+                                </p>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <button
+                  onClick={() => setIsManageSyncDialogOpen(false)}
+                  disabled={manageSyncSaving}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDisabledAccounts}
+                  disabled={manageSyncLoading || manageSyncSaving}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
+                >
+                  {manageSyncSaving ? 'Saving...' : 'Save Settings'}
                 </button>
               </DialogFooter>
             </DialogContent>
