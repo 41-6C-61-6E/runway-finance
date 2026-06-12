@@ -148,7 +148,18 @@ export async function POST(request: Request) {
         .set({ accountId: sourceAccountId })
         .where(eq(transactions.accountId, targetAccountId));
 
-      // 7. Update source account's credentials and metadata to target's values
+      // 7. Temporarily clear target account's connection IDs and change its externalId
+      // to avoid unique constraint conflicts when updating the source account.
+      await tx
+        .update(accounts)
+        .set({
+          connectionId: null,
+          plaidConnectionId: null,
+          externalId: `temp-remap-${targetAccountId}-${Date.now()}`,
+        })
+        .where(eq(accounts.id, targetAccountId));
+
+      // 8. Update source account's credentials and metadata to target's values
       await tx
         .update(accounts)
         .set({
@@ -162,7 +173,7 @@ export async function POST(request: Request) {
         })
         .where(eq(accounts.id, sourceAccountId));
 
-      // 8. Delete the target account record
+      // 9. Delete the target account record
       await tx
         .delete(accounts)
         .where(eq(accounts.id, targetAccountId));

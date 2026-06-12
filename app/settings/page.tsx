@@ -27,7 +27,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Link2
+  Link2,
+  ArrowUpDown
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
@@ -435,6 +436,12 @@ function SettingsPageBody() {
       setRemapLoading(false);
     }
   }, [remapSourceId, remapTargetId, fetchAccounts]);
+
+  const handleSwapRemapAccounts = useCallback(() => {
+    const temp = remapSourceId;
+    setRemapSourceId(remapTargetId);
+    setRemapTargetId(temp);
+  }, [remapSourceId, remapTargetId]);
 
   const handleToggleAccount = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
@@ -2237,50 +2244,97 @@ function SettingsPageBody() {
               <div className="space-y-4 py-2">
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1">
-                    Orphaned Account (Source)
+                    Account to Keep (Preserves History & Settings)
                   </label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    The original account with all your historical transactions and balance snapshots.
+                    The account you want to keep. It retains all history, settings, and its ID.
                   </p>
                   <select
                     value={remapSourceId}
-                    onChange={(e) => setRemapSourceId(e.target.value)}
+                    onChange={(e) => {
+                      setRemapSourceId(e.target.value);
+                      if (e.target.value === remapTargetId) {
+                        setRemapTargetId('');
+                      }
+                    }}
                     className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="">Select orphaned account...</option>
-                    {orphanedAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.institution || 'Unknown Bank'})
-                      </option>
-                    ))}
+                    <option value="">Select account to keep...</option>
+                    {orphanedAccounts.length > 0 && (
+                      <optgroup label="Orphaned Accounts (Unlinked)">
+                        {orphanedAccounts.map((a) => (
+                          <option key={a.id} value={a.id} disabled={a.id === remapTargetId}>
+                            {a.name} ({a.institution || 'Unknown Bank'})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {activeAutomaticAccounts.length > 0 && (
+                      <optgroup label="Active Synced Accounts">
+                        {activeAutomaticAccounts.map((a) => (
+                          <option key={a.id} value={a.id} disabled={a.id === remapTargetId}>
+                            {a.name} ({a.institution || 'Unknown Bank'})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
+                </div>
+
+                <div className="flex justify-center my-1">
+                  <button
+                    type="button"
+                    onClick={handleSwapRemapAccounts}
+                    className="p-1.5 rounded-full border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-ring"
+                    title="Swap Keep and Merge accounts"
+                  >
+                    <ArrowUpDown className="w-4.5 h-4.5" />
+                  </button>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1">
-                    Active Synced Account (Target)
+                    Account to Merge & Delete (New Sync & Duplicate)
                   </label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    The newly synced duplicate account that you want to merge into the old account.
+                    The duplicate account to merge. Its new transactions and sync credentials will be transferred, and then this record will be deleted.
                   </p>
                   <select
                     value={remapTargetId}
-                    onChange={(e) => setRemapTargetId(e.target.value)}
+                    onChange={(e) => {
+                      setRemapTargetId(e.target.value);
+                      if (e.target.value === remapSourceId) {
+                        setRemapSourceId('');
+                      }
+                    }}
                     className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="">Select active synced account...</option>
-                    {activeAutomaticAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.institution || 'Unknown Bank'})
-                      </option>
-                    ))}
+                    <option value="">Select account to merge & delete...</option>
+                    {orphanedAccounts.length > 0 && (
+                      <optgroup label="Orphaned Accounts (Unlinked)">
+                        {orphanedAccounts.map((a) => (
+                          <option key={a.id} value={a.id} disabled={a.id === remapSourceId}>
+                            {a.name} ({a.institution || 'Unknown Bank'})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {activeAutomaticAccounts.length > 0 && (
+                      <optgroup label="Active Synced Accounts">
+                        {activeAutomaticAccounts.map((a) => (
+                          <option key={a.id} value={a.id} disabled={a.id === remapSourceId}>
+                            {a.name} ({a.institution || 'Unknown Bank'})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">
                   <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong className="text-foreground">Important:</strong> Any new transactions on the target account will be moved to the source account, its external credentials will be updated, and the duplicate target account record will be deleted.
+                    <strong className="text-foreground">Important:</strong> Any new transactions on the merged account will be moved to the kept account, its sync connection/credentials will be updated to the new credentials, and the duplicate merged account record will be deleted.
                   </p>
                 </div>
 

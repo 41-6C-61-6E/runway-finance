@@ -1,5 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
-import { accountSnapshots, transactions, accounts } from '@/lib/db/schema';
+import { accountSnapshots, transactions, accounts, userSettings, holdingSnapshots } from '@/lib/db/schema';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, cleanupTransientZeroSnapshots } from '@/lib/services/account-history';
 
@@ -11,6 +11,8 @@ let mockLatestRealSnapshotResponse: any[] = [];
 let mockAccountResponse: any[] = [{ externalId: 'imported-test-account-id' }];
 let mockInsertValues: any[] = [];
 let mockDeleteWhereCalls: any[] = [];
+let mockUserSettingsResponse: any[] = [];
+let mockHoldingSnapshotsResponse: any[] = [];
 
 // Mock query builder to support Drizzle chained method calls without DB connection
 class MockDbQueryBuilder {
@@ -78,6 +80,10 @@ class MockDbQueryBuilder {
       }
     } else if (this._fromTable === accounts) {
       result = mockAccountResponse;
+    } else if (this._fromTable === userSettings) {
+      result = mockUserSettingsResponse;
+    } else if (this._fromTable === holdingSnapshots) {
+      result = mockHoldingSnapshotsResponse;
     }
     return Promise.resolve(result).then(onfulfilled, onrejected);
   }
@@ -368,8 +374,9 @@ describe('account-history', () => {
       expect(inserted[0].isImported).toBe(false);
     });
 
-    it('skips calculation and deletes synthetic snapshots for investment accounts', async () => {
+    it('skips calculation and deletes synthetic snapshots for investment accounts when investments toggle is disabled', async () => {
       mockAccountResponse = [{ externalId: 'investment-account-id', type: 'investment' }];
+      mockUserSettingsResponse = [{ showSyntheticData: { investments: false } }];
       mockDeleteWhereCalls = [];
       mockPoolQuery.mockClear();
 
@@ -387,6 +394,70 @@ describe('account-history', () => {
       // Verify the delete call is targeting isSynthetic: true
       const deleteCondition = mockDeleteWhereCalls[0][0];
       expect(deleteCondition).toBeDefined();
+    });
+
+    it('calculates historical snapshots for investment accounts when investments toggle is enabled', async () => {
+      mockAccountResponse = [{ externalId: 'investment-account-id', type: 'investment' }];
+      mockUserSettingsResponse = [{ showSyntheticData: { investments: true } }];
+      mockRealSnapshotsResponse = [];
+      mockEarliestTxResponse = [{ date: '2026-05-02' }];
+      mockPostedTxsResponse = [
+        { date: '2026-05-02', postedDate: null, amount: '10.00' },
+        { date: '2026-05-03', postedDate: '2026-05-03', amount: '20.00' },
+      ];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_inv',
+        'user_123',
+        '2026-05-02',
+        '2026-05-03'
+      );
+
+      expect(result.syntheticCount).toBe(2);
+    });
+
+    it('filters out matching positive and negative transaction pairs when ignoreSettlementTransactions is enabled', async () => {
+      mockAccountResponse = [{
+        externalId: 'investment-account-id',
+        type: 'investment',
+        metadata: JSON.stringify({ ignoreSettlementTransactions: true })
+      }];
+      mockRealSnapshotsResponse = [];
+      mockEarliestTxResponse = [{ date: '2026-06-08' }];
+      mockPostedTxsResponse = [
+        { date: '2026-06-08', postedDate: null, amount: '50.00', description: 'CASH' },
+        { date: '2026-06-08', postedDate: null, amount: '-50.00', description: 'VANGUARD' },
+        { date: '2026-06-09', postedDate: null, amount: '10.00', description: 'INTEREST' },
+      ];
+      mockUserSettingsResponse = [{ showSyntheticData: { investments: true } }];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_inv',
+        'user_123',
+        '2026-06-08',
+        '2026-06-09'
+      );
+
+      // 2026-06-08 has +50 and -50 matching pair. The -50 is ignored, leaving +50 change.
+      // So balance on 2026-06-08 = 50.
+      // 2026-06-09 has +10. So balance on 2026-06-09 = 60.
+      expect(result.syntheticCount).toBe(2);
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            snapshotDate: params[i + 2],
+            balance: params[i + 3],
+          });
+        }
+      }
+
+      expect(inserted).toContainEqual({ snapshotDate: '2026-06-08', balance: '50' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-06-09', balance: '60' });
     });
   });
 
@@ -515,6 +586,127 @@ describe('account-history', () => {
 
       // Even though the gap is 3 days (<= 45), these snapshots are imported, so they must not be deleted.
       expect(mockDeleteWhereCalls).toHaveLength(0);
+    });
+
+    it('uses market-data-driven engine for investments when toggle is enabled and holdings are present', async () => {
+      mockAccountResponse = [{ externalId: 'plaid-invest-1', type: 'investment', metadata: null }];
+      mockUserSettingsResponse = [{
+        showSyntheticData: { global: true, investments: true },
+        useMarketDataForSnapshots: true
+      }];
+      mockHoldingSnapshotsResponse = [
+        {
+          snapshotDate: '2026-05-28',
+          securityId: 'sec_1',
+          ticker: 'VTI',
+          name: 'Vanguard Total Stock Market',
+          quantity: '10',
+          price: '95.00',
+          value: '950.00'
+        },
+        {
+          snapshotDate: '2026-05-29',
+          securityId: 'sec_1',
+          ticker: 'VTI',
+          name: 'Vanguard Total Stock Market',
+          quantity: '10',
+          price: '97.00',
+          value: '970.00'
+        }
+      ];
+      // Real snapshots for anchoring
+      mockRealSnapshotsResponse = [
+        { date: '2026-05-28', balance: '1000.00', isSynthetic: false }
+      ];
+
+      mockPoolQuery.mockClear();
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('query1.finance.yahoo.com')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              chart: {
+                result: [{
+                  timestamp: [
+                    Math.floor(new Date('2026-05-28T00:00:00Z').getTime() / 1000),
+                    Math.floor(new Date('2026-05-29T00:00:00Z').getTime() / 1000)
+                  ],
+                  indicators: {
+                    quote: [{
+                      close: [100.00, 105.00]
+                    }]
+                  }
+                }]
+              }
+            })
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      try {
+        const result = await generateHistoricalAccountSnapshots(
+          'acct_123',
+          'user_123',
+          '2026-05-28',
+          '2026-05-29'
+        );
+
+        // Expect 1 synthetic snapshot created for 2026-05-29 (since 2026-05-28 is covered by real snapshot)
+        expect(result.syntheticCount).toBe(1);
+        expect(result.skippedRealCount).toBe(0);
+
+        // Verify inserted value (should be 1050.00)
+        expect(mockPoolQuery).toHaveBeenCalled();
+        const callParams = mockPoolQuery.mock.calls[0][1];
+        // row schema: userId, accountId, snapshotDate, balance, isSynthetic, isImported
+        expect(callParams[2]).toBe('2026-05-29');
+        expect(callParams[3]).toBe('1050'); // 1050
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('falls back to transaction-based calculation if holdings are missing when toggle is enabled', async () => {
+      mockAccountResponse = [{ externalId: 'plaid-invest-1', type: 'investment', metadata: null }];
+      mockUserSettingsResponse = [{
+        showSyntheticData: { global: true, investments: true },
+        useMarketDataForSnapshots: true
+      }];
+      mockHoldingSnapshotsResponse = []; // empty holdings!
+      mockRealSnapshotsResponse = [];
+      mockEarliestTxResponse = [{ date: '2026-05-28' }];
+      mockPostedTxsResponse = [
+        { date: '2026-05-28', postedDate: null, amount: '500.00', description: 'deposit' },
+        { date: '2026-05-29', postedDate: null, amount: '100.00', description: 'interest' }
+      ];
+
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_123',
+        'user_123',
+        '2026-05-28',
+        '2026-05-29'
+      );
+
+      // Verify that it successfully falls back and runs transaction-based snapshots
+      expect(result.syntheticCount).toBe(2);
+      
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            date: params[i + 2],
+            balance: params[i + 3]
+          });
+        }
+      }
+      expect(inserted).toHaveLength(2);
+      expect(inserted[0]).toEqual({ date: '2026-05-28', balance: '500' });
+      expect(inserted[1]).toEqual({ date: '2026-05-29', balance: '600' });
     });
   });
 });

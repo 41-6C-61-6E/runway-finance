@@ -724,7 +724,7 @@ export async function generateAssetHistorySnapshots(
   return inserted;
 }
 
-async function getAccountCurrentBalance(accountId: string, dek?: Uint8Array): Promise<number> {
+export async function getAccountCurrentBalance(accountId: string, dek?: Uint8Array): Promise<number> {
   try {
     const { getDb } = await import('@/lib/db');
     const db = getDb();

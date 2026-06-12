@@ -5,11 +5,13 @@ import { useState, useEffect, useCallback } from 'react';
 const DEFAULTS: {
   global: boolean;
   netWorth: boolean;
+  investments: boolean;
   realEstate: boolean;
   cashFlowProjections: boolean;
 } = {
   global: false,
   netWorth: false,
+  investments: false,
   realEstate: false,
   cashFlowProjections: false,
 };

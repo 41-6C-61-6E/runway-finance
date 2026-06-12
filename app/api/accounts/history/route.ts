@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
-import { filterReportableAccounts, isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 
@@ -100,6 +100,7 @@ export async function GET(request: Request) {
     const synthSettings = {
       global: true,
       netWorth: true,
+      investments: true,
       realEstate: true,
       cashFlowProjections: true,
       ...(typeof rawShowSynthetic === 'object' && rawShowSynthetic !== null ? rawShowSynthetic : {}),
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
     const importSettings = {
       global: true,
       netWorth: true,
+      investments: true,
       realEstate: true,
       cashFlowProjections: true,
       ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
@@ -116,14 +118,19 @@ export async function GET(request: Request) {
 
     const isGlobalEnabled = synthSettings.global !== false;
     const isNetWorthEnabled = isGlobalEnabled && synthSettings.netWorth !== false;
+    const isInvestmentsEnabled = isGlobalEnabled && synthSettings.investments !== false;
     const isRealEstateEnabled = isGlobalEnabled && synthSettings.realEstate !== false;
     const isImportNetWorthEnabled = importSettings.global !== false && importSettings.netWorth !== false;
+    const isImportInvestmentsEnabled = importSettings.global !== false && importSettings.investments !== false;
     const isImportRealEstateEnabled = importSettings.global !== false && importSettings.realEstate !== false;
 
     // Filter reportable accounts based on settings
     let filteredAccounts = reportableAccounts;
     if (!isImportNetWorthEnabled) {
-      filteredAccounts = filteredAccounts.filter(acc => !acc.externalId?.startsWith('imported-'));
+      filteredAccounts = filteredAccounts.filter(acc => !(acc.externalId?.startsWith('imported-') && !isInvestmentAccount(acc.type)));
+    }
+    if (!isImportInvestmentsEnabled) {
+      filteredAccounts = filteredAccounts.filter(acc => !(acc.externalId?.startsWith('imported-') && isInvestmentAccount(acc.type)));
     }
     const realEstateTypes = [
       'realestate',
@@ -186,12 +193,6 @@ export async function GET(request: Request) {
       eq(accountSnapshots.userId, dataUserId),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
-    if (!isNetWorthEnabled) {
-      snapshotsConditionsBefore.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
-    }
-    if (!isImportNetWorthEnabled) {
-      snapshotsConditionsBefore.push(eq(accountSnapshots.isImported, false));
-    }
 
     const snapshotsBefore = await getDb()
       .select({
@@ -199,6 +200,7 @@ export async function GET(request: Request) {
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
         isSynthetic: accountSnapshots.isSynthetic,
+        isImported: accountSnapshots.isImported,
       })
       .from(accountSnapshots)
       .where(and(...snapshotsConditionsBefore))
@@ -210,12 +212,6 @@ export async function GET(request: Request) {
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),
     ];
-    if (!isNetWorthEnabled) {
-      snapshotsConditionsInRange.push(or(eq(accountSnapshots.isSynthetic, false), eq(accountSnapshots.isImported, true)));
-    }
-    if (!isImportNetWorthEnabled) {
-      snapshotsConditionsInRange.push(eq(accountSnapshots.isImported, false));
-    }
 
     const snapshotsInRange = await getDb()
       .select({
@@ -223,13 +219,14 @@ export async function GET(request: Request) {
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
         isSynthetic: accountSnapshots.isSynthetic,
+        isImported: accountSnapshots.isImported,
       })
       .from(accountSnapshots)
       .where(and(...snapshotsConditionsInRange))
       .orderBy(accountSnapshots.snapshotDate);
 
     // Decrypt snapshot balances
-    const decryptSnap = async (snap: typeof snapshotsInRange[number]) => {
+    const decryptSnap = async (snap: any) => {
       let balance = 0;
       try {
         const decrypted = await decryptField(snap.balance, dek);
@@ -245,8 +242,39 @@ export async function GET(request: Request) {
       return { ...snap, balance };
     };
 
-    const decryptedBefore = await Promise.all(snapshotsBefore.map(decryptSnap));
-    const decryptedInRange = await Promise.all(snapshotsInRange.map(decryptSnap));
+    const decryptedBeforeRaw = await Promise.all(snapshotsBefore.map(decryptSnap));
+    const decryptedInRangeRaw = await Promise.all(snapshotsInRange.map(decryptSnap));
+
+    const accountsById = new Map<string, typeof filteredAccounts[number]>();
+    for (const acc of filteredAccounts) {
+      accountsById.set(acc.id, acc);
+    }
+
+    const filterSyntheticSnaps = (snap: any) => {
+      const acc = accountsById.get(snap.accountId);
+      if (!acc) return false;
+      
+      if (snap.isImported) {
+        if (isInvestmentAccount(acc.type)) {
+          return isImportInvestmentsEnabled;
+        }
+        return isImportNetWorthEnabled;
+      }
+
+      if (snap.isSynthetic) {
+        if (isInvestmentAccount(acc.type)) {
+          return isInvestmentsEnabled;
+        }
+        if (realEstateTypes.includes(acc.type.toLowerCase())) {
+          return isRealEstateEnabled;
+        }
+        return isNetWorthEnabled;
+      }
+      return true;
+    };
+
+    const decryptedBefore = decryptedBeforeRaw.filter(filterSyntheticSnaps);
+    const decryptedInRange = decryptedInRangeRaw.filter(filterSyntheticSnaps);
 
     // 4. Initialize forward-fill state
     const latestByAccount = new Map<string, number>();
