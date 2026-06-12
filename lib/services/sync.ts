@@ -653,7 +653,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       durationMs: ms(startedAt),
     });
 
+    const disabledAccounts = connection.disabledAccounts || [];
+
     for (const sfAccount of data.accounts) {
+      if (disabledAccounts.includes(sfAccount.id)) {
+        logger.debug(`${LOG_TAG} Skipping sync-disabled SimpleFIN account: ${sfAccount.name} (${sfAccount.id})`);
+        continue;
+      }
       const balanceNum = parseFloat(sfAccount.balance);
 
       const [existingAccount] = await getDb()
