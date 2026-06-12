@@ -26,6 +26,7 @@ export async function GET() {
       and(
         eq(accounts.userId, dataUserId),
         isNull(accounts.connectionId),
+        isNull(accounts.plaidConnectionId),
         ne(accounts.type, 'paystub'),
       )
     )
