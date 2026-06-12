@@ -386,6 +386,18 @@ function SettingsPageBody() {
   const [manageSyncError, setManageSyncError] = useState('');
   const [tempDisabledAccounts, setTempDisabledAccounts] = useState<string[]>([]);
 
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const [accountToConvert, setAccountToConvert] = useState<Account | null>(null);
+  const [isConvertConfirmOpen, setIsConvertConfirmOpen] = useState(false);
+  const [isConvertLoading, setIsConvertLoading] = useState(false);
+  const [convertError, setConvertError] = useState('');
+
+
+
   const fetchConnections = useCallback(async () => {
     try {
       const res = await fetch('/api/connections', { credentials: 'include' });
@@ -499,6 +511,58 @@ function SettingsPageBody() {
       setManageSyncSaving(false);
     }
   }, [manageSyncConn, tempDisabledAccounts, fetchConnections, fetchAccounts]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (!accountToDelete) return;
+    setIsDeleteLoading(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`/api/accounts/${accountToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Confirm-Delete': 'true',
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to delete account');
+      }
+      setIsDeleteConfirmOpen(false);
+      setAccountToDelete(null);
+      await fetchAccounts();
+      await fetchConnections();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  }, [accountToDelete, fetchAccounts, fetchConnections]);
+
+
+  const handleConvertToManual = useCallback(async () => {
+    if (!accountToConvert) return;
+    setIsConvertLoading(true);
+    setConvertError('');
+    try {
+      const res = await fetch(`/api/accounts/${accountToConvert.id}/convert-to-manual`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to convert account to manual');
+      }
+      setIsConvertConfirmOpen(false);
+      setAccountToConvert(null);
+      await fetchAccounts();
+      await fetchConnections();
+    } catch (err) {
+      setConvertError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsConvertLoading(false);
+    }
+  }, [accountToConvert, fetchAccounts, fetchConnections]);
+
+
 
   const handleToggleAccount = useCallback(
     (accountId: string, field: 'isHidden' | 'isExcludedFromNetWorth') => async (e: React.MouseEvent) => {
@@ -832,7 +896,6 @@ function SettingsPageBody() {
 
     const refreshCost = refreshesPerMonth * 0.08;
     const total = baseFee + refreshCost;
-
     return {
       baseFee,
       refreshCost,
@@ -840,7 +903,80 @@ function SettingsPageBody() {
     };
   };
 
+
+  const renderOrphanedAccountsAlert = () => {
+    if (orphanedAccounts.length === 0) return null;
+
+    return (
+      <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              The following automatic accounts are no longer connected to a bank integration. You can re-map them to an active connection to resume sync, convert them to manual accounts to manage them yourself while preserving historical data, or delete them to permanently remove them.
+            </p>
+          </div>
+        </div>
+
+        <div className="divide-y divide-border/40 border border-border/60 rounded-lg overflow-hidden bg-background/40 backdrop-blur-xs">
+          {orphanedAccounts.map((a) => (
+            <div key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 text-xs">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-foreground truncate">{a.name}</span>
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Unlinked
+                  </span>
+                  {a.institution && (
+                    <span className="text-muted-foreground truncate flex-1 min-w-0">· {a.institution}</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                  <span>Balance: {parseFloat(a.balance || '0').toLocaleString('en-US', { style: 'currency', currency: a.currency || 'USD' })}</span>
+                  <span>·</span>
+                  <span>Type: {a.type}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setRemapSourceId(a.id);
+                    setRemapTargetId(activeAutomaticAccounts[0]?.id || '');
+                    setIsRemapDialogOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-md transition-colors"
+                >
+                  Re-map
+                </button>
+                <button
+                  onClick={() => {
+                    setAccountToConvert(a);
+                    setIsConvertConfirmOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-md transition-colors"
+                >
+                  Convert to Manual
+                </button>
+                <button
+                  onClick={() => {
+                    setAccountToDelete(a);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-md transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
+
     <div className="min-h-screen w-full">
       <PageHeader title="Settings" icon={Settings} />
       <PageContent className="flex flex-col items-center" maxWidth="max-w-6xl">
@@ -1151,29 +1287,8 @@ function SettingsPageBody() {
               </button>
             </div>
           )}
-          {orphanedAccounts.length > 0 && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
-                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    You have {orphanedAccounts.length} automatic account{orphanedAccounts.length !== 1 ? 's' : ''} no longer linked to a bank connection. Re-map {orphanedAccounts.length === 1 ? 'it' : 'them'} to a currently active synced account to preserve its full history.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setRemapSourceId(orphanedAccounts[0]?.id || '');
-                  setRemapTargetId(activeAutomaticAccounts[0]?.id || '');
-                  setIsRemapDialogOpen(true);
-                }}
-                className="px-3 py-1.5 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors flex-shrink-0"
-              >
-                Re-map Account
-              </button>
-            </div>
-          )}
+          {renderOrphanedAccountsAlert()}
+
 
           {/* Account Management - only shown when a connection exists */}
           {hasConnection && (
@@ -1328,30 +1443,10 @@ function SettingsPageBody() {
           )}
 
           {accountSubTab === 'connections' && (
-        <div className="space-y-5 sm:space-y-6">
-          {orphanedAccounts.length > 0 && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl mb-5 sm:mb-6 flex flex-col sm:flex-row items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-start gap-3 flex-1 min-w-0 w-full sm:w-auto">
-                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-amber-500">Unlinked Accounts Detected</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    You have {orphanedAccounts.length} automatic account{orphanedAccounts.length !== 1 ? 's' : ''} no longer linked to a bank connection. Re-map {orphanedAccounts.length === 1 ? 'it' : 'them'} to a currently active synced account to preserve its full history.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setRemapSourceId(orphanedAccounts[0]?.id || '');
-                  setRemapTargetId(activeAutomaticAccounts[0]?.id || '');
-                  setIsRemapDialogOpen(true);
-                }}
-                className="px-3 py-1.5 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors flex-shrink-0"
-              >
-                Re-map Account
-              </button>
-            </div>
-          )}
+            <div className="space-y-5 sm:space-y-6">
+              {renderOrphanedAccountsAlert()}
+
+
 
           {/* Add Connection Options */}
           <div className="p-0">
@@ -2527,6 +2622,88 @@ function SettingsPageBody() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Convert Orphaned Account to Manual Confirmation Dialog */}
+          <AlertDialog open={isConvertConfirmOpen} onOpenChange={(open) => !open && !isConvertLoading && setIsConvertConfirmOpen(false)}>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Convert to Manual Account</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3">
+                  <span className="block">
+                    Are you sure you want to convert <strong className="text-foreground">{accountToConvert?.name}</strong> to a manual account?
+                  </span>
+                  <span className="block text-xs bg-primary/5 border border-primary/10 rounded-lg p-3 text-muted-foreground leading-relaxed font-normal">
+                    💡 <strong>What this does:</strong>
+                    <ul className="list-disc pl-4 mt-1.5 space-y-1.5">
+                      <li>Disconnects the account from all automated bank integrations.</li>
+                      <li>Moves the account to the <strong>Manual Accounts</strong> list.</li>
+                      <li><strong className="text-foreground">Preserves all history:</strong> No transactions, balances, or snapshots will be lost.</li>
+                      <li>Allows you to manually update the balance moving forward.</li>
+                    </ul>
+                  </span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {convertError && (
+                <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg text-sm text-destructive mt-2">
+                  {convertError}
+                </div>
+              )}
+              <AlertDialogFooter className="mt-4">
+                <AlertDialogCancel disabled={isConvertLoading} onClick={() => {
+                  setIsConvertConfirmOpen(false);
+                  setAccountToConvert(null);
+                  setConvertError('');
+                }}>
+                  Cancel
+                </AlertDialogCancel>
+                <button
+                  disabled={isConvertLoading}
+                  onClick={handleConvertToManual}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
+                >
+                  {isConvertLoading ? 'Converting...' : 'Convert to Manual'}
+                </button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Delete Orphaned Account Confirmation Dialog */}
+          <AlertDialog open={isDeleteConfirmOpen} onOpenChange={(open) => !open && !isDeleteLoading && setIsDeleteConfirmOpen(false)}>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive">Delete Unlinked Account</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3">
+                  <span className="block">
+                    Are you sure you want to permanently delete the account <strong className="text-foreground">{accountToDelete?.name}</strong>?
+                  </span>
+                  <span className="block text-xs bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive leading-relaxed font-normal">
+                    ⚠️ <strong>This action cannot be undone.</strong> Deleting this account will permanently remove all of its historical balances, snapshots, and <strong>every associated transaction</strong>.
+                  </span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {deleteError && (
+                <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg text-xs text-destructive mt-2">
+                  {deleteError}
+                </div>
+              )}
+              <AlertDialogFooter className="mt-4">
+                <AlertDialogCancel disabled={isDeleteLoading} onClick={() => {
+                  setIsDeleteConfirmOpen(false);
+                  setAccountToDelete(null);
+                  setDeleteError('');
+                }}>
+                  Cancel
+                </AlertDialogCancel>
+                <button
+                  disabled={isDeleteLoading}
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-destructive rounded-lg hover:bg-destructive/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {isDeleteLoading ? 'Deleting...' : 'Permanently Delete'}
+                </button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Account Detail Drawer */}
           <AccountDetailDrawer
