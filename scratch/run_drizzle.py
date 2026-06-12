@@ -11,7 +11,7 @@ def main():
     
     # Spawn process with slave pty for stdin/stdout/stderr
     proc = subprocess.Popen(
-        ["pnpm", "db:generate", "--name", "add_investments"],
+        ["pnpm", "db:generate", "--name", "add_simplefin_disabled_accounts"],
         stdin=slave,
         stdout=slave,
         stderr=slave,
