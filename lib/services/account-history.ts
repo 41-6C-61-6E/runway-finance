@@ -896,7 +896,10 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
 
     const encryptedNw = dek ? await encryptRow('net_worth_snapshots', nwValues, dek) : nwValues;
 
-    await db.insert(netWorthSnapshots).values(encryptedNw);
+    await db.insert(netWorthSnapshots).values(encryptedNw).onConflictDoUpdate({
+      target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
+      set: encryptedNw,
+    });
   }
 }
 
@@ -909,6 +912,15 @@ function toDateString(d: any): string {
   }
   return String(d);
 }
+
+const TICKER_MAPPINGS: Record<string, string> = {
+  'LMCSTK': 'LMT',
+  'LMCMBI': 'AGG',
+  'LMSMPH': 'IWM',
+  'LMMEPH': 'IJH',
+};
+
+const CONSTANT_PRICE_TICKERS = new Set(['SCHMMF', 'LMCSVF', 'SCHSEC']);
 
 export async function generateInvestmentMarketSnapshots(
   accountId: string,
@@ -965,22 +977,49 @@ export async function generateInvestmentMarketSnapshots(
     }
   }
 
+  // Determine overall range of days to evaluate
+  // We calculate daily valuations from the first holding snapshot date (or fromDate, whichever is earlier) to toDate
+  const calculationStartDate = sortedSnapshotDates[0] < fromDate ? sortedSnapshotDates[0] : fromDate;
+  const start = new Date(calculationStartDate + 'T00:00:00Z');
+  const end = new Date(toDate + 'T00:00:00Z');
+  const dailyDates: string[] = [];
+  let curr = new Date(start);
+  while (curr <= end) {
+    dailyDates.push(curr.toISOString().split('T')[0]);
+    curr.setUTCDate(curr.getUTCDate() + 1);
+  }
+
   // 3. Fetch historical prices from Yahoo Finance for each unique ticker
   const tickerPrices = new Map<string, Map<string, number>>();
-  if (uniqueTickers.size > 0) {
+  
+  // Pre-populate constant-price tickers with 1.00
+  for (const ticker of uniqueTickers) {
+    if (CONSTANT_PRICE_TICKERS.has(ticker)) {
+      const priceMap = new Map<string, number>();
+      for (const d of dailyDates) {
+        priceMap.set(d, 1.00);
+      }
+      tickerPrices.set(ticker, priceMap);
+    }
+  }
+
+  const fetchableTickers = Array.from(uniqueTickers).filter(t => !CONSTANT_PRICE_TICKERS.has(t));
+
+  if (fetchableTickers.length > 0) {
     const startTs = Math.floor(new Date(fromDate + 'T00:00:00Z').getTime() / 1000);
     const endTs = Math.floor(new Date(toDate + 'T00:00:00Z').getTime() / 1000) + 86400; // include end date
 
     await Promise.all(
-      Array.from(uniqueTickers).map(async (ticker) => {
+      fetchableTickers.map(async (ticker) => {
         try {
-          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${startTs}&period2=${endTs}&interval=1d`;
+          const mappedTicker = TICKER_MAPPINGS[ticker] ?? ticker;
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mappedTicker)}?period1=${startTs}&period2=${endTs}&interval=1d`;
           const res = await fetch(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             signal: AbortSignal.timeout(8000),
           });
           if (!res.ok) {
-            logger.warn(`${LOG_TAG} Yahoo Finance fetch failed for ticker ${ticker}: ${res.status}`);
+            logger.warn(`${LOG_TAG} Yahoo Finance fetch failed for ticker ${ticker} (mapped to ${mappedTicker}): ${res.status}`);
             return;
           }
           const data = await res.json() as any;
@@ -995,7 +1034,7 @@ export async function generateInvestmentMarketSnapshots(
                 priceMap.set(dateStr, price);
               }
             }
-            tickerPrices.set(ticker, priceMap);
+            tickerPrices.set(ticker, priceMap); // Store under the original ticker
           }
         } catch (err) {
           logger.warn(`${LOG_TAG} Error fetching Yahoo Finance history for ticker ${ticker}:`, err);
@@ -1007,18 +1046,6 @@ export async function generateInvestmentMarketSnapshots(
   // 4. Generate daily raw holdings valuations V(t)
   const valuationByDate = new Map<string, number>();
   const activeHoldingsBySecurity = new Map<string, { ticker: string | null, name: string | null, quantity: number, price: number }>();
-
-  // Determine overall range of days to evaluate
-  // We calculate daily valuations from the first holding snapshot date (or fromDate, whichever is earlier) to toDate
-  const calculationStartDate = sortedSnapshotDates[0] < fromDate ? sortedSnapshotDates[0] : fromDate;
-  const start = new Date(calculationStartDate + 'T00:00:00Z');
-  const end = new Date(toDate + 'T00:00:00Z');
-  const dailyDates: string[] = [];
-  let curr = new Date(start);
-  while (curr <= end) {
-    dailyDates.push(curr.toISOString().split('T')[0]);
-    curr.setUTCDate(curr.getUTCDate() + 1);
-  }
 
   // Walk forward day by day to compute daily V(t)
   for (const dateStr of dailyDates) {
@@ -1045,9 +1072,24 @@ export async function generateInvestmentMarketSnapshots(
       let price = pos.price; // fallback to last known price from snapshot
       if (pos.ticker) {
         const tickerUpper = pos.ticker.toUpperCase().trim();
-        const yahooPrice = tickerPrices.get(tickerUpper)?.get(dateStr);
-        if (yahooPrice !== undefined) {
-          price = yahooPrice;
+        const priceMap = tickerPrices.get(tickerUpper);
+        if (priceMap) {
+          const yahooPrice = priceMap.get(dateStr);
+          if (yahooPrice !== undefined) {
+            price = yahooPrice;
+          } else {
+            // Weekend/holiday lookback: carry forward the most recent price from Yahoo Finance
+            let lookbackDate = new Date(dateStr + 'T00:00:00Z');
+            for (let d = 0; d < 10; d++) {
+              lookbackDate.setUTCDate(lookbackDate.getUTCDate() - 1);
+              const lookbackStr = lookbackDate.toISOString().split('T')[0];
+              const prevPrice = priceMap.get(lookbackStr);
+              if (prevPrice !== undefined) {
+                price = prevPrice;
+                break;
+              }
+            }
+          }
         }
       }
       dailyValuation += pos.quantity * price;

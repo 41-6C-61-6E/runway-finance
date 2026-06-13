@@ -20,6 +20,15 @@ export interface QuoteData {
   error?: string;
 }
 
+const TICKER_MAPPINGS: Record<string, string> = {
+  'LMCSTK': 'LMT',
+  'LMCMBI': 'AGG',
+  'LMSMPH': 'IWM',
+  'LMMEPH': 'IJH',
+};
+
+const CONSTANT_PRICE_TICKERS = new Set(['SCHMMF', 'LMCSVF', 'SCHSEC']);
+
 async function fetchYahooQuote(ticker: string): Promise<QuoteData> {
   const cached = cache.get(ticker);
   if (cached && cached.expiresAt > Date.now()) {
@@ -37,8 +46,29 @@ async function fetchYahooQuote(ticker: string): Promise<QuoteData> {
     shortName: null,
   };
 
+  if (CONSTANT_PRICE_TICKERS.has(ticker)) {
+    const nameMap: Record<string, string> = {
+      'SCHMMF': 'Schwab Money Market Fund',
+      'LMCSVF': 'Lockheed Martin Stable Value Fund',
+      'SCHSEC': 'Schwab Sweep Security',
+    };
+    const data: QuoteData = {
+      ticker,
+      price: 1.00,
+      change: 0.0,
+      changePercent: 0.0,
+      high52: 1.00,
+      low52: 1.00,
+      marketCap: null,
+      shortName: nameMap[ticker] ?? 'Stable Value Fund',
+    };
+    cache.set(ticker, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+    return data;
+  }
+
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+    const mappedTicker = TICKER_MAPPINGS[ticker] ?? ticker;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mappedTicker)}?interval=1d&range=1d`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0',
