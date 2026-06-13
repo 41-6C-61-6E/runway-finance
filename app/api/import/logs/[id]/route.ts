@@ -4,11 +4,54 @@ import { getDb } from '@/lib/db';
 import { importLog, transactions, accountSnapshots, accounts } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { encryptField } from '@/lib/crypto';
+import { encryptField, decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const { id } = await params;
+
+  try {
+    const db = getDb();
+    const dek = await getSessionDEK();
+
+    const [log] = await db
+      .select()
+      .from(importLog)
+      .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)))
+      .limit(1);
+
+    if (!log) {
+      return NextResponse.json({ error: 'Import log not found' }, { status: 404 });
+    }
+
+    let fileContent = '';
+    if (log.fileContent) {
+      fileContent = await decryptField(log.fileContent, dek);
+    }
+
+    return NextResponse.json({
+      ...log,
+      fileContent,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch import log', message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   _request: Request,

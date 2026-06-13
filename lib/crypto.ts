@@ -194,6 +194,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   account_snapshots: ['balance'],
   holdings: ['name', 'quantity', 'price', 'costBasis', 'value'],
   holding_snapshots: ['name', 'quantity', 'price', 'value', 'costBasis'],
+  import_log: ['fileContent'],
 
   simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
   plaid_connections: ['accessTokenEncrypted', 'accessTokenIv', 'accessTokenTag'],

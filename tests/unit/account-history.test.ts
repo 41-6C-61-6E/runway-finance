@@ -981,5 +981,63 @@ describe('account-history', () => {
       expect(snapshot.totalLiabilities).toBe('0');
       expect(snapshot.netWorth).toBe('300');
     });
+
+    it('interpolates balances directly for investment accounts before the first holdings sync date', async () => {
+      mockAccountResponse = [
+        {
+          id: 'acc_invest',
+          externalId: 'imported-invest',
+          type: 'investment',
+          metadata: null,
+        }
+      ];
+      mockUserSettingsResponse = [
+        {
+          showSyntheticData: { global: true, investments: true },
+          useMarketDataForSnapshots: true,
+        }
+      ];
+      mockRealSnapshotsResponse = [
+        { date: '2026-05-01', balance: '90000.00', isSynthetic: false, isImported: true },
+        { date: '2026-06-01', balance: '100000.00', isSynthetic: false, isImported: false },
+      ];
+      mockHoldingSnapshotsResponse = [
+        {
+          snapshotDate: '2026-06-01',
+          securityId: 'sec_1',
+          ticker: 'SCHMMF',
+          name: 'Schwab Money Market Fund',
+          quantity: '100000',
+          price: '1.00',
+          value: '100000.00'
+        }
+      ];
+
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acc_invest',
+        'user_123',
+        '2026-05-01',
+        '2026-06-01'
+      );
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            snapshotDate: params[i + 2],
+            balance: params[i + 3],
+          });
+        }
+      }
+
+      const midPoint = inserted.find(s => s.snapshotDate === '2026-05-17');
+      expect(midPoint).toBeDefined();
+      const parsedVal = parseFloat(midPoint.balance);
+      expect(parsedVal).toBeGreaterThan(94000);
+      expect(parsedVal).toBeLessThan(96000);
+    });
   });
 });

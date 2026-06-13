@@ -22,12 +22,28 @@ import {
   aiProposals,
   importLog,
   userSettings,
+
+  plaidConnections,
+  holdings,
+  holdingSnapshots,
+  tags,
+  goalAllocationHistory,
+  paystubs,
+  paystubLineItems,
+  paystubFieldMappings,
+  paystubAutoGenerateSettings,
+  transactionTags,
+  accountTags,
+  budgetTags,
+  goalTags,
 } from '@/lib/db/schema';
 
 const USER_TABLES: { table: any; dbName: string }[] = [
   { table: simplifinConnections, dbName: 'simplefin_connections' },
+  { table: plaidConnections, dbName: 'plaid_connections' },
   { table: categories, dbName: 'categories' },
   { table: accounts, dbName: 'accounts' },
+  { table: tags, dbName: 'tags' },
   { table: transactions, dbName: 'transactions' },
   { table: categoryRules, dbName: 'category_rules' },
   { table: budgets, dbName: 'budgets' },
@@ -41,6 +57,13 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
   { table: importLog, dbName: 'import_log' },
+  { table: holdings, dbName: 'holdings' },
+  { table: holdingSnapshots, dbName: 'holding_snapshots' },
+  { table: goalAllocationHistory, dbName: 'goal_allocation_history' },
+  { table: paystubs, dbName: 'paystubs' },
+  { table: paystubLineItems, dbName: 'paystub_line_items' },
+  { table: paystubFieldMappings, dbName: 'paystub_field_mappings' },
+  { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings' },
 ];
 
 export async function GET() {
@@ -62,6 +85,47 @@ export async function GET() {
     );
     data[dbName] = decrypted;
   }
+
+  // Export tag join tables by joining with user's tags
+  const transactionTagsExport = await db
+    .select({
+      transactionId: transactionTags.transactionId,
+      tagId: transactionTags.tagId,
+    })
+    .from(transactionTags)
+    .innerJoin(tags, eq(transactionTags.tagId, tags.id))
+    .where(eq(tags.userId, userId));
+  data.transaction_tags = transactionTagsExport;
+
+  const accountTagsExport = await db
+    .select({
+      accountId: accountTags.accountId,
+      tagId: accountTags.tagId,
+    })
+    .from(accountTags)
+    .innerJoin(tags, eq(accountTags.tagId, tags.id))
+    .where(eq(tags.userId, userId));
+  data.account_tags = accountTagsExport;
+
+  const budgetTagsExport = await db
+    .select({
+      budgetId: budgetTags.budgetId,
+      tagId: budgetTags.tagId,
+    })
+    .from(budgetTags)
+    .innerJoin(tags, eq(budgetTags.tagId, tags.id))
+    .where(eq(tags.userId, userId));
+  data.budget_tags = budgetTagsExport;
+
+  const goalTagsExport = await db
+    .select({
+      goalId: goalTags.goalId,
+      tagId: goalTags.tagId,
+    })
+    .from(goalTags)
+    .innerJoin(tags, eq(goalTags.tagId, tags.id))
+    .where(eq(tags.userId, userId));
+  data.goal_tags = goalTagsExport;
 
   const [settings] = await db
     .select()
