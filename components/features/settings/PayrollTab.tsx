@@ -2144,7 +2144,7 @@ export default function PayrollTab() {
               </>
             ) : (
               <>
-                {viewingPaystub.source === 'json' && viewingPaystub.sourceJson && (
+                {viewingPaystub?.source === 'json' && viewingPaystub?.sourceJson && (
                   <button
                     onClick={() => handleDownloadPaystubJson(viewingPaystub)}
                     className="px-4 py-2 text-sm font-medium text-foreground border border-border hover:bg-muted rounded-lg transition-colors inline-flex items-center gap-1"
