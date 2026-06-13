@@ -141,14 +141,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           try {
             const { syncScheduler } = await import('@/lib/services/sync-scheduler');
             const { manualAccountScheduler } = await import('@/lib/services/manual-account-scheduler');
+            const { runAutoGenerate } = await import('@/lib/services/paystub-auto-generate');
             if (syncScheduler.isRunning) {
               await syncScheduler.scheduleForUser(user.username);
             }
             if (manualAccountScheduler.isRunning) {
               await manualAccountScheduler.scheduleForUser(user.username);
             }
+
+            // Run paystub auto-generation in the background on login
+            runAutoGenerate(user.username, dek).catch((err) => {
+              logger.error('Auth: Failed to auto-generate paystubs on login', {
+                error: err instanceof Error ? err.message : String(err),
+              });
+            });
           } catch (err) {
-            logger.error('Auth: Failed to reschedule sync timers', { error: err instanceof Error ? err.message : String(err) });
+            logger.error('Auth: Failed to reschedule sync timers or auto-generate paystubs', { error: err instanceof Error ? err.message : String(err) });
           }
 
           // Resolve the data user ID for share members

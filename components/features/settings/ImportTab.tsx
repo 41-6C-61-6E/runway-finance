@@ -102,8 +102,13 @@ export default function ImportTab() {
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setError(err.message || 'Failed to fetch import history');
       }
-    } catch {} finally {
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch import history');
+    } finally {
       setLogsLoading(false);
     }
   }, []);
