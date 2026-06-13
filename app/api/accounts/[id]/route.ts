@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags, simplifinConnections, plaidConnections } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow, decryptField } from '@/lib/crypto';
@@ -173,6 +173,64 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           .set({ disabledAccounts: updatedDisabled })
           .where(eq(plaidConnections.id, conn.id));
         logger.info('Disabled sync for unlinked Plaid account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
+  }
+
+  if (typeof body.connectionId === 'string' && body.connectionId) {
+    const [conn] = await getDb()
+      .select()
+      .from(simplifinConnections)
+      .where(
+        and(
+          eq(simplifinConnections.id, body.connectionId),
+          eq(simplifinConnections.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (account.externalId && disabled.includes(account.externalId)) {
+        const updatedDisabled = disabled.filter((id) => id !== account.externalId);
+        await getDb()
+          .update(simplifinConnections)
+          .set({ disabledAccounts: updatedDisabled })
+          .where(eq(simplifinConnections.id, conn.id));
+        logger.info('Enabled sync for re-linked SimpleFIN account', {
+          accountId: id,
+          connectionId: conn.id,
+          externalId: account.externalId,
+        });
+      }
+    }
+  }
+
+  if (typeof body.plaidConnectionId === 'string' && body.plaidConnectionId) {
+    const [conn] = await getDb()
+      .select()
+      .from(plaidConnections)
+      .where(
+        and(
+          eq(plaidConnections.id, body.plaidConnectionId),
+          eq(plaidConnections.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (conn) {
+      const disabled = conn.disabledAccounts || [];
+      if (account.externalId && disabled.includes(account.externalId)) {
+        const updatedDisabled = disabled.filter((id) => id !== account.externalId);
+        await getDb()
+          .update(plaidConnections)
+          .set({ disabledAccounts: updatedDisabled })
+          .where(eq(plaidConnections.id, conn.id));
+        logger.info('Enabled sync for re-linked Plaid account', {
           accountId: id,
           connectionId: conn.id,
           externalId: account.externalId,

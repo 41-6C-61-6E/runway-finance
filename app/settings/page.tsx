@@ -378,6 +378,13 @@ function SettingsPageBody() {
   const [remapError, setRemapError] = useState('');
   const [remapSuccess, setRemapSuccess] = useState('');
 
+  const [isRelinkDialogOpen, setIsRelinkDialogOpen] = useState(false);
+  const [relinkAccount, setRelinkAccount] = useState<Account | null>(null);
+  const [relinkTargetConnectionId, setRelinkTargetConnectionId] = useState('');
+  const [relinkLoading, setRelinkLoading] = useState(false);
+  const [relinkError, setRelinkError] = useState('');
+  const [relinkSuccess, setRelinkSuccess] = useState('');
+
   const [isManageSyncDialogOpen, setIsManageSyncDialogOpen] = useState(false);
   const [manageSyncConn, setManageSyncConn] = useState<Connection | null>(null);
   const [manageSyncAccounts, setManageSyncAccounts] = useState<Array<{ id: string; name: string; institution: string; balance: string; currency: string }>>([]);
@@ -463,6 +470,50 @@ function SettingsPageBody() {
     setRemapSourceId(remapTargetId);
     setRemapTargetId(temp);
   }, [remapSourceId, remapTargetId]);
+
+  const handleRelink = useCallback(async () => {
+    if (!relinkAccount || !relinkTargetConnectionId) {
+      setRelinkError('Please select a sync connection.');
+      return;
+    }
+    setRelinkLoading(true);
+    setRelinkError('');
+    setRelinkSuccess('');
+    try {
+      const conn = connections.find((c) => c.id === relinkTargetConnectionId);
+      if (!conn) {
+        throw new Error('Selected connection not found.');
+      }
+
+      const isPlaid = conn.provider !== 'simplefin';
+      const body = {
+        connectionId: isPlaid ? null : conn.id,
+        plaidConnectionId: isPlaid ? conn.id : null,
+      };
+
+      const res = await fetch(`/api/accounts/${relinkAccount.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to re-link account');
+      }
+      setRelinkSuccess('Account re-linked successfully!');
+      await fetchAccounts();
+      setTimeout(() => {
+        setIsRelinkDialogOpen(false);
+        setRelinkAccount(null);
+        setRelinkTargetConnectionId('');
+        setRelinkSuccess('');
+      }, 1500);
+    } catch (err) {
+      setRelinkError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setRelinkLoading(false);
+    }
+  }, [relinkAccount, relinkTargetConnectionId, connections, fetchAccounts]);
 
   const openManageSync = useCallback(async (conn: Connection) => {
     setManageSyncConn(conn);
@@ -939,6 +990,16 @@ function SettingsPageBody() {
                 </div>
               </div>
               <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setRelinkAccount(a);
+                    setRelinkTargetConnectionId(connections[0]?.id || '');
+                    setIsRelinkDialogOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-md transition-colors"
+                >
+                  Re-link
+                </button>
                 <button
                   onClick={() => {
                     setRemapSourceId(a.id);
@@ -2526,6 +2587,81 @@ function SettingsPageBody() {
                   className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
                 >
                   {remapLoading ? 'Re-mapping...' : 'Re-map Account'}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Re-linking Dialog */}
+          <Dialog open={isRelinkDialogOpen} onOpenChange={setIsRelinkDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Re-link to Sync Connection</DialogTitle>
+                <DialogDescription>
+                  Reconnect this unlinked account to one of your active sync connections.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1">
+                    Select Connection
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Choose the sync connection to link this account back to. Sync will resume on the next update.
+                  </p>
+                  <select
+                    value={relinkTargetConnectionId}
+                    onChange={(e) => setRelinkTargetConnectionId(e.target.value)}
+                    className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Select sync connection...</option>
+                    {connections.length > 0 ? (
+                      connections.map((conn) => (
+                        <option key={conn.id} value={conn.id}>
+                          {conn.label || (conn.provider === 'simplefin' ? 'SimpleFIN Connection' : 'Plaid Connection')} ({conn.provider === 'simplefin' ? 'SimpleFIN' : 'Plaid'})
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>No connections found</option>
+                    )}
+                  </select>
+                </div>
+
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <strong className="text-foreground">Important:</strong> This will restore sync for the account. The next sync run will update its balance and pull any missing transactions.
+                  </p>
+                </div>
+
+                {relinkError && (
+                  <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg text-sm text-destructive">
+                    {relinkError}
+                  </div>
+                )}
+
+                {relinkSuccess && (
+                  <div className="p-3 bg-chart-1/20 border border-chart-1/30 rounded-lg text-sm text-chart-1">
+                    {relinkSuccess}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <button
+                  onClick={() => setIsRelinkDialogOpen(false)}
+                  disabled={relinkLoading}
+                  className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRelink}
+                  disabled={relinkLoading || !relinkTargetConnectionId}
+                  className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
+                >
+                  {relinkLoading ? 'Re-linking...' : 'Re-link Account'}
                 </button>
               </DialogFooter>
             </DialogContent>
