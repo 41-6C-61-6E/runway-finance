@@ -27,10 +27,11 @@ export function snapToPeriod(ym: string, timeframe: TimeRange): string {
       else { sy = y - 1; sm = 12; }
       break;
     }
+    case '5y':
     case '1y': { sm = 12; break; }
     default: break;
   }
-  if (timeframe !== '1y' && (sy > cy || (sy === cy && sm > cm))) return getCurrentMonth();
+  if (timeframe !== '1y' && timeframe !== '5y' && (sy > cy || (sy === cy && sm > cm))) return getCurrentMonth();
   return `${sy}-${String(sm).padStart(2, '0')}`;
 }
 
@@ -47,7 +48,7 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
     return { start: `${cy}-01`, end: currentYm };
   }
 
-  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11 } as Record<string, number>)[timeframe] ?? 0;
+  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
   const [ey, em] = end.split('-').map(Number);
   const start = new Date(ey, em - 1 - monthsBack, 1);
   return {
@@ -70,6 +71,7 @@ export function getPeriodLabel(ym: string, timeframe: TimeRange): string {
     case '6m': return `H${m / 6} ${y}`;
     case '1y': return `${y}`;
     case 'ytd': return `YTD ${y}`;
+    case '5y': return `${y - 4} – ${y}`;
     default: return '';
   }
 }
