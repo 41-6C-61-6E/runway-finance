@@ -8,6 +8,33 @@ import { getAccountCurrentBalance } from './asset-estimator';
 
 const LOG_TAG = '[account-history]';
 
+const EXCHANGE_RATES: Record<string, number> = {
+  USD: 1.0,
+  EUR: 1.09,
+  GBP: 1.27,
+  CAD: 0.73,
+  AUD: 0.66,
+  JPY: 0.0064,
+  CHF: 1.11,
+  CNY: 0.14,
+};
+
+export function convertCurrency(amount: number, fromCurrency: string, toCurrency: string): number {
+  const from = (fromCurrency || 'USD').toUpperCase().trim();
+  const to = (toCurrency || 'USD').toUpperCase().trim();
+  if (from === to) return amount;
+
+  const fromRate = EXCHANGE_RATES[from] ?? 1.0;
+  const toRate = EXCHANGE_RATES[to] ?? 1.0;
+
+  const usdAmount = amount * fromRate;
+  return usdAmount / toRate;
+}
+
+export function roundToCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 async function getLatestRealSnapshot(
   accountId: string,
   userId: string,
@@ -249,21 +276,20 @@ export async function generateHistoricalAccountSnapshots(
     )
     .limit(1);
 
+  const [settings] = await getDb()
+    .select({ 
+      showSyntheticData: userSettings.showSyntheticData,
+      useMarketDataForSnapshots: userSettings.useMarketDataForSnapshots,
+    })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  
+  const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
   const isInvestment = account?.type && isInvestmentAccount(account.type);
   let ignoreSettlementTransactions = false;
 
   if (isInvestment) {
-    // Check if investments synthetic data toggle is enabled and if market data estimation is enabled
-    const [settings] = await getDb()
-      .select({ 
-        showSyntheticData: userSettings.showSyntheticData,
-        useMarketDataForSnapshots: userSettings.useMarketDataForSnapshots,
-      })
-      .from(userSettings)
-      .where(eq(userSettings.userId, userId))
-      .limit(1);
-    
-    const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
     const isInvestmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
     const useMarketData = settings?.useMarketDataForSnapshots === true;
 
@@ -299,6 +325,24 @@ export async function generateHistoricalAccountSnapshots(
       } catch (err) {
         logger.warn(`${LOG_TAG} Failed to decrypt metadata for investment account`, { accountId, err });
       }
+    }
+  } else {
+    // Check if netWorth (standard accounts) synthetic data toggle is enabled
+    const isNetWorthEnabled = showSynthetic?.global !== false && showSynthetic?.netWorth !== false;
+
+    if (!isNetWorthEnabled) {
+      // Delete any existing synthetic snapshots for this account
+      await getDb()
+        .delete(accountSnapshots)
+        .where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            eq(accountSnapshots.isSynthetic, true)
+          )
+        );
+      logger.debug(`${LOG_TAG} Skipping historical snapshot generation for standard account (disabled in settings)`, { accountId });
+      return { syntheticCount: 0, skippedRealCount: 0 };
     }
   }
 
@@ -547,6 +591,32 @@ export async function generateHistoricalAccountSnapshots(
     }
   }
 
+  let liabilityIsPositive = false;
+  if (account?.type && isLiabilityAccount(account.type)) {
+    let refBalance = 0;
+    if (hasAnchor && anchorBalance !== 0) {
+      refBalance = anchorBalance;
+    } else {
+      const firstNonZeroReal = decryptedRealSnapshots.find(r => parseFloat(r.balance) !== 0);
+      if (firstNonZeroReal) {
+        refBalance = parseFloat(firstNonZeroReal.balance);
+      } else if (loanOriginationAmount !== undefined && loanOriginationAmount !== 0) {
+        refBalance = loanOriginationAmount;
+      } else {
+        const [accDetail] = await getDb()
+          .select({ balance: accounts.balance })
+          .from(accounts)
+          .where(eq(accounts.id, accountId))
+          .limit(1);
+        if (accDetail) {
+          const decrypted = dek ? await decryptField(accDetail.balance, dek) : accDetail.balance;
+          refBalance = parseFloat(decrypted) || 0;
+        }
+      }
+    }
+    liabilityIsPositive = refBalance >= 0;
+  }
+
   const getDailyChange = (dateStr: string, currentBal: number): number => {
     const dayTxs = txsByDate.get(dateStr);
     if (!dayTxs || dayTxs.length === 0) return 0;
@@ -575,7 +645,7 @@ export async function generateHistoricalAccountSnapshots(
         netChange += tx.amount;
       }
     }
-    return netChange;
+    return roundToCents(netChange);
   };
 
   // Perform daily snapshot balance computation
@@ -583,7 +653,7 @@ export async function generateHistoricalAccountSnapshots(
     // Only forward pass needed starting from anchorBalance at anchorDate
     let current = new Date(anchorDate + 'T00:00:00Z');
     const endLimit = new Date(calculationToDate + 'T00:00:00Z');
-    let runningBalance = anchorBalance;
+    let runningBalance = roundToCents(anchorBalance);
 
     while (current < endLimit) {
       current.setUTCDate(current.getUTCDate() + 1);
@@ -591,10 +661,15 @@ export async function generateHistoricalAccountSnapshots(
 
       const realBal = realByDate.get(dateStr);
       if (realBal !== undefined) {
-        runningBalance = realBal;
+        runningBalance = roundToCents(realBal);
       } else {
         const dailyChange = getDailyChange(dateStr, runningBalance);
-        runningBalance += dailyChange;
+        if (liabilityIsPositive) {
+          runningBalance -= dailyChange;
+        } else {
+          runningBalance += dailyChange;
+        }
+        runningBalance = roundToCents(runningBalance);
       }
       balanceByDate.set(dateStr, runningBalance);
     }
@@ -606,7 +681,7 @@ export async function generateHistoricalAccountSnapshots(
 
     if (firstRealDate && firstReal) {
       const firstRealBalance = parseFloat(firstReal.balance);
-      const anchorVal = isNaN(firstRealBalance) ? 0 : firstRealBalance;
+      const anchorVal = isNaN(firstRealBalance) ? 0 : roundToCents(firstRealBalance);
       balanceByDate.set(firstRealDate, anchorVal);
 
       // Backward Pass
@@ -617,7 +692,12 @@ export async function generateHistoricalAccountSnapshots(
       while (current > startLimit) {
         const dateStr = current.toISOString().split('T')[0];
         const dailyChange = getDailyChange(dateStr, runningBalance);
-        runningBalance -= dailyChange;
+        if (liabilityIsPositive) {
+          runningBalance += dailyChange;
+        } else {
+          runningBalance -= dailyChange;
+        }
+        runningBalance = roundToCents(runningBalance);
 
         current.setUTCDate(current.getUTCDate() - 1);
         const prevDateStr = current.toISOString().split('T')[0];
@@ -635,18 +715,25 @@ export async function generateHistoricalAccountSnapshots(
 
         const realBal = realByDate.get(dateStr);
         if (realBal !== undefined) {
-          runningBalance = realBal;
+          runningBalance = roundToCents(realBal);
         } else {
           const dailyChange = getDailyChange(dateStr, runningBalance);
-          runningBalance += dailyChange;
+          if (liabilityIsPositive) {
+            runningBalance -= dailyChange;
+          } else {
+            runningBalance += dailyChange;
+          }
+          runningBalance = roundToCents(runningBalance);
         }
         balanceByDate.set(dateStr, runningBalance);
       }
     } else if (earliestTxDate) {
       // Determine starting balance: use loan origination amount if available
-      const startingBalance = (loanOriginationAmount !== undefined && loanOriginationDate !== undefined && loanOriginationDate <= earliestTxDate)
-        ? loanOriginationAmount
-        : (loanOriginationAmount !== undefined ? loanOriginationAmount : 0);
+      const startingBalance = roundToCents(
+        (loanOriginationAmount !== undefined && loanOriginationDate !== undefined && loanOriginationDate <= earliestTxDate)
+          ? loanOriginationAmount
+          : (loanOriginationAmount !== undefined ? loanOriginationAmount : 0)
+      );
 
       // If anchored from loan origination data, pre-fill dates from origination to earliestTxDate
       if (loanOriginationAmount !== undefined && loanOriginationDate !== undefined && loanOriginationDate < earliestTxDate) {
@@ -661,7 +748,13 @@ export async function generateHistoricalAccountSnapshots(
       let current = new Date(earliestTxDate + 'T00:00:00Z');
       const endLimit = new Date(calculationToDate + 'T00:00:00Z');
       const dailyChange = getDailyChange(earliestTxDate, startingBalance);
-      let runningBalance = startingBalance + dailyChange;
+      let runningBalance = startingBalance;
+      if (liabilityIsPositive) {
+        runningBalance -= dailyChange;
+      } else {
+        runningBalance += dailyChange;
+      }
+      runningBalance = roundToCents(runningBalance);
       balanceByDate.set(earliestTxDate, runningBalance);
 
       while (current < endLimit) {
@@ -669,10 +762,15 @@ export async function generateHistoricalAccountSnapshots(
         const dateStr = current.toISOString().split('T')[0];
         const realBal = realByDate.get(dateStr);
         if (realBal !== undefined) {
-          runningBalance = realBal;
+          runningBalance = roundToCents(realBal);
         } else {
           const nextDailyChange = getDailyChange(dateStr, runningBalance);
-          runningBalance += nextDailyChange;
+          if (liabilityIsPositive) {
+            runningBalance -= nextDailyChange;
+          } else {
+            runningBalance += nextDailyChange;
+          }
+          runningBalance = roundToCents(runningBalance);
         }
         balanceByDate.set(dateStr, runningBalance);
       }
@@ -698,7 +796,7 @@ export async function generateHistoricalAccountSnapshots(
           userId,
           accountId,
           snapshotDate: dateStr,
-          balance: String(bal),
+          balance: String(roundToCents(bal)),
           isSynthetic: true,
           isImported: isAccountImported,
         });
@@ -760,6 +858,13 @@ export async function generateHistoricalAccountSnapshots(
  */
 export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Array) {
   const db = getDb();
+
+  const [settings] = await db
+    .select({ currency: userSettings.currency })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const baseCurrency = settings?.currency || 'USD';
 
   // 1. Get all accounts
   const userAccounts = await db
@@ -869,21 +974,28 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
       }
 
       const bal = latestByAccount.get(acc.id) ?? 0;
+      const convertedBal = convertCurrency(bal, acc.currency || 'USD', baseCurrency);
 
       if (isAssetAccount(accountType)) {
-        totalAssets += bal;
+        totalAssets += convertedBal;
       } else if (isLiabilityAccount(accountType)) {
-        totalLiabilities += Math.abs(bal);
+        totalLiabilities += Math.abs(convertedBal);
       }
 
       if (!breakdown[accountType]) {
         breakdown[accountType] = { count: 0, value: 0 };
       }
       breakdown[accountType].count++;
-      breakdown[accountType].value += bal;
+      breakdown[accountType].value += convertedBal;
     }
 
-    const netWorth = totalAssets - totalLiabilities;
+    totalAssets = roundToCents(totalAssets);
+    totalLiabilities = roundToCents(totalLiabilities);
+    const netWorth = roundToCents(totalAssets - totalLiabilities);
+
+    for (const key of Object.keys(breakdown)) {
+      breakdown[key].value = roundToCents(breakdown[key].value);
+    }
 
     const nwValues = {
       userId,
@@ -1094,7 +1206,7 @@ export async function generateInvestmentMarketSnapshots(
       }
       dailyValuation += pos.quantity * price;
     }
-    valuationByDate.set(dateStr, dailyValuation);
+    valuationByDate.set(dateStr, roundToCents(dailyValuation));
   }
 
   // 5. Get all real (confirmed) snapshots of the account balance to anchor
@@ -1173,7 +1285,7 @@ export async function generateInvestmentMarketSnapshots(
 
     if (prevRealDate !== null && nextRealDate !== null) {
       if (prevRealDate === nextRealDate) {
-        interpolatedDiscrepancy.set(dateStr, realDiscrepancy.get(prevRealDate)!);
+        interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(prevRealDate)!));
       } else {
         const d1 = realDiscrepancy.get(prevRealDate)!;
         const d2 = realDiscrepancy.get(nextRealDate)!;
@@ -1181,12 +1293,12 @@ export async function generateInvestmentMarketSnapshots(
         const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
         const t = new Date(dateStr + 'T00:00:00Z').getTime();
         const fraction = (t - t1) / (t2 - t1);
-        interpolatedDiscrepancy.set(dateStr, d1 + (d2 - d1) * fraction);
+        interpolatedDiscrepancy.set(dateStr, roundToCents(d1 + (d2 - d1) * fraction));
       }
     } else if (prevRealDate !== null) {
-      interpolatedDiscrepancy.set(dateStr, realDiscrepancy.get(prevRealDate)!);
+      interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(prevRealDate)!));
     } else if (nextRealDate !== null) {
-      interpolatedDiscrepancy.set(dateStr, realDiscrepancy.get(nextRealDate)!);
+      interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(nextRealDate)!));
     } else {
       interpolatedDiscrepancy.set(dateStr, 0);
     }
@@ -1197,7 +1309,7 @@ export async function generateInvestmentMarketSnapshots(
   for (const dateStr of dailyDates) {
     const v = valuationByDate.get(dateStr) || 0;
     const d = interpolatedDiscrepancy.get(dateStr) || 0;
-    finalBalances.set(dateStr, v + d);
+    finalBalances.set(dateStr, roundToCents(v + d));
   }
 
   // 8. Delete existing synthetic snapshots for this account in the date range
@@ -1232,7 +1344,7 @@ export async function generateInvestmentMarketSnapshots(
         userId,
         accountId,
         snapshotDate: dateStr,
-        balance: String(bal),
+        balance: String(roundToCents(bal)),
         isSynthetic: true,
         isImported: isAccountImported,
       });

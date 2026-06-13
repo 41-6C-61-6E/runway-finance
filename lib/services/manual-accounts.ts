@@ -12,7 +12,7 @@ import type { ApiConfig } from '@/lib/services/asset-estimator';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents } from '@/lib/services/account-history';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -861,6 +861,14 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
 
 async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
   const db = getDb();
+
+  const [settings] = await db
+    .select({ currency: userSettings.currency })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const baseCurrency = settings?.currency || 'USD';
+
   const userAccounts = await db
     .select()
     .from(accounts)
@@ -878,20 +886,29 @@ async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
     const balance = parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance.toString());
     const accountType = acc.type.toLowerCase();
 
+    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
+
     if (isAssetAccount(accountType)) {
-      totalAssets += balance;
+      totalAssets += convertedBal;
     } else if (isLiabilityAccount(accountType)) {
-      totalLiabilities += Math.abs(balance);
+      totalLiabilities += Math.abs(convertedBal);
     }
 
     if (!breakdown[accountType]) {
       breakdown[accountType] = { count: 0, value: 0 };
     }
     breakdown[accountType].count++;
-    breakdown[accountType].value += balance;
+    breakdown[accountType].value += convertedBal;
   }
 
-  const netWorth = totalAssets - totalLiabilities;
+  totalAssets = roundToCents(totalAssets);
+  totalLiabilities = roundToCents(totalLiabilities);
+  const netWorth = roundToCents(totalAssets - totalLiabilities);
+
+  for (const key of Object.keys(breakdown)) {
+    breakdown[key].value = roundToCents(breakdown[key].value);
+  }
+
   const today = nowISO();
 
   const nwValues: any = {
