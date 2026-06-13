@@ -75,7 +75,7 @@ export function useDateWindow(
     return `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}` > currentMonth;
   }, [timeframe, windowEnd, shift, currentMonth]);
 
-  const showWindowNav = timeframe !== 'all';
+  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd';
 
   const windowLabel = useMemo(() => getPeriodLabel(windowEnd, timeframe), [windowEnd, timeframe]);
 

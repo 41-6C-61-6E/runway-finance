@@ -43,8 +43,8 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
   }
 
   if (timeframe === 'ytd') {
-    const [y] = end.split('-').map(Number);
-    return { start: `${y}-01`, end };
+    const [cy] = currentYm.split('-').map(Number);
+    return { start: `${cy}-01`, end: currentYm };
   }
 
   const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11 } as Record<string, number>)[timeframe] ?? 0;

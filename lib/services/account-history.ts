@@ -1261,10 +1261,18 @@ export async function generateInvestmentMarketSnapshots(
     return realBal - estVal;
   };
 
+  const firstHoldingDate = sortedSnapshotDates[0];
+  const baselineRealDate = sortedRealDates.find(d => d >= firstHoldingDate) || sortedRealDates[sortedRealDates.length - 1];
+  const baselineDiscrepancy = baselineRealDate ? getDiscrepancy(baselineRealDate) : 0;
+
   // Compute discrepancy D(t) on dates with real snapshots
   const realDiscrepancy = new Map<string, number>();
   for (const d of sortedRealDates) {
-    realDiscrepancy.set(d, getDiscrepancy(d));
+    if (d < firstHoldingDate) {
+      realDiscrepancy.set(d, baselineDiscrepancy);
+    } else {
+      realDiscrepancy.set(d, getDiscrepancy(d));
+    }
   }
 
   // 6. Calculate discrepancy D(t) for all dates in dailyDates by interpolation
@@ -1307,9 +1315,46 @@ export async function generateInvestmentMarketSnapshots(
   // 7. Calculate daily estimated balance B(t) = V(t) + D(t)
   const finalBalances = new Map<string, number>();
   for (const dateStr of dailyDates) {
-    const v = valuationByDate.get(dateStr) || 0;
-    const d = interpolatedDiscrepancy.get(dateStr) || 0;
-    finalBalances.set(dateStr, roundToCents(v + d));
+    if (dateStr < firstHoldingDate) {
+      // Find surrounding real snapshots for direct balance interpolation
+      let prevRealDate: string | null = null;
+      let nextRealDate: string | null = null;
+
+      for (const d of sortedRealDates) {
+        if (d <= dateStr) {
+          prevRealDate = d;
+        }
+        if (d >= dateStr && nextRealDate === null) {
+          nextRealDate = d;
+        }
+      }
+
+      let balance = 0;
+      if (prevRealDate !== null && nextRealDate !== null) {
+        if (prevRealDate === nextRealDate) {
+          balance = realByDate.get(prevRealDate)!;
+        } else {
+          const b1 = realByDate.get(prevRealDate)!;
+          const b2 = realByDate.get(nextRealDate)!;
+          const t1 = new Date(prevRealDate + 'T00:00:00Z').getTime();
+          const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
+          const t = new Date(dateStr + 'T00:00:00Z').getTime();
+          const fraction = (t - t1) / (t2 - t1);
+          balance = b1 + (b2 - b1) * fraction;
+        }
+      } else if (prevRealDate !== null) {
+        balance = realByDate.get(prevRealDate)!;
+      } else if (nextRealDate !== null) {
+        balance = realByDate.get(nextRealDate)!;
+      } else {
+        balance = 0;
+      }
+      finalBalances.set(dateStr, roundToCents(balance));
+    } else {
+      const v = valuationByDate.get(dateStr) || 0;
+      const d = interpolatedDiscrepancy.get(dateStr) || 0;
+      finalBalances.set(dateStr, roundToCents(v + d));
+    }
   }
 
   // 8. Delete existing synthetic snapshots for this account in the date range

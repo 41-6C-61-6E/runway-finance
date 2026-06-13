@@ -1,0 +1,107 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { getCurrentMonth, getMonthRange, snapToPeriod, formatMonth, getPeriodLabel } from '@/lib/utils/date-window';
+
+describe('date-window utilities', () => {
+  beforeEach(() => {
+    // Lock system time to June 15, 2026
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('getCurrentMonth', () => {
+    it('returns the current month in YYYY-MM format', () => {
+      expect(getCurrentMonth()).toBe('2026-06');
+    });
+  });
+
+  describe('getMonthRange', () => {
+    it('returns YTD range from Jan to current month for "ytd"', () => {
+      const range = getMonthRange('ytd');
+      expect(range).toEqual({ start: '2026-01', end: '2026-06' });
+    });
+
+    it('returns from 2000-01 to current month for "all"', () => {
+      const range = getMonthRange('all');
+      expect(range).toEqual({ start: '2000-01', end: '2026-06' });
+    });
+
+    it('returns correct range for "1m"', () => {
+      const range = getMonthRange('1m', '2026-05');
+      expect(range).toEqual({ start: '2026-05', end: '2026-05' });
+    });
+
+    it('returns correct range for "3m"', () => {
+      const range = getMonthRange('3m', '2026-06');
+      expect(range).toEqual({ start: '2026-04', end: '2026-06' });
+    });
+
+    it('returns correct range for "6m"', () => {
+      const range = getMonthRange('6m', '2026-06');
+      expect(range).toEqual({ start: '2026-01', end: '2026-06' });
+    });
+
+    it('returns correct range for "1y"', () => {
+      const range = getMonthRange('1y', '2026-06');
+      expect(range).toEqual({ start: '2025-07', end: '2026-06' });
+    });
+  });
+
+  describe('snapToPeriod', () => {
+    it('handles 1m timeframe (no-op)', () => {
+      expect(snapToPeriod('2026-04', '1m')).toBe('2026-04');
+    });
+
+    it('snaps to end of 3m period', () => {
+      // April (4) and May (5) snap to March (3), June (6) snaps to June (6)
+      expect(snapToPeriod('2026-04', '3m')).toBe('2026-03');
+      expect(snapToPeriod('2026-05', '3m')).toBe('2026-03');
+      expect(snapToPeriod('2026-06', '3m')).toBe('2026-06');
+    });
+
+    it('snaps to end of 6m period', () => {
+      // March (3) snaps to last Dec (12), August (8) snaps to June (6)
+      expect(snapToPeriod('2026-03', '6m')).toBe('2025-12');
+      expect(snapToPeriod('2026-08', '6m')).toBe('2026-06');
+    });
+
+    it('snaps to December for 1y', () => {
+      expect(snapToPeriod('2026-05', '1y')).toBe('2026-12');
+    });
+  });
+
+  describe('formatMonth', () => {
+    it('formats YYYY-MM to long month and year', () => {
+      expect(formatMonth('2026-06')).toBe('June 2026');
+    });
+  });
+
+  describe('getPeriodLabel', () => {
+    it('returns "All time" for "all"', () => {
+      expect(getPeriodLabel('2026-06', 'all')).toBe('All time');
+    });
+
+    it('returns formatted month for "1m"', () => {
+      expect(getPeriodLabel('2026-06', '1m')).toBe('June 2026');
+    });
+
+    it('returns Q label for "3m"', () => {
+      expect(getPeriodLabel('2026-06', '3m')).toBe('Q2 2026');
+    });
+
+    it('returns H label for "6m"', () => {
+      expect(getPeriodLabel('2026-06', '6m')).toBe('H1 2026');
+    });
+
+    it('returns year label for "1y"', () => {
+      expect(getPeriodLabel('2026-12', '1y')).toBe('2026');
+    });
+
+    it('returns YTD label for "ytd"', () => {
+      expect(getPeriodLabel('2026-06', 'ytd')).toBe('YTD 2026');
+    });
+  });
+});
