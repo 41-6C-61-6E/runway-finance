@@ -345,6 +345,7 @@ export const importLog = pgTable('import_log', {
   endDate: date('end_date'),
   dataStartDate: date('data_start_date'),
   dataEndDate: date('data_end_date'),
+  fileContent: text('file_content'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -792,6 +792,22 @@ export default function PayrollTab() {
     setDeleteAllLoading(false);
   };
 
+  const handleDownloadPaystubJson = (paystub: any) => {
+    if (!paystub?.sourceJson) return;
+    try {
+      const parsed = JSON.parse(paystub.sourceJson);
+      const blob = new Blob([JSON.stringify(parsed, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `paystub_${paystub.checkDate}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Failed to parse or download the original paystub JSON.');
+    }
+  };
+
   // ── Helpers ──
 
   const formatCurrency = (val: string | number) => {
@@ -2128,6 +2144,14 @@ export default function PayrollTab() {
               </>
             ) : (
               <>
+                {viewingPaystub.source === 'json' && viewingPaystub.sourceJson && (
+                  <button
+                    onClick={() => handleDownloadPaystubJson(viewingPaystub)}
+                    className="px-4 py-2 text-sm font-medium text-foreground border border-border hover:bg-muted rounded-lg transition-colors inline-flex items-center gap-1"
+                  >
+                    📥 Download Original JSON
+                  </button>
+                )}
                 <button
                   onClick={handleStartEdit}
                   className="px-4 py-2 text-sm font-medium text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
