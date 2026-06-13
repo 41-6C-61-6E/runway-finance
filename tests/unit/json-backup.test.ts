@@ -62,6 +62,8 @@ const mockDb = {
   onConflictDoNothing: vi.fn().mockResolvedValue([]),
   update: vi.fn().mockReturnThis(),
   set: vi.fn().mockReturnThis(),
+  transaction: vi.fn().mockImplementation((callback) => callback(mockDb)),
+  execute: vi.fn().mockResolvedValue([]),
 };
 
 vi.mock('@/lib/db', () => ({
