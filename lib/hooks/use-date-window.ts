@@ -5,8 +5,8 @@ import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
 import { getCurrentMonth, getMonthRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
 
-const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, 'ytd': 12 };
-const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11 };
+const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, 'ytd': 12, '5y': 60 };
+const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 };
 
 export interface DateWindowState {
   timeframe: TimeRange;
