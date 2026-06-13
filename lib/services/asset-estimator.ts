@@ -1,4 +1,4 @@
-import { accountSnapshots, accounts } from '@/lib/db/schema';
+import { accountSnapshots, accounts, userSettings } from '@/lib/db/schema';
 import { eq, and, desc, gt, lt, asc, sql } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
@@ -270,9 +270,9 @@ async function estimateMetalsHistory(
 // ─── Mortgage Synthetic Snapshots ────────────────────────────────────────────
 
 function formatDate(date: Date): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -281,10 +281,10 @@ function getAnniversaryDate(startDateStr: string, year: number, monthIndex: numb
   const targetDay = startParts[2];
   
   // Find maximum days in target year/month (monthIndex is 0-indexed)
-  const maxDays = new Date(year, monthIndex + 1, 0).getDate();
+  const maxDays = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
   const day = Math.min(targetDay, maxDays);
   
-  return new Date(year, monthIndex, day);
+  return new Date(Date.UTC(year, monthIndex, day));
 }
 
 export function generateMortgagePaydownHistory(
@@ -305,25 +305,25 @@ export function generateMortgagePaydownHistory(
     effectivePayment = originalBalance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
   }
 
-  const start = new Date(startDate + 'T00:00:00');
-  const today = new Date(currentDate + 'T00:00:00');
+  const start = new Date(startDate + 'T00:00:00Z');
+  const today = new Date(currentDate + 'T00:00:00Z');
 
   if (status === 'paid_off') {
     const endEventDateStr = endDateStr || currentDate;
-    const endEventDate = new Date(endEventDateStr + 'T00:00:00');
+    const endEventDate = new Date(endEventDateStr + 'T00:00:00Z');
 
     // 1. Walk forward from startDate to endEventDate - 1 month
     let balance = originalBalance;
-    let forwardCursor = new Date(start);
-    const endEventDateMinus1Month = new Date(endEventDate);
-    endEventDateMinus1Month.setMonth(endEventDateMinus1Month.getMonth() - 1);
+    let forwardCursor = new Date(start.getTime());
+    const endEventDateMinus1Month = new Date(endEventDate.getTime());
+    endEventDateMinus1Month.setUTCMonth(endEventDateMinus1Month.getUTCMonth() - 1);
 
     while (forwardCursor <= endEventDateMinus1Month) {
       snapshots.push({
         date: formatDate(forwardCursor),
         balance: Math.round(balance * 100) / 100,
       });
-      forwardCursor.setMonth(forwardCursor.getMonth() + 1);
+      forwardCursor.setUTCMonth(forwardCursor.getUTCMonth() + 1);
 
       if (monthlyRate > 0) {
         const interest = balance * monthlyRate;
@@ -346,24 +346,24 @@ export function generateMortgagePaydownHistory(
     // then adjust proportionally to hit targetEndBalance.
     const isRefinanced = status === 'refinanced';
     const targetEndDateStr = isRefinanced ? (endDateStr || currentDate) : currentDate;
-    const targetEndDate = new Date(targetEndDateStr + 'T00:00:00');
+    const targetEndDate = new Date(targetEndDateStr + 'T00:00:00Z');
     
     // For refinanced, the amortization history ends 1 month before refinanceDate,
     // with balance equal to payoffBalance. On refinanceDate, it is 0.
-    const amortEndLimitDate = new Date(targetEndDate);
+    const amortEndLimitDate = new Date(targetEndDate.getTime());
     if (isRefinanced) {
-      amortEndLimitDate.setMonth(amortEndLimitDate.getMonth() - 1);
+      amortEndLimitDate.setUTCMonth(amortEndLimitDate.getUTCMonth() - 1);
     }
 
     const targetEndBalance = isRefinanced ? (payoffBalance ?? 0) : currentBalance;
 
     let balance = originalBalance;
-    let cursor = new Date(start);
+    let cursor = new Date(start.getTime());
     const tempSnaps: Array<{ date: string; balance: number }> = [];
 
     // Find the latest anniversary on or before amortEndLimitDate
-    let year = amortEndLimitDate.getFullYear();
-    let month = amortEndLimitDate.getMonth();
+    let year = amortEndLimitDate.getUTCFullYear();
+    let month = amortEndLimitDate.getUTCMonth();
     let latestAnniversary = getAnniversaryDate(startDate, year, month);
     if (latestAnniversary > amortEndLimitDate) {
       month -= 1;
@@ -385,7 +385,7 @@ export function generateMortgagePaydownHistory(
       }
       if (balance < 0) balance = 0;
 
-      cursor.setMonth(cursor.getMonth() + 1);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
 
     // Push the end limit date itself if it wasn't pushed (meaning it's not aligned with the anniversary)
@@ -447,6 +447,32 @@ export async function generateAssetHistorySnapshots(
 ): Promise<number> {
   const { getDb } = await import(/* @vite-ignore */ '@/lib/db');
   const db = getDb();
+
+  // Check if real estate synthetic data toggle is enabled
+  const [settings] = await db
+    .select({ showSyntheticData: userSettings.showSyntheticData })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
+  const isRealEstateEnabled = showSynthetic?.global !== false && showSynthetic?.realEstate !== false;
+
+  if (!isRealEstateEnabled) {
+    try {
+      await db.delete(accountSnapshots).where(
+        and(
+          eq(accountSnapshots.accountId, accountId),
+          eq(accountSnapshots.userId, userId),
+          eq(accountSnapshots.isSynthetic, true)
+        )
+      );
+    } catch (err) {
+      logger.error(`${LOG_TAG} Failed to clear existing synthetic snapshots for ${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    logger.debug(`${LOG_TAG} Skipping historical asset snapshot generation (disabled in settings)`, { accountId });
+    return 0;
+  }
 
   // Delete existing synthetic snapshots first. If this fails, abort —
   // otherwise old data (potentially from a different amortization

@@ -21,6 +21,9 @@ class MockDbQueryBuilder {
   private _isDelete: boolean = false;
 
   select(...args: any[]) {
+    this._limitValue = null;
+    this._fromTable = null;
+    this._isDelete = false;
     return this;
   }
 
@@ -30,12 +33,15 @@ class MockDbQueryBuilder {
   }
 
   delete(table: any) {
+    this._limitValue = null;
     this._isDelete = true;
     this._fromTable = table;
     return this;
   }
 
   insert(table: any) {
+    this._limitValue = null;
+    this._isDelete = false;
     this._fromTable = table;
     return this;
   }
@@ -793,6 +799,187 @@ describe('account-history', () => {
       } finally {
         global.fetch = originalFetch;
       }
+    });
+  });
+
+  describe('financial fixes and enhancements', () => {
+    it('corrects liability signs dynamically for positive credit card balances', async () => {
+      // CC with positive convention: expense increases positive balance, payment decreases it
+      mockAccountResponse = [
+        {
+          id: 'acct_cc_pos',
+          externalId: 'imported-cc-pos',
+          type: 'credit',
+          metadata: null,
+        }
+      ];
+      mockRealSnapshotsResponse = [
+        { date: '2026-05-04', balance: '1000.00' }
+      ];
+      mockEarliestTxResponse = [{ date: '2026-05-02' }];
+      mockPostedTxsResponse = [
+        { date: '2026-05-02', postedDate: null, amount: '-50.00', description: 'Expense (charge)' },
+        { date: '2026-05-03', postedDate: null, amount: '200.00', description: 'Payment' },
+      ];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_cc_pos',
+        'user_123',
+        '2026-05-02',
+        '2026-05-04'
+      );
+
+      // Expected inserted: 2026-05-02, 2026-05-03.
+      expect(result.syntheticCount).toBe(2);
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            snapshotDate: params[i + 2],
+            balance: params[i + 3],
+          });
+        }
+      }
+
+      // Anchor is 1000 at 2026-05-04
+      // CC positive convention:
+      // Backward pass:
+      // 2026-05-04 is real. Prev date is 2026-05-03.
+      // 2026-05-04 change is 0. Balance at 2026-05-03 is 1000.
+      // 2026-05-03 has a payment of +200. So before that, balance was 1000 + 200 = 1200.
+      // So balance on 2026-05-02 is 1200.
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '1000' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '1200' });
+    });
+
+    it('corrects liability signs dynamically for negative credit card balances', async () => {
+      // CC with negative convention (SimpleFIN style): expense decreases balance (more negative), payment increases it
+      mockAccountResponse = [
+        {
+          id: 'acct_cc_neg',
+          externalId: 'imported-cc-neg',
+          type: 'credit',
+          metadata: null,
+        }
+      ];
+      mockRealSnapshotsResponse = [
+        { date: '2026-05-04', balance: '-1000.00' }
+      ];
+      mockEarliestTxResponse = [{ date: '2026-05-02' }];
+      mockPostedTxsResponse = [
+        { date: '2026-05-02', postedDate: null, amount: '-50.00', description: 'Expense' },
+        { date: '2026-05-03', postedDate: null, amount: '200.00', description: 'Payment' },
+      ];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_cc_neg',
+        'user_123',
+        '2026-05-02',
+        '2026-05-04'
+      );
+
+      expect(result.syntheticCount).toBe(2);
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            snapshotDate: params[i + 2],
+            balance: params[i + 3],
+          });
+        }
+      }
+
+      // Anchor is -1000 at 2026-05-04
+      // CC negative convention:
+      // Backward pass:
+      // 2026-05-03 balance is -1000.
+      // 2026-05-02 balance = -1000 - 200 = -1200.
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '-1000' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '-1200' });
+    });
+
+    it('enforces strict two-decimal-place rounding on all generated daily snapshots', async () => {
+      mockAccountResponse = [
+        {
+          id: 'acct_checking',
+          externalId: 'imported-checking',
+          type: 'checking',
+          metadata: null,
+        }
+      ];
+      mockRealSnapshotsResponse = [];
+      mockEarliestTxResponse = [{ date: '2026-05-02' }];
+      // Accumulated float values that drift, e.g. 10.01 + 20.02 + 30.04 = 60.07000000000001
+      mockPostedTxsResponse = [
+        { date: '2026-05-02', postedDate: null, amount: '10.01' },
+        { date: '2026-05-03', postedDate: null, amount: '20.02' },
+        { date: '2026-05-04', postedDate: null, amount: '30.04' },
+      ];
+      mockPoolQuery.mockClear();
+
+      const result = await generateHistoricalAccountSnapshots(
+        'acct_checking',
+        'user_123',
+        '2026-05-02',
+        '2026-05-04'
+      );
+
+      const inserted: any[] = [];
+      for (const call of mockPoolQuery.mock.calls) {
+        const params = call[1];
+        for (let i = 0; i < params.length; i += 6) {
+          inserted.push({
+            snapshotDate: params[i + 2],
+            balance: params[i + 3],
+          });
+        }
+      }
+
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '10.01' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '30.03' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-04', balance: '60.07' });
+    });
+
+    it('converts currencies in recalculateNetWorthSnapshots correctly', async () => {
+      mockInsertValues = [];
+      mockUserSettingsResponse = [{ currency: 'EUR' }]; // user's base currency is EUR
+      mockAccountResponse = [
+        {
+          id: 'acc_usd',
+          name: 'USD Account',
+          type: 'checking',
+          currency: 'USD',
+          isExcludedFromNetWorth: false,
+          isHidden: false,
+        },
+        {
+          id: 'acc_eur',
+          name: 'EUR Account',
+          type: 'checking',
+          currency: 'EUR',
+          isExcludedFromNetWorth: false,
+          isHidden: false,
+        }
+      ];
+      mockRealSnapshotsResponse = [
+        { accountId: 'acc_usd', snapshotDate: '2026-05-01', balance: '109.00' }, // 109 USD = 100 EUR
+        { accountId: 'acc_eur', snapshotDate: '2026-05-01', balance: '200.00' }, // 200 EUR = 200 EUR
+      ];
+
+      await recalculateNetWorthSnapshots('user_123');
+
+      expect(mockInsertValues).toHaveLength(1);
+      const snapshot = mockInsertValues[0];
+      // Total assets in EUR should be: 109 USD converted to EUR (= 100 EUR) + 200 EUR = 300 EUR
+      expect(snapshot.totalAssets).toBe('300');
+      expect(snapshot.totalLiabilities).toBe('0');
+      expect(snapshot.netWorth).toBe('300');
     });
   });
 });
