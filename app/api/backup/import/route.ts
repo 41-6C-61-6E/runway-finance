@@ -23,6 +23,20 @@ import {
   importLog,
   userSettings,
   syncLogs,
+
+  plaidConnections,
+  holdings,
+  holdingSnapshots,
+  tags,
+  goalAllocationHistory,
+  paystubs,
+  paystubLineItems,
+  paystubFieldMappings,
+  paystubAutoGenerateSettings,
+  transactionTags,
+  accountTags,
+  budgetTags,
+  goalTags,
 } from '@/lib/db/schema';
 import { getPool } from '@/lib/db';
 
@@ -34,27 +48,38 @@ interface BackupPayload {
 
 const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: syncLogs, dbName: 'sync_logs' },
+  { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings' },
+  { table: paystubLineItems, dbName: 'paystub_line_items' },
   { table: transactions, dbName: 'transactions' },
   { table: accountSnapshots, dbName: 'account_snapshots' },
   { table: importLog, dbName: 'import_log' },
-  { table: budgets, dbName: 'budgets' },
-  { table: financialGoals, dbName: 'financial_goals' },
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
+  { table: holdings, dbName: 'holdings' },
+  { table: holdingSnapshots, dbName: 'holding_snapshots' },
+  { table: goalAllocationHistory, dbName: 'goal_allocation_history' },
+  { table: paystubs, dbName: 'paystubs' },
+  { table: paystubFieldMappings, dbName: 'paystub_field_mappings' },
+  { table: budgets, dbName: 'budgets' },
+  { table: financialGoals, dbName: 'financial_goals' },
   { table: categoryRules, dbName: 'category_rules' },
   { table: accounts, dbName: 'accounts' },
   { table: simplifinConnections, dbName: 'simplefin_connections' },
+  { table: plaidConnections, dbName: 'plaid_connections' },
   { table: categories, dbName: 'categories' },
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
   { table: netWorthSnapshots, dbName: 'net_worth_snapshots' },
   { table: monthlyCashFlow, dbName: 'monthly_cash_flow' },
+  { table: tags, dbName: 'tags' },
 ];
 
 const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: simplifinConnections, dbName: 'simplefin_connections' },
+  { table: plaidConnections, dbName: 'plaid_connections' },
   { table: categories, dbName: 'categories' },
   { table: accounts, dbName: 'accounts' },
+  { table: tags, dbName: 'tags' },
   { table: aiProviders, dbName: 'ai_providers' },
   { table: aiProposals, dbName: 'ai_proposals' },
   { table: netWorthSnapshots, dbName: 'net_worth_snapshots' },
@@ -62,12 +87,19 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: categoryRules, dbName: 'category_rules' },
   { table: budgets, dbName: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals' },
+  { table: paystubFieldMappings, dbName: 'paystub_field_mappings' },
+  { table: paystubs, dbName: 'paystubs' },
+  { table: goalAllocationHistory, dbName: 'goal_allocation_history' },
+  { table: holdings, dbName: 'holdings' },
+  { table: holdingSnapshots, dbName: 'holding_snapshots' },
 
   { table: categorySpendingSummary, dbName: 'category_spending_summary' },
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
   { table: importLog, dbName: 'import_log' },
   { table: transactions, dbName: 'transactions' },
   { table: accountSnapshots, dbName: 'account_snapshots' },
+  { table: paystubLineItems, dbName: 'paystub_line_items' },
+  { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings' },
 ];
 
 export async function POST(request: Request) {
@@ -144,6 +176,24 @@ export async function POST(request: Request) {
       );
       for (let i = 0; i < encrypted.length; i += 50) {
         const batch = encrypted.slice(i, i + 50);
+        await db.insert(table).values(batch as any).onConflictDoNothing();
+      }
+    }
+
+    // Insert tag join tables separately since they don't have userId
+    const joinTables = [
+      { table: transactionTags, dbName: 'transaction_tags' },
+      { table: accountTags, dbName: 'account_tags' },
+      { table: budgetTags, dbName: 'budget_tags' },
+      { table: goalTags, dbName: 'goal_tags' },
+    ];
+
+    for (const { table, dbName } of joinTables) {
+      const rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
+      if (!rows || rows.length === 0) continue;
+      
+      for (let i = 0; i < rows.length; i += 50) {
+        const batch = rows.slice(i, i + 50);
         await db.insert(table).values(batch as any).onConflictDoNothing();
       }
     }

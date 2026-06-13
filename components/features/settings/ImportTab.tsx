@@ -388,16 +388,46 @@ export default function ImportTab() {
     if (!deleteConfirm) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/import/logs/${deleteConfirm}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
+      const res = await db_delete_log(deleteConfirm);
+      if (res) {
         setLogs((prev) => prev.filter((l) => l.id !== deleteConfirm));
       }
     } catch {} finally {
       setDeleting(false);
       setDeleteConfirm(null);
+    }
+  };
+
+  const db_delete_log = async (id: string) => {
+    const res = await fetch(`/api/import/logs/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    return res.ok;
+  };
+
+  // Download import file
+  const handleDownloadImport = async (id: string, fileName: string) => {
+    try {
+      const res = await fetch(`/api/import/logs/${id}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch import details');
+      const data = await res.json();
+      if (!data.fileContent) {
+        alert('No original file content stored for this import.');
+        return;
+      }
+      
+      const blob = new Blob([data.fileContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName || 'imported_file.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Failed to download original file.');
     }
   };
 
@@ -1219,12 +1249,22 @@ export default function ImportTab() {
                       </span>
                     </td>
                     <td className="p-2 text-right">
-                      <button
-                        onClick={() => setDeleteConfirm(log.id)}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Remove
-                      </button>
+                      <div className="flex items-center justify-end gap-3">
+                        {log.status !== 'failed' && (
+                          <button
+                            onClick={() => handleDownloadImport(log.id, log.fileName)}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeleteConfirm(log.id)}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors animate-none"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

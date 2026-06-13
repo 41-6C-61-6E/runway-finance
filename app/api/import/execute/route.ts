@@ -278,6 +278,8 @@ export async function POST(request: Request) {
     });
 
     await db.transaction(async (tx) => {
+      const encryptedFileContent = await encryptField(csvText, dek);
+
       // Step 1: Create import log entry FIRST so FK constraints on import_id are satisfied
       await tx.insert(importLog).values({
         id: importId,
@@ -295,6 +297,7 @@ export async function POST(request: Request) {
         endDate: endDate ? parseDateField(endDate) : null,
         dataStartDate,
         dataEndDate,
+        fileContent: encryptedFileContent,
       });
 
       // Step 2: Create any new accounts
