@@ -17,9 +17,9 @@ class PaystubAutoGenerateScheduler {
   }
 
   async init(): Promise<void> {
-    this.scheduleCheck();
     this._isRunning = true;
     logger.info(`${LOG_TAG} Scheduler initialized`);
+    await this.execute();
   }
 
   private scheduleCheck(): void {
