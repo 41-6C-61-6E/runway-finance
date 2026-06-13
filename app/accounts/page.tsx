@@ -242,10 +242,25 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     hierarchyTimeframe,
     hierarchyTimeframe
   );
+
+  const queryStartDate = useMemo(() => {
+    if (timeframe === 'all') return undefined;
+    return txMonthRange.start + '-01';
+  }, [timeframe, txMonthRange.start]);
+
+  const queryEndDate = useMemo(() => {
+    if (timeframe === 'all') return undefined;
+    const [ey, em] = txMonthRange.end.split('-').map(Number);
+    return txMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+  }, [timeframe, txMonthRange.end]);
+
   const { data: txData, isLoading, error } = useQuery({
-    queryKey: ['account-transactions', accountId],
+    queryKey: ['account-transactions', accountId, queryStartDate, queryEndDate],
     queryFn: async () => {
-      const res = await fetch(`/api/transactions?accountId=${accountId}&limit=5`, { credentials: 'include' });
+      let url = `/api/transactions?accountId=${accountId}&limit=5`;
+      if (queryStartDate) url += `&startDate=${queryStartDate}`;
+      if (queryEndDate) url += `&endDate=${queryEndDate}`;
+      const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch transactions');
       return res.json();
     },
@@ -292,6 +307,15 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     }
     return accountHistory.slice(startIdx, endIdx + 1);
   }, [accountHistory, timeframe, txMonthRange.start, txMonthRange.end]);
+
+  const visibleMiniDateRange = useMemo(() => {
+    if (visibleMiniData.length === 0) return null;
+    const first = String(visibleMiniData[0].date);
+    const last = String(visibleMiniData[visibleMiniData.length - 1].date);
+    if (first === last) return null;
+    const fmt = (d: string) => formatSafeUTCDate(d, { month: 'short', year: 'numeric' });
+    return `${fmt(first)} – ${fmt(last)}`;
+  }, [visibleMiniData]);
 
   const { minVal, maxVal } = useMemo(() => {
     if (visibleMiniData.length === 0) return { minVal: 0, maxVal: 1000 };
@@ -340,7 +364,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
               <Activity className="w-3.5 h-3.5" /> Balance History
             </span>
-            {accountHistory.length >= 2 && showWindowNav && (
+            {showWindowNav && (
               <DateWindowNav
                 prev={prevWindow}
                 next={nextWindow}
@@ -359,49 +383,58 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
             ) : visibleMiniData.length < 2 ? (
               <span className="text-[10px] text-muted-foreground/60 italic">Insufficient historical data for this account</span>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                <AreaChart data={visibleMiniData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
-                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                    ticks={miniTicks}
-                    tickFormatter={(d) => {
-                      if (!d) return '';
-                      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                    }}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                    domain={[minVal, maxVal]}
-                    tickFormatter={(v) => {
-                      const absV = Math.abs(v);
-                      if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
-                      if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
-                      return `$${absV.toFixed(0)}`;
-                    }}
-                  />
-                  <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} />
-                  <Area
-                    type="monotone"
-                    dataKey="balance"
-                    stroke={chartColor}
-                    strokeWidth={1.5}
-                    fill={`url(#gradient-mini-${accountId})`}
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                  <AreaChart data={visibleMiniData} margin={{ top: 15, right: 5, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                      ticks={miniTicks}
+                      tickFormatter={(d) => {
+                        if (!d) return '';
+                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
+                      }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                      domain={[minVal, maxVal]}
+                      tickFormatter={(v) => {
+                        const absV = Math.abs(v);
+                        if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
+                        if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
+                        return `$${absV.toFixed(0)}`;
+                      }}
+                    />
+                    <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="balance"
+                      stroke={chartColor}
+                      strokeWidth={1.5}
+                      fill={`url(#gradient-mini-${accountId})`}
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                {visibleMiniDateRange && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {visibleMiniDateRange}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1267,7 +1300,29 @@ export default function AccountsPage() {
     const firstAcc = accs[0];
     const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
 
-    const [startIdx, endIdx] = getTimeframeIndices(historyData, hierarchyTimeframe);
+    // Use month-aligned date range instead of rolling date range
+    const range = getMonthRange(hierarchyTimeframe);
+    let startIdx = 0;
+    let endIdx = historyData.length - 1;
+
+    if (hierarchyTimeframe !== 'all') {
+      const startStr = range.start + '-01';
+      const [ey, em] = range.end.split('-').map(Number);
+      const endStr = range.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+
+      const foundStart = historyData.findIndex((d) => d.date >= startStr);
+      if (foundStart !== -1) startIdx = foundStart;
+      
+      let foundEnd = historyData.length - 1;
+      for (let i = historyData.length - 1; i >= 0; i--) {
+        if (historyData[i].date <= endStr) {
+          foundEnd = i;
+          break;
+        }
+      }
+      endIdx = foundEnd;
+    }
+
     const slicedHistory = historyData.slice(startIdx, endIdx + 1);
 
     const points = slicedHistory.map((d) => {
