@@ -45,6 +45,10 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  onConflictDoUpdate(config: any) {
+    return this;
+  }
+
   where(...args: any[]) {
     if (this._isDelete) {
       mockDeleteWhereCalls.push(args);
@@ -707,6 +711,88 @@ describe('account-history', () => {
       expect(inserted).toHaveLength(2);
       expect(inserted[0]).toEqual({ date: '2026-05-28', balance: '500' });
       expect(inserted[1]).toEqual({ date: '2026-05-29', balance: '600' });
+    });
+
+    it('supports ticker mapping, constant price mapping, and carry-forward lookback on weekends', async () => {
+      mockAccountResponse = [{ externalId: 'plaid-invest-1', type: 'investment', metadata: null }];
+      mockUserSettingsResponse = [{
+        showSyntheticData: { global: true, investments: true },
+        useMarketDataForSnapshots: true
+      }];
+      mockHoldingSnapshotsResponse = [
+        {
+          snapshotDate: '2026-06-05',
+          securityId: 'sec_1',
+          ticker: 'LMCSTK',
+          name: 'Lockheed Martin Stock',
+          quantity: '10',
+          price: '450.00',
+          value: '4500.00'
+        },
+        {
+          snapshotDate: '2026-06-05',
+          securityId: 'sec_2',
+          ticker: 'SCHMMF',
+          name: 'Schwab Money Market Fund',
+          quantity: '1000',
+          price: '1.00',
+          value: '1000.00'
+        }
+      ];
+      mockRealSnapshotsResponse = [
+        { date: '2026-06-05', balance: '5500.00', isSynthetic: false }
+      ];
+
+      mockPoolQuery.mockClear();
+      const originalFetch = global.fetch;
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('query1.finance.yahoo.com')) {
+          expect(url).toContain('LMT');
+          expect(url).not.toContain('LMCSTK');
+          expect(url).not.toContain('SCHMMF');
+
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              chart: {
+                result: [{
+                  timestamp: [
+                    Math.floor(new Date('2026-06-05T00:00:00Z').getTime() / 1000)
+                  ],
+                  indicators: {
+                    quote: [{
+                      close: [460.00]
+                    }]
+                  }
+                }]
+              }
+            })
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+      global.fetch = fetchMock;
+
+      try {
+        const result = await generateHistoricalAccountSnapshots(
+          'acct_123',
+          'user_123',
+          '2026-06-05',
+          '2026-06-07'
+        );
+
+        expect(result.syntheticCount).toBe(2);
+        expect(mockPoolQuery).toHaveBeenCalled();
+        const callParams = mockPoolQuery.mock.calls[0][1];
+        
+        expect(callParams[2]).toBe('2026-06-06');
+        expect(callParams[3]).toBe('5500');
+
+        expect(callParams[8]).toBe('2026-06-07');
+        expect(callParams[9]).toBe('5500');
+      } finally {
+        global.fetch = originalFetch;
+      }
     });
   });
 });
