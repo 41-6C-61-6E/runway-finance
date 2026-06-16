@@ -393,6 +393,13 @@
       "when": 1781624598161,
       "tag": "0055_pale_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1781647818491,
+      "tag": "0056_windy_wolverine",
+      "breakpoints": true
     }
   ]
 }

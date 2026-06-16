@@ -79,6 +79,7 @@ export async function analyzeUncategorized(
     let endpoint: string;
     let model: string;
     let apiKey = '';
+    let jsonMode = false;
 
     if (settings.aiActiveProviderId) {
       const providerRows = await db
@@ -89,6 +90,7 @@ export async function analyzeUncategorized(
       if (providerRows.length && providerRows[0].endpoint && providerRows[0].model) {
         endpoint = providerRows[0].endpoint;
         model = providerRows[0].model;
+        jsonMode = providerRows[0].jsonMode;
         if (providerRows[0].apiKeyEncrypted) {
           try {
             apiKey = await decryptField(providerRows[0].apiKeyEncrypted, dek);
@@ -235,7 +237,7 @@ export async function analyzeUncategorized(
         const batchStart = Date.now();
         logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
         onLog?.(`Batch ${batchNum}: Calling model (${model}). Waiting for response...`);
-        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, batchAbortController.signal);
+        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, jsonMode, batchAbortController.signal);
 
         const { suggestions } = aiResponse;
         const elapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
@@ -387,21 +389,25 @@ async function callAiApi(
   apiKey: string,
   prompt: string,
   systemPrompt: string,
+  jsonMode: boolean,
   signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
 
-  const body = {
+  const body: Record<string, any> = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: prompt },
     ],
     temperature: 0.1,
-    response_format: { type: 'json_object' },
     chat_id: 'finance-categorize',
     stream: true,
   };
+
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -542,17 +548,22 @@ function buildPayload(
   txns: TransactionInfo[],
   categories: CategoryInfo[],
 ): Record<string, unknown> | null {
+  const normalize = (val: string | null | undefined) => (val === '' ? null : (val ?? null));
+
   switch (suggestion.type) {
     case 'categorize': {
       const tx = txns[suggestion.transactionIndex];
       if (!tx) return null;
 
-      let resolvedCategoryId = suggestion.categoryId;
+      const categoryId = normalize(suggestion.categoryId);
+      const categoryName = normalize(suggestion.categoryName);
+
+      let resolvedCategoryId = categoryId;
       if (resolvedCategoryId) {
         const catById = categories.find((c) => c.id === resolvedCategoryId);
         if (!catById) {
-          const catByName = suggestion.categoryName
-            ? categories.find((c) => c.name.toLowerCase() === suggestion.categoryName.toLowerCase())
+          const catByName = categoryName
+            ? categories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase())
             : null;
           resolvedCategoryId = catByName?.id ?? null;
         }
@@ -563,28 +574,30 @@ function buildPayload(
         transactionId: tx.id,
         transactionDescription: tx.description,
         proposedCategoryId: resolvedCategoryId,
-        proposedCategoryName: suggestion.categoryName,
+        proposedCategoryName: categoryName,
       };
     }
     case 'create_category': {
+      const parentName = normalize(suggestion.parentName);
       let parentId: string | null = null;
-      if (suggestion.parentName) {
-        const parent = categories.find((c) => c.name.toLowerCase() === suggestion.parentName!.toLowerCase() && !c.parentId);
+      if (parentName) {
+        const parent = categories.find((c) => c.name.toLowerCase() === parentName.toLowerCase() && !c.parentId);
         parentId = parent?.id ?? null;
       }
       return {
         type: 'create_category',
         name: suggestion.name,
-        parentName: suggestion.parentName,
+        parentName: parentName,
         parentId,
         color: suggestion.color,
         isIncome: suggestion.isIncome,
       };
     }
     case 'create_rule': {
+      const setCategoryName = normalize(suggestion.setCategoryName);
       let setCategoryId: string | null = null;
-      if (suggestion.setCategoryName) {
-        const cat = categories.find((c) => c.name.toLowerCase() === suggestion.setCategoryName!.toLowerCase());
+      if (setCategoryName) {
+        const cat = categories.find((c) => c.name.toLowerCase() === setCategoryName.toLowerCase());
         setCategoryId = cat?.id ?? null;
       }
       return {
@@ -595,7 +608,7 @@ function buildPayload(
         conditionValue: suggestion.conditionValue,
         conditionCaseSensitive: suggestion.conditionCaseSensitive,
         setCategoryId,
-        setCategoryName: suggestion.setCategoryName,
+        setCategoryName: setCategoryName,
       };
     }
     default:

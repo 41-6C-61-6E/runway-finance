@@ -2,7 +2,7 @@ import { getDb } from '@/lib/db';
 import { aiProviders, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
-import { encryptField } from '@/lib/crypto';
+import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
 /**
@@ -52,15 +52,41 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
     )
     .limit(10);
 
-  const alreadyExists = existing.some(
+  const existingProvider = existing.find(
     (row) => row.name === envProvider.name && row.endpoint === envProvider.endpoint
   );
 
-  if (alreadyExists) {
-    logger.debug('[seed-ai-providers] Provider already exists for user', {
-      userId,
-      name: envProvider.name,
-    });
+  if (existingProvider) {
+    if (!dek) {
+      dek = await getServerDEK(userId);
+    }
+    let existingApiKey = '';
+    if (existingProvider.apiKeyEncrypted) {
+      try {
+        existingApiKey = await decryptField(existingProvider.apiKeyEncrypted, dek);
+      } catch (err) {
+        logger.error('[seed-ai-providers] Failed to decrypt existing api key', { error: String(err) });
+      }
+    }
+
+    if (existingApiKey !== envProvider.apiKey || existingProvider.model !== envProvider.model) {
+      logger.info('[seed-ai-providers] Updating existing provider with new env config', {
+        userId,
+        name: envProvider.name,
+        modelChanged: existingProvider.model !== envProvider.model,
+        apiKeyChanged: existingApiKey !== envProvider.apiKey,
+      });
+
+      const apiKeyEncrypted = await encryptField(envProvider.apiKey, dek);
+      await db
+        .update(aiProviders)
+        .set({
+          model: envProvider.model,
+          apiKeyEncrypted,
+          updatedAt: new Date(),
+        })
+        .where(eq(aiProviders.id, existingProvider.id));
+    }
     return;
   }
 

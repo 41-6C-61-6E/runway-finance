@@ -10,6 +10,9 @@ function hexToBytes(hex: string): Uint8Array {
 
 // Get the DEK for the current authenticated user (from JWT session)
 export async function getSessionDEK(): Promise<Uint8Array> {
+  if (process.env.TEST_DEK_HEX) {
+    return hexToBytes(process.env.TEST_DEK_HEX);
+  }
   const session = await auth();
   const dekHex = (session?.user as Record<string, unknown> | undefined)?.dek;
   if (!dekHex || typeof dekHex !== 'string') {

@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
 
 export async function GET() {
   await cookies(); // ensure route is treated as dynamic under cacheComponents
@@ -17,6 +18,12 @@ export async function GET() {
 
   const db = getDb();
   const dek = await getSessionDEK();
+
+  try {
+    await seedUserAiProviders(session.user.id, dek);
+  } catch (err) {
+    logger.error('[api/ai/providers] Failed to seed/update providers on GET', { error: String(err) });
+  }
 
   const rows = await db
     .select()
@@ -38,6 +45,7 @@ export async function GET() {
       model: row.model,
       apiKey,
       isActive: row.isActive,
+      jsonMode: row.jsonMode,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -52,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { name?: string; endpoint?: string; model?: string; apiKey?: string; setActive?: boolean };
+  let body: { name?: string; endpoint?: string; model?: string; apiKey?: string; setActive?: boolean; jsonMode?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -92,6 +100,7 @@ export async function POST(request: Request) {
         model: body.model,
         apiKeyEncrypted,
         isActive: body.setActive ?? false,
+        jsonMode: body.jsonMode ?? false,
       })
       .returning();
 
@@ -112,6 +121,7 @@ export async function POST(request: Request) {
       model: created.model,
       apiKey: body.apiKey ?? '',
       isActive: created.isActive,
+      jsonMode: created.jsonMode,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
     });
