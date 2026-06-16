@@ -328,12 +328,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           const investmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
 
           if (investmentsEnabled) {
-            const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+            const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } = await import('@/lib/services/account-history');
             const today = new Date().toISOString().split('T')[0];
+            const fromDate = await getAccountEarliestCalculationDate(
+              id,
+              dataUserId,
+              decrypted.metadata,
+              dek
+            );
             await generateHistoricalAccountSnapshots(
               id,
               dataUserId,
-              '2023-01-01',
+              fromDate,
               today,
               dek
             );

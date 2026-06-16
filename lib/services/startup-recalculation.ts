@@ -3,7 +3,7 @@ import { accounts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } from '@/lib/services/account-history';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
@@ -56,7 +56,13 @@ export async function recalculateAllSnapshots(): Promise<void> {
               account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
             );
           } else {
-            await generateHistoricalAccountSnapshots(account.id, userId, '2023-01-01', today, dek);
+            const fromDate = await getAccountEarliestCalculationDate(
+              account.id,
+              userId,
+              account.metadata,
+              dek
+            );
+            await generateHistoricalAccountSnapshots(account.id, userId, fromDate, today, dek);
           }
         } catch (accountErr) {
           logger.error('[startup-recalculation] Failed to regenerate snapshots for account', {
