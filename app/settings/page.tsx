@@ -1531,7 +1531,7 @@ function SettingsPageBody() {
                   <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
                     <div>
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-foreground">Link via Plaid</h3>
+                        <h3 className="text-sm font-semibold text-foreground">Connect via Plaid</h3>
                         {connections.some((c) => c.provider === 'plaid') && (
                           <button
                             type="button"
@@ -1596,29 +1596,45 @@ function SettingsPageBody() {
                       disabled={plaidLoading || loading}
                       className="w-full px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 animate-shimmer"
                     >
-                      {plaidLoading ? 'Initializing Plaid...' : 'Link Institution via Plaid'}
+                      {plaidLoading ? 'Initializing Plaid...' : 'Connect via Plaid'}
                     </button>
                   </div>
 
-                  {/* Option B: SimpleFIN Bridge */}
+                  {/* Option B: SimpleFIN (MX) */}
                   <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-foreground">Connect via SimpleFIN Bridge</h3>
+                      <h3 className="text-sm font-semibold text-foreground">Connect via SimpleFIN (MX)</h3>
                       <p className="text-xs text-muted-foreground mt-1">
                         Import transactions from your bank using a SimpleFIN setup token/API key.
                       </p>
                     </div>
                     {hasMySimpleFin ? (
-                      <div className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/50 px-2.5 py-1.5 rounded-lg">
-                        SimpleFIN connection already linked. Delete it first if you need to reconnect.
+                      <div className="space-y-3">
+                        <div className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/50 px-2.5 py-1.5 rounded-lg">
+                          SimpleFIN connection already linked. Delete it first if you need to reconnect.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const conn = connections.find((c) => c.userId === currentUserId && c.provider === 'simplefin');
+                            if (conn) openManageSync(conn);
+                          }}
+                          className="w-full px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          Manage SimpleFIN (MX) Institutions
+                        </button>
                       </div>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setShowSimpleFinForm(!showSimpleFinForm)}
-                        className="w-full px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
+                        className={`w-full px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                          showSimpleFinForm
+                            ? 'text-foreground bg-muted hover:bg-accent border border-border'
+                            : 'text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 animate-shimmer'
+                        }`}
                       >
-                        {showSimpleFinForm ? 'Hide SimpleFIN Form' : 'Connect via SimpleFIN Bridge'}
+                        {showSimpleFinForm ? 'Hide SimpleFIN Form' : 'Connect via SimpleFIN (MX)'}
                       </button>
                     )}
                   </div>
@@ -2211,8 +2227,8 @@ function SettingsPageBody() {
 
       {/* Plaid Credentials Dialog */}
       <Dialog open={isPlaidCredentialsDialogOpen} onOpenChange={setIsPlaidCredentialsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-4 border-b border-border">
             <DialogTitle>
               {connections.some((c) => c.provider === 'plaid') ? 'Update Plaid API Credentials' : 'Configure Plaid API Credentials'}
             </DialogTitle>
@@ -2222,53 +2238,55 @@ function SettingsPageBody() {
                 : 'Enter your Plaid API keys to link bank accounts securely. Credentials are encrypted at rest.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSavePlaidCredentials} className="space-y-4">
-            <div>
-              <label htmlFor="plaidClientId" className="block text-sm font-medium text-foreground mb-1">
-                Plaid Client ID
-              </label>
-              <Input
-                id="plaidClientId"
-                value={plaidClientId}
-                onChange={(e) => setPlaidClientId(e.target.value)}
-                placeholder="Enter Plaid Client ID..."
-                required
-              />
+          <form onSubmit={handleSavePlaidCredentials} className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div>
+                <label htmlFor="plaidClientId" className="block text-sm font-medium text-foreground mb-1">
+                  Plaid Client ID
+                </label>
+                <Input
+                  id="plaidClientId"
+                  value={plaidClientId}
+                  onChange={(e) => setPlaidClientId(e.target.value)}
+                  placeholder="Enter Plaid Client ID..."
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="plaidSecret" className="block text-sm font-medium text-foreground mb-1">
+                  Plaid Secret
+                </label>
+                <Input
+                  id="plaidSecret"
+                  type="password"
+                  value={plaidSecret}
+                  onChange={(e) => setPlaidSecret(e.target.value)}
+                  placeholder="Enter Plaid Secret..."
+                  required
+                />
+                <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                  Use your Plaid <strong>Production Secret</strong> if linking actual bank accounts, or <strong>Sandbox Secret</strong> for testing.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="plaidEnvironment" className="block text-sm font-medium text-foreground mb-1">
+                  Plaid Environment
+                </label>
+                <select
+                  id="plaidEnvironment"
+                  value={plaidEnvironment}
+                  onChange={(e) => setPlaidEnvironment(e.target.value)}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="sandbox">Sandbox (Mock data)</option>
+                  <option value="production">Production / Pay-as-you-go (Real bank connections)</option>
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                  Choose <strong>Production / Pay-as-you-go</strong> to connect your actual accounts. It includes 10 free connections, and can exceed this limit via pay-as-you-go billing. Sandbox is for simulated testing only.
+                </p>
+              </div>
             </div>
-            <div>
-              <label htmlFor="plaidSecret" className="block text-sm font-medium text-foreground mb-1">
-                Plaid Secret
-              </label>
-              <Input
-                id="plaidSecret"
-                type="password"
-                value={plaidSecret}
-                onChange={(e) => setPlaidSecret(e.target.value)}
-                placeholder="Enter Plaid Secret..."
-                required
-              />
-              <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
-                Use your Plaid <strong>Production Secret</strong> if linking actual bank accounts, or <strong>Sandbox Secret</strong> for testing.
-              </p>
-            </div>
-            <div>
-              <label htmlFor="plaidEnvironment" className="block text-sm font-medium text-foreground mb-1">
-                Plaid Environment
-              </label>
-              <select
-                id="plaidEnvironment"
-                value={plaidEnvironment}
-                onChange={(e) => setPlaidEnvironment(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="sandbox">Sandbox (Mock data)</option>
-                <option value="production">Production / Pay-as-you-go (Real bank connections)</option>
-              </select>
-              <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
-                Choose <strong>Production / Pay-as-you-go</strong> to connect your actual accounts. It includes 10 free connections, and can exceed this limit via pay-as-you-go billing. Sandbox is for simulated testing only.
-              </p>
-            </div>
-            <DialogFooter className="gap-2">
+            <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10 gap-2">
               <button
                 type="button"
                 onClick={() => setIsPlaidCredentialsDialogOpen(false)}
@@ -2290,74 +2308,77 @@ function SettingsPageBody() {
 
       {/* Connection Details Dialog */}
           <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-4 border-b border-border">
                 <DialogTitle>Connection Details</DialogTitle>
                 <DialogDescription>View and manage your SimpleFIN connection.</DialogDescription>
               </DialogHeader>
-              {detailsConn && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm text-muted-foreground">Label</label>
-                    <Input
-                      value={detailsLabel}
-                      onChange={(e) => setDetailsLabel(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Status</label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${
-                        detailsConn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
-                        detailsConn.lastSyncStatus === 'error' ? 'bg-destructive' :
-                        'bg-muted-foreground/50'
-                      }`} />
-                      <span className="text-foreground text-sm">
-                        {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Sync Frequency</label>
-                    <div className="mt-1 text-foreground text-sm capitalize">{detailsConn.syncFrequency}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Last Sync</label>
-                    <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Next Sync</label>
-                    <div className="mt-1 text-foreground text-sm">
-                      {detailsConn.syncFrequency === 'manual'
-                        ? 'Not scheduled'
-                        : (() => {
-                            const ns = computeNextSync(detailsConn.syncFrequency, detailsConn.lastSyncAt);
-                            if (!ns) return 'Not scheduled';
-                            if (ns.getTime() <= Date.now()) return 'Overdue';
-                            return formatRelativeTime(ns.toISOString());
-                          })()
-                      }
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Created</label>
-                    <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Access URL</label>
-                    <div className="mt-1 text-muted-foreground text-sm font-mono">{maskAccessUrl(detailsConn)}</div>
-                  </div>
-                  {detailsConn.lastSyncError && (
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {detailsConn && (
+                  <div className="space-y-4">
                     <div>
-                      <label className="text-sm text-destructive">Last Error</label>
-                      <div className="mt-1 text-destructive text-sm">{detailsConn.lastSyncError}</div>
+                      <label className="text-xs text-muted-foreground font-medium">Label</label>
+                      <Input
+                        value={detailsLabel}
+                        onChange={(e) => setDetailsLabel(e.target.value)}
+                        className="mt-1"
+                      />
                     </div>
-                  )}
-                </div>
-              )}
-              <DialogFooter>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Status</label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          detailsConn.lastSyncStatus === 'ok' ? 'bg-chart-1' :
+                          detailsConn.lastSyncStatus === 'error' ? 'bg-destructive' :
+                          'bg-muted-foreground/50'
+                        }`} />
+                        <span className="text-foreground text-sm">
+                          {detailsConn.lastSyncStatus === 'ok' ? 'Synced' : detailsConn.lastSyncStatus === 'error' ? 'Error' : 'Pending'}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Sync Frequency</label>
+                      <div className="mt-1 text-foreground text-sm capitalize">{detailsConn.syncFrequency}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Last Sync</label>
+                      <div className="mt-1 text-foreground text-sm">{formatRelativeTime(detailsConn.lastSyncAt)}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Next Sync</label>
+                      <div className="mt-1 text-foreground text-sm">
+                        {detailsConn.syncFrequency === 'manual'
+                          ? 'Not scheduled'
+                          : (() => {
+                              const ns = computeNextSync(detailsConn.syncFrequency, detailsConn.lastSyncAt);
+                              if (!ns) return 'Not scheduled';
+                              if (ns.getTime() <= Date.now()) return 'Overdue';
+                              return formatRelativeTime(ns.toISOString());
+                            })()
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Created</label>
+                      <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Access URL</label>
+                      <div className="mt-1 text-muted-foreground text-sm font-mono truncate">{maskAccessUrl(detailsConn)}</div>
+                    </div>
+                    {detailsConn.lastSyncError && (
+                      <div>
+                        <label className="text-xs text-destructive font-medium">Last Error</label>
+                        <div className="mt-1 text-destructive text-sm leading-normal">{detailsConn.lastSyncError}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10">
                 <button
+                  type="button"
                   onClick={() => setDetailsConn(null)}
                   className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
                 >
@@ -2455,15 +2476,15 @@ function SettingsPageBody() {
 
           {/* Re-mapping Dialog */}
           <Dialog open={isRemapDialogOpen} onOpenChange={setIsRemapDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-4 border-b border-border">
                 <DialogTitle>Re-map Unlinked Account</DialogTitle>
                 <DialogDescription>
                   Reconnect an orphaned automatic account to an active synced account to preserve all history.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1">
                     Account to Keep (Preserves History & Settings)
@@ -2573,8 +2594,9 @@ function SettingsPageBody() {
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10">
                 <button
+                  type="button"
                   onClick={() => setIsRemapDialogOpen(false)}
                   disabled={remapLoading}
                   className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
@@ -2582,6 +2604,7 @@ function SettingsPageBody() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleRemap}
                   disabled={remapLoading || !remapSourceId || !remapTargetId}
                   className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
@@ -2594,15 +2617,15 @@ function SettingsPageBody() {
 
           {/* Re-linking Dialog */}
           <Dialog open={isRelinkDialogOpen} onOpenChange={setIsRelinkDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-4 border-b border-border">
                 <DialogTitle>Re-link to Sync Connection</DialogTitle>
                 <DialogDescription>
                   Reconnect this unlinked account to one of your active sync connections.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1">
                     Select Connection
@@ -2648,8 +2671,9 @@ function SettingsPageBody() {
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10">
                 <button
+                  type="button"
                   onClick={() => setIsRelinkDialogOpen(false)}
                   disabled={relinkLoading}
                   className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
@@ -2657,6 +2681,7 @@ function SettingsPageBody() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleRelink}
                   disabled={relinkLoading || !relinkTargetConnectionId}
                   className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
@@ -2669,15 +2694,15 @@ function SettingsPageBody() {
 
           {/* Manage Sync Dialog */}
           <Dialog open={isManageSyncDialogOpen} onOpenChange={setIsManageSyncDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-4 border-b border-border">
                 <DialogTitle>Manage Sync Accounts</DialogTitle>
                 <DialogDescription>
                   Configure which accounts retrieved from SimpleFIN are actively syncing data to this application.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div className="p-3 bg-muted/40 border border-border/80 rounded-lg text-xs text-muted-foreground leading-relaxed">
                   <span className="font-semibold text-foreground block mb-0.5">Sync Disabled vs. Exclude from Net Worth</span>
                   Disabling sync blocks these accounts at the SimpleFIN integration level. No new transactions or balances will be fetched, and the account won't be auto-created. This is different from "Exclude from Net Worth", which keeps syncing data in the background but hides the account from your net worth totals.
@@ -2694,7 +2719,7 @@ function SettingsPageBody() {
                     Fetching accounts from SimpleFIN...
                   </div>
                 ) : (
-                  <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+                  <div className="space-y-2.5">
                     {manageSyncAccounts.length === 0 ? (
                       <div className="text-sm text-muted-foreground text-center py-4">
                         No accounts found in this SimpleFIN connection.
@@ -2711,11 +2736,11 @@ function SettingsPageBody() {
                               type="checkbox"
                               checked={!isDisabled}
                               onChange={(e) => {
-                                if (e.target.checked) {
-                                  setTempDisabledAccounts(prev => prev.filter(id => id !== acc.id));
-                                } else {
-                                  setTempDisabledAccounts(prev => [...prev, acc.id]);
-                                }
+                                  if (e.target.checked) {
+                                    setTempDisabledAccounts(prev => prev.filter(id => id !== acc.id));
+                                  } else {
+                                    setTempDisabledAccounts(prev => [...prev, acc.id]);
+                                  }
                               }}
                               className="mt-1 accent-primary"
                             />
@@ -2740,8 +2765,9 @@ function SettingsPageBody() {
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10">
                 <button
+                  type="button"
                   onClick={() => setIsManageSyncDialogOpen(false)}
                   disabled={manageSyncSaving}
                   className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
@@ -2749,6 +2775,7 @@ function SettingsPageBody() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSaveDisabledAccounts}
                   disabled={manageSyncLoading || manageSyncSaving}
                   className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50"
