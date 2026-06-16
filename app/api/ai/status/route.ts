@@ -22,5 +22,9 @@ export async function GET() {
     totalCount: existing.totalCount ?? 0,
     error: existing.error ?? null,
     log: existing.log ?? [],
+    startedAt: existing.startedAt,
+    proposalsCreated: existing.proposalsCreated ?? 0,
+    autoApproved: existing.autoApproved ?? 0,
+    elapsedSeconds: existing.startedAt ? Math.floor((Date.now() - existing.startedAt) / 1000) : 0,
   });
 }

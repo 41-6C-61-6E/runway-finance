@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
 
-  let body: { name?: string; endpoint?: string; model?: string; apiKey?: string; isActive?: boolean };
+  let body: { name?: string; endpoint?: string; model?: string; apiKey?: string; isActive?: boolean; jsonMode?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -39,6 +39,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.name !== undefined) updates.name = body.name;
   if (body.endpoint !== undefined) updates.endpoint = body.endpoint;
   if (body.model !== undefined) updates.model = body.model;
+  if (body.jsonMode !== undefined) updates.jsonMode = body.jsonMode;
   if (body.apiKey !== undefined) {
     updates.apiKeyEncrypted = body.apiKey ? await encryptField(body.apiKey, dek) : null;
   }
@@ -76,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     endpoint: updated.endpoint,
     model: updated.model,
     isActive: updated.isActive,
+    jsonMode: updated.jsonMode,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,
   });

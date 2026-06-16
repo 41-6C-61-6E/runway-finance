@@ -472,6 +472,57 @@ export default function AiSuggestionsPage() {
       }
     } catch { /* ignore */ }
 
+    // Check actual backend status on mount
+    fetch('/api/ai/status', { credentials: 'include' })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'running') {
+            const startedAt = data.startedAt || Date.now() - (data.elapsedSeconds || 0) * 1000;
+            setStartTime(startedAt);
+            setTotalToAnalyze(data.totalCount || null);
+            setProcessedCount(data.processedCount ?? 0);
+            if (data.log) setAnalysisLogs(data.log);
+            setAnalyzing(true);
+            analyzingRef.current = true;
+            
+            // Re-persist running state
+            const statusWithTimestamp = {
+              status: 'running' as const,
+              message: 'Analysis running...',
+              startedAt,
+              totalToAnalyze: data.totalCount
+            };
+            setSavedStatus(statusWithTimestamp);
+            localStorage.setItem(STATUS_KEY, JSON.stringify(statusWithTimestamp));
+          } else if (data.status === 'completed' || data.status === 'error') {
+            const msg = data.status === 'completed'
+              ? `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`
+              : (data.error || 'Failed to run analysis.');
+            const finalStatus: AnalysisStatus = { status: data.status, message: msg };
+            
+            setSavedStatus(finalStatus);
+            localStorage.setItem(STATUS_KEY, JSON.stringify(finalStatus));
+            
+            setAnalyzing(false);
+            analyzingRef.current = false;
+            fetchProposals();
+          } else if (data.status === 'idle') {
+            const raw = localStorage.getItem(STATUS_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.status === 'running') {
+                setSavedStatus(null);
+                localStorage.removeItem(STATUS_KEY);
+                setAnalyzing(false);
+                analyzingRef.current = false;
+              }
+            }
+          }
+        }
+      })
+      .catch(() => {});
+
     return () => {
       // When navigating away, mark as not analyzing in this component instance
       analyzingRef.current = false;
@@ -572,7 +623,7 @@ export default function AiSuggestionsPage() {
         const res = await fetch('/api/ai/status', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
-          if (data.status === 'running' || data.status === 'completed') {
+          if (data.status === 'running') {
             setProcessedCount(data.processedCount ?? 0);
             if (data.totalCount) setTotalToAnalyze(data.totalCount);
             if (data.log) {
@@ -582,12 +633,43 @@ export default function AiSuggestionsPage() {
                 setCurrentStep(rawLastLog);
               }
             }
+          } else if (data.status === 'completed') {
+            setProcessedCount(data.processedCount ?? 0);
+            if (data.log) setAnalysisLogs(data.log);
+            setCurrentStep('Analysis complete.');
+            
+            const msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
+            const finalStatus: AnalysisStatus = { status: 'completed', message: msg };
+            persistStatus(finalStatus);
+            
+            setAnalyzing(false);
+            analyzingRef.current = false;
+            showFeedback('success', msg);
+            await fetchProposals();
+          } else if (data.status === 'error') {
+            setProcessedCount(data.processedCount ?? 0);
+            if (data.log) setAnalysisLogs(data.log);
+            setCurrentStep(`Error: ${data.error}`);
+            
+            const msg = data.error || 'Failed to run analysis. Please check your AI provider configuration.';
+            const finalStatus: AnalysisStatus = { status: 'error', message: msg };
+            persistStatus(finalStatus);
+            
+            setAnalyzing(false);
+            analyzingRef.current = false;
+            showFeedback('error', msg);
+            await fetchProposals();
+          } else if (data.status === 'idle') {
+            setAnalyzing(false);
+            analyzingRef.current = false;
+            persistStatus(null);
+            await fetchProposals();
           }
         }
       } catch { /* ignore */ }
     }, 1500);
     return () => clearInterval(interval);
-  }, [analyzing]);
+  }, [analyzing, fetchProposals]);
 
   const persistStatus = (status: AnalysisStatus) => {
     setSavedStatus(status);
@@ -639,38 +721,25 @@ export default function AiSuggestionsPage() {
       
       const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
       
-      let finalStatus: AnalysisStatus;
       if (!res.ok) {
-        finalStatus = { 
+        const finalStatus: AnalysisStatus = { 
           status: 'error', 
           message: data.error || 'Failed to run analysis. Please check your AI provider configuration.' 
         };
-      } else {
-        const msg = data.errors?.length
-          ? `Analysis completed with ${data.errors.length} error(s): ${data.errors.join('; ')}. ${data.proposalsCreated} proposals created.`
-          : `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
-        finalStatus = { status: data.errors?.length ? 'error' : 'completed', message: msg };
-      }
-
-      // Always persist the outcome so it is visible upon return
-      localStorage.setItem(STATUS_KEY, JSON.stringify(finalStatus));
-
-      if (analyzingRef.current) {
-        setSavedStatus(finalStatus);
-        showFeedback(finalStatus.status === 'completed' ? 'success' : 'error', finalStatus.message);
-        await fetchProposals();
+        persistStatus(finalStatus);
+        if (analyzingRef.current) {
+          showFeedback('error', finalStatus.message);
+          setAnalyzing(false);
+          analyzingRef.current = false;
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
 
       const errorStatus: AnalysisStatus = { status: 'error', message: 'Failed to run analysis. Please try again or check your connection.' };
-      localStorage.setItem(STATUS_KEY, JSON.stringify(errorStatus));
+      persistStatus(errorStatus);
       if (analyzingRef.current) {
-        setSavedStatus(errorStatus);
         showFeedback('error', errorStatus.message);
-      }
-    } finally {
-      if (analyzingRef.current) {
         setAnalyzing(false);
         analyzingRef.current = false;
       }

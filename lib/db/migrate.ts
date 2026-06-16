@@ -92,6 +92,19 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
+    // 1c. Check if json_mode column exists on ai_providers
+    const colCheck3 = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'ai_providers' AND column_name = 'json_mode'
+    `);
+    if (colCheck3.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Adding missing json_mode column to ai_providers...');
+      await client.query(`
+        ALTER TABLE ai_providers
+        ADD COLUMN IF NOT EXISTS json_mode BOOLEAN NOT NULL DEFAULT FALSE
+      `);
+    }
+
     // 2. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

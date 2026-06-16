@@ -6,6 +6,9 @@ export type AnalysisSession = {
   status: 'running' | 'completed' | 'error';
   error?: string;
   log: string[];
+  startedAt?: number;
+  proposalsCreated?: number;
+  autoApproved?: number;
 };
 
 export const activeAnalysisSessions = new Map<string, AnalysisSession>();
