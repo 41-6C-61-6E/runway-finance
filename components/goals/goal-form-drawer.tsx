@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Search, Sparkles } from 'lucide-react';
 
 interface GoalFormData {
   name: string;
@@ -13,12 +13,28 @@ interface GoalFormData {
   targetAmount: string;
   currentAmount: string;
   targetDate: string;
-  category: string;
+  categoryId: string;
+  tagIds: string[];
   status: string;
   linkedAccountId: string;
   percentage: string;
   reserve: string;
   sortOrder: number;
+  priority: number;
+}
+
+interface Category {
+  id: string;
+  parentId: string | null;
+  name: string;
+  color: string;
+  isIncome: boolean;
+}
+
+interface TagItem {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface GoalFormDialogProps {
@@ -33,12 +49,14 @@ interface GoalFormDialogProps {
     targetAmount: string;
     currentAmount: string;
     targetDate: string | null;
-    category: string | null;
+    category: any;
     status: string;
     linkedAccountId: string | null;
     percentage: string;
     reserve: string;
     sortOrder: number;
+    priority?: number;
+    tags?: Array<{ id: string; name: string; color: string }>;
   };
 }
 
@@ -65,6 +83,13 @@ const statuses = [
 
 export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormDialogProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [allTags, setAllTags] = useState<TagItem[]>([]);
+  const [tagSearch, setTagSearch] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+
   const [form, setForm] = useState<GoalFormData>({
     name: '',
     description: '',
@@ -72,12 +97,14 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
     targetAmount: '',
     currentAmount: '0',
     targetDate: '',
-    category: '',
+    categoryId: '',
+    tagIds: [],
     status: 'active',
     linkedAccountId: '',
     percentage: '100',
     reserve: '0',
     sortOrder: 0,
+    priority: 0,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -96,9 +123,33 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
       } catch {}
     };
 
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch('/api/categories', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setCategories(data);
+        }
+      } catch {}
+    };
+
+    const fetchTags = async () => {
+      try {
+        const res = await fetch('/api/tags', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setAllTags(data);
+        }
+      } catch {}
+    };
+
     fetchAccounts();
+    fetchCategories();
+    fetchTags();
 
     if (editGoal) {
+      const catId = typeof editGoal.category === 'object' && editGoal.category ? editGoal.category.id : '';
+      const tagIdsList = editGoal.tags ? editGoal.tags.map((t) => t.id) : [];
       setForm({
         name: editGoal.name,
         description: editGoal.description || '',
@@ -106,12 +157,14 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
         targetAmount: editGoal.targetAmount,
         currentAmount: editGoal.currentAmount,
         targetDate: editGoal.targetDate || '',
-        category: editGoal.category || '',
+        categoryId: catId,
+        tagIds: tagIdsList,
         status: editGoal.status,
         linkedAccountId: editGoal.linkedAccountId || '',
         percentage: editGoal.percentage || '100',
         reserve: editGoal.reserve || '0',
         sortOrder: editGoal.sortOrder ?? 0,
+        priority: editGoal.priority ?? 0,
       });
     } else {
       setForm({
@@ -121,16 +174,22 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
         targetAmount: '',
         currentAmount: '0',
         targetDate: '',
-        category: '',
+        categoryId: '',
+        tagIds: [],
         status: 'active',
         linkedAccountId: '',
         percentage: '100',
         reserve: '0',
         sortOrder: 0,
+        priority: 0,
       });
     }
     setError('');
     setSharedAccountWarning(null);
+    setCategorySearch('');
+    setTagSearch('');
+    setShowCategoryDropdown(false);
+    setShowTagDropdown(false);
   }, [open, editGoal]);
 
   // Check for shared account when linked account changes
@@ -297,15 +356,219 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
             />
           </div>
 
-          {/* Category */}
-          <div className="space-y-1.5">
+          {/* Category Selector */}
+          <div className="space-y-1.5 relative">
             <Label htmlFor="goal-category">Category</Label>
-            <Input
-              id="goal-category"
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              placeholder="e.g., Retirement, House, Car"
-            />
+            <div className="relative">
+              {(() => {
+                const selectedCat = form.categoryId ? categories.find((c) => c.id === form.categoryId) : null;
+                const parents = categories.filter((c) => !c.parentId);
+                const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
+
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    >
+                      {selectedCat ? (
+                        <>
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
+                          <span>{selectedCat.name}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Uncategorized</span>
+                      )}
+                      <span className="ml-auto text-muted-foreground">▼</span>
+                    </button>
+
+                    {showCategoryDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col overflow-hidden">
+                          <div className="relative p-2 border-b border-border">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                            <input
+                              value={categorySearch}
+                              onChange={(e) => setCategorySearch(e.target.value)}
+                              placeholder="Search categories..."
+                              className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <div className="flex-1 overflow-y-auto max-h-56">
+                            {(() => {
+                              const filter = categorySearch.toLowerCase();
+                              const filteredParents = filter
+                                ? parents.filter((p) =>
+                                    p.name.toLowerCase().includes(filter) ||
+                                    getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+                                  )
+                                : parents;
+                              const noResults = filteredParents.length === 0;
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setForm({ ...form, categoryId: '' }); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
+                                  >
+                                    None (uncategorized)
+                                  </button>
+                                  {filteredParents.map((parent) => {
+                                    const childList = filter
+                                      ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
+                                      : getChildren(parent.id);
+                                    if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
+                                    return (
+                                      <div key={parent.id}>
+                                        <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-semibold text-muted-foreground bg-muted/30">
+                                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
+                                          {parent.name}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setForm({ ...form, categoryId: parent.id }); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                          className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
+                                            form.categoryId === parent.id
+                                              ? 'text-primary bg-primary/10'
+                                              : 'text-foreground/80 hover:bg-muted'
+                                          }`}
+                                        >
+                                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
+                                          {parent.name}
+                                        </button>
+                                        {childList.map((child) => (
+                                          <button
+                                            type="button"
+                                            key={child.id}
+                                            onClick={() => { setForm({ ...form, categoryId: child.id }); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
+                                              form.categoryId === child.id
+                                                ? 'text-primary bg-primary/10'
+                                                : 'text-foreground/80 hover:bg-muted'
+                                            }`}
+                                          >
+                                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                            {child.name}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    );
+                                  })}
+                                  {noResults && (
+                                    <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                                      No categories found
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </>)}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Tags Picker */}
+          <div className="space-y-1.5 relative">
+            <Label>Tags</Label>
+            <div className="relative">
+              <div
+                className="min-h-[38px] w-full flex flex-wrap gap-1 px-3 py-1.5 bg-background border border-input rounded-lg cursor-pointer"
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+              >
+                {form.tagIds.length === 0 && (
+                  <span className="text-sm text-muted-foreground self-center">No tags selected</span>
+                )}
+                {form.tagIds.map((tagId) => {
+                  const tag = allTags.find((t) => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <span
+                      key={tagId}
+                      className="tag-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                      style={{ '--tag-color': tag.color } as React.CSSProperties}
+                    >
+                      #{tag.name}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setForm({ ...form, tagIds: form.tagIds.filter((id) => id !== tagId) }); }}
+                        className="ml-0.5 text-current opacity-60 hover:opacity-100 font-bold"
+                      >×</button>
+                    </span>
+                  );
+                })}
+                <span className="ml-auto self-center text-muted-foreground text-xs">▼</span>
+              </div>
+
+              {showTagDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col overflow-hidden">
+                    <div className="relative p-2 border-b border-border">
+                      <input
+                        value={tagSearch}
+                        onChange={(e) => setTagSearch(e.target.value)}
+                        placeholder="Search tags..."
+                        className="w-full px-3 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      {allTags.length === 0 && (
+                        <div className="px-3 py-4 text-xs text-muted-foreground text-center">No tags — create them in Settings → Tags</div>
+                      )}
+                      {allTags
+                        .filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase()))
+                        .map((tag) => (
+                          <button
+                            type="button"
+                            key={tag.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (form.tagIds.includes(tag.id)) {
+                                setForm({ ...form, tagIds: form.tagIds.filter((id) => id !== tag.id) });
+                              } else {
+                                setForm({ ...form, tagIds: [...form.tagIds, tag.id] });
+                              }
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
+                              form.tagIds.includes(tag.id) ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted'
+                            }`}
+                          >
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                            {tag.name}
+                            {form.tagIds.includes(tag.id) && <span className="ml-auto text-xs">✓</span>}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div className="space-y-1.5">
+            <Label htmlFor="goal-priority">Priority</Label>
+            <select
+              id="goal-priority"
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) || 0 })}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
+            >
+              <option value={0}>None (P0)</option>
+              <option value={1}>High (P1)</option>
+              <option value={2}>Medium (P2)</option>
+              <option value={3}>Low (P3)</option>
+            </select>
           </div>
 
           {/* Status */}

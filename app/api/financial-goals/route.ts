@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { financialGoals } from '@/lib/db/schema';
+import { financialGoals, categories, tags, goalTags } from '@/lib/db/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
+import { decryptRow, decryptRows, encryptRow, decryptField } from '@/lib/crypto';
 import { computeGoalAllocations, findSharedAccounts, getGoalAllocation } from '@/lib/services/goal-allocation';
 
 export async function GET(req: NextRequest) {
@@ -24,12 +24,68 @@ export async function GET(req: NextRequest) {
   if (type) conditions.push(eq(financialGoals.type, type));
 
   const goals = await getDb()
-    .select()
+    .select({
+      goal: financialGoals,
+      category: {
+        id: categories.id,
+        name: categories.name,
+        color: categories.color,
+      }
+    })
     .from(financialGoals)
+    .leftJoin(categories, eq(financialGoals.categoryId, categories.id))
     .where(and(...conditions))
     .orderBy(asc(financialGoals.sortOrder));
 
-  const decrypted = await decryptRows('financial_goals', goals, dek);
+  // Fetch all tags for the user's goals
+  const allGoalTags = await getDb()
+    .select({
+      goalId: goalTags.goalId,
+      tagId: tags.id,
+      tagName: tags.name,
+      tagColor: tags.color,
+    })
+    .from(goalTags)
+    .innerJoin(tags, eq(goalTags.tagId, tags.id))
+    .where(eq(tags.userId, dataUserId));
+
+  // Decrypt tag names
+  const decryptedTags = await Promise.all(
+    allGoalTags.map(async (t) => ({
+      goalId: t.goalId,
+      id: t.tagId,
+      name: t.tagName ? await decryptField(t.tagName, dek) : '',
+      color: t.tagColor,
+    }))
+  );
+
+  const tagsByGoalId = new Map<string, Array<{ id: string; name: string; color: string }>>();
+  for (const t of decryptedTags) {
+    if (!tagsByGoalId.has(t.goalId)) {
+      tagsByGoalId.set(t.goalId, []);
+    }
+    tagsByGoalId.get(t.goalId)!.push({ id: t.id, name: t.name, color: t.color });
+  }
+
+  // Decrypt rows
+  const decrypted = await Promise.all(
+    goals.map(async (row) => {
+      const decGoal = await decryptRow('financial_goals', row.goal, dek);
+      let decCategory = null;
+      if (row.category && row.category.id) {
+        decCategory = {
+          id: row.category.id,
+          name: row.category.name ? await decryptField(row.category.name, dek) : '',
+          color: row.category.color,
+        };
+      }
+      return {
+        ...decGoal,
+        category: decCategory,
+        tags: tagsByGoalId.get(decGoal.id) ?? [],
+      };
+    })
+  );
   
   // Compute allocations for goals with linked accounts
   const allocationMap = new Map<string, any>();
@@ -70,7 +126,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const userId = session.user.id;
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-    const { name, description, type, targetAmount, currentAmount, targetDate, category, priority, status, linkedAccountId, percentage, reserve, sortOrder } = body;
+    const { name, description, type, targetAmount, currentAmount, targetDate, categoryId, tagIds, priority, status, linkedAccountId, percentage, reserve, sortOrder } = body;
 
     if (!name || !type || !targetAmount) {
       return NextResponse.json({ error: 'name, type, and targetAmount are required' }, { status: 400 });
@@ -84,7 +140,7 @@ export async function POST(req: NextRequest) {
       targetAmount: String(targetAmount),
       currentAmount: String(currentAmount || 0),
       targetDate: targetDate || null,
-      category: category || null,
+      categoryId: categoryId || null,
       priority: priority || 0,
       status: status || 'active',
       linkedAccountId: linkedAccountId || null,
@@ -94,6 +150,14 @@ export async function POST(req: NextRequest) {
     }, dek);
 
     const goal = await getDb().insert(financialGoals).values(encryptedValues).returning();
+
+    // Insert tags if provided
+    if (tagIds && tagIds.length > 0) {
+      await getDb().insert(goalTags).values(
+        tagIds.map((tagId: string) => ({ goalId: goal[0].id, tagId }))
+      );
+    }
+
     const decrypted = await decryptRow('financial_goals', goal[0], dek);
 
     logger.info('POST /api/financial-goals', { goalId: goal[0].id });
@@ -142,6 +206,7 @@ export async function PATCH(req: NextRequest) {
     if (updates.targetAmount !== undefined) updateData.targetAmount = String(updates.targetAmount);
     if (updates.currentAmount !== undefined) updateData.currentAmount = String(updates.currentAmount);
     if (updates.targetDate !== undefined) updateData.targetDate = updates.targetDate || null;
+    if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId || null;
     if (updates.percentage !== undefined) updateData.percentage = String(updates.percentage);
     if (updates.reserve !== undefined) updateData.reserve = String(updates.reserve);
     if (updates.status !== undefined) updateData.status = updates.status;
@@ -170,6 +235,16 @@ export async function PATCH(req: NextRequest) {
       })
       .where(eq(financialGoals.id, goalId))
       .returning();
+
+    // Replace tags if provided
+    if (updates.tagIds !== undefined) {
+      await getDb().delete(goalTags).where(eq(goalTags.goalId, goalId));
+      if (updates.tagIds.length > 0) {
+        await getDb().insert(goalTags).values(
+          updates.tagIds.map((tagId: string) => ({ goalId, tagId }))
+        );
+      }
+    }
 
     logger.info('PATCH /api/financial-goals', { goalId: id });
     const decrypted = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];

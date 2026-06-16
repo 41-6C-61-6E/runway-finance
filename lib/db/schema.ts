@@ -596,6 +596,7 @@ export const financialGoals = pgTable('financial_goals', {
   currentAmount: text('current_amount').notNull(),
   targetDate: date('target_date'),
   category: text('category'),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
   priority: integer('priority').notNull().default(0),
   status: text('status').notNull().default('active'),
   linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),

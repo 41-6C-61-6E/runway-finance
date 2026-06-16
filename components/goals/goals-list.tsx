@@ -15,7 +15,8 @@ interface Goal {
   targetAmount: string;
   currentAmount: string;
   targetDate: string | null;
-  category: string | null;
+  category: { id: string; name: string; color: string } | null;
+  tags?: Array<{ id: string; name: string; color: string }>;
   status: string;
   linkedAccountId: string | null;
   percentage: string;
@@ -252,7 +253,7 @@ export function GoalsList() {
       {activeGoals.length > 0 && (
         <>
           {filter !== 'completed' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-4">
               {activeGoals.map((goal) => (
                 <GoalCard
                   key={goal.id}
@@ -294,7 +295,7 @@ export function GoalsList() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-4">
             {completedGoals.map((goal) => (
               <GoalCard
                 key={goal.id}
@@ -351,6 +352,8 @@ export function GoalsList() {
           percentage: editingGoal.percentage,
           reserve: editingGoal.reserve,
           sortOrder: editingGoal.sortOrder,
+          priority: editingGoal.priority,
+          tags: editingGoal.tags,
         } : undefined}
       />
     </div>

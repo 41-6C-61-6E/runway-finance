@@ -83,11 +83,15 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
 
   const meta = property.metadata || {};
   const propertyType = meta.propertyType as string | undefined;
-  const propertyId = meta.propertyId as string | undefined;
+  const address = meta.address as string | undefined;
+  const bedrooms = meta.bedrooms as number | undefined;
+  const bathrooms = meta.bathrooms as number | undefined;
+  const squareFootage = meta.squareFootage as number | undefined;
   const purchasePrice = meta.purchasePrice as number | undefined;
   const purchaseDate = meta.purchaseDate as string | undefined;
   const zipCode = meta.zipCode as string | undefined;
   const initialValue = meta.initialValue as number | undefined;
+
 
   const handleSaveValue = () => {
     const val = parseFloat(newValue);
@@ -377,7 +381,7 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                 )}
 
                 {/* Property Details Section */}
-                {(purchasePrice !== undefined || purchaseDate || zipCode || propertyId || initialValue !== undefined) && (
+                {(purchasePrice !== undefined || purchaseDate || zipCode || address || initialValue !== undefined) && (
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Property Details</span>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
@@ -405,20 +409,31 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                           <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(initialValue)}</span>
                         </div>
                       )}
-                      {propertyId && (
+                      {address && (
                         <div className="flex justify-between items-center py-0.5 col-span-2 border-t border-border/30 pt-1.5 mt-1">
-                          <span className="text-muted-foreground">Redfin ID</span>
-                          <a
-                            href={`https://www.redfin.com/property/${propertyId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline cursor-pointer"
-                          >
-                            {propertyId}
-                            <Link2 className="w-3 h-3" />
-                          </a>
+                          <span className="text-muted-foreground">Address</span>
+                          <span className="text-foreground truncate max-w-[200px]" title={address}>{address}</span>
                         </div>
                       )}
+                      {bedrooms !== undefined && (
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground">Beds</span>
+                          <span className="text-foreground">{bedrooms}</span>
+                        </div>
+                      )}
+                      {bathrooms !== undefined && (
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground">Baths</span>
+                          <span className="text-foreground">{bathrooms}</span>
+                        </div>
+                      )}
+                      {squareFootage !== undefined && (
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground">Sq Ft</span>
+                          <span className="text-foreground font-mono">{squareFootage.toLocaleString()}</span>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 )}

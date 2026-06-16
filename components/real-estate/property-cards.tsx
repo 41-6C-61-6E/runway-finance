@@ -77,6 +77,49 @@ export function PropertyCards() {
   const [savingProperty, setSavingProperty] = useState(false);
   const [propertyEditError, setPropertyEditError] = useState<string | null>(null);
 
+  // Address validation states
+  const [validatingAddress, setValidatingAddress] = useState(false);
+  const [validationResult, setValidationResult] = useState<{ status: 'success' | 'error'; message: string; price?: number } | null>(null);
+
+  const handleValidateAddress = async () => {
+    const address = propertyEditMeta.address?.trim();
+    if (!address) {
+      setValidationResult({ status: 'error', message: 'Please enter a property address to validate.' });
+      return;
+    }
+    setValidatingAddress(true);
+    setValidationResult(null);
+    try {
+      const res = await fetch('/api/manual-accounts/validate-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          address,
+          propertyType: propertyEditMeta.propertyType || undefined,
+          bedrooms: propertyEditMeta.bedrooms || undefined,
+          bathrooms: propertyEditMeta.bathrooms || undefined,
+          squareFootage: propertyEditMeta.squareFootage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this address.' });
+      } else {
+        setValidationResult({
+          status: 'success',
+          message: `Valid address! RentCast Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
+          price: data.price,
+        });
+      }
+    } catch {
+      setValidationResult({ status: 'error', message: 'Network error. Could not connect to validation service.' });
+    } finally {
+      setValidatingAddress(false);
+    }
+  };
+
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -191,7 +234,14 @@ export function PropertyCards() {
       const metadata: Record<string, unknown> = { ...editingProperty.metadata };
       if (propertyEditMeta.propertyType) metadata.propertyType = propertyEditMeta.propertyType;
       else delete metadata.propertyType;
-      metadata.propertyId = propertyEditMeta.propertyId || '';
+      metadata.address = propertyEditMeta.address || '';
+      if (propertyEditMeta.bedrooms) metadata.bedrooms = parseFloat(propertyEditMeta.bedrooms);
+      else delete metadata.bedrooms;
+      if (propertyEditMeta.bathrooms) metadata.bathrooms = parseFloat(propertyEditMeta.bathrooms);
+      else delete metadata.bathrooms;
+      if (propertyEditMeta.squareFootage) metadata.squareFootage = parseFloat(propertyEditMeta.squareFootage);
+      else delete metadata.squareFootage;
+      
       if (propertyEditMeta.purchasePrice) metadata.purchasePrice = parseFloat(propertyEditMeta.purchasePrice);
       else delete metadata.purchasePrice;
       if (propertyEditMeta.purchaseDate) metadata.purchaseDate = propertyEditMeta.purchaseDate;
@@ -200,6 +250,7 @@ export function PropertyCards() {
       else delete metadata.zipCode;
       if (propertyEditMeta.initialValue) metadata.initialValue = parseFloat(propertyEditMeta.initialValue);
       else delete metadata.initialValue;
+
       
       metadata.mortgageAccountIds = selectedMortgageIds;
 
@@ -409,7 +460,7 @@ export function PropertyCards() {
       </Sheet>
 
       {/* Edit Property Details Sheet */}
-      <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); setSelectedMortgageIds([]); } }}>
+      <Sheet open={!!editingProperty} onOpenChange={(open) => { if (!open) { setEditingProperty(null); setPropertyEditError(null); setSelectedMortgageIds([]); setValidationResult(null); } }}>
         <SheetContent side="right" className="overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle>Edit Property Details</SheetTitle>
@@ -438,13 +489,62 @@ export function PropertyCards() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
-              <Input
-                value={propertyEditMeta.propertyId || ''}
-                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
-                placeholder="e.g., 446533"
-              />
+              <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+              <div className="flex gap-2">
+                <div className="relative flex-grow">
+                  <Input
+                    value={propertyEditMeta.address || ''}
+                    onChange={(e) => setPropertyEditMeta((m) => ({ ...m, address: e.target.value }))}
+                    placeholder="e.g., 123 Main St, San Francisco, CA"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleValidateAddress}
+                  disabled={validatingAddress}
+                  className="px-3 py-2 text-xs font-semibold bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground rounded-lg transition-all"
+                >
+                  {validatingAddress ? 'Checking...' : 'Validate'}
+                </button>
+              </div>
+              {validationResult && (
+                <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
+                  {validationResult.message}
+                </p>
+              )}
             </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Beds</label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={propertyEditMeta.bedrooms || ''}
+                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, bedrooms: e.target.value }))}
+                  placeholder="e.g., 3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Baths</label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={propertyEditMeta.bathrooms || ''}
+                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, bathrooms: e.target.value }))}
+                  placeholder="e.g., 2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Sq Ft</label>
+                <Input
+                  type="number"
+                  value={propertyEditMeta.squareFootage || ''}
+                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, squareFootage: e.target.value }))}
+                  placeholder="e.g., 1500"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
