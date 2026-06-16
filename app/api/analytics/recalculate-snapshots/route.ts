@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } from '@/lib/services/account-history';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { readApiConfig } from '@/lib/services/manual-accounts';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
@@ -74,10 +74,16 @@ export async function POST(request: Request) {
               syntheticCount: count,
             });
           } else {
+            const fromDate = await getAccountEarliestCalculationDate(
+              account.id,
+              dataUserId,
+              account.metadata,
+              dek
+            );
             const result = await generateHistoricalAccountSnapshots(
               account.id,
               dataUserId,
-              '2023-01-01',
+              fromDate,
               today,
               dek
             );

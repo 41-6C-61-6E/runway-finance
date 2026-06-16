@@ -398,7 +398,7 @@ export async function PATCH(request: Request) {
         ];
 
         const { isInvestmentAccount } = await import('@/lib/utils/account-scope');
-        const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+        const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } = await import('@/lib/services/account-history');
         const { generateAssetHistorySnapshots } = await import('@/lib/services/asset-estimator');
         const { readApiConfig } = await import('@/lib/services/manual-accounts');
 
@@ -422,7 +422,8 @@ export async function PATCH(request: Request) {
           } else {
             for (const acc of standardAccounts) {
               try {
-                await generateHistoricalAccountSnapshots(acc.id, dataUserId, '2023-01-01', today, dek);
+                const fromDate = await getAccountEarliestCalculationDate(acc.id, dataUserId, acc.metadata, dek);
+                await generateHistoricalAccountSnapshots(acc.id, dataUserId, fromDate, today, dek);
               } catch (err) {
                 console.error(`Failed to recalculate synthetic netWorth snapshots for ${acc.id}:`, err);
               }
@@ -448,7 +449,8 @@ export async function PATCH(request: Request) {
           } else {
             for (const acc of investmentAccounts) {
               try {
-                await generateHistoricalAccountSnapshots(acc.id, dataUserId, '2023-01-01', today, dek);
+                const fromDate = await getAccountEarliestCalculationDate(acc.id, dataUserId, acc.metadata, dek);
+                await generateHistoricalAccountSnapshots(acc.id, dataUserId, fromDate, today, dek);
               } catch (err) {
                 console.error(`Failed to recalculate synthetic investments snapshots for ${acc.id}:`, err);
               }

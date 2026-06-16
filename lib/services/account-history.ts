@@ -97,6 +97,57 @@ export async function getEarliestTransactionDate(
   return tx ? String(tx.date) : null;
 }
 
+/**
+ * Determine the earliest date we have any historical data for an account
+ * (earliest transaction date, earliest real snapshot date, or loan origination/purchase date).
+ */
+export async function getAccountEarliestCalculationDate(
+  accountId: string,
+  userId: string,
+  metadata?: string | null,
+  dek?: Uint8Array
+): Promise<string> {
+  const db = getDb();
+  
+  // 1. Get earliest transaction date
+  const earliestTx = await getEarliestTransactionDate(accountId);
+
+  // 2. Get earliest real snapshot date
+  const [earliestReal] = await db
+    .select({ date: accountSnapshots.snapshotDate })
+    .from(accountSnapshots)
+    .where(
+      and(
+        eq(accountSnapshots.accountId, accountId),
+        eq(accountSnapshots.userId, userId),
+        eq(accountSnapshots.isSynthetic, false)
+      )
+    )
+    .orderBy(asc(accountSnapshots.snapshotDate))
+    .limit(1);
+  const earliestRealDate = earliestReal ? String(earliestReal.date) : null;
+
+  // 3. Get purchase/origination date from metadata
+  let originationDate: string | null = null;
+  if (metadata) {
+    try {
+      const decryptedMeta = dek ? await decryptField(metadata, dek) : metadata;
+      if (decryptedMeta) {
+        const meta = JSON.parse(decryptedMeta);
+        const pDate = meta.purchaseDate || meta.loanOriginationDate || meta.originalLoanDate;
+        if (pDate) originationDate = String(pDate);
+      }
+    } catch (e) {}
+  }
+
+  const earliest = [earliestTx, earliestRealDate, originationDate]
+    .filter((d): d is string => !!d)
+    .sort()[0];
+
+  // Default fallback if no dates found is today's date
+  return earliest || new Date().toISOString().split('T')[0];
+}
+
 async function getPostedTransactions(
   accountId: string,
   fromDate: string,
@@ -107,6 +158,7 @@ async function getPostedTransactions(
     postedDate: string | null;
     amount: string;
     description: string;
+    payee: string | null;
   }>
 > {
   return getDb()
@@ -115,6 +167,7 @@ async function getPostedTransactions(
       postedDate: transactions.postedDate,
       amount: transactions.amount,
       description: transactions.description,
+      payee: transactions.payee,
     })
     .from(transactions)
     .where(
@@ -290,6 +343,7 @@ export async function generateHistoricalAccountSnapshots(
   let ignoreSettlementTransactions = false;
 
   if (isInvestment) {
+    ignoreSettlementTransactions = true; // Automatically ignore same-day opposite transactions for investment accounts by default
     const isInvestmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
     const useMarketData = settings?.useMarketDataForSnapshots === true;
 
@@ -529,6 +583,8 @@ export async function generateHistoricalAccountSnapshots(
     effectiveToDate = firstRealDate && firstRealDate > calculationToDate ? firstRealDate : calculationToDate;
   }
 
+  const INTERNAL_INVESTMENT_REGEX = /sweep|reinvestment|reinvest|dividend|capital gain|money market|settlement fund|\b(?:buy|sell)\b|investment buy/i;
+
   // 4. Fetch posted transactions in the range [effectiveFromDate, effectiveToDate]
   const txs = await getPostedTransactions(accountId, effectiveFromDate, effectiveToDate);
 
@@ -555,6 +611,22 @@ export async function generateHistoricalAccountSnapshots(
         descriptionStr = dek ? await decryptField(tx.description, dek) : tx.description;
       } catch (err) {
         // ignore
+      }
+    }
+
+    let payeeStr = '';
+    if (tx.payee) {
+      try {
+        payeeStr = dek ? await decryptField(tx.payee, dek) : tx.payee;
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    if (isInvestment) {
+      const isInternal = INTERNAL_INVESTMENT_REGEX.test(descriptionStr) || INTERNAL_INVESTMENT_REGEX.test(payeeStr);
+      if (isInternal) {
+        continue;
       }
     }
 
@@ -702,6 +774,33 @@ export async function generateHistoricalAccountSnapshots(
         current.setUTCDate(current.getUTCDate() - 1);
         const prevDateStr = current.toISOString().split('T')[0];
         balanceByDate.set(prevDateStr, runningBalance);
+      }
+
+      // Adjust backward pass balances to linearly distribute any starting discrepancy for investment accounts
+      if (isInvestment) {
+        const calcStartVal = balanceByDate.get(effectiveFromDate) ?? 0;
+        const expectedStartVal = 0; // Investment accounts are assumed to start at 0
+        const startDiscrepancy = calcStartVal - expectedStartVal;
+
+        if (startDiscrepancy !== 0) {
+          const tStart = new Date(effectiveFromDate + 'T00:00:00Z').getTime();
+          const tEnd = new Date(firstRealDate + 'T00:00:00Z').getTime();
+          if (tEnd > tStart) {
+            let adjCurrent = new Date(effectiveFromDate + 'T00:00:00Z');
+            const adjEnd = new Date(firstRealDate + 'T00:00:00Z');
+            while (adjCurrent <= adjEnd) {
+              const dateStr = adjCurrent.toISOString().split('T')[0];
+              const t = adjCurrent.getTime();
+              const fraction = (t - tStart) / (tEnd - tStart);
+              const val = balanceByDate.get(dateStr);
+              if (val !== undefined) {
+                const adjustedVal = val - startDiscrepancy * (1 - fraction);
+                balanceByDate.set(dateStr, Math.max(0, roundToCents(adjustedVal)));
+              }
+              adjCurrent.setUTCDate(adjCurrent.getUTCDate() + 1);
+            }
+          }
+        }
       }
 
       // Forward Pass
@@ -1345,7 +1444,17 @@ export async function generateInvestmentMarketSnapshots(
       } else if (prevRealDate !== null) {
         balance = realByDate.get(prevRealDate)!;
       } else if (nextRealDate !== null) {
-        balance = realByDate.get(nextRealDate)!;
+        // Interpolate starting from 0 at calculationStartDate to nextRealDate balance
+        const b2 = realByDate.get(nextRealDate)!;
+        const t1 = new Date(calculationStartDate + 'T00:00:00Z').getTime();
+        const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
+        const t = new Date(dateStr + 'T00:00:00Z').getTime();
+        if (t2 > t1) {
+          const fraction = (t - t1) / (t2 - t1);
+          balance = b2 * fraction;
+        } else {
+          balance = b2;
+        }
       } else {
         balance = 0;
       }

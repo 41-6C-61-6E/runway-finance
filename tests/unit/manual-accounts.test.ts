@@ -98,6 +98,7 @@ vi.mock('@/lib/services/account-history', () => {
   return {
     generateHistoricalAccountSnapshots: mockGenerateHistorical,
     recalculateNetWorthSnapshots: mockRecalculate,
+    getAccountEarliestCalculationDate: vi.fn(async () => '2023-01-01'),
   };
 });
 

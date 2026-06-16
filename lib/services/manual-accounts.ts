@@ -12,7 +12,7 @@ import type { ApiConfig } from '@/lib/services/asset-estimator';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate } from '@/lib/services/account-history';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -820,8 +820,9 @@ export async function addAccountSnapshot(
   } else {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const earliestDate = date < '2023-01-01' ? date : '2023-01-01';
-      await generateHistoricalAccountSnapshots(accountId, userId, earliestDate, today, dek);
+      const fromDate = await getAccountEarliestCalculationDate(accountId, userId, account.metadata, dek);
+      const finalFromDate = date < fromDate ? date : fromDate;
+      await generateHistoricalAccountSnapshots(accountId, userId, finalFromDate, today, dek);
     } catch (err) {
       logger.error(`${LOG_TAG} Failed to generate historical snapshots in addAccountSnapshot`, { accountId, err });
     }
