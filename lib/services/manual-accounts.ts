@@ -37,14 +37,15 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
     return {
       metalsApiUrl: keys.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl,
       metalsApiKey: keys.metalsApiKey || '',
-      redfinApiUrl: keys.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl,
-      redfinApiKey: keys.redfinApiKey || '',
+      rentcastApiUrl: keys.rentcastApiUrl || DEFAULT_API_CONFIG.rentcastApiUrl,
+      rentcastApiKey: keys.rentcastApiKey || (typeof process !== 'undefined' ? (process.env.RENTCAST_API_KEY ?? '') : ''),
       fredApiUrl: keys.fredApiUrl || DEFAULT_API_CONFIG.fredApiUrl,
       fredApiKey: keys.fredApiKey || (typeof process !== 'undefined' ? (process.env.FRED_API_KEY ?? '') : ''),
       btcApiUrl: keys.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl,
       btcApiKey: keys.btcApiKey || '',
       btcXpubApiUrl: keys.btcXpubApiUrl || DEFAULT_API_CONFIG.btcXpubApiUrl,
     };
+
   } catch (err) {
     // May fail if no session DEK is available, fall back to defaults
     return { ...DEFAULT_API_CONFIG };
@@ -81,31 +82,79 @@ function manualExternalId(): string {
   return `manual-${randomUUID()}`;
 }
 
-async function fetchRedfinValue(propertyId: string, apiConfig?: ApiConfig): Promise<number> {
-  const baseUrl = apiConfig?.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl!;
-  const url = `${baseUrl}?propertyId=${encodeURIComponent(propertyId)}`;
-  const curlCmd = `curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' '${url}'`;
-  logger.info(`${LOG_TAG} Redfin API call`, { propertyId, url });
-  logger.debug(`${LOG_TAG} Redfin curl: ${curlCmd}`);
+const rentcastPropertyTypeMap: Record<string, string> = {
+  'single-family': 'Single Family',
+  'condo': 'Condo',
+  'townhouse': 'Townhouse',
+  'multi-family': 'Multi-Family',
+  'land': 'Land',
+};
+
+export async function fetchRentcastValue(
+  params: {
+    address: string;
+    propertyType?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    squareFootage?: number;
+  },
+  apiConfig?: ApiConfig
+): Promise<number> {
+  const baseUrl = apiConfig?.rentcastApiUrl || DEFAULT_API_CONFIG.rentcastApiUrl || 'https://api.rentcast.io/v1/avm/value';
+  const apiKey = apiConfig?.rentcastApiKey || (typeof process !== 'undefined' ? (process.env.RENTCAST_API_KEY ?? '') : '');
+
+  if (!apiKey) {
+    throw new Error('RentCast API key is not configured. Please add it to your environment variables or user settings.');
+  }
+
+  const queryParams = new URLSearchParams();
+  queryParams.append('address', params.address);
+  if (params.propertyType) {
+    const mappedType = rentcastPropertyTypeMap[params.propertyType];
+    if (mappedType) {
+      queryParams.append('propertyType', mappedType);
+    }
+  }
+  if (params.bedrooms !== undefined && params.bedrooms !== null && !isNaN(params.bedrooms)) {
+    queryParams.append('bedrooms', String(params.bedrooms));
+  }
+  if (params.bathrooms !== undefined && params.bathrooms !== null && !isNaN(params.bathrooms)) {
+    queryParams.append('bathrooms', String(params.bathrooms));
+  }
+  if (params.squareFootage !== undefined && params.squareFootage !== null && !isNaN(params.squareFootage)) {
+    queryParams.append('squareFootage', String(params.squareFootage));
+  }
+
+  const url = `${baseUrl}?${queryParams.toString()}`;
+  const curlCmd = `curl -s -H "X-Api-Key: [REDACTED]" '${url}'`;
+  logger.info(`${LOG_TAG} RentCast API call`, { address: params.address, url });
+  logger.debug(`${LOG_TAG} RentCast curl: ${curlCmd}`);
+
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+      headers: {
+        'Accept': 'application/json',
+        'X-Api-Key': apiKey,
+      },
     });
   } catch (err) {
-    throw new Error(`Redfin network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`RentCast network error\n  URL: ${url}\n  error: ${err instanceof Error ? err.message : String(err)}`);
   }
+
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Redfin HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
+    throw new Error(`RentCast HTTP ${res.status}\n  URL: ${url}\n  response: ${body.slice(0, 300)}`);
   }
-  const html = await res.text();
-  const match = html.match(/\$([0-9]{1,3}(?:,[0-9]{3})*)/);
-  if (!match) {
-    throw new Error(`Redfin parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  page length: ${html.length} chars, no price pattern found`);
+
+  const data = await res.json() as { price?: number };
+  if (data.price === undefined || data.price === null) {
+    throw new Error(`RentCast parse error: No price field returned in response.\n  Response: ${JSON.stringify(data).slice(0, 300)}`);
   }
-  return parseFloat(match[1].replace(/,/g, ''));
+
+  return data.price;
 }
+
 
 const TREZOR_HOSTS = ['btc2.trezor.io', 'btc1.trezor.io', 'btc3.trezor.io'];
 
@@ -400,11 +449,20 @@ export async function syncManualAccount(
       case 'townhouse':
       case 'multi-family':
       case 'other': {
-        const propertyId = meta.propertyId as string;
-        if (!propertyId) throw new Error('No propertyId in metadata');
-        newValue = await fetchRedfinValue(propertyId, apiConfig);
+        const address = meta.address as string | undefined;
+        if (!address) {
+          throw new Error('No property address in metadata. Please edit the account to provide a property address for RentCast sync.');
+        }
+        newValue = await fetchRentcastValue({
+          address,
+          propertyType: meta.propertyType as string | undefined,
+          bedrooms: meta.bedrooms !== undefined && meta.bedrooms !== null ? parseFloat(String(meta.bedrooms)) : undefined,
+          bathrooms: meta.bathrooms !== undefined && meta.bathrooms !== null ? parseFloat(String(meta.bathrooms)) : undefined,
+          squareFootage: meta.squareFootage !== undefined && meta.squareFootage !== null ? parseFloat(String(meta.squareFootage)) : undefined,
+        }, apiConfig);
         break;
       }
+
       case 'crypto': {
         const xpub = meta.xpub as string;
         if (!xpub) throw new Error('No xpub in metadata');
