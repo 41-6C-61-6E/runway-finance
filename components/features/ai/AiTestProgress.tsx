@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Check, X, Zap } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 type StageName = 'config' | 'connecting' | 'sending' | 'receiving';
 
@@ -173,7 +173,7 @@ export default function AiTestProgress({
       <DialogContent className="max-w-lg p-6">
         <div className="flex items-start justify-between mb-5">
           <div>
-            <h2 className="text-base font-semibold text-foreground">{title}</h2>
+            <DialogTitle className="text-base font-semibold text-foreground">{title}</DialogTitle>
             {!result && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Elapsed: {formatTime(elapsed)}
