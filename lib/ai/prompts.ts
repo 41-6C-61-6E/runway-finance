@@ -17,15 +17,15 @@ Respond with ONLY valid JSON matching this schema:
     {
       "type": "categorize",
       "transactionIndex": number,
-      "categoryId": string | null,
-      "categoryName": string | null,
+      "categoryId": string,
+      "categoryName": string,
       "confidence": number,
       "explanation": string
     },
     {
       "type": "create_category",
       "name": string,
-      "parentName": string | null,
+      "parentName": string,
       "isIncome": boolean,
       "color": string,
       "reasoning": string,
@@ -39,15 +39,17 @@ Respond with ONLY valid JSON matching this schema:
       "conditionOperator": "contains" | "equals" | "starts_with" | "ends_with" | "regex",
       "conditionValue": string,
       "conditionCaseSensitive": boolean,
-      "setCategoryName": string | null,
+      "setCategoryName": string,
       "confidence": number,
       "explanation": string
     }
   ]
 }
 
+Use "" (empty string) when the field is not applicable for this suggestion type. Do not use null.
+
 For "categorize" suggestions:
-- Use "categoryId": null and "categoryName": null if you're suggesting a new category should be created instead. The new category will be created separately via a "create_category" suggestion.
+- Use "categoryId": "" and "categoryName": "" if you're suggesting a new category should be created instead. The new category will be created separately via a "create_category" suggestion.
 
 For "create_rule" suggestions:
 - "setCategoryName" must reference an existing category name or a newly proposed category name.

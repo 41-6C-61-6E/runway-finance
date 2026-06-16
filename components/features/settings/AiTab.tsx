@@ -12,6 +12,7 @@ type Provider = {
   model: string;
   apiKey: string;
   isActive: boolean;
+  jsonMode: boolean;
 };
 
 type AutomationSettings = {
@@ -55,6 +56,7 @@ export default function AiTab() {
   const [formModel, setFormModel] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
   const [formSetActive, setFormSetActive] = useState(false);
+  const [formJsonMode, setFormJsonMode] = useState(false);
   const [formTesting, setFormTesting] = useState(false);
   const [formTestResult, setFormTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [showTestProgress, setShowTestProgress] = useState<string | null>(null);
@@ -145,6 +147,7 @@ export default function AiTab() {
     setFormModel('');
     setFormApiKey('');
     setFormSetActive(false);
+    setFormJsonMode(false);
     setShowForm(true);
     setFetchedModels([]);
     setIsCustomModel(false);
@@ -158,6 +161,7 @@ export default function AiTab() {
     setFormModel(p.model);
     setFormApiKey(p.apiKey);
     setFormSetActive(false);
+    setFormJsonMode(p.jsonMode ?? false);
     setShowForm(true);
     setFetchedModels([]);
     setIsCustomModel(false);
@@ -175,6 +179,7 @@ export default function AiTab() {
       endpoint: formEndpoint.trim(),
       model: formModel.trim(),
       apiKey: formApiKey,
+      jsonMode: formJsonMode,
     };
     if (editingId) {
       body.isActive = formSetActive;
@@ -362,7 +367,7 @@ export default function AiTab() {
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     <div><span className="font-mono">{p.endpoint}</span> / <span className="font-mono">{p.model}</span></div>
-                    <div>API key: {p.apiKey ? '••••••••' : '(none)'}</div>
+                    <div>API key: {p.apiKey ? '••••••••' : '(none)'} | JSON Mode: {p.jsonMode ? 'Enabled' : 'Disabled'}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 shrink-0">
@@ -488,6 +493,20 @@ export default function AiTab() {
                 </div>
               )}
             </div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formJsonMode}
+                onChange={(e) => setFormJsonMode(e.target.checked)}
+                className="mt-0.5 rounded border-border accent-primary"
+              />
+              <div className="flex-1">
+                <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Forces the model to respond in JSON. Omit/disable this for providers that experience FSM/grammar issues (like local vLLM).
+                </p>
+              </div>
+            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
