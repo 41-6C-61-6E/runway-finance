@@ -12,6 +12,7 @@ interface GoalWaterfallItem {
   goalName: string;
   allocatedAmount: number;
   desiredAllocation: number;
+  targetAmount: number;
   isUnderfunded: boolean;
   sortOrder: number;
   status: string;
@@ -130,9 +131,9 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
       {/* Waterfall Bars */}
       <div className="space-y-2">
         {account.goals.map((goal, index) => {
-          const barWidth = account.accountBalance > 0
-            ? (goal.allocatedAmount / account.accountBalance) * 100
-            : 0;
+          const target = goal.targetAmount || 0;
+          const allocated = goal.allocatedAmount || 0;
+          const progressPercent = target > 0 ? Math.min((allocated / target) * 100, 100) : 0;
 
           return (
             <div key={goal.goalId} className="space-y-1">
@@ -151,20 +152,29 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="blur-number">${goal.allocatedAmount.toLocaleString()}</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    ${allocated.toLocaleString()} / ${target.toLocaleString()}
+                  </span>
+                  <span className="font-semibold text-foreground blur-number">
+                    ({Math.round(progressPercent)}%)
+                  </span>
                 </div>
               </div>
 
               {/* Bar */}
-              <div className="relative h-6 bg-muted/30 rounded overflow-hidden">
+              <div
+                className={cn(
+                  "relative h-6 rounded overflow-hidden",
+                  goal.isReleased ? "bg-green-500/10" : "bg-chart-1/10"
+                )}
+              >
                 <div
                   className={cn(
                     'h-full transition-all duration-500 ease-out',
-                    goal.isReleased ? 'bg-green-500/40' :
-                    'bg-chart-1/60'
+                    goal.isReleased ? 'bg-green-500/40' : 'bg-chart-1/60'
                   )}
-                  style={{ width: `${Math.min(barWidth, 100)}%` }}
+                  style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>

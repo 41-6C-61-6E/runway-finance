@@ -22,6 +22,7 @@ const nextConfig = {
     remotePatterns: [],
   },
   experimental: {
+    webpackMemoryOptimizations: process.env.NODE_ENV !== 'production',
     workerThreads: process.env.DISABLE_WORKER_THREADS === 'true' ? false : undefined,
     cpus: process.env.DISABLE_WORKER_THREADS === 'true' ? 1 : undefined,
   },

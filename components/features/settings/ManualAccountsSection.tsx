@@ -247,7 +247,12 @@ export default function ManualAccountsSection() {
   const [editMeta, setEditMeta] = useState<Record<string, string>>({});
   const [editLoading, setEditLoading] = useState(false);
 
+  // Address validation states
+  const [validatingAddress, setValidatingAddress] = useState(false);
+  const [validationResult, setValidationResult] = useState<{ status: 'success' | 'error'; message: string; price?: number } | null>(null);
+
   // Tags state
+
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<any[]>([]);
   const [tagSearch, setTagSearch] = useState('');
@@ -281,6 +286,47 @@ export default function ManualAccountsSection() {
     fetchAccounts();
   }, [fetchAccounts]);
 
+  const handleValidateAddress = async (meta: Record<string, string>, isEdit: boolean) => {
+    const address = meta.address?.trim();
+    if (!address) {
+      setValidationResult({ status: 'error', message: 'Please enter a property address to validate.' });
+      return;
+    }
+    setValidatingAddress(true);
+    setValidationResult(null);
+    try {
+      const res = await fetch('/api/manual-accounts/validate-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          address,
+          propertyType: meta.propertyType || undefined,
+          bedrooms: meta.bedrooms || undefined,
+          bathrooms: meta.bathrooms || undefined,
+          squareFootage: meta.squareFootage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this address.' });
+      } else {
+        setValidationResult({
+          status: 'success',
+          message: `Valid address! RentCast Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
+          price: data.price,
+        });
+        if (!isEdit) {
+          setCreateInitialValue(String(data.price));
+        }
+      }
+    } catch {
+      setValidationResult({ status: 'error', message: 'Network error. Could not connect to validation service.' });
+    } finally {
+      setValidatingAddress(false);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
@@ -302,12 +348,16 @@ export default function ManualAccountsSection() {
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
       }
       if (REAL_ESTATE_TYPES.includes(createType)) {
-        metadata.propertyId = createMeta.propertyId || '';
+        metadata.address = createMeta.address || '';
+        if (createMeta.bedrooms) metadata.bedrooms = parseFloat(createMeta.bedrooms);
+        if (createMeta.bathrooms) metadata.bathrooms = parseFloat(createMeta.bathrooms);
+        if (createMeta.squareFootage) metadata.squareFootage = parseFloat(createMeta.squareFootage);
         if (createMeta.propertyType) metadata.propertyType = createMeta.propertyType;
         if (createMeta.purchasePrice) metadata.purchasePrice = parseFloat(createMeta.purchasePrice);
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
         if (createMeta.zipCode) metadata.zipCode = createMeta.zipCode;
         if (createInitialValue) metadata.initialValue = parseFloat(createInitialValue) || 0;
+
         if (createMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [createMeta.linkedMortgageId];
         }
@@ -508,7 +558,10 @@ export default function ManualAccountsSection() {
       const metadata: Record<string, unknown> = {};
 
       if (REAL_ESTATE_TYPES.includes(editAccount.type)) {
-        metadata.propertyId = editMeta.propertyId || '';
+        metadata.address = editMeta.address || '';
+        if (editMeta.bedrooms) metadata.bedrooms = parseFloat(editMeta.bedrooms);
+        if (editMeta.bathrooms) metadata.bathrooms = parseFloat(editMeta.bathrooms);
+        if (editMeta.squareFootage) metadata.squareFootage = parseFloat(editMeta.squareFootage);
         if (editMeta.propertyType) metadata.propertyType = editMeta.propertyType;
         if (editMeta.purchasePrice) metadata.purchasePrice = parseFloat(editMeta.purchasePrice);
         if (editMeta.purchaseDate) metadata.purchaseDate = editMeta.purchaseDate;
@@ -521,6 +574,7 @@ export default function ManualAccountsSection() {
         }
         metadata.syncFrequency = editMeta.syncFrequency || 'manual';
       }
+
       else if (editAccount.type === 'mortgage') {
         metadata.originalLoanAmount = parseFloat(editMeta.originalLoanAmount || '0');
         metadata.interestRate = parseFloat(editMeta.interestRate || '0');
@@ -685,13 +739,62 @@ export default function ManualAccountsSection() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
-            <Input
-              value={createMeta.propertyId || ''}
-              onChange={(e) => setCreateMeta((m) => ({ ...m, propertyId: e.target.value }))}
-              placeholder="e.g., 446533"
-            />
+            <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+            <div className="flex gap-2">
+              <div className="relative flex-grow">
+                <Input
+                  value={createMeta.address || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, address: e.target.value }))}
+                  placeholder="e.g., 123 Main St, San Francisco, CA"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleValidateAddress(createMeta, false)}
+                disabled={validatingAddress}
+                className="px-3 py-2 text-xs font-semibold bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground rounded-lg transition-all"
+              >
+                {validatingAddress ? 'Checking...' : 'Validate'}
+              </button>
+            </div>
+            {validationResult && (
+              <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
+                {validationResult.message}
+              </p>
+            )}
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Beds</label>
+              <Input
+                type="number"
+                step="0.5"
+                value={createMeta.bedrooms || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, bedrooms: e.target.value }))}
+                placeholder="e.g., 3"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Baths</label>
+              <Input
+                type="number"
+                step="0.5"
+                value={createMeta.bathrooms || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, bathrooms: e.target.value }))}
+                placeholder="e.g., 2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Sq Ft</label>
+              <Input
+                type="number"
+                value={createMeta.squareFootage || ''}
+                onChange={(e) => setCreateMeta((m) => ({ ...m, squareFootage: e.target.value }))}
+                placeholder="e.g., 1500"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
@@ -1278,13 +1381,62 @@ export default function ManualAccountsSection() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID (optional)</label>
-                  <Input
-                    value={editMeta.propertyId || ''}
-                    onChange={(e) => setEditMeta((m) => ({ ...m, propertyId: e.target.value }))}
-                    placeholder="e.g., 446533"
-                  />
+                  <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-grow">
+                      <Input
+                        value={editMeta.address || ''}
+                        onChange={(e) => setEditMeta((m) => ({ ...m, address: e.target.value }))}
+                        placeholder="e.g., 123 Main St, San Francisco, CA"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleValidateAddress(editMeta, true)}
+                      disabled={validatingAddress}
+                      className="px-3 py-2 text-xs font-semibold bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground rounded-lg transition-all"
+                    >
+                      {validatingAddress ? 'Checking...' : 'Validate'}
+                    </button>
+                  </div>
+                  {validationResult && (
+                    <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
+                      {validationResult.message}
+                    </p>
+                  )}
                 </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Beds</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={editMeta.bedrooms || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, bedrooms: e.target.value }))}
+                      placeholder="e.g., 3"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Baths</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={editMeta.bathrooms || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, bathrooms: e.target.value }))}
+                      placeholder="e.g., 2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Sq Ft</label>
+                    <Input
+                      type="number"
+                      value={editMeta.squareFootage || ''}
+                      onChange={(e) => setEditMeta((m) => ({ ...m, squareFootage: e.target.value }))}
+                      placeholder="e.g., 1500"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
