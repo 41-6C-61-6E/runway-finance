@@ -776,33 +776,6 @@ export async function generateHistoricalAccountSnapshots(
         balanceByDate.set(prevDateStr, runningBalance);
       }
 
-      // Adjust backward pass balances to linearly distribute any starting discrepancy for investment accounts
-      if (isInvestment) {
-        const calcStartVal = balanceByDate.get(effectiveFromDate) ?? 0;
-        const expectedStartVal = 0; // Investment accounts are assumed to start at 0
-        const startDiscrepancy = calcStartVal - expectedStartVal;
-
-        if (startDiscrepancy !== 0) {
-          const tStart = new Date(effectiveFromDate + 'T00:00:00Z').getTime();
-          const tEnd = new Date(firstRealDate + 'T00:00:00Z').getTime();
-          if (tEnd > tStart) {
-            let adjCurrent = new Date(effectiveFromDate + 'T00:00:00Z');
-            const adjEnd = new Date(firstRealDate + 'T00:00:00Z');
-            while (adjCurrent <= adjEnd) {
-              const dateStr = adjCurrent.toISOString().split('T')[0];
-              const t = adjCurrent.getTime();
-              const fraction = (t - tStart) / (tEnd - tStart);
-              const val = balanceByDate.get(dateStr);
-              if (val !== undefined) {
-                const adjustedVal = val - startDiscrepancy * (1 - fraction);
-                balanceByDate.set(dateStr, Math.max(0, roundToCents(adjustedVal)));
-              }
-              adjCurrent.setUTCDate(adjCurrent.getUTCDate() + 1);
-            }
-          }
-        }
-      }
-
       // Forward Pass
       current = new Date(firstRealDate + 'T00:00:00Z');
       const endLimit = new Date(calculationToDate + 'T00:00:00Z');
@@ -889,16 +862,20 @@ export async function generateHistoricalAccountSnapshots(
     if (realByDate.has(dateStr)) {
       skippedReal++;
     } else {
-      const bal = balanceByDate.get(dateStr);
-      if (bal !== undefined && !isNaN(bal)) {
-        toInsert.push({
-          userId,
-          accountId,
-          snapshotDate: dateStr,
-          balance: String(roundToCents(bal)),
-          isSynthetic: true,
-          isImported: isAccountImported,
-        });
+      // For investment accounts, only generate synthetic snapshots on dates with transactions
+      const hasEvent = !isInvestment || txsByDate.has(dateStr);
+      if (hasEvent) {
+        const bal = balanceByDate.get(dateStr);
+        if (bal !== undefined && !isNaN(bal)) {
+          toInsert.push({
+            userId,
+            accountId,
+            snapshotDate: dateStr,
+            balance: String(roundToCents(bal)),
+            isSynthetic: true,
+            isImported: isAccountImported,
+          });
+        }
       }
     }
     current.setUTCDate(current.getUTCDate() + 1);
@@ -1257,6 +1234,7 @@ export async function generateInvestmentMarketSnapshots(
   // 4. Generate daily raw holdings valuations V(t)
   const valuationByDate = new Map<string, number>();
   const activeHoldingsBySecurity = new Map<string, { ticker: string | null, name: string | null, quantity: number, price: number }>();
+  const tradingDays = new Set<string>();
 
   // Walk forward day by day to compute daily V(t)
   for (const dateStr of dailyDates) {
@@ -1279,6 +1257,7 @@ export async function generateInvestmentMarketSnapshots(
 
     // Calculate total value V(t) for this day
     let dailyValuation = 0;
+    let hasDailyPrice = false;
     for (const pos of activeHoldingsBySecurity.values()) {
       let price = pos.price; // fallback to last known price from snapshot
       if (pos.ticker) {
@@ -1288,6 +1267,9 @@ export async function generateInvestmentMarketSnapshots(
           const yahooPrice = priceMap.get(dateStr);
           if (yahooPrice !== undefined) {
             price = yahooPrice;
+            if (!CONSTANT_PRICE_TICKERS.has(tickerUpper)) {
+              hasDailyPrice = true;
+            }
           } else {
             // Weekend/holiday lookback: carry forward the most recent price from Yahoo Finance
             let lookbackDate = new Date(dateStr + 'T00:00:00Z');
@@ -1304,6 +1286,9 @@ export async function generateInvestmentMarketSnapshots(
         }
       }
       dailyValuation += pos.quantity * price;
+    }
+    if (hasDailyPrice) {
+      tradingDays.add(dateStr);
     }
     valuationByDate.set(dateStr, roundToCents(dailyValuation));
   }
@@ -1374,10 +1359,10 @@ export async function generateInvestmentMarketSnapshots(
     }
   }
 
-  // 6. Calculate discrepancy D(t) for all dates in dailyDates by interpolation
-  const interpolatedDiscrepancy = new Map<string, number>();
+  // 6. Calculate discrepancy D(t) for all dates in dailyDates using a step-function (no interpolation)
+  const stepDiscrepancy = new Map<string, number>();
   for (const dateStr of dailyDates) {
-    // Find surrounding real snapshots
+    // Find the latest real snapshot on or before dateStr
     let prevRealDate: string | null = null;
     let nextRealDate: string | null = null;
 
@@ -1390,78 +1375,21 @@ export async function generateInvestmentMarketSnapshots(
       }
     }
 
-    if (prevRealDate !== null && nextRealDate !== null) {
-      if (prevRealDate === nextRealDate) {
-        interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(prevRealDate)!));
-      } else {
-        const d1 = realDiscrepancy.get(prevRealDate)!;
-        const d2 = realDiscrepancy.get(nextRealDate)!;
-        const t1 = new Date(prevRealDate + 'T00:00:00Z').getTime();
-        const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
-        const t = new Date(dateStr + 'T00:00:00Z').getTime();
-        const fraction = (t - t1) / (t2 - t1);
-        interpolatedDiscrepancy.set(dateStr, roundToCents(d1 + (d2 - d1) * fraction));
-      }
-    } else if (prevRealDate !== null) {
-      interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(prevRealDate)!));
+    if (prevRealDate !== null) {
+      stepDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(prevRealDate)!));
     } else if (nextRealDate !== null) {
-      interpolatedDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(nextRealDate)!));
+      stepDiscrepancy.set(dateStr, roundToCents(realDiscrepancy.get(nextRealDate)!));
     } else {
-      interpolatedDiscrepancy.set(dateStr, 0);
+      stepDiscrepancy.set(dateStr, 0);
     }
   }
 
   // 7. Calculate daily estimated balance B(t) = V(t) + D(t)
   const finalBalances = new Map<string, number>();
   for (const dateStr of dailyDates) {
-    if (dateStr < firstHoldingDate) {
-      // Find surrounding real snapshots for direct balance interpolation
-      let prevRealDate: string | null = null;
-      let nextRealDate: string | null = null;
-
-      for (const d of sortedRealDates) {
-        if (d <= dateStr) {
-          prevRealDate = d;
-        }
-        if (d >= dateStr && nextRealDate === null) {
-          nextRealDate = d;
-        }
-      }
-
-      let balance = 0;
-      if (prevRealDate !== null && nextRealDate !== null) {
-        if (prevRealDate === nextRealDate) {
-          balance = realByDate.get(prevRealDate)!;
-        } else {
-          const b1 = realByDate.get(prevRealDate)!;
-          const b2 = realByDate.get(nextRealDate)!;
-          const t1 = new Date(prevRealDate + 'T00:00:00Z').getTime();
-          const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
-          const t = new Date(dateStr + 'T00:00:00Z').getTime();
-          const fraction = (t - t1) / (t2 - t1);
-          balance = b1 + (b2 - b1) * fraction;
-        }
-      } else if (prevRealDate !== null) {
-        balance = realByDate.get(prevRealDate)!;
-      } else if (nextRealDate !== null) {
-        // Interpolate starting from 0 at calculationStartDate to nextRealDate balance
-        const b2 = realByDate.get(nextRealDate)!;
-        const t1 = new Date(calculationStartDate + 'T00:00:00Z').getTime();
-        const t2 = new Date(nextRealDate + 'T00:00:00Z').getTime();
-        const t = new Date(dateStr + 'T00:00:00Z').getTime();
-        if (t2 > t1) {
-          const fraction = (t - t1) / (t2 - t1);
-          balance = b2 * fraction;
-        } else {
-          balance = b2;
-        }
-      } else {
-        balance = 0;
-      }
-      finalBalances.set(dateStr, roundToCents(balance));
-    } else {
+    if (dateStr >= firstHoldingDate) {
       const v = valuationByDate.get(dateStr) || 0;
-      const d = interpolatedDiscrepancy.get(dateStr) || 0;
+      const d = stepDiscrepancy.get(dateStr) || 0;
       finalBalances.set(dateStr, roundToCents(v + d));
     }
   }
@@ -1491,6 +1419,10 @@ export async function generateInvestmentMarketSnapshots(
     if (dateStr < fromDate) continue;
     // Don't overwrite real snapshots
     if (realByDate.has(dateStr)) continue;
+
+    // Only generate synthetic snapshots on event/trading days
+    const hasEvent = snapsByDate.has(dateStr) || tradingDays.has(dateStr);
+    if (!hasEvent) continue;
 
     const bal = finalBalances.get(dateStr);
     if (bal !== undefined && !isNaN(bal)) {
