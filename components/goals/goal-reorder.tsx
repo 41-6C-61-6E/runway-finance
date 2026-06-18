@@ -6,10 +6,8 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { GripVertical, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-  console.log(`[${type}] ${message}`);
-};
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/utils/api-client';
 
 interface GoalForReorder {
   id: string;
@@ -131,22 +129,19 @@ export function GoalReorder({ goals: initialGoals, accountId, onReorder }: GoalR
         sortOrder: index,
       }));
 
-      const res = await fetch('/api/goals/bulk-reorder', {
+      await apiFetch('/api/goals/bulk-reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ updates }),
       });
 
-      if (res.ok) {
-        setHasChanges(false);
-        showToast('Goal order updated', 'success');
-        onReorder?.();
-      } else {
-        showToast('Failed to update goal order', 'error');
-      }
-    } catch {
-      showToast('Failed to update goal order', 'error');
+      setHasChanges(false);
+      toast.success('Goal order updated');
+      onReorder?.();
+    } catch (err) {
+      toast.error('Failed to update goal order');
+      console.error('Failed to save goal order reorder:', err);
     }
   };
 

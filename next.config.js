@@ -46,6 +46,23 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self';",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com;",
+              "style-src 'self' 'unsafe-inline';",
+              "img-src 'self' blob: data:;",
+              "font-src 'self' data:;",
+              "connect-src 'self' https://cdn.plaid.com;",
+              "frame-src 'self' https://cdn.plaid.com;",
+              "object-src 'none';",
+              "base-uri 'self';",
+              "form-action 'self';",
+              "frame-ancestors 'none';",
+              "upgrade-insecure-requests;",
+            ].join(" "),
+          },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

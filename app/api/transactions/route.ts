@@ -512,9 +512,7 @@ export async function GET(request: Request) {
   );
   const isEncryptedSort =
     filters.sort === "amount" ||
-    filters.sort === "description" ||
-    filters.sort === "account" ||
-    filters.sort === "category";
+    filters.sort === "description";
 
   // If we can paginate in the database, do so! (Massive speedup for page loads/nav)
   if (!hasEncryptedFilters && !isEncryptedSort) {
@@ -534,6 +532,16 @@ export async function GET(request: Request) {
         filters.order === "asc"
           ? asc(transactions.categorizedByAi)
           : desc(transactions.categorizedByAi);
+    } else if (filters.sort === "account") {
+      orderByClause =
+        filters.order === "asc"
+          ? asc(accounts.displayOrder)
+          : desc(accounts.displayOrder);
+    } else if (filters.sort === "category") {
+      orderByClause =
+        filters.order === "asc"
+          ? asc(categories.displayOrder)
+          : desc(categories.displayOrder);
     } else {
       orderByClause = desc(transactions.date);
     }
@@ -554,7 +562,7 @@ export async function GET(request: Request) {
       .leftJoin(accounts, eq(transactions.accountId, accounts.id))
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(and(...whereConditions))
-      .orderBy(orderByClause)
+      .orderBy(orderByClause, desc(transactions.date))
       .limit(filters.limit)
       .offset(filters.offset);
 

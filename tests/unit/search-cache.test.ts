@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { hydrateUserSearchCache, invalidateUserSearchCache, getSearchMatchingTransactionIds, getUserTransactionsFromCache } from '@/lib/services/search-cache';
+import { hydrateUserSearchCache, invalidateUserSearchCache, getSearchMatchingTransactionIds, getUserTransactionsFromCache, getSearchCacheSize, clearSearchCache } from '@/lib/services/search-cache';
 import { encryptField } from '@/lib/crypto';
 
 // Mock variables to control query responses
@@ -160,5 +160,42 @@ describe('Search Cache Service', () => {
     invalidateUserSearchCache(userId);
     matches = await getSearchMatchingTransactionIds(userId, testDek, 'gas');
     expect(matches.size).toBe(0);
+  });
+
+  it('enforces LRU cache limits when exceeding max user capacity', async () => {
+    clearSearchCache();
+    expect(getSearchCacheSize()).toBe(0);
+
+    const desc = await encryptField('Dummy Transaction', testDek);
+    mockDbResponse = [
+      {
+        id: 'tx_dummy',
+        description: desc,
+        payee: null,
+        notes: null,
+        categoryName: null,
+        accountName: null,
+      },
+    ];
+
+    // Hydrate cache for 6 different users (cache max capacity is 5)
+    for (let i = 1; i <= 6; i++) {
+      await hydrateUserSearchCache(`user_${i}`, testDek);
+    }
+
+    // Cache size should be capped at 5
+    expect(getSearchCacheSize()).toBe(5);
+
+    // The oldest user (user_1) should have been evicted.
+    // Set database response to empty.
+    mockDbResponse = [];
+    
+    // user_1 should return 0 results (since it was evicted and database is now empty)
+    const matchesUser1 = await getSearchMatchingTransactionIds('user_1', testDek, 'dummy');
+    expect(matchesUser1.size).toBe(0);
+
+    // user_6 (most recently hydrated) should still be in cache and return 1 result even though database is empty
+    const matchesUser6 = await getSearchMatchingTransactionIds('user_6', testDek, 'dummy');
+    expect(matchesUser6.size).toBe(1);
   });
 });

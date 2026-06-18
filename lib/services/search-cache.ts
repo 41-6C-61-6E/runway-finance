@@ -1,74 +1,128 @@
 import { getDb } from '@/lib/db';
 import { transactions, accounts, categories } from '@/lib/db/schema';
-import { eq, and, or, sql } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
 const CACHE_TTL_MS = 1 * 60 * 60 * 1000;
 
+export interface CachedTransaction {
+  description: string;
+  payee: string;
+  notes: string;
+  categoryName: string;
+  accountName: string;
+  amount: string;
+  categoryId: string | null;
+  accountId: string;
+  date: string;
+  ignored: boolean;
+  source: string | null;
+}
+
+export interface UserCacheEntry {
+  transactions: Map<string, CachedTransaction>;
+  status: 'uninitialized' | 'hydrating' | 'ready';
+  promise?: Promise<void>;
+  touchedAt: number;
+}
+
+export class SimpleLRUCache<K, V> {
+  private max: number;
+  private cache: Map<K, V>;
+
+  constructor(max: number = 5) {
+    this.max = max;
+    this.cache = new Map<K, V>();
+  }
+
+  get(key: K): V | undefined {
+    const item = this.cache.get(key);
+    if (item !== undefined) {
+      // Refresh key order (move to the end of insertion order)
+      this.cache.delete(key);
+      this.cache.set(key, item);
+    }
+    return item;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.max) {
+      // Evict oldest (first key in map insertion order)
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  delete(key: K): boolean {
+    return this.cache.delete(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+
+  keys(): K[] {
+    return Array.from(this.cache.keys());
+  }
+}
+
 // Global-safe caches to survive Next.js dev server hot reloads
 const globalForSearchCache = globalThis as unknown as {
-  searchCache?: Map<string, Map<string, {
-  description: string;
-  payee: string;
-  notes: string;
-  categoryName: string;
-  accountName: string;
-  amount: string;
-  categoryId: string | null;
-  accountId: string;
-  date: string;
-  ignored: boolean;
-  source: string | null;
-}>>;
-  searchCacheStatus?: Map<string, 'uninitialized' | 'hydrating' | 'ready'>;
-  searchCachePromises?: Map<string, Promise<void>>;
-  searchCacheTouchedAt?: Map<string, number>;
+  userCache?: SimpleLRUCache<string, UserCacheEntry>;
 };
 
-const searchCache = globalForSearchCache.searchCache ?? new Map<string, Map<string, {
-  description: string;
-  payee: string;
-  notes: string;
-  categoryName: string;
-  accountName: string;
-  amount: string;
-  categoryId: string | null;
-  accountId: string;
-  date: string;
-  ignored: boolean;
-  source: string | null;
-}>>();
-const searchCacheStatus = globalForSearchCache.searchCacheStatus ?? new Map<string, 'uninitialized' | 'hydrating' | 'ready'>();
-const searchCachePromises = globalForSearchCache.searchCachePromises ?? new Map<string, Promise<void>>();
-const searchCacheTouchedAt = globalForSearchCache.searchCacheTouchedAt ?? new Map<string, number>();
+const userCache = globalForSearchCache.userCache ?? new SimpleLRUCache<string, UserCacheEntry>(5);
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForSearchCache.searchCache = searchCache;
-  globalForSearchCache.searchCacheStatus = searchCacheStatus;
-  globalForSearchCache.searchCachePromises = searchCachePromises;
-  globalForSearchCache.searchCacheTouchedAt = searchCacheTouchedAt;
+  globalForSearchCache.userCache = userCache;
+}
+
+function getUserEntry(userId: string): UserCacheEntry {
+  let entry = userCache.get(userId);
+  if (!entry) {
+    entry = {
+      transactions: new Map(),
+      status: 'uninitialized',
+      touchedAt: Date.now(),
+    };
+    userCache.set(userId, entry);
+  }
+  return entry;
 }
 
 /**
  * Decrypts and caches all searchable transactions for a user.
  */
 export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): Promise<void> {
-  const status = searchCacheStatus.get(userId) ?? 'uninitialized';
+  const entry = getUserEntry(userId);
 
-  if (status === 'ready') {
-    const lastTouched = searchCacheTouchedAt.get(userId) ?? 0;
-    if (Date.now() - lastTouched < CACHE_TTL_MS) return;
-    searchCacheStatus.set(userId, 'uninitialized');
+  if (entry.status === 'ready') {
+    if (Date.now() - entry.touchedAt < CACHE_TTL_MS) {
+      entry.touchedAt = Date.now(); // update LRU access time
+      userCache.set(userId, entry); // refresh LRU order
+      return;
+    }
+    entry.status = 'uninitialized';
   }
 
-  if (status === 'hydrating') {
-    const promise = searchCachePromises.get(userId);
-    if (promise) return promise;
+  if (entry.status === 'hydrating') {
+    if (entry.promise) return entry.promise;
   }
 
   logger.info('Hydrating search cache for user', { userId });
-  searchCacheStatus.set(userId, 'hydrating');
+  entry.status = 'hydrating';
+  entry.touchedAt = Date.now();
+  userCache.set(userId, entry); // refresh LRU order
 
   const hydratePromise = (async () => {
     try {
@@ -105,19 +159,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           )
         );
 
-      const userCache = new Map<string, {
-  description: string;
-  payee: string;
-  notes: string;
-  categoryName: string;
-  accountName: string;
-  amount: string;
-  categoryId: string | null;
-  accountId: string;
-  date: string;
-  ignored: boolean;
-  source: string | null;
-}>();
+      const transactionsMap = new Map<string, CachedTransaction>();
 
       // Decrypt search fields for each transaction in parallel batch
       await Promise.all(
@@ -129,7 +171,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           const accountName = row.accountName ? await decryptField(row.accountName, dek) : '';
           const amount = row.amount ? await decryptField(row.amount, dek) : '0';
 
-          userCache.set(row.id, {
+          transactionsMap.set(row.id, {
             description: String(description).toLowerCase(),
             payee: String(payee).toLowerCase(),
             notes: String(notes).toLowerCase(),
@@ -145,20 +187,23 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
         })
       );
 
-      searchCache.set(userId, userCache);
-      searchCacheStatus.set(userId, 'ready');
-      searchCacheTouchedAt.set(userId, Date.now());
-      logger.info('Search cache hydrated successfully', { userId, count: userCache.size });
+      entry.transactions = transactionsMap;
+      entry.status = 'ready';
+      entry.touchedAt = Date.now();
+      userCache.set(userId, entry); // refresh LRU order
+      logger.info('Search cache hydrated successfully', { userId, count: transactionsMap.size });
     } catch (err) {
       logger.error('Failed to hydrate search cache', { userId, error: err });
-      searchCacheStatus.set(userId, 'uninitialized');
+      entry.status = 'uninitialized';
+      userCache.set(userId, entry);
       throw err;
     } finally {
-      searchCachePromises.delete(userId);
+      entry.promise = undefined;
     }
   })();
 
-  searchCachePromises.set(userId, hydratePromise);
+  entry.promise = hydratePromise;
+  userCache.set(userId, entry);
   return hydratePromise;
 }
 
@@ -166,9 +211,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
  * Invalidates the search cache for a user.
  */
 export function invalidateUserSearchCache(userId: string): void {
-  searchCache.delete(userId);
-  searchCacheStatus.set(userId, 'uninitialized');
-  searchCacheTouchedAt.delete(userId);
+  userCache.delete(userId);
   logger.info('Invalidated search cache for user', { userId });
 }
 
@@ -183,13 +226,13 @@ export async function getSearchMatchingTransactionIds(
 ): Promise<Set<string>> {
   await hydrateUserSearchCache(userId, dek);
 
-  const userCache = searchCache.get(userId);
+  const entry = userCache.get(userId);
   const matchingIds = new Set<string>();
-  if (!userCache) return matchingIds;
+  if (!entry || entry.status !== 'ready') return matchingIds;
 
   const q = query.toLowerCase();
 
-  for (const [id, tx] of userCache.entries()) {
+  for (const [id, tx] of entry.transactions.entries()) {
     if (
       tx.description.includes(q) ||
       tx.payee.includes(q) ||
@@ -210,21 +253,23 @@ export async function getSearchMatchingTransactionIds(
 export async function getUserTransactionsFromCache(
   userId: string,
   dek: Uint8Array
-): Promise<Array<{
-  description: string;
-  payee: string;
-  notes: string;
-  categoryName: string;
-  accountName: string;
-  amount: string;
-  categoryId: string | null;
-  accountId: string;
-  date: string;
-  ignored: boolean;
-  source: string | null;
-}>> {
+): Promise<Array<CachedTransaction>> {
   await hydrateUserSearchCache(userId, dek);
-  const userCache = searchCache.get(userId);
-  if (!userCache) return [];
-  return Array.from(userCache.values());
+  const entry = userCache.get(userId);
+  if (!entry || entry.status !== 'ready') return [];
+  return Array.from(entry.transactions.values());
+}
+
+/**
+ * Gets the current search cache size (exposed for testing).
+ */
+export function getSearchCacheSize(): number {
+  return userCache.size;
+}
+
+/**
+ * Clears the search cache (exposed for testing).
+ */
+export function clearSearchCache(): void {
+  userCache.clear();
 }

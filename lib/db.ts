@@ -12,8 +12,23 @@ export function getPool(): Pool {
     return null as unknown as Pool;
   }
   if (!pool) {
+    const max = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 20;
+    const idleTimeoutMillis = process.env.DB_POOL_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 10) : 30000;
+    const connectionTimeoutMillis = process.env.DB_POOL_CONNECTION_TIMEOUT_MS ? parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT_MS, 10) : 2000;
+
     pool = new Pool({
       connectionString: DATABASE_URL,
+      max,
+      idleTimeoutMillis,
+      connectionTimeoutMillis,
+    });
+
+    pool.on('error', (err) => {
+      logger.error('Unexpected database pool error', { error: err.message });
+    });
+
+    pool.on('connect', () => {
+      logger.debug('New database client connected to the pool');
     });
   }
   return pool;

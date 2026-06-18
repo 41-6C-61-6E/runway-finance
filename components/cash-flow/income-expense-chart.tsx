@@ -104,6 +104,14 @@ export function IncomeExpenseChart() {
     expenses: -Math.abs(d.expenses),
   })), [data]);
 
+  const srSummary = useMemo(() => {
+    if (chartData.length === 0) return '';
+    const lastPoint = chartData[chartData.length - 1];
+    const totalIncome = chartData.reduce((sum, d) => sum + d.income, 0);
+    const totalExpenses = chartData.reduce((sum, d) => sum + Math.abs(d.expenses), 0);
+    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${lastPoint.month}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}.`;
+  }, [chartData]);
+
   const allValues = chartData.flatMap((d) => [d.income, d.expenses, d.net]);
   const minVal = Math.min(...allValues, 0);
   const maxVal = Math.max(...allValues, 1);
@@ -230,8 +238,13 @@ export function IncomeExpenseChart() {
     );
   }
 
+
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -287,7 +300,7 @@ export function IncomeExpenseChart() {
               <div className="min-w-max h-full px-2 pb-2">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               {chartType === 'bar' ? (
-              <ComposedChart data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+               <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 {sharedAxes}
                 <Bar
                   dataKey="income"
@@ -318,7 +331,7 @@ export function IncomeExpenseChart() {
                 />
               </ComposedChart>
             ) : (
-              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+               <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                 <defs>
                   <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45} />

@@ -4,6 +4,7 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
 import { runAutoGenerate } from '@/lib/services/paystub-auto-generate';
 import { logger } from '@/lib/logger';
+import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
 const LOG_TAG = '[paystub-auto-generate-scheduler]';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -53,16 +54,22 @@ class PaystubAutoGenerateScheduler {
       let totalGenerated = 0;
 
       for (const userId of userIds) {
+        let logId = '';
         try {
+          logId = await logJobStart('paystub-auto-generate', userId);
           const dek = await getServerDEK(userId);
           const count = await runAutoGenerate(userId, dek);
           totalGenerated += count;
+          await logJobEnd(logId, 'success', undefined, { paystubsGenerated: count });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes('No encryption keys') || msg.includes('No server-wrapped')) {
             logger.warn(`${LOG_TAG} Skipping user — ${msg}`, { userId });
           } else {
             logger.error(`${LOG_TAG} Failed for user`, { userId, error: msg });
+          }
+          if (logId) {
+            await logJobEnd(logId, 'failed', msg);
           }
         }
       }

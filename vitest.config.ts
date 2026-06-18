@@ -10,7 +10,7 @@ export default defineConfig({
     env: {
       ENCRYPTION_KEY: 'a'.repeat(64), // 64-char hex for tests only
     },
-    include: ['tests/unit/**/*.test.ts'],
+    include: ['tests/unit/**/*.test.{ts,tsx}'],
   },
   resolve: {
     alias: {

@@ -166,6 +166,14 @@ export function DebtBreakdown() {
     router.push(`/transactions?accountTypes=${accountType}`);
   };
 
+  const srSummary = useMemo(() => {
+    if (activeCategories.length === 0) return '';
+    const breakDownStr = activeCategories
+      .map((cat) => `${cat.label}: ${formatCompact(cat.amount)} (${activeTotal > 0 ? ((cat.amount / activeTotal) * 100).toFixed(1) : 0}%)`)
+      .join(', ');
+    return `Total ${activeTab === 'assets' ? 'Assets' : 'Debt'} is ${formatCompact(activeTotal)}. Breakdown: ${breakDownStr}.`;
+  }, [activeCategories, activeTotal, activeTab]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -193,6 +201,9 @@ export function DebtBreakdown() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -283,7 +294,7 @@ export function DebtBreakdown() {
             <div className="h-[200px] sm:h-[220px] flex-shrink-0 w-full sm:w-[45%] max-w-[240px] sm:max-w-none">
               {pieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                  <PieChart>
+                  <PieChart role="img" aria-label={`${activeTab === 'assets' ? 'Assets' : 'Debt'} Breakdown Pie Chart`}>
                     <Pie
                       data={pieData}
                       dataKey="value"

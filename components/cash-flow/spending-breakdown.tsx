@@ -219,6 +219,12 @@ export function SpendingBreakdown() {
     }
   };
 
+  const srSummary = useMemo(() => {
+    if (pieData.length === 0) return '';
+    const items = pieData.map(d => `${d.label}: ${formatCurrency(d.value)}`).join(', ');
+    return `Spending breakdown by category. Total spending is ${formatCurrency(totalSpending)}. Breakdown: ${items}.`;
+  }, [pieData, totalSpending]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -268,6 +274,9 @@ export function SpendingBreakdown() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -345,6 +354,8 @@ export function SpendingBreakdown() {
                       <div className="min-w-max h-full">
                         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                           <BarChart
+                            role="img"
+                            aria-label="Spending Breakdown Bar Chart"
                             layout="vertical"
                             data={pieData}
                             margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
@@ -380,7 +391,7 @@ export function SpendingBreakdown() {
                 })() : (
                   <>
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                      <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                      <PieChart role="img" aria-label="Spending Breakdown Pie Chart" margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                         <Pie
                           data={pieData}
                           cx="50%"

@@ -171,7 +171,11 @@ export async function decryptField(payload: string | number, key: Uint8Array): P
   
   try {
     return await decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
-  } catch {
+  } catch (err) {
+    logger.error('[crypto] Field decryption failed', {
+      error: err instanceof Error ? err.message : String(err),
+      iv: parsed.iv,
+    });
     // Return empty string if decryption fails (corrupted data or wrong key)
     return '';
   }

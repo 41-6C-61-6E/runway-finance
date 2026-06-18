@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, pruneRateLimitMap, getRateLimitMapSize, clearRateLimitMap } from '@/lib/rate-limit';
 
 describe('rate limit helper', () => {
   it('allows requests within threshold and blocks requests exceeding it', () => {
@@ -39,5 +39,26 @@ describe('rate limit helper', () => {
 
     // Should be allowed again
     expect(checkRateLimit(key, 1, windowMs)).toBe(true);
+  });
+
+  it('correctly prunes expired entries', async () => {
+    clearRateLimitMap();
+    const windowMs = 30;
+
+    checkRateLimit('client-x', 1, windowMs);
+    checkRateLimit('client-y', 1, windowMs * 10);
+
+    expect(getRateLimitMapSize()).toBe(2);
+
+    // Wait for client-x to expire
+    await new Promise((resolve) => setTimeout(resolve, windowMs + 10));
+
+    pruneRateLimitMap();
+
+    // client-x should be pruned, client-y should remain
+    expect(getRateLimitMapSize()).toBe(1);
+    
+    // Verify client-x is cleared from the map
+    expect(checkRateLimit('client-x', 1, windowMs)).toBe(true);
   });
 });
