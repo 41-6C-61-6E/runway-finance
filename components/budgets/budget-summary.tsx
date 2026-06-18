@@ -11,6 +11,8 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/utils/api-client';
 
 interface BudgetData {
   id: string;
@@ -43,10 +45,12 @@ export function BudgetSummary() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' })
-      .then((res) => res.json())
+    apiFetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' })
       .then((data) => setBudgets(data.budgets ?? []))
-      .catch(() => {})
+      .catch((err) => {
+        toast.error('Failed to load budgets');
+        console.error('Error fetching budgets:', err);
+      })
       .finally(() => setLoading(false));
   }, [periodType, periodKey]);
 

@@ -7,8 +7,8 @@ import { useImportedData } from '@/lib/hooks/use-imported-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
 import { useShowMath } from '@/lib/hooks/use-show-math';
 import { useMarketDataForSnapshots } from '@/lib/hooks/use-market-data-snapshots';
-import { Check, Calculator, Database } from 'lucide-react';
-import { useState } from 'react';
+import { Check, Calculator, Database, RefreshCw, AlertTriangle, Play, HelpCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
@@ -69,6 +69,58 @@ export default function AnalyticsTab() {
   const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
   const { enabled: useMarketDataEnabled, loading: marketDataLoading, updateEnabled: updateUseMarketData } = useMarketDataForSnapshots();
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'data' | 'charts'>('general');
+
+  const [recalcStatus, setRecalcStatus] = useState<any>(null);
+  const [recalcLoading, setRecalcLoading] = useState(false);
+
+  const fetchRecalcStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/analytics/recalculate-snapshots', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setRecalcStatus(data.status);
+        return data.status;
+      }
+    } catch (err) {
+      console.error('Failed to fetch recalculation status', err);
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    fetchRecalcStatus();
+  }, [fetchRecalcStatus]);
+
+  useEffect(() => {
+    if (recalcStatus?.status === 'running') {
+      const timer = setInterval(async () => {
+        const status = await fetchRecalcStatus();
+        if (status && status.status !== 'running') {
+          clearInterval(timer);
+        }
+      }, 2000);
+      return () => clearInterval(timer);
+    }
+  }, [recalcStatus?.status, fetchRecalcStatus]);
+
+  const handleTriggerRecalc = async (type = 'netWorth') => {
+    setRecalcLoading(true);
+    try {
+      const res = await fetch(`/api/analytics/recalculate-snapshots?type=${type}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRecalcStatus(data.status || { status: 'running' });
+        fetchRecalcStatus();
+      }
+    } catch (err) {
+      console.error('Failed to trigger recalculation', err);
+    } finally {
+      setRecalcLoading(false);
+    }
+  };
 
   const loading = visLoading || synthLoading || importLoading || defaultsLoading || mathLoading || marketDataLoading;
 
@@ -307,6 +359,110 @@ export default function AnalyticsTab() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* ── Manual Snapshot Recalculation ───────────────────────────────── */}
+          <div className="border-t border-border/60 pt-6">
+            <h2 className="text-lg font-semibold text-foreground mb-1">Manual Data Recalculation</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              If your charts or summaries appear out of sync, you can trigger a full historical recalculation.
+              This process runs in the background and yields execution threads to keep the application responsive.
+            </p>
+
+            <div className="p-4 bg-muted/30 border border-border rounded-lg space-y-4">
+              {recalcStatus && (
+                <div className="text-xs space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">Status:</span>
+                    {recalcStatus.status === 'running' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium animate-pulse">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Running ({recalcStatus.processedUsers}/{recalcStatus.totalUsers} users)
+                      </span>
+                    )}
+                    {recalcStatus.status === 'completed' && (
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 font-medium">
+                        Completed
+                      </span>
+                    )}
+                    {recalcStatus.status === 'failed' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                        <AlertTriangle className="w-3 h-3" />
+                        Failed
+                      </span>
+                    )}
+                    {recalcStatus.status === 'idle' && (
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                        Idle
+                      </span>
+                    )}
+                  </div>
+
+                  {recalcStatus.status === 'running' && (
+                    <div className="space-y-1.5">
+                      <div className="w-full bg-muted border border-border/40 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-primary h-full transition-all duration-300"
+                          style={{
+                            width: `${
+                              recalcStatus.totalUsers > 0
+                                ? (recalcStatus.processedUsers / recalcStatus.totalUsers) * 100
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Yielding thread cycles. Recalculation will finish momentarily.
+                      </p>
+                    </div>
+                  )}
+
+                  {recalcStatus.startedAt && (
+                    <p className="text-muted-foreground">
+                      Started: <span className="text-foreground">{new Date(recalcStatus.startedAt).toLocaleString()}</span>
+                    </p>
+                  )}
+                  {recalcStatus.completedAt && (
+                    <p className="text-muted-foreground">
+                      Finished: <span className="text-foreground">{new Date(recalcStatus.completedAt).toLocaleString()}</span>
+                    </p>
+                  )}
+
+                  {recalcStatus.errors && recalcStatus.errors.length > 0 && (
+                    <details className="mt-2 text-destructive border border-destructive/20 rounded bg-destructive/5 p-2 max-h-40 overflow-y-auto">
+                      <summary className="cursor-pointer font-semibold select-none">
+                        View errors ({recalcStatus.errors.length})
+                      </summary>
+                      <ul className="list-disc pl-4 mt-1 space-y-1 font-mono text-[10px] leading-normal select-text">
+                        {recalcStatus.errors.map((err: string, i: number) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2.5 pt-2 border-t border-border/50">
+                <button
+                  type="button"
+                  disabled={recalcLoading || recalcStatus?.status === 'running'}
+                  onClick={() => handleTriggerRecalc('netWorth')}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  {recalcStatus?.status === 'running' ? 'Recalculating...' : 'Recalculate Net Worth'}
+                </button>
+                <button
+                  type="button"
+                  disabled={recalcLoading || recalcStatus?.status === 'running'}
+                  onClick={() => handleTriggerRecalc('summaries')}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+                >
+                  Recalculate Summaries
+                </button>
+              </div>
             </div>
           </div>
         </div>

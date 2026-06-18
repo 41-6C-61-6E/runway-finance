@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Component, useState, useEffect, type ReactNode, type ErrorInfo } from 'react';
+import React, { useState, useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, Terminal, Trash2, Send, CheckCircle2, ChevronRight } from 'lucide-react';
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import ReactErrorBoundary from './ReactErrorBoundary';
 
 interface ClientError {
   id: string;
@@ -23,120 +24,55 @@ interface ClientError {
   date: string;
 }
 
-// Error Boundary to catch React component render crashes
-interface ErrorBoundaryProps {
-  children: ReactNode;
-  onError: (error: Error, errorInfo: ErrorInfo) => void;
-}
-
-class ReactErrorBoundary extends Component<
-  ErrorBoundaryProps,
-  { hasError: boolean; reporting: boolean; reported: boolean; error: Error | null }
-> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, reporting: false, reported: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    this.props.onError(error, errorInfo);
-  }
-
-  async handleReport() {
-    if (!this.state.error) return;
-    this.setState({ reporting: true });
-    try {
-      await fetch('/api/logs/client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          errorName: this.state.error.name,
-          errorMessage: this.state.error.message,
-          errorStack: this.state.error.stack,
-          url: window.location.href,
-        }),
-      });
-      this.setState({ reported: true });
-    } catch {
-      // Ignore
-    } finally {
-      this.setState({ reporting: false });
-    }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background text-foreground">
-          <div className="max-w-md w-full border border-border bg-card p-6 rounded-xl shadow-lg text-center space-y-4">
-            <AlertTriangle className="w-12 h-12 text-destructive mx-auto animate-pulse" />
-            <h1 className="text-xl font-bold">Something went wrong</h1>
-            <p className="text-sm text-muted-foreground text-left bg-muted/50 p-3 rounded border border-border/55 max-h-40 overflow-auto font-mono text-xs select-text">
-              {this.state.error?.name}: {this.state.error?.message}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              A critical rendering error occurred in the browser. You can report this to the server so it can be investigated in the application logs.
-            </p>
-            <div className="flex justify-center gap-3 pt-2">
-              <Button onClick={() => window.location.reload()} variant="outline" size="sm">
-                Reload Application
-              </Button>
-              <Button
-                onClick={() => this.handleReport()}
-                variant={this.state.reported ? 'secondary' : 'destructive'}
-                disabled={this.state.reporting || this.state.reported}
-                size="sm"
-                className="flex items-center gap-1.5"
-              >
-                {this.state.reported ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Reported
-                  </>
-                ) : this.state.reporting ? (
-                  'Reporting...'
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Report Error
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export function ClientErrorReporter({ children }: { children: ReactNode }) {
   const [errors, setErrors] = useState<ClientError[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isBoundaryActive, setIsBoundaryActive] = useState(false);
+  const reportedErrorsRef = useRef<Set<string>>(new Set());
+
+  const autoReportError = async (payload: { name: string; message: string; stack?: string; url: string }, id: string) => {
+    try {
+      const response = await fetch('/api/logs/client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          errorName: payload.name,
+          errorMessage: payload.message,
+          errorStack: payload.stack,
+          url: payload.url,
+        }),
+      });
+      if (response.ok) {
+        setErrors((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, reported: true } : e))
+        );
+      }
+    } catch {
+      // Ignored to prevent feedback loop
+    }
+  };
 
   const addError = (payload: { name: string; message: string; stack?: string; url: string }) => {
-    setErrors((prev) => {
-      // Prevent duplicate logging of the same error message/stack in current session
-      if (prev.some((e) => e.message === payload.message && e.stack === payload.stack)) {
-        return prev;
-      }
-      const newErr: ClientError = {
-        id: Math.random().toString(36).substring(7),
-        name: payload.name,
-        message: payload.message,
-        stack: payload.stack,
-        url: payload.url,
-        reported: false,
-        reporting: false,
-        date: new Date().toISOString(),
-      };
-      return [...prev, newErr];
-    });
+    const errorKey = `${payload.message}::${payload.stack || ''}`;
+    if (reportedErrorsRef.current.has(errorKey)) {
+      return;
+    }
+    reportedErrorsRef.current.add(errorKey);
+
+    const newId = Math.random().toString(36).substring(7);
+    const newErr: ClientError = {
+      id: newId,
+      name: payload.name,
+      message: payload.message,
+      stack: payload.stack,
+      url: payload.url,
+      reported: false,
+      reporting: false,
+      date: new Date().toISOString(),
+    };
+
+    setErrors((prev) => [...prev, newErr]);
+    autoReportError(payload, newId);
   };
 
   useEffect(() => {
@@ -194,11 +130,14 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
         })
         .join(' ');
 
-      // Bypass internal logs to avoid infinite loop
+      // Bypass internal logs and benign next-auth errors to avoid infinite loop or false positive alerts
       if (
         message.includes('[logger]') || 
         message.includes('[client-error]') ||
-        message.includes('NextRouter')
+        message.includes('NextRouter') ||
+        message.toLowerCase().includes('clientfetcherror') ||
+        message.includes('errors.authjs.dev') ||
+        message.includes('next-auth')
       ) {
         return;
       }
@@ -270,11 +209,14 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ReactErrorBoundary onError={(err) => addError({ name: err.name, message: err.message, stack: err.stack, url: typeof window !== 'undefined' ? window.location.href : '' })}>
+    <ReactErrorBoundary onError={(err) => {
+      setIsBoundaryActive(true);
+      addError({ name: err.name, message: err.message, stack: err.stack, url: typeof window !== 'undefined' ? window.location.href : '' });
+    }}>
       {children}
 
       {/* Floating warning badge */}
-      {errors.length > 0 && (
+      {errors.length > 0 && !isBoundaryActive && (
         <div className="fixed bottom-4 right-4 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
           <div className="bg-destructive/10 backdrop-blur-md border border-destructive/30 hover:border-destructive/50 transition-all rounded-lg p-3 shadow-lg flex items-center gap-3 text-xs max-w-sm">
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-destructive/20 text-destructive animate-pulse flex-shrink-0">

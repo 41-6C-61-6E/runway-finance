@@ -5,6 +5,7 @@ import { getServerDEK } from '@/lib/crypto-context';
 import { eq, and, isNull } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptField } from '@/lib/crypto';
+import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
 const LOG_TAG = '[manual-account-scheduler]';
 
@@ -175,8 +176,10 @@ class ManualAccountScheduler {
 
     let syncSuccess = false;
     let dekUnavailable = false;
+    let logId = '';
 
     try {
+      logId = await logJobStart('manual-account-sync', userId, { accountId: id });
       const dek = await getServerDEK(userId);
       const apiConfig = await readApiConfig(userId);
       const result = await syncManualAccount(id, userId, apiConfig, dek);
@@ -184,11 +187,13 @@ class ManualAccountScheduler {
 
       if (syncSuccess) {
         logger.info(`${LOG_TAG} Auto-sync completed`, { accountId: id });
+        await logJobEnd(logId, 'success', undefined, { accountId: id });
       } else {
         logger.error(`${LOG_TAG} Auto-sync failed`, {
           accountId: id,
           error: result.errorMessage,
         });
+        await logJobEnd(logId, 'failed', result.errorMessage, { accountId: id });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -200,6 +205,9 @@ class ManualAccountScheduler {
           accountId: id,
           error: msg,
         });
+      }
+      if (logId) {
+        await logJobEnd(logId, 'failed', msg, { accountId: id, dekUnavailable });
       }
     }
 

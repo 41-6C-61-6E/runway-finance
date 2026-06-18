@@ -47,14 +47,27 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
     });
   }, [visibleData]);
 
+  const srSummary = useMemo(() => {
+    if (chartData.length === 0) return '';
+    const lastPoint = chartData[chartData.length - 1];
+    const firstPoint = chartData[0];
+    const seriesNames = visibleData.map(s => s.id).join(', ');
+    return `Cash Flow projections chart showing trend for: ${seriesNames}. Start date is ${firstPoint.x}, end date is ${lastPoint.x}.`;
+  }, [chartData, visibleData]);
+
   if (chartData.length === 0) return null;
 
   return (
     <div className="h-[320px]">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <div className="h-full w-full overflow-x-auto overflow-y-hidden">
         <div className="min-w-max h-full px-2 pb-2">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
+            role="img"
+            aria-label="Cash Flow Projections Line Chart"
             data={chartData}
             margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
           >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { useBudgetPeriod } from './budget-period-selector';
@@ -93,6 +93,14 @@ export function BudgetVsActualChart() {
     ...expenseItems,
   ];
 
+  const srSummary = useMemo(() => {
+    if (allChartData.length === 0) return '';
+    const totalBudget = allChartData.reduce((sum, item) => sum + item.budgeted, 0);
+    const totalActual = allChartData.reduce((sum, item) => sum + item.actual, 0);
+    const percent = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0;
+    return `Budget summary: Total budgeted is ${formatCurrency(totalBudget)}, total actual spending is ${formatCurrency(totalActual)}, which is ${percent.toFixed(0)}% of the budget.`;
+  }, [allChartData]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -142,6 +150,9 @@ export function BudgetVsActualChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -180,6 +191,8 @@ export function BudgetVsActualChart() {
               <div className="min-w-max h-full px-2 pb-2">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               <BarChart
+              role="img"
+              aria-label="Budget vs Actual Spending Bar Chart"
               layout="vertical"
               data={allChartData}
               margin={isMobile ? { top: 10, right: 15, left: 10, bottom: 10 } : { top: 10, right: 60, left: 10, bottom: 10 }}

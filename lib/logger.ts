@@ -99,10 +99,56 @@ if (typeof window === 'undefined' && process.env.NEXT_RUNTIME === 'nodejs') {
   }
 }
 
+function serializeError(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    const errorDetails: Record<string, unknown> = {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    };
+    if ('cause' in err && err.cause !== undefined) {
+      errorDetails.cause = err.cause instanceof Error ? serializeError(err.cause) : String(err.cause);
+    }
+    for (const key of Object.keys(err)) {
+      errorDetails[key] = (err as any)[key];
+    }
+    return errorDetails;
+  }
+  return { message: String(err) };
+}
+
+function cleanMetadata(obj: unknown, seen = new WeakSet()): any {
+  if (obj === null || obj === undefined) return obj;
+
+  if (obj instanceof Error) {
+    return serializeError(obj);
+  }
+
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (seen.has(obj)) {
+    return '[Circular Reference]';
+  }
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanMetadata(item, seen));
+  }
+
+  const clean: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    clean[key] = cleanMetadata(val, seen);
+  }
+  return clean;
+}
+
 function formatMetadata(metadata?: Record<string, unknown>): string {
   if (!metadata || Object.keys(metadata).length === 0) return '';
   try {
-    return ' ' + JSON.stringify(metadata);
+    const cleaned = cleanMetadata(metadata);
+    return ' ' + JSON.stringify(cleaned);
   } catch {
     return ' [Error stringifying metadata]';
   }

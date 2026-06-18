@@ -2,7 +2,6 @@ import { getDb } from '@/lib/db';
 import { userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
-import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 
 export async function getPlaidConfig(userId: string, dek: Uint8Array) {
   const settings = await getDb()
@@ -43,9 +42,10 @@ export async function getPlaidConfig(userId: string, dek: Uint8Array) {
   return { clientId, secret, env };
 }
 
-export async function getPlaidClient(userId: string, dek: Uint8Array): Promise<PlaidApi> {
+export async function getPlaidClient(userId: string, dek: Uint8Array): Promise<import('plaid').PlaidApi> {
   const { clientId, secret, env } = await getPlaidConfig(userId, dek);
 
+  const { Configuration, PlaidApi, PlaidEnvironments } = await import('plaid');
   const environment = PlaidEnvironments[env as keyof typeof PlaidEnvironments] ?? PlaidEnvironments.sandbox;
 
   const configuration = new Configuration({
