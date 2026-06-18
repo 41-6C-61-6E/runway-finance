@@ -5,6 +5,7 @@ node_modules/
 .dist/
 .env.local
 .env
+.env.local
 .vercel/
 .DS_Store
 

@@ -5,6 +5,7 @@ import { syncPlaidConnection } from '@/lib/services/plaid-sync';
 import { getServerDEK } from '@/lib/crypto-context';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
 const LOG_TAG = '[sync-scheduler]';
 
@@ -151,6 +152,7 @@ class SyncScheduler {
     let syncSuccess = false;
     let dekUnavailable = false;
     let isSimplefin = true;
+    let logId = '';
 
     try {
       // Find the connection type
@@ -175,6 +177,12 @@ class SyncScheduler {
         return;
       }
 
+      logId = await logJobStart(
+        isSimplefin ? 'simplefin-sync' : 'plaid-sync',
+        connection.userId,
+        { connectionId: id }
+      );
+
       const dek = await getServerDEK(connection.userId);
       
       let result: any;
@@ -187,12 +195,14 @@ class SyncScheduler {
 
       if (syncSuccess) {
         logger.info(`${LOG_TAG} Auto-sync completed`, { connectionId: id, isSimplefin });
+        await logJobEnd(logId, 'success', undefined, { isSimplefin, connectionId: id });
       } else {
         logger.error(`${LOG_TAG} Auto-sync failed`, {
           connectionId: id,
           isSimplefin,
           error: result.errorMessage,
         });
+        await logJobEnd(logId, 'failed', result.errorMessage, { isSimplefin, connectionId: id });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -207,6 +217,9 @@ class SyncScheduler {
           connectionId: id,
           error: msg,
         });
+      }
+      if (logId) {
+        await logJobEnd(logId, 'failed', msg, { isSimplefin, connectionId: id, dekUnavailable });
       }
     }
 

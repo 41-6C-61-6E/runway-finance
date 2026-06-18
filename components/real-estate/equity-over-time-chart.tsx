@@ -357,6 +357,18 @@ export function EquityOverTimeChart() {
     'var(--color-chart-5)',
   ], []);
 
+  const srSummary = useMemo(() => {
+    if (activeTimeline.length === 0) return '';
+    const latestPoint = activeTimeline[activeTimeline.length - 1];
+    const firstPoint = activeTimeline[0];
+    const diff = latestPoint.equity - firstPoint.equity;
+    const direction = diff >= 0 ? 'increased' : 'decreased';
+
+    let summaryStr = `Real estate value is currently ${formatCurrency(latestPoint.homeValue)} with ${formatCurrency(latestPoint.equity)} in equity and ${formatCurrency(latestPoint.mortgage)} in outstanding mortgages.`;
+    summaryStr += ` Over the selected timeframe, your equity has ${direction} by ${formatCurrency(Math.abs(diff))}.`;
+    return summaryStr;
+  }, [activeTimeline]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -483,8 +495,13 @@ export function EquityOverTimeChart() {
     );
   };
 
+
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -555,6 +572,8 @@ export function EquityOverTimeChart() {
             <div className="h-full">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <ComposedChart
+                  role="img"
+                  aria-label="Equity Over Time Composed Chart"
                   data={activeTimeline}
                   margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
                 >

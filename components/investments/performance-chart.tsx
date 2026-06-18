@@ -205,6 +205,13 @@ export function PerformanceChart() {
     </div>
   );
 
+  const srSummary = useMemo(() => {
+    if (!summary) return '';
+    const isChangePositive = summary.change >= 0;
+    const direction = isChangePositive ? 'increased' : 'decreased';
+    return `Portfolio value is currently ${formatCurrency(summary.current)} as of latest. Over the selected ${timeframe} timeframe, it has ${direction} by ${formatCurrency(Math.abs(summary.change))} (${summary.percentChange.toFixed(2)}%), starting from ${formatCurrency(summary.previous)}.`;
+  }, [summary, timeframe]);
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -242,6 +249,9 @@ export function PerformanceChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader isCollapsed={isCollapsed} onToggle={setIsCollapsed} title={headerEl} />
       {!isCollapsed && (
         <>
@@ -307,7 +317,7 @@ export function PerformanceChart() {
             <div className="flex-1 min-w-0 p-4 sm:p-5">
               <div className="h-[200px] sm:h-[280px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                  <AreaChart data={mergedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <AreaChart role="img" aria-label="Portfolio History Area Chart" data={mergedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="portfolioHistoryGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={portfolioColor} stopOpacity={0.3} />

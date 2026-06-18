@@ -9,6 +9,7 @@ import { PWARegister } from '@/components/pwa-register';
 import { Analytics } from '@vercel/analytics/next';
 import { ChartColorSchemeInitializer } from '@/components/chart-color-scheme-initializer';
 import { ClientErrorReporter } from '@/components/client-error-reporter';
+import { Toaster } from 'sonner';
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         <SessionProvider>
           <TooltipProvider delayDuration={300}>
             <ClientErrorReporter>
+              <Toaster richColors position="top-right" />
               <ChartColorSchemeInitializer />
               <div className="min-h-[100dvh] flex flex-col">
                 <Suspense fallback={null}>

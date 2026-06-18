@@ -260,6 +260,15 @@ export function NetWorthChart() {
     return medianFiltered;
   }, [chartData, timeframe]);
 
+  const srSummary = useMemo(() => {
+    if (processedData.length === 0) return '';
+    const latestPoint = processedData[processedData.length - 1];
+    const firstPoint = processedData[0];
+    const diff = latestPoint.netWorth - firstPoint.netWorth;
+    const direction = diff >= 0 ? 'increased' : 'decreased';
+    return `Net Worth is currently ${formatCurrency(latestPoint.netWorth)} as of ${formatSafeUTCDate(latestPoint.date, { month: 'long', day: 'numeric', year: 'numeric' })}. Over the selected timeframe, it has ${direction} by ${formatCurrency(Math.abs(diff))}.`;
+  }, [processedData]);
+
   const { barData, bucketSize } = useMemo(
     () => computeChangeBarData(processedData),
     [processedData]
@@ -466,8 +475,13 @@ export function NetWorthChart() {
     );
   }
 
+
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div className="sr-only" aria-live="polite">
+        {srSummary}
+      </div>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -515,7 +529,7 @@ export function NetWorthChart() {
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                  <AreaChart data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <AreaChart role="img" aria-label="Net Worth Over Time Area Chart" data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
                         {areaGradientOffset === 1 ? (
@@ -593,6 +607,8 @@ export function NetWorthChart() {
               <div className="h-[180px] sm:h-[220px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
+                    role="img"
+                    aria-label="Net Worth Change Bar Chart"
                     data={barData}
                     margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                     barCategoryGap="20%"
