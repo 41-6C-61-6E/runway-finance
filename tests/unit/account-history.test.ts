@@ -743,6 +743,24 @@ describe('account-history', () => {
           quantity: '1000',
           price: '1.00',
           value: '1000.00'
+        },
+        {
+          snapshotDate: '2026-06-07', // Sunday event
+          securityId: 'sec_1',
+          ticker: 'LMCSTK',
+          name: 'Lockheed Martin Stock',
+          quantity: '10',
+          price: '450.00',
+          value: '4500.00'
+        },
+        {
+          snapshotDate: '2026-06-07', // Sunday event
+          securityId: 'sec_2',
+          ticker: 'SCHMMF',
+          name: 'Schwab Money Market Fund',
+          quantity: '1000',
+          price: '1.00',
+          value: '1000.00'
         }
       ];
       mockRealSnapshotsResponse = [
@@ -787,15 +805,13 @@ describe('account-history', () => {
           '2026-06-07'
         );
 
-        expect(result.syntheticCount).toBe(2);
+        // Expect 1 synthetic snapshot created for 2026-06-07 (since 2026-06-06 has no event/market data)
+        expect(result.syntheticCount).toBe(1);
         expect(mockPoolQuery).toHaveBeenCalled();
         const callParams = mockPoolQuery.mock.calls[0][1];
         
-        expect(callParams[2]).toBe('2026-06-06');
-        expect(callParams[3]).toBe('5500');
-
-        expect(callParams[8]).toBe('2026-06-07');
-        expect(callParams[9]).toBe('5500');
+        expect(callParams[2]).toBe('2026-06-07');
+        expect(callParams[3]).toBe('5500'); // 5600 valuation - 100 discrepancy
       } finally {
         global.fetch = originalFetch;
       }
@@ -982,7 +998,7 @@ describe('account-history', () => {
       expect(snapshot.netWorth).toBe('300');
     });
 
-    it('interpolates balances directly for investment accounts before the first holdings sync date', async () => {
+    it('does not generate synthetic snapshots for investment accounts before the first holdings sync date', async () => {
       mockAccountResponse = [
         {
           id: 'acc_invest',
@@ -1022,25 +1038,11 @@ describe('account-history', () => {
         '2026-06-01'
       );
 
-      const inserted: any[] = [];
-      for (const call of mockPoolQuery.mock.calls) {
-        const params = call[1];
-        for (let i = 0; i < params.length; i += 6) {
-          inserted.push({
-            snapshotDate: params[i + 2],
-            balance: params[i + 3],
-          });
-        }
-      }
-
-      const midPoint = inserted.find(s => s.snapshotDate === '2026-05-17');
-      expect(midPoint).toBeDefined();
-      const parsedVal = parseFloat(midPoint.balance);
-      expect(parsedVal).toBeGreaterThan(94000);
-      expect(parsedVal).toBeLessThan(96000);
+      expect(result.syntheticCount).toBe(0);
+      expect(mockPoolQuery).not.toHaveBeenCalled();
     });
 
-    it('applies linear discrepancy adjustment for investment accounts in standard transaction-based backfill', async () => {
+    it('calculates historical snapshots for investment accounts in standard transaction-based backfill without linear adjustment', async () => {
       mockAccountResponse = [
         {
           id: 'acc_invest_std',
@@ -1084,16 +1086,14 @@ describe('account-history', () => {
         }
       }
 
-      const startPoint = inserted.find(s => s.snapshotDate === '2026-05-01');
-      expect(startPoint).toBeDefined();
-      expect(parseFloat(startPoint.balance)).toBe(0);
-
-      const midPoint = inserted.find(s => s.snapshotDate === '2026-05-17');
-      expect(midPoint).toBeDefined();
-      expect(parseFloat(midPoint.balance)).toBeCloseTo(61.29, 1);
+      // Should only insert on the transaction date (2026-05-15)
+      expect(result.syntheticCount).toBe(1);
+      const txPoint = inserted.find(s => s.snapshotDate === '2026-05-15');
+      expect(txPoint).toBeDefined();
+      expect(parseFloat(txPoint.balance)).toBe(100); // balance is anchor (100) on 2026-06-01, rolling back 20 gives 80 before transaction, 100 after
     });
 
-    it('automatically ignores internal transactions and clamps adjusted balances to 0 for investment accounts', async () => {
+    it('automatically ignores internal transactions and calculates correct raw balances for investment accounts', async () => {
       mockAccountResponse = [
         {
           id: 'acc_invest_internal_test',
@@ -1145,25 +1145,11 @@ describe('account-history', () => {
         }
       }
 
-      // Check starting point (clamped to 0)
-      const startPoint = inserted.find(s => s.snapshotDate === '2026-05-01');
-      expect(startPoint).toBeDefined();
-      expect(parseFloat(startPoint.balance)).toBe(0);
-
-      // Check dates before the rollover on 2026-05-10
-      // Expected start discrepancy should be calcStartVal = finalRealBalance (100) - externalTxAmount (40) = 60.
-      // So starting from 0, it should linearly grow.
-      // Crucially, it should NOT go negative or dip because the -40 sweeps/buys are ignored.
-      for (const snap of inserted) {
-        expect(parseFloat(snap.balance)).toBeGreaterThanOrEqual(0);
-      }
-
-      // Check midpoint value
-      const midPoint = inserted.find(s => s.snapshotDate === '2026-05-17');
-      expect(midPoint).toBeDefined();
-      const midVal = parseFloat(midPoint.balance);
-      expect(midVal).toBeGreaterThan(40);
-      expect(midVal).toBeLessThan(100);
+      // Should only insert on the non-ignored transaction date (2026-05-10)
+      expect(result.syntheticCount).toBe(1);
+      const txPoint = inserted.find(s => s.snapshotDate === '2026-05-10');
+      expect(txPoint).toBeDefined();
+      expect(parseFloat(txPoint.balance)).toBe(100); // Rolled back from 100 on 2026-06-01: balance before transaction is 60, after is 100
     });
   });
 });
