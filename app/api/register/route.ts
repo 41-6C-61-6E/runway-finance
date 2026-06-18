@@ -9,9 +9,22 @@ import { seedUserCategories } from '@/lib/db/seed-categories';
 import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
 import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
 import { validateInvitation, acceptInvitation } from '@/lib/sharing';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+              ?? request.headers.get('x-real-ip')
+              ?? 'unknown';
+
+    if (!checkRateLimit(`register:${ip}`, 5, 60_000)) {
+      logger.warn('Register API: rate limit exceeded', { ip });
+      return NextResponse.json(
+        { message: 'Too many registration attempts. Please try again in a minute.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { username, password, email, pin, sharingEmail, sharingPin } = body;
 
