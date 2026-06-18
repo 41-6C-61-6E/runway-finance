@@ -632,7 +632,9 @@ describe('account-history', () => {
       mockPoolQuery.mockClear();
       const originalFetch = global.fetch;
       global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('query1.finance.yahoo.com')) {
+        try {
+          const parsed = new URL(url);
+          if (parsed.hostname === 'query1.finance.yahoo.com') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
@@ -651,6 +653,9 @@ describe('account-history', () => {
               }
             })
           });
+          }
+        } catch {
+          // ignore parsing error, reject as unknown URL
         }
         return Promise.reject(new Error('Unknown URL'));
       });
@@ -770,7 +775,9 @@ describe('account-history', () => {
       mockPoolQuery.mockClear();
       const originalFetch = global.fetch;
       const fetchMock = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('query1.finance.yahoo.com')) {
+        try {
+          const parsed = new URL(url);
+          if (parsed.hostname === 'query1.finance.yahoo.com') {
           expect(url).toContain('LMT');
           expect(url).not.toContain('LMCSTK');
           expect(url).not.toContain('SCHMMF');
@@ -792,6 +799,9 @@ describe('account-history', () => {
               }
             })
           });
+          }
+        } catch {
+          // ignore parsing error, reject as unknown URL
         }
         return Promise.reject(new Error('Unknown URL'));
       });
