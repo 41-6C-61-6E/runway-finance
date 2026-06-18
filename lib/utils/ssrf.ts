@@ -51,6 +51,34 @@ export async function validateEndpointUrl(
 
   const hostname = url.hostname.toLowerCase();
 
+  // Validate hostname structure to prevent parsing tricks (e.g. userinfo containing @, control characters, etc.)
+  // We only allow alphanumeric, dots, hyphens, and standard brackets for IPv6.
+  const HOSTNAME_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
+  const isIPv6Bracket = hostname.startsWith('[') && hostname.endsWith(']');
+  const cleanHostname = isIPv6Bracket ? hostname.slice(1, -1) : hostname;
+  
+  // For standard domains/IPv4 we check HOSTNAME_REGEX.
+  // For IPv6, we validate it contains only hex characters, colons, and optionally a percent sign / dots.
+  const IPV6_REGEX = /^[0-9a-fA-F:.%]+$/;
+  
+  if (isIPv6Bracket) {
+    if (!IPV6_REGEX.test(cleanHostname)) {
+      return { ok: false, error: 'Invalid hostname format' };
+    }
+  } else {
+    if (!HOSTNAME_REGEX.test(hostname)) {
+      return { ok: false, error: 'Invalid hostname format' };
+    }
+  }
+
+  // Also validate port is numeric if present
+  if (url.port) {
+    const PORT_REGEX = /^[0-9]+$/;
+    if (!PORT_REGEX.test(url.port)) {
+      return { ok: false, error: 'Invalid port format' };
+    }
+  }
+
   if (PRIVATE_HOSTNAMES.has(hostname)) {
     return { ok: false, error: 'Requests to localhost are not allowed' };
   }

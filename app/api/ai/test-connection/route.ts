@@ -31,7 +31,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: validated.error });
   }
 
-  const endpoint = validated.url.toString().replace(/\/$/, '');
+  const endpoint = validated.url.toString();
+  const targetUrl = new URL(endpoint);
+  if (!targetUrl.pathname.endsWith('/')) {
+    targetUrl.pathname += '/chat/completions';
+  } else {
+    targetUrl.pathname += 'chat/completions';
+  }
 
   logger.info('Testing AI connection', { endpoint, model, hasKey: !!apiKey });
 
@@ -44,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const startTime = Date.now();
-    const res = await fetch(`${endpoint}/chat/completions`, {
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({

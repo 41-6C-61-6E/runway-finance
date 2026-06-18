@@ -28,7 +28,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validated.error }, { status: 400 });
   }
 
-  const endpoint = validated.url.toString().replace(/\/$/, '');
+  const endpoint = validated.url.toString();
+  const targetUrl = new URL(endpoint);
+  if (!targetUrl.pathname.endsWith('/')) {
+    targetUrl.pathname += '/models';
+  } else {
+    targetUrl.pathname += 'models';
+  }
 
   try {
     const headers: Record<string, string> = {
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    const res = await fetch(`${endpoint}/models`, {
+    const res = await fetch(targetUrl, {
       method: 'GET',
       headers,
     });
