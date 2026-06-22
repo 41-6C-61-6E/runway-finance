@@ -67,7 +67,7 @@ export default function BugReportingDropdown() {
       if (!res.ok) return [];
       return res.json() as Promise<Issue[]>;
     },
-    enabled: !!config?.enabled && open,
+    enabled: !!config?.enabled,
   });
 
   // 3. Mutation: Create
@@ -234,6 +234,10 @@ export default function BugReportingDropdown() {
     }
   };
 
+  const hasActiveIssues = issuesList.some(
+    (issue) => issue.status === 'reported' || issue.status === 'requested'
+  );
+
   return (
     <div className="relative" ref={ref}>
       <Tooltip>
@@ -245,6 +249,9 @@ export default function BugReportingDropdown() {
             aria-label="Submit Feedback / Track issues"
           >
             <MessageSquare className="w-5 h-5" />
+            {hasActiveIssues && (
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-destructive rounded-full ring-2 ring-background" />
+            )}
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom">Bugs & Feedback</TooltipContent>
