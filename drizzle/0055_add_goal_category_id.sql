@@ -1,0 +1,3 @@
+ALTER TABLE "financial_goals" ADD COLUMN IF NOT EXISTS "category_id" uuid;--> statement-breakpoint
+ALTER TABLE "financial_goals" DROP CONSTRAINT IF EXISTS "financial_goals_category_id_categories_id_fk";--> statement-breakpoint
+ALTER TABLE "financial_goals" ADD CONSTRAINT "financial_goals_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE set null ON UPDATE no action;

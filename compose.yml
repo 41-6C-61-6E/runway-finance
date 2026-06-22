@@ -34,6 +34,7 @@ services:
       - REGISTRATION_PIN=${REGISTRATION_PIN}  # PIN needed to register a new account, set to empty string to disable new registration
       - FRED_API_KEY=${FRED_API_KEY}
       - RENTCAST_API_KEY=${RENTCAST_API_KEY}
+      - BUG_REPORTING=${BUG_REPORTING:-false}
 
 
       # Optional: Auto-seed AI provider for all users (all 4 required to create a provider)

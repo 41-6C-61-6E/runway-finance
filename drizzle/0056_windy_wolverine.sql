@@ -1,1 +1,0 @@
-ALTER TABLE "ai_providers" ADD COLUMN "json_mode" boolean DEFAULT false NOT NULL;
