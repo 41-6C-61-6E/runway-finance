@@ -25,3 +25,7 @@ pgdata/
 .idea/
 chat.json
 .DS_Store
+
+# PWA Generated Service Worker
+/public/sw.js
+
