@@ -1,0 +1,1 @@
+ALTER TABLE "ai_providers" ADD COLUMN IF NOT EXISTS "json_mode" boolean DEFAULT false NOT NULL;

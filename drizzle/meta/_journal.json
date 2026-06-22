@@ -391,14 +391,14 @@
       "idx": 55,
       "version": "7",
       "when": 1781624598161,
-      "tag": "0055_pale_paladin",
+      "tag": "0055_add_goal_category_id",
       "breakpoints": true
     },
     {
       "idx": 56,
       "version": "7",
       "when": 1781647818491,
-      "tag": "0056_windy_wolverine",
+      "tag": "0056_add_ai_provider_json_mode",
       "breakpoints": true
     },
     {
@@ -406,6 +406,13 @@
       "version": "7",
       "when": 1781822625375,
       "tag": "0057_add_scheduler_job_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1782091376277,
+      "tag": "0058_add_issues_table",
       "breakpoints": true
     }
   ]
