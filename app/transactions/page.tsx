@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Receipt, LayoutList, Columns2 } from 'lucide-react';
+import { Sparkles, Receipt, LayoutList, Columns2, X } from 'lucide-react';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
@@ -77,6 +77,9 @@ function TransactionsContent() {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('edit');
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
+  const [pendingAiIds, setPendingAiIds] = useState<string[]>([]);
+  const [aiSuggestionsDismissed, setAiSuggestionsDismissed] = useState(false);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = usePersistentState<string[]>('finance:transactions:dismissedSuggestionIds', []);
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
@@ -130,10 +133,28 @@ function TransactionsContent() {
     setCustomPresets((prev) => (prev || []).filter((p) => p.id !== id));
   }, [setCustomPresets]);
 
+  const handleAiSuggestionsDismiss = useCallback((dismissed: boolean) => {
+    if (dismissed) {
+      setAiSuggestionsDismissed(true);
+      setDismissedSuggestionIds((prev) => Array.from(new Set([...(prev || []), ...pendingAiIds])));
+    }
+  }, [pendingAiIds, setDismissedSuggestionIds]);
+
+  const hasNewSuggestions = pendingAiIds.length > 0 && pendingAiIds.some(id => !dismissedSuggestionIds.includes(id));
+  const isSuggestionsDismissed = aiSuggestionsDismissed || !hasNewSuggestions;
+
   useEffect(() => {
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
-      .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPendingAiCount(data.length);
+          setPendingAiIds(data.map((p: any) => p.id));
+        } else {
+          setPendingAiCount(0);
+          setPendingAiIds([]);
+        }
+      })
       .catch(() => {})
   }, []);
 
@@ -315,17 +336,6 @@ function TransactionsContent() {
       <PageHeader
         title="Transactions"
         icon={Receipt}
-        leftExtra={
-          pendingAiCount > 0 && (
-            <Link
-              href="/ai-suggestions"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors"
-            >
-              <Sparkles className="h-3 w-3" />
-              {pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}
-            </Link>
-          )
-        }
       />
       <PageContent maxWidth="max-w-[1920px]">
         <FilterBar 
@@ -338,6 +348,9 @@ function TransactionsContent() {
           onDeletePreset={handleDeletePreset}
           compactView={compactView}
           onCompactViewChange={setCompactView}
+          pendingAiCount={pendingAiCount}
+          aiSuggestionsDismissed={isSuggestionsDismissed}
+          onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
         />
 
         <div className="min-w-0">

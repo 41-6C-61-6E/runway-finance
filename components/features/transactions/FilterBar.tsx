@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Columns2 } from 'lucide-react';
+import { Columns2, Sparkles, X } from 'lucide-react';
+import Link from 'next/link';
 import { getTypesByGroup } from '@/lib/constants/account-types';
 
 type FilterState = {
@@ -43,6 +44,9 @@ interface FilterBarProps {
   onDeletePreset: (id: string) => void;
   compactView?: boolean;
   onCompactViewChange?: (compact: boolean) => void;
+  pendingAiCount?: number;
+  aiSuggestionsDismissed?: boolean;
+  onAiSuggestionsDismissed?: (dismissed: boolean) => void;
 }
 
 type Account = {
@@ -177,7 +181,10 @@ export default function FilterBar({
   onSavePreset,
   onDeletePreset,
   compactView,
-  onCompactViewChange
+  onCompactViewChange,
+  pendingAiCount,
+  aiSuggestionsDismissed,
+  onAiSuggestionsDismissed
 }: FilterBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSavingView, setIsSavingView] = useState(false);
@@ -495,6 +502,30 @@ export default function FilterBar({
           </div>
         }
         className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
+        actions={
+          pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && (
+            <Link
+              href="/ai-suggestions"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-all pr-1.5 shadow-sm shrink-0"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>{pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}</span>
+              <span className="w-px h-3 bg-primary/25 mx-0.5" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAiSuggestionsDismissed?.(true);
+                }}
+                className="p-0.5 hover:bg-primary/20 rounded text-primary transition-colors cursor-pointer flex items-center justify-center"
+                aria-label="Dismiss AI suggestions"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Link>
+          )
+        }
         rightActions={
           <button
             type="button"
