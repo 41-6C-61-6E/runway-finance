@@ -85,7 +85,7 @@ export function MobileNav() {
     <>
       {/* Bottom Nav Bar */}
       <nav
-        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/45 backdrop-blur-xl border border-sidebar-border/30 flex items-center justify-around py-2 px-3 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
+        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/45 backdrop-blur-xl border border-sidebar-border/30 flex items-center justify-around py-3 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
         }}
@@ -98,13 +98,13 @@ export function MobileNav() {
             <a
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-1.5 px-3.5 rounded-full transition-all duration-200 active:scale-95 group ${
+              className={`flex flex-col items-center justify-center py-2 px-4.5 rounded-full transition-all duration-200 active:scale-95 group ${
                 active
                   ? 'text-primary bg-primary/15 shadow-sm'
                   : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
               }`}
             >
-              <Icon className="h-5 w-5 flex-shrink-0" />
+              <Icon className="h-6 w-6 flex-shrink-0" />
             </a>
           );
         })}
@@ -112,13 +112,13 @@ export function MobileNav() {
         {/* Hamburger Menu Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center py-1.5 px-3.5 rounded-full transition-all duration-200 active:scale-95 group ${
+          className={`flex flex-col items-center justify-center py-2 px-4.5 rounded-full transition-all duration-200 active:scale-95 group ${
             isOpen
               ? 'text-primary bg-primary/15 shadow-sm'
               : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
           }`}
         >
-          {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+          {isOpen ? <X className="h-6 w-6 flex-shrink-0" /> : <Menu className="h-6 w-6 flex-shrink-0" />}
         </button>
       </nav>
 

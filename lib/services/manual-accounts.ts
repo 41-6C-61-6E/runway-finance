@@ -483,6 +483,22 @@ export async function syncManualAccount(
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Sync failed';
     logger.error(`${LOG_TAG} Sync failed`, { accountId, type: account.type, error: msg });
+
+    try {
+      meta.syncError = msg;
+      const updatedMeta = JSON.stringify(meta);
+      const encryptedMeta = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
+      await db
+        .update(accounts)
+        .set({
+          metadata: encryptedMeta,
+          updatedAt: new Date(),
+        })
+        .where(eq(accounts.id, accountId));
+    } catch (saveErr) {
+      logger.error(`${LOG_TAG} Failed to save sync error to metadata`, { accountId, error: String(saveErr) });
+    }
+
     return {
       status: 'error',
       newBalance: oldBalance,
@@ -500,6 +516,13 @@ export async function syncManualAccount(
     balanceDate: new Date(),
     updatedAt: new Date(),
   };
+
+  if (meta.syncError !== undefined) {
+    delete meta.syncError;
+    const updatedMeta = JSON.stringify(meta);
+    accountUpdate.metadata = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
+  }
+
   await db.update(accounts).set(accountUpdate).where(eq(accounts.id, accountId));
 
   if (Math.abs(delta) > 0.0001) {

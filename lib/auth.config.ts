@@ -14,7 +14,13 @@ export const authConfig = {
       const { pathname } = request.nextUrl;
 
       // Rate limit auth and registration endpoints
-      if (pathname.startsWith("/api/auth") || pathname.startsWith("/api/register")) {
+      if (
+        (pathname.startsWith("/api/auth") &&
+          !pathname.startsWith("/api/auth/session") &&
+          !pathname.startsWith("/api/auth/csrf") &&
+          !pathname.startsWith("/api/auth/providers")) ||
+        pathname.startsWith("/api/register")
+      ) {
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
                   ?? request.headers.get("x-real-ip")
                   ?? "unknown";
