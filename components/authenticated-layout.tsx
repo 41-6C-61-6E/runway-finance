@@ -1,6 +1,8 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import AccountsSidebar from '@/components/accounts-sidebar';
 import ResizableSidebar from '@/components/resizable-sidebar';
 import { useSidebar, SidebarProvider, COLLAPSED_WIDTH } from '@/components/sidebar-context';
@@ -13,13 +15,41 @@ import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = pathname === '/signin';
-  const isSettingsPage = pathname === '/settings';
-  const hideAccountsSidebar = isSettingsPage;
+  const router = useRouter();
+  const { data: session, status } = useSession();
 
-  if (isAuthPage) {
+  const isAuthPage = pathname === '/signin';
+  const isOfflinePage = pathname === '/offline';
+
+  useEffect(() => {
+    if (status === 'unauthenticated' && !isAuthPage && !isOfflinePage) {
+      router.push('/signin');
+    } else if (status === 'authenticated' && isAuthPage) {
+      router.push('/');
+    }
+  }, [status, isAuthPage, isOfflinePage, router]);
+
+  if (isAuthPage || isOfflinePage) {
+    if (status === 'authenticated' && isAuthPage) {
+      return null;
+    }
     return <>{children}</>;
   }
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <LoadingSpinner category="default" />
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return null;
+  }
+
+  const isSettingsPage = pathname === '/settings';
+  const hideAccountsSidebar = isSettingsPage;
 
   return (
     <UserSettingsProvider>
