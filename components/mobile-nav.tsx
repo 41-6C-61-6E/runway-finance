@@ -98,14 +98,13 @@ export function MobileNav() {
             <a
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-full transition-all duration-200 active:scale-95 group ${
+              className={`flex flex-col items-center justify-center py-1.5 px-3.5 rounded-full transition-all duration-200 active:scale-95 group ${
                 active
-                  ? 'text-primary bg-primary/15 font-semibold shadow-sm'
+                  ? 'text-primary bg-primary/15 shadow-sm'
                   : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
               }`}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
-              <span className="text-[10px] tracking-wide">{item.label}</span>
             </a>
           );
         })}
@@ -113,14 +112,13 @@ export function MobileNav() {
         {/* Hamburger Menu Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-full transition-all duration-200 active:scale-95 group ${
+          className={`flex flex-col items-center justify-center py-1.5 px-3.5 rounded-full transition-all duration-200 active:scale-95 group ${
             isOpen
-              ? 'text-primary bg-primary/15 font-semibold shadow-sm'
+              ? 'text-primary bg-primary/15 shadow-sm'
               : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
           }`}
         >
           {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-          <span className="text-[10px] tracking-wide">{isOpen ? 'Close' : 'Menu'}</span>
         </button>
       </nav>
 
