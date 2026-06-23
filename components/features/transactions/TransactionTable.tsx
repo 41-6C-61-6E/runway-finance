@@ -732,6 +732,14 @@ export default function TransactionTable({
   }, [fetchTransactions]);
 
   useEffect(() => {
+    const handleFocus = () => {
+      fetchTransactions();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [fetchTransactions]);
+
+  useEffect(() => {
     const selected = Object.keys(rowSelection).filter((id) => rowSelection[id]);
     setSelectedIds(new Set(selected));
   }, [rowSelection]);
@@ -836,11 +844,11 @@ export default function TransactionTable({
               </span>
               {isPending && (
                 <span
-                  className="ml-1.5 inline-flex items-center text-chart-3 shrink-0"
+                  className="ml-1.5 inline-flex items-center text-primary shrink-0"
                   title="Pending"
                 >
                   <svg
-                    className="h-2 w-2 animate-pulse"
+                    className="h-2 w-2"
                     fill="currentColor"
                     viewBox="0 0 8 8"
                   >
@@ -896,7 +904,7 @@ export default function TransactionTable({
                     "noopener,noreferrer",
                   );
                 }}
-                className="opacity-0 group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
+                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
                 title="Search on Google"
               >
                 <Search className="h-3.5 w-3.5" />
@@ -1461,7 +1469,7 @@ export default function TransactionTable({
                     <div
                       key={row.id}
                       className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5 px-3 sm:px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer group w-full ${
-                        isPending ? "bg-chart-3/[0.02]" : ""
+                        isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                       }`}
                       onClick={() => onTransactionClick?.(tx)}
                     >
@@ -1471,18 +1479,36 @@ export default function TransactionTable({
                           {formattedDate}
                         </span>
                       </div>
-                      {/* Row 1, Col 2: Description + pending dot + tags */}
+                      {/* Row 1, Col 2: Description + pending dot + search spyglass + tags */}
                       <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                         <span className="text-sm text-foreground truncate font-medium">
                           {tx.payee || tx.description}
                         </span>
                         {isPending && (
-                          <span className="inline-flex items-center text-chart-3 shrink-0" title="Pending">
-                            <svg className="h-2 w-2 animate-pulse" fill="currentColor" viewBox="0 0 8 8">
+                          <span className="inline-flex items-center text-primary shrink-0" title="Pending">
+                            <svg className="h-2 w-2" fill="currentColor" viewBox="0 0 8 8">
                               <circle cx="4" cy="4" r="3" />
                             </svg>
                           </span>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const searchQuery =
+                              tx.payee && tx.description && tx.payee !== tx.description
+                                ? `${tx.payee} ${tx.description}`
+                                : tx.payee || tx.description;
+                            window.open(
+                              `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
+                          }}
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1 shrink-0"
+                          title="Search on Google"
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                        </button>
                         {txTags.length > 0 && (
                           <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
                             {txTags.map((tag) => (
@@ -1846,7 +1872,7 @@ export default function TransactionTable({
                       <tr
                         key={row.id}
                         className={`border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group ${
-                          isPending ? "bg-chart-3/[0.02]" : ""
+                          isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                         }`}
                         onClick={() => onTransactionClick?.(row.original)}
                       >

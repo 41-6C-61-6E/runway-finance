@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
@@ -92,6 +93,16 @@ function findMajorType(type: string): string {
   return 'banking';
 }
 
+const invalidateAllFinanceQueries = (queryClient: any) => {
+  queryClient.invalidateQueries({ queryKey: ['accounts'] });
+  queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
+  queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
+  queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
+  queryClient.invalidateQueries({ queryKey: ['investments'] });
+};
+
 interface AccountDetailDrawerProps {
   account: Account | null;
   open: boolean;
@@ -100,6 +111,7 @@ interface AccountDetailDrawerProps {
 }
 
 export default function AccountDetailDrawer({ account, open, onClose, onSuccess }: AccountDetailDrawerProps) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState(account?.name ?? '');
   const [type, setType] = useState(account?.type ?? '');
   const [majorType, setMajorType] = useState('banking');
@@ -135,13 +147,14 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       if (!res.ok) {
         throw new Error('Failed to unlink account');
       }
+      invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setUnlinking(false);
     }
-  }, [account, onSuccess]);
+  }, [account, onSuccess, queryClient]);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -174,13 +187,14 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       if (!res.ok) {
         throw new Error('Failed to delete account');
       }
+      invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setDeleting(false);
     }
-  }, [account, onSuccess]);
+  }, [account, onSuccess, queryClient]);
   useEffect(() => {
     if (!account || !open) return;
     setName(account.name);
@@ -274,11 +288,12 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         credentials: 'include',
         body: JSON.stringify(payload),
       });
+      invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, onSuccess]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, onSuccess, queryClient]);
 
   if (!account || !open) return null;
 
