@@ -14,10 +14,13 @@ export function PWARegister() {
     }
 
     let cancelled = false;
+    let intervalId: any;
 
     navigator.serviceWorker
       .register("/sw.js", { scope: "/" })
       .then((registration) => {
+        if (cancelled) return;
+
         registration.addEventListener("updatefound", () => {
           const installing = registration.installing;
           if (installing) {
@@ -35,11 +38,19 @@ export function PWARegister() {
             });
           }
         });
+
+        // Check for updates every hour (3600000ms)
+        intervalId = setInterval(() => {
+          registration.update().catch(() => {});
+        }, 60 * 60 * 1000);
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
   }, []);
 
