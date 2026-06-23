@@ -77,7 +77,7 @@ export function MobileNav() {
     isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
   }`;
 
-  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar border-t border-sidebar-border rounded-t-[2rem] p-6 transition-transform duration-300 ease-out shadow-2xl ${
+  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] p-6 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] ${
     isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
   }`;
 
@@ -85,8 +85,10 @@ export function MobileNav() {
     <>
       {/* Bottom Nav Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 bg-sidebar border-t border-sidebar-border flex items-center justify-around pt-2 px-2 pb-2 md:hidden shadow-lg"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}
+        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/45 backdrop-blur-xl border border-sidebar-border/30 flex items-center justify-around py-2 px-3 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+        }}
       >
         {mainNavItems.map((item) => {
           const Icon = item.icon;
@@ -96,17 +98,13 @@ export function MobileNav() {
             <a
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all duration-150 active:scale-95 group ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-full transition-all duration-200 active:scale-95 group ${
                 active
-                  ? 'text-primary font-semibold'
-                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground'
+                  ? 'text-primary bg-primary/15 font-semibold shadow-sm'
+                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
               }`}
             >
-              <div className={`p-1.5 rounded-lg transition-colors ${
-                active ? 'bg-primary/20' : 'group-hover:bg-sidebar-foreground/8'
-              }`}>
-                <Icon className="h-5 w-5 flex-shrink-0" />
-              </div>
+              <Icon className="h-5 w-5 flex-shrink-0" />
               <span className="text-[10px] tracking-wide">{item.label}</span>
             </a>
           );
@@ -115,17 +113,13 @@ export function MobileNav() {
         {/* Hamburger Menu Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all duration-150 active:scale-95 group ${
+          className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-full transition-all duration-200 active:scale-95 group ${
             isOpen
-              ? 'text-primary font-semibold'
-              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground'
+              ? 'text-primary bg-primary/15 font-semibold shadow-sm'
+              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
           }`}
         >
-          <div className={`p-1.5 rounded-lg transition-colors ${
-            isOpen ? 'bg-primary/20' : 'group-hover:bg-sidebar-foreground/8'
-          }`}>
-            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-          </div>
+          {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
           <span className="text-[10px] tracking-wide">{isOpen ? 'Close' : 'Menu'}</span>
         </button>
       </nav>
