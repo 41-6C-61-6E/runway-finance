@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PropertyCard } from './property-card';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
@@ -57,10 +58,32 @@ interface RealEstateData {
 }
 
 export function PropertyCards() {
-  const [data, setData] = useState<RealEstateData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [mortgageAccounts, setMortgageAccounts] = useState<{ id: string; name: string; balance: string }[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: queryData, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['real-estate-properties'],
+    queryFn: async () => {
+      const [reRes, mortRes] = await Promise.all([
+        fetch('/api/real-estate', { credentials: 'include' }),
+        fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
+      ]);
+      if (!reRes.ok) throw new Error('Failed to fetch real estate data');
+      const reData = await reRes.json();
+      const mortgageData = mortRes.ok ? await mortRes.json() : [];
+      return {
+        data: reData as RealEstateData,
+        mortgageAccounts: mortgageData,
+      };
+    },
+  });
+
+  const data = queryData?.data ?? null;
+  const mortgageAccounts = queryData?.mortgageAccounts ?? [];
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+
+  const fetchData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
+  }, [queryClient]);
 
   const [linkingPropertyId, setLinkingPropertyId] = useState<string | null>(null);
   const [selectedMortgageId, setSelectedMortgageId] = useState('');
@@ -118,27 +141,6 @@ export function PropertyCards() {
       setValidatingAddress(false);
     }
   };
-
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [reRes, mortRes] = await Promise.all([
-        fetch('/api/real-estate', { credentials: 'include' }),
-        fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
-      ]);
-      if (!reRes.ok) throw new Error('Failed to fetch real estate data');
-      setData(await reRes.json());
-      if (mortRes.ok) setMortgageAccounts(await mortRes.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleLinkMortgage = async () => {
     if (!linkingPropertyId || !selectedMortgageId) return;

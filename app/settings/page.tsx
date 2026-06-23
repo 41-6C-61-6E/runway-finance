@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePlaidLink } from 'react-plaid-link';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
@@ -117,8 +118,19 @@ const SETTINGS_TABS = [
   { id: 'advanced' as const, label: 'Advanced', description: 'Backups, dev tools, and database settings', icon: ShieldAlert },
 ];
 
+const invalidateAllFinanceQueries = (queryClient: any) => {
+  queryClient.invalidateQueries({ queryKey: ['accounts'] });
+  queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
+  queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
+  queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
+  queryClient.invalidateQueries({ queryKey: ['investments'] });
+};
+
 function SettingsPageBody() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
   const { sidebarWidth } = useSidebar();
@@ -454,6 +466,7 @@ function SettingsPageBody() {
       setRemapSourceId('');
       setRemapTargetId('');
       await fetchAccounts();
+      invalidateAllFinanceQueries(queryClient);
       setTimeout(() => {
         setIsRemapDialogOpen(false);
         setRemapSuccess('');
@@ -502,6 +515,7 @@ function SettingsPageBody() {
       }
       setRelinkSuccess('Account re-linked successfully!');
       await fetchAccounts();
+      invalidateAllFinanceQueries(queryClient);
       setTimeout(() => {
         setIsRelinkDialogOpen(false);
         setRelinkAccount(null);
@@ -556,6 +570,7 @@ function SettingsPageBody() {
       setIsManageSyncDialogOpen(false);
       await fetchConnections();
       await fetchAccounts();
+      invalidateAllFinanceQueries(queryClient);
     } catch (err) {
       setManageSyncError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -582,6 +597,7 @@ function SettingsPageBody() {
       setAccountToDelete(null);
       await fetchAccounts();
       await fetchConnections();
+      invalidateAllFinanceQueries(queryClient);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -606,6 +622,7 @@ function SettingsPageBody() {
       setAccountToConvert(null);
       await fetchAccounts();
       await fetchConnections();
+      invalidateAllFinanceQueries(queryClient);
     } catch (err) {
       setConvertError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -634,6 +651,7 @@ function SettingsPageBody() {
         if (!res.ok) {
           throw new Error('Failed to update account');
         }
+        invalidateAllFinanceQueries(queryClient);
       } catch {
         // Roll back if request fails
         setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, [field]: originalValue } : a)));
@@ -738,6 +756,8 @@ function SettingsPageBody() {
       setSetupToken('');
       setLabel('');
       await fetchConnections();
+      await fetchAccounts();
+      invalidateAllFinanceQueries(queryClient);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -777,7 +797,11 @@ function SettingsPageBody() {
         durationMs: data.durationMs ?? 0,
         details: data.details ?? [],
       });
-      if (res.ok) await fetchConnections();
+      if (res.ok) {
+        await fetchConnections();
+        await fetchAccounts();
+        invalidateAllFinanceQueries(queryClient);
+      }
     } catch {
       setSyncResult({ status: 'error', accountsSynced: 0, transactionsFetched: 0, transactionsNew: 0, transactionsUpdated: 0, durationMs: 0, details: [] });
     } finally {
@@ -806,7 +830,11 @@ function SettingsPageBody() {
         durationMs: data.durationMs ?? 0,
         details: data.details ?? [],
       });
-      if (res.ok) await fetchConnections();
+      if (res.ok) {
+        await fetchConnections();
+        await fetchAccounts();
+        invalidateAllFinanceQueries(queryClient);
+      }
     } catch {
       setSyncResult({ status: 'error', accountsSynced: 0, transactionsFetched: 0, transactionsNew: 0, transactionsUpdated: 0, durationMs: 0, details: [] });
     } finally {
@@ -829,6 +857,7 @@ function SettingsPageBody() {
       if (res.ok) {
         await fetchConnections();
         await fetchAccounts();
+        invalidateAllFinanceQueries(queryClient);
         setDeleteConn(null);
       } else {
         const data = await res.json();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { formatCurrency } from '@/lib/utils/format';
@@ -41,40 +42,42 @@ interface Category {
 }
 
 export function BudgetTable() {
+  const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
   const showBudgetTags = settingsContext?.settings?.accountTagVisibility?.budgets !== false;
   const { periodType, periodKey } = useBudgetPeriod();
-  const [budgets, setBudgets] = useState<BudgetData[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['budgets', periodType, periodKey],
+    queryFn: async () => {
+      const [budgetRes, acctRes] = await Promise.all([
+        fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' }),
+        fetch('/api/accounts', { credentials: 'include' }),
+      ]);
+      if (!budgetRes.ok) throw new Error('Failed to fetch budgets');
+      const resData = await budgetRes.json();
+      const accountsData = acctRes.ok ? await acctRes.json() : [];
+      return {
+        budgets: resData.budgets ?? [],
+        categories: resData.categories ?? [],
+        accounts: accountsData,
+      };
+    },
+  });
+
+  const budgets = data?.budgets ?? [];
+  const categories = data?.categories ?? [];
+  const accounts = data?.accounts ?? [];
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+
   const [showForm, setShowForm] = useState(false);
   const [editBudget, setEditBudget] = useState<BudgetData | null>(null);
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchBudgets = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [budgetRes, acctRes] = await Promise.all([
-        fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' }),
-        fetch('/api/accounts', { credentials: 'include' }),
-      ]);
-      if (!budgetRes.ok) throw new Error('Failed to fetch');
-      const data = await budgetRes.json();
-      setBudgets(data.budgets ?? []);
-      if (data.categories) setCategories(data.categories);
-      if (acctRes.ok) setAccounts(await acctRes.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  }, [periodType, periodKey]);
-
-  useEffect(() => { fetchBudgets(); }, [fetchBudgets]);
+  const fetchBudgets = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  }, [queryClient]);
 
   const handleDelete = async () => {
     if (!deleteBudget) return;
@@ -82,7 +85,7 @@ export function BudgetTable() {
     try {
       await fetch(`/api/budgets/${deleteBudget.id}`, { method: 'DELETE', credentials: 'include' });
       setDeleteBudget(null);
-      fetchBudgets();
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch {} finally {
       setDeleteLoading(false);
     }

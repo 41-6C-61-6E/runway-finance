@@ -466,8 +466,8 @@ export default function DataCleanup() {
                                   {new Date(tx.date).toLocaleDateString()}
                                 </span>
                                 {tx.pending && (
-                                  <span className="inline-flex items-center text-chart-3" title="Pending">
-                                    <svg className="h-1.5 w-1.5 animate-pulse" fill="currentColor" viewBox="0 0 8 8">
+                                  <span className="inline-flex items-center text-primary" title="Pending">
+                                    <svg className="h-1.5 w-1.5" fill="currentColor" viewBox="0 0 8 8">
                                       <circle cx="4" cy="4" r="3" />
                                     </svg>
                                     <span className="text-[10px] ml-1 font-medium">Pending</span>

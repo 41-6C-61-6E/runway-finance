@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
 
 export function PWARegister() {
   useEffect(() => {
@@ -22,6 +23,14 @@ export function PWARegister() {
           if (installing) {
             installing.addEventListener("statechange", () => {
               if (installing.state === "installed" && navigator.serviceWorker.controller) {
+                toast.info("A new version of Runway Finance is available!", {
+                  description: "Click update to load the latest changes.",
+                  action: {
+                    label: "Update",
+                    onClick: () => window.location.reload(),
+                  },
+                  duration: Infinity,
+                });
               }
             });
           }

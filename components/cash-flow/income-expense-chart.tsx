@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   ComposedChart,
@@ -50,7 +51,17 @@ const typeOptions = [
 
 export function IncomeExpenseChart() {
   const router = useRouter();
-  const [allData, setAllData] = useState<MonthlyData[]>([]);
+  const { data: allData = [], isLoading: loading, error: queryError } = useQuery<MonthlyData[]>({
+    queryKey: ['cash-flow-monthly'],
+    queryFn: async () => {
+      const res = await fetch('/api/cash-flow/monthly?months=120');
+      if (!res.ok) throw new Error('Failed to fetch monthly cash flow data');
+      return res.json();
+    },
+  });
+
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+
   const {
     timeframe, setTimeframe,
     windowEnd, setWindowEnd,
@@ -60,28 +71,8 @@ export function IncomeExpenseChart() {
     showWindowNav,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
   const [showFilters, setShowFilters] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch('/api/cash-flow/monthly?months=120');
-        if (!res.ok) throw new Error('Failed to fetch monthly data');
-        const json = await res.json();
-        setAllData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const numMonths = MONTH_MAP[timeframe] || 12;
   const effectiveEndIdx = useMemo(() => {
