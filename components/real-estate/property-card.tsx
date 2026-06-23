@@ -211,6 +211,24 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
 
             {currentTab === 'overview' ? (
               <>
+                {meta.syncError && (
+                  <div className="mb-4 p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive font-medium flex items-start gap-2">
+                    <span className="mt-0.5">⚠️</span>
+                    <div className="flex-grow min-w-0">
+                      <span className="font-semibold block mb-0.5">Sync Failed</span>
+                      <span className="break-words block">{String(meta.syncError)}</span>
+                      {String(meta.syncError).toLowerCase().includes('address') && onEditProperty && (
+                        <button
+                          onClick={onEditProperty}
+                          className="mt-1.5 block text-[10px] font-bold text-primary hover:underline text-left cursor-pointer"
+                        >
+                          Edit property to add address
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Core Metrics */}
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>

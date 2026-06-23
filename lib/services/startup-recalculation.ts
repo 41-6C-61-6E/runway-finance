@@ -16,6 +16,18 @@ const MODEL_SNAPSHOT_TYPES = [
   'vehicle', 'metals', 'mortgage'
 ];
 
+function formatRecalculationError(err: unknown): string {
+  if (err instanceof Error) {
+    if ('cause' in err && err.cause !== undefined) {
+      const causeMsg = err.cause instanceof Error ? err.cause.message : String(err.cause);
+      return `${err.message} (cause: ${causeMsg})`;
+    }
+    return err.message;
+  }
+  return String(err);
+}
+
+
 export interface RecalculationStatus {
   status: 'idle' | 'running' | 'completed' | 'failed';
   totalUsers: number;
@@ -129,10 +141,10 @@ export async function runBackgroundRecalculation(
               await generateHistoricalAccountSnapshots(account.id, userId, fromDate, today, dek);
             }
           } catch (accountErr) {
-            const errMsg = `Account "${account.name}" (${account.id}): ${accountErr instanceof Error ? accountErr.message : String(accountErr)}`;
+            const errMsg = `Account "${account.name}" (${account.id}): ${formatRecalculationError(accountErr)}`;
             recalculationStatus.errors.push(errMsg);
             logger.error('[startup-recalculation] Failed to generate account snapshots', {
-              userId, accountId: account.id, error: String(accountErr)
+              userId, accountId: account.id, error: accountErr
             });
           }
         }
@@ -149,10 +161,10 @@ export async function runBackgroundRecalculation(
               account.id, userId, account.type, meta as Record<string, unknown>, apiConfig, dek
             );
           } catch (accountErr) {
-            const errMsg = `Real Estate "${account.name}" (${account.id}): ${accountErr instanceof Error ? accountErr.message : String(accountErr)}`;
+            const errMsg = `Real Estate "${account.name}" (${account.id}): ${formatRecalculationError(accountErr)}`;
             recalculationStatus.errors.push(errMsg);
             logger.error('[startup-recalculation] Failed to generate real estate snapshots', {
-              userId, accountId: account.id, error: String(accountErr)
+              userId, accountId: account.id, error: accountErr
             });
           }
         }
@@ -165,18 +177,18 @@ export async function runBackgroundRecalculation(
           updateCategorySpendingSummaries(userId, dek),
           updateCategoryIncomeSummaries(userId, dek),
         ]).catch((err) => {
-          const errMsg = `Summaries: ${err instanceof Error ? err.message : String(err)}`;
+          const errMsg = `Summaries: ${formatRecalculationError(err)}`;
           recalculationStatus.errors.push(errMsg);
-          logger.error('[startup-recalculation] Failed to update summaries', { userId, error: String(err) });
+          logger.error('[startup-recalculation] Failed to update summaries', { userId, error: err });
         });
       }
 
       invalidateUserSearchCache(userId);
       logger.info('[startup-recalculation] Completed recalculation for user', { userId });
     } catch (userErr) {
-      const errMsg = `User ${userId}: ${userErr instanceof Error ? userErr.message : String(userErr)}`;
+      const errMsg = `User ${userId}: ${formatRecalculationError(userErr)}`;
       recalculationStatus.errors.push(errMsg);
-      logger.error('[startup-recalculation] Failed recalculation for user', { userId, error: String(userErr) });
+      logger.error('[startup-recalculation] Failed recalculation for user', { userId, error: userErr });
     }
 
     recalculationStatus.processedUsers++;
@@ -197,7 +209,7 @@ export async function recalculateAllSnapshots(): Promise<void> {
   setTimeout(() => {
     logger.info('[startup-recalculation] Triggering deferred startup recalculation');
     runBackgroundRecalculation().catch((err: unknown) => {
-      logger.error('[startup-recalculation] Startup recalculation run error', { error: String(err) });
+      logger.error('[startup-recalculation] Startup recalculation run error', { error: err });
     });
   }, 8000);
 }

@@ -461,7 +461,7 @@ export default function ManualAccountsSection() {
         changed: data.changed,
         errorMessage: data.errorMessage,
       });
-      if (res.ok) await fetchAccounts();
+      await fetchAccounts();
     } catch {
       setSyncResult({ status: 'error', newBalance: '0', oldBalance: '0', changed: false, errorMessage: 'Network error' });
     } finally {
@@ -1131,6 +1131,24 @@ export default function ManualAccountsSection() {
                     </div>
                   </div>
                 </div>
+                {account.metadata?.syncError && (
+                  <div className="mt-3 p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive font-medium flex items-start gap-2">
+                    <span className="mt-0.5">⚠️</span>
+                    <div className="flex-grow min-w-0">
+                      <span className="font-semibold block mb-0.5">Sync Failed</span>
+                      <span className="break-words block">{String(account.metadata.syncError)}</span>
+                      {String(account.metadata.syncError).toLowerCase().includes('address') && (
+                        <button
+                          onClick={() => openEdit(account)}
+                          className="mt-1.5 block text-[10px] font-bold text-primary hover:underline text-left cursor-pointer"
+                        >
+                          Edit account to provide a property address
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {canSync(account) && (
                   <div className="flex items-center justify-start mt-2">
                     <div className="flex items-center gap-2">
