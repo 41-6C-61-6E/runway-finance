@@ -433,6 +433,7 @@ const SankeyCustomNode = ({
   columnOffsets,
   margin,
   usableHeight,
+  ...restProps
 }: any) => {
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
@@ -470,9 +471,19 @@ const SankeyCustomNode = ({
 
   return (
     <g
-      onMouseEnter={() => setHoveredNode(payload.id)}
-      onMouseLeave={() => setHoveredNode(null)}
-      onClick={() => onClick && onClick(payload.id)}
+      {...restProps}
+      onMouseEnter={(e) => {
+        setHoveredNode(payload.id);
+        if (restProps.onMouseEnter) restProps.onMouseEnter(e);
+      }}
+      onMouseLeave={(e) => {
+        setHoveredNode(null);
+        if (restProps.onMouseLeave) restProps.onMouseLeave(e);
+      }}
+      onClick={(e) => {
+        if (onClick) onClick(payload.id);
+        if (restProps.onClick) restProps.onClick(e);
+      }}
       className="cursor-pointer"
     >
       <rect
@@ -538,6 +549,7 @@ const SankeyCustomLink = ({
   columnOffsets,
   margin,
   usableHeight,
+  ...restProps
 }: any) => {
   const gradId = `link-grad-${index}`;
 
@@ -577,7 +589,11 @@ const SankeyCustomLink = ({
 
   return (
     <g
-      onClick={() => onClick && onClick(sourceId, targetId)}
+      {...restProps}
+      onClick={(e) => {
+        if (onClick) onClick(sourceId, targetId);
+        if (restProps.onClick) restProps.onClick(e);
+      }}
       className="cursor-pointer"
     >
       <defs>
@@ -913,6 +929,8 @@ export function CashFlowSankey() {
 
   const sankeyTooltip = useMemo(() => (
     <Tooltip
+      isAnimationActive={false}
+      allowEscapeViewBox={{ x: true, y: true }}
       content={({ active, payload }) => {
         if (!active || !payload || !payload.length) return null;
         const data = payload[0].payload;
