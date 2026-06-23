@@ -1,4 +1,4 @@
-const CACHE_NAME = "personal-finance-v1";
+const CACHE_NAME = "personal-finance-26.06.1782187930275";
 const STATIC_ASSETS = [
   "/",
   "/offline",
@@ -32,12 +32,18 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Bypass API requests
   if (url.pathname.startsWith("/api/")) {
     return;
   }
 
+  // Only handle GET requests for caching
+  if (request.method !== "GET") {
+    return;
+  }
+
+  // Cache static assets and config files
   if (
-    request.method !== "GET" ||
     url.pathname.startsWith("/_next/static") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/manifest.json" ||
@@ -47,6 +53,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Handle HTML document requests with network-first and fallback
   if (request.headers.get("Accept")?.includes("text/html")) {
     event.respondWith(networkFirstWithFallback(request));
     return;

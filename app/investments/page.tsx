@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -16,6 +15,7 @@ import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
+import { useQuery } from '@tanstack/react-query';
 
 interface InvestmentsData {
   accounts: any[];
@@ -32,67 +32,64 @@ interface InvestmentsData {
 
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
-  const [data, setData] = useState<InvestmentsData | null>(null);
-  const [incomeData, setIncomeData] = useState<{ monthlyIncome: any[]; totalAnnual: number; transactions: any[] } | null>(null);
-  const [portfolioHistory, setPortfolioHistory] = useState<any[]>([]);
-  const [quotes, setQuotes] = useState<QuoteData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // 1. Fetch main investments data
+  const { data, isLoading: dataLoading, error: dataError } = useQuery<InvestmentsData>({
+    queryKey: ['investments'],
+    queryFn: async () => {
+      const res = await fetch('/api/investments', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch investments data');
+      return res.json();
+    },
+  });
 
-        // Fetch investments data, classified income, and 1m history in parallel
-        const [investmentsRes, incomeRes, historyRes] = await Promise.all([
-          fetch('/api/investments', { credentials: 'include' }),
-          fetch('/api/investments/income', { credentials: 'include' }),
-          fetch('/api/investments/history?timeframe=1m', { credentials: 'include' }),
-        ]);
+  // 2. Fetch classified income
+  const { data: incomeData = null, isLoading: incomeLoading } = useQuery<{ monthlyIncome: any[]; totalAnnual: number; transactions: any[] } | null>({
+    queryKey: ['investments-income'],
+    queryFn: async () => {
+      const res = await fetch('/api/investments/income', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch income data');
+      return res.json();
+    },
+  });
 
-        if (!investmentsRes.ok) {
-          throw new Error('Failed to fetch investments data');
-        }
-        
-        const investmentsJson: InvestmentsData = await investmentsRes.json();
-        setData(investmentsJson);
+  // 3. Fetch 1m portfolio history
+  const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[] }>({
+    queryKey: ['investments-history'],
+    queryFn: async () => {
+      const res = await fetch('/api/investments/history?timeframe=1m', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch history data');
+      return res.json();
+    },
+  });
 
-        if (incomeRes.ok) {
-          const incomeJson = await incomeRes.json();
-          setIncomeData(incomeJson);
-        }
+  const portfolioHistory = historyRes?.data || [];
 
-        if (historyRes.ok) {
-          const historyJson = await historyRes.json();
-          setPortfolioHistory(historyJson.data || []);
-        }
+  // Extract unique tickers from holdings
+  const tickers = data?.holdings
+    ?.map((h) => h.ticker)
+    .filter((t): t is string => !!t && typeof t === 'string' && t.trim().length > 0) || [];
+  const uniqueTickers = Array.from(new Set(tickers));
 
-        // Fetch live quotes if holdings have tickers
-        const tickers = investmentsJson.holdings
-          ?.map((h) => h.ticker)
-          .filter((t): t is string => !!t && typeof t === 'string' && t.trim().length > 0);
+  // 4. Fetch live stock quotes
+  const { data: quotesRes, isLoading: quotesLoading } = useQuery<{ quotes: QuoteData[] }>({
+    queryKey: ['investments-quotes', uniqueTickers.join(',')],
+    queryFn: async () => {
+      const res = await fetch(`/api/investments/quotes?tickers=${uniqueTickers.join(',')}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch live quotes');
+      return res.json();
+    },
+    enabled: uniqueTickers.length > 0,
+    refetchInterval: 1000 * 60 * 5, // Poll every 5 minutes
+    refetchOnWindowFocus: true,
+  });
 
-        if (tickers && tickers.length > 0) {
-          const uniqueTickers = Array.from(new Set(tickers));
-          const quotesRes = await fetch(`/api/investments/quotes?tickers=${uniqueTickers.join(',')}`, {
-            credentials: 'include',
-          });
-          if (quotesRes.ok) {
-            const quotesJson = await quotesRes.json();
-            setQuotes(quotesJson.quotes || []);
-          }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const quotes = quotesRes?.quotes || [];
 
-    fetchAllData();
-  }, []);
+  const loading = dataLoading || incomeLoading || historyLoading || (uniqueTickers.length > 0 && quotesLoading);
+  const error = dataError ? (dataError instanceof Error ? dataError.message : String(dataError)) : null;
 
   if (loading) {
     return (

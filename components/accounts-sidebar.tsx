@@ -40,6 +40,8 @@ export default function AccountsSidebar() {
       if (!res.ok) return [];
       return res.json();
     },
+    refetchInterval: 1000 * 60 * 5, // Poll every 5 minutes
+    refetchOnWindowFocus: true,
   });
 
   const { hideSubheadings } = useAccountSubheadings();

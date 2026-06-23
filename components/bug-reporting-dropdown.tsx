@@ -46,6 +46,7 @@ export default function BugReportingDropdown() {
   // Tracking State
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showClosed, setShowClosed] = useState(false);
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -68,6 +69,8 @@ export default function BugReportingDropdown() {
       return res.json() as Promise<Issue[]>;
     },
     enabled: !!config?.enabled,
+    refetchInterval: 1000 * 30, // Poll every 30 seconds
+    refetchOnWindowFocus: true,
   });
 
   // 3. Mutation: Create
@@ -234,6 +237,10 @@ export default function BugReportingDropdown() {
     }
   };
 
+  const openIssues = issuesList.filter((issue) => issue.status !== 'closed');
+  const closedIssuesCount = issuesList.length - openIssues.length;
+  const displayedIssues = showClosed ? issuesList : openIssues;
+
   const hasActiveIssues = issuesList.some(
     (issue) => issue.status === 'reported' || issue.status === 'requested'
   );
@@ -277,7 +284,7 @@ export default function BugReportingDropdown() {
                 tab === 'track' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Track List ({issuesList.length})
+              Open Issues ({openIssues.length})
             </button>
           </div>
 
@@ -365,106 +372,128 @@ export default function BugReportingDropdown() {
                   <span className="text-xs">No bugs or features reported yet.</span>
                 </div>
               ) : (
-                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-3 no-scrollbar">
-                  {issuesList.map((issue) => {
-                    const isExpanded = expandedIssueId === issue.id;
-                    const isConfirmingDelete = deleteConfirmId === issue.id;
-                    return (
-                      <div 
-                        key={issue.id} 
-                        className="p-3 border border-border/60 bg-muted/20 hover:bg-muted/30 transition-all rounded-lg space-y-2 flex flex-col justify-between"
-                      >
-                        {/* Upper Section */}
-                        <div className="flex items-start gap-2.5 justify-between">
-                          <div className="flex-shrink-0 mt-0.5">
-                            {issue.type === 'bug' ? (
-                              <Bug className="w-4 h-4 text-destructive" />
-                            ) : (
-                              <Sparkles className="w-4 h-4 text-primary" />
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <h4 
-                              onClick={() => setExpandedIssueId(isExpanded ? null : issue.id)}
-                              className="text-xs font-semibold text-foreground truncate cursor-pointer hover:underline flex items-center justify-between gap-1"
-                            >
-                              <span className="truncate">{issue.title}</span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                              )}
-                            </h4>
-
-                            <p 
-                              className={`text-[11px] text-muted-foreground leading-relaxed mt-0.5 ${
-                                isExpanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'
-                              }`}
-                            >
-                              {issue.description}
-                            </p>
-
-                            <div className="flex items-center gap-1.5 mt-2 text-[10px] text-muted-foreground">
-                              <span>by {issue.reporterName || 'Unknown'}</span>
-                              <span>•</span>
-                              <span>{formatTimeAgo(issue.createdAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Lower Actions Section */}
-                        <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
-                          {/* Status Badge Dropdown */}
-                          <div className="relative flex items-center">
-                            <select
-                              value={issue.status}
-                              onChange={(e) => updateStatusMutation.mutate({ id: issue.id, status: e.target.value })}
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded border cursor-pointer focus:outline-none appearance-none pr-5 relative transition-all ${getStatusStyles(issue.status)}`}
-                              aria-label="Change issue status"
-                            >
-                              {(issue.type === 'bug' ? statuses.bug : statuses.feature).map((st) => (
-                                <option key={st} value={st} className="bg-card text-foreground">
-                                  {st}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="w-3 h-3 text-current absolute right-1.5 pointer-events-none" />
-                          </div>
-
-                          {/* Delete Button */}
-                          <div className="flex items-center">
-                            {isConfirmingDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => deleteMutation.mutate(issue.id)}
-                                disabled={deleteMutation.isPending}
-                                className="flex items-center gap-0.5 text-[10px] font-bold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
-                              >
-                                {deleteMutation.isPending ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Check className="w-3 h-3" />
-                                    Confirm
-                                  </>
-                                )}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setDeleteConfirmId(issue.id)}
-                                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all cursor-pointer"
-                                title="Delete report"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-3 no-scrollbar flex flex-col justify-between">
+                  <div>
+                    {displayedIssues.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 space-y-2 border border-dashed border-border rounded-lg text-muted-foreground bg-muted/10">
+                        <MessageSquare className="w-5 h-5 opacity-20" />
+                        <span className="text-xs">No open issues.</span>
                       </div>
-                    );
-                  })}
+                    ) : (
+                      <div className="space-y-3">
+                        {displayedIssues.map((issue) => {
+                          const isExpanded = expandedIssueId === issue.id;
+                          const isConfirmingDelete = deleteConfirmId === issue.id;
+                          return (
+                            <div 
+                              key={issue.id} 
+                              className="p-3 border border-border/60 bg-muted/20 hover:bg-muted/30 transition-all rounded-lg space-y-2 flex flex-col justify-between"
+                            >
+                              {/* Upper Section */}
+                              <div className="flex items-start gap-2.5 justify-between">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  {issue.type === 'bug' ? (
+                                    <Bug className="w-4 h-4 text-destructive" />
+                                  ) : (
+                                    <Sparkles className="w-4 h-4 text-primary" />
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <h4 
+                                    onClick={() => setExpandedIssueId(isExpanded ? null : issue.id)}
+                                    className="text-xs font-semibold text-foreground truncate cursor-pointer hover:underline flex items-center justify-between gap-1"
+                                  >
+                                    <span className="truncate">{issue.title}</span>
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                    ) : (
+                                      <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                    )}
+                                  </h4>
+
+                                  <p 
+                                    className={`text-[11px] text-muted-foreground leading-relaxed mt-0.5 ${
+                                      isExpanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'
+                                    }`}
+                                  >
+                                    {issue.description}
+                                  </p>
+
+                                  <div className="flex items-center gap-1.5 mt-2 text-[10px] text-muted-foreground">
+                                    <span>by {issue.reporterName || 'Unknown'}</span>
+                                    <span>•</span>
+                                    <span>{formatTimeAgo(issue.createdAt)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Lower Actions Section */}
+                              <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
+                                {/* Status Badge Dropdown */}
+                                <div className="relative flex items-center">
+                                  <select
+                                    value={issue.status}
+                                    onChange={(e) => updateStatusMutation.mutate({ id: issue.id, status: e.target.value })}
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border cursor-pointer focus:outline-none appearance-none pr-5 relative transition-all ${getStatusStyles(issue.status)}`}
+                                    aria-label="Change issue status"
+                                  >
+                                    {(issue.type === 'bug' ? statuses.bug : statuses.feature).map((st) => (
+                                      <option key={st} value={st} className="bg-card text-foreground">
+                                        {st}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="w-3 h-3 text-current absolute right-1.5 pointer-events-none" />
+                                </div>
+
+                                {/* Delete Button */}
+                                <div className="flex items-center">
+                                  {isConfirmingDelete ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteMutation.mutate(issue.id)}
+                                      disabled={deleteMutation.isPending}
+                                      className="flex items-center gap-0.5 text-[10px] font-bold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
+                                    >
+                                      {deleteMutation.isPending ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Check className="w-3 h-3" />
+                                          Confirm
+                                        </>
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteConfirmId(issue.id)}
+                                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all cursor-pointer"
+                                      title="Delete report"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Show/Hide Closed Issues Toggle Button */}
+                  {closedIssuesCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowClosed(!showClosed)}
+                      className="w-full py-2 mt-2 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {showClosed ? 'Hide Closed Issues' : `Show Closed Issues (${closedIssuesCount})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

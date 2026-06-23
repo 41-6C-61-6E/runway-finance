@@ -11,7 +11,7 @@ body,
 :root {
   height: 100%;
   /* Use dynamic viewport height on iOS to prevent toolbar resize issues */
-  min-height: -webkit-fill-available;
+  min-height: 100dvh;
 }
 
 /* Prevent iOS Safari from zooming in when tapping inputs/selects */
@@ -389,6 +389,11 @@ body,
 /* Restore visible border for the sub-tab toggle wrapper */
 .settings-accounts-toggle {
   border-color: var(--border) !important;
+}
+
+/* Hide mobile bottom navigation bar when keyboard is open (i.e. an input is focused) to prevent it from covering content on iOS */
+body:has(input:focus, textarea:focus, select:focus) nav.fixed.bottom-0 {
+  display: none !important;
 }
 
 

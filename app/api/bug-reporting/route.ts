@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { issues, user } from '@/lib/db/schema';
+import { issues, users } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { CreateIssueSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
@@ -27,10 +27,10 @@ export async function GET() {
         status: issues.status,
         createdAt: issues.createdAt,
         updatedAt: issues.updatedAt,
-        reporterName: user.name,
+        reporterName: users.username,
       })
       .from(issues)
-      .leftJoin(user, eq(issues.userId, user.id))
+      .leftJoin(users, eq(issues.userId, users.username))
       .orderBy(desc(issues.createdAt));
 
     return NextResponse.json(rows);

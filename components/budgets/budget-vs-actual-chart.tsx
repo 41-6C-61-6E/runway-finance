@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { useBudgetPeriod } from './budget-period-selector';
@@ -28,9 +29,19 @@ interface BudgetData {
 export function BudgetVsActualChart() {
   const router = useRouter();
   const { periodType, periodKey } = useBudgetPeriod();
-  const [budgets, setBudgets] = useState<BudgetData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const { data, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['budgets-chart', periodType, periodKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch budget charts data');
+      return res.json();
+    },
+  });
+
+  const budgets = data?.budgets ?? [];
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+
   const [excludeIncome, setExcludeIncome] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('budgetVsActualChart');
@@ -44,19 +55,6 @@ export function BudgetVsActualChart() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.json();
-      })
-      .then((data) => setBudgets(data.budgets ?? []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [periodType, periodKey]);
 
   const incomeItems = budgets
     .filter((d) => d.type === 'income' && (d.budgeted > 0 || d.actual > 0))

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -216,7 +217,18 @@ const formatTimeUntil = (date: Date): string => {
   return `in ${days}d`;
 };
 
+const invalidateAllFinanceQueries = (queryClient: any) => {
+  queryClient.invalidateQueries({ queryKey: ['accounts'] });
+  queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
+  queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
+  queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
+  queryClient.invalidateQueries({ queryKey: ['investments'] });
+};
+
 export default function ManualAccountsSection() {
+  const queryClient = useQueryClient();
   const [accounts, setAccounts] = useState<ManualAccount[]>([]);
   const [realEstateAccounts, setRealEstateAccounts] = useState<ManualAccount[]>([]);
   const [allMortgageAccounts, setAllMortgageAccounts] = useState<ManualAccount[]>([]);
@@ -275,12 +287,15 @@ export default function ManualAccountsSection() {
       if (reRes.ok) setRealEstateAccounts(await reRes.json());
       if (mRes.ok) setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
       setAllTags(Array.isArray(tagsData) ? tagsData : []);
+
+      // Invalidate global react-query cache for all financial views
+      invalidateAllFinanceQueries(queryClient);
     } catch {
       setAccounts([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     fetchAccounts();
