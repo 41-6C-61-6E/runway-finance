@@ -14,10 +14,9 @@ import {
   CircleDollarSign,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   ResponsiveContainer,
-  Tooltip as RechartsTooltip,
 } from 'recharts';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 
@@ -68,19 +67,27 @@ function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boole
   }
   const chartData = data.map((v, i) => ({ i, v }));
   const color = isPositive ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+  const gradId = `sparklineGrad-${isPositive ? 'pos' : 'neg'}`;
   return (
-    <div className="h-10 w-full">
+    <div className="h-10 w-full mt-1.5">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line
+        <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
             type="monotone"
             dataKey="v"
             stroke={color}
             strokeWidth={1.5}
+            fill={`url(#${gradId})`}
             dot={false}
             isAnimationActive={false}
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
@@ -241,10 +248,17 @@ export function InvestmentsSummary({
         }
       />
       {!isCollapsed && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 divide-x-0 sm:divide-x divide-border border-t border-border">
-          {tiles.map((tile, idx) => (
-            <StatTile key={idx} {...tile} />
-          ))}
+        <div className="border-t border-border bg-card/30">
+          <div className="flex lg:grid overflow-x-auto lg:overflow-visible gap-3 lg:gap-0 lg:grid-cols-6 lg:divide-x divide-border -mx-4 px-4 py-4 lg:py-0 lg:mx-0 lg:px-0 scrollbar-none snap-x snap-mandatory">
+            {tiles.map((tile, idx) => (
+              <div
+                key={idx}
+                className="w-[185px] lg:w-auto shrink-0 snap-start bg-card lg:bg-transparent border border-border/80 lg:border-0 rounded-xl lg:rounded-none shadow-sm lg:shadow-none hover:border-primary/25 lg:hover:border-transparent transition-all duration-300 hover:scale-[1.01] lg:hover:scale-100"
+              >
+                <StatTile {...tile} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

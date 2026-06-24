@@ -126,6 +126,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showSector, setShowSector] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  const toggleRow = (id: string) => {
+    setExpandedRow(expandedRow === id ? null : id);
+  };
 
   // Map quotes for easy lookup
   const quotesMap = useMemo(() => {
@@ -297,7 +302,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto border border-border/40 rounded-xl bg-card">
+      {/* Table Container (Desktop Only) */}
+      <div className="hidden md:block overflow-x-auto border border-border/40 rounded-xl bg-card">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="bg-muted/15 border-b border-border/40 text-muted-foreground/80">
@@ -509,6 +515,146 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Accordion / List Card View (Mobile Only) */}
+      <div className="block md:hidden space-y-2.5">
+        {sortedHoldings.length > 0 ? (
+          sortedHoldings.map((h, idx) => {
+            const rowId = `${h.accountId}-${h.securityId}-${idx}`;
+            const isExpanded = expandedRow === rowId;
+            const hasReturn = h.unrealizedGainLoss !== null && h.costBasis !== null && h.costBasis > 0;
+            const isReturnPositive = h.unrealizedGainLoss ? h.unrealizedGainLoss >= 0 : false;
+            const assetType = getAssetType(h.ticker, h.name);
+            const sector = getSector(h.ticker);
+
+            const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+            const price = quote?.price ?? h.price;
+            const value = quote?.price ? quote.price * h.quantity : h.value;
+            const dayChangePct = quote?.changePercent;
+            const dayChangeVal = quote?.change;
+            const high52 = quote?.high52;
+            const low52 = quote?.low52;
+            const isDayChangePositive = dayChangePct != null ? dayChangePct >= 0 : null;
+
+            const acc = accounts.find((a) => a.id === h.accountId);
+            const relativeSync = acc?.updatedAt ? formatRelativeTime(acc.updatedAt) : '';
+
+            let rangePct = 50;
+            if (high52 && low52 && high52 > low52 && price) {
+              rangePct = ((price - low52) / (high52 - low52)) * 100;
+              rangePct = Math.max(0, Math.min(100, rangePct));
+            }
+
+            return (
+              <div
+                key={rowId}
+                className="bg-card border border-border rounded-xl p-3.5 flex flex-col gap-2 hover:border-primary/20 transition-all duration-200 cursor-pointer active:bg-muted/10"
+                onClick={() => toggleRow(rowId)}
+              >
+                {/* Header Row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {h.ticker && (
+                        <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
+                          {h.ticker}
+                        </span>
+                      )}
+                      <span className="font-semibold text-foreground truncate max-w-[170px]" title={h.name}>
+                        {h.name}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
+                      <span className="px-1 py-0.5 bg-muted text-muted-foreground rounded border border-border/40 font-medium">
+                        {assetType}
+                      </span>
+                      {sector !== '—' && (
+                        <span className="text-[10px] opacity-80">{sector}</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Value & Return Right-aligned */}
+                  <div className="text-right shrink-0">
+                    <div className="font-bold text-foreground blur-number text-sm">{formatCurrency(value)}</div>
+                    {hasReturn ? (
+                      <span className={`text-[10px] font-semibold flex items-center justify-end gap-0.5 ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
+                        {isReturnPositive ? '▲' : '▼'}
+                        {h.unrealizedReturnPct!.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/50">No return data</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expanded Accordion details */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-2 gap-y-2.5 gap-x-4 text-[11px] text-muted-foreground animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div>
+                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Quantity / Price</span>
+                      <span className="font-mono text-foreground font-semibold blur-number">
+                        {h.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {formatCurrency(price)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
+                      <span className="font-mono text-foreground font-semibold">
+                        {h.portfolioWeight.toFixed(1)}% of total
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Today's Performance</span>
+                      {dayChangePct != null ? (
+                        <span className={`font-semibold font-mono ${isDayChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
+                          {isDayChangePositive ? '+' : ''}{dayChangePct.toFixed(2)}% ({formatCurrency(dayChangeVal ?? 0)})
+                        </span>
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Account / Institution</span>
+                      <span className="text-foreground font-medium truncate max-w-[130px] inline-block font-sans" title={`${h.institutionName} - ${h.accountName}`}>
+                        {h.institutionName ? `${h.institutionName}` : h.accountName}
+                      </span>
+                    </div>
+
+                    {low52 && high52 ? (
+                      <div className="col-span-2 pt-1">
+                        <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-1">52-Week Price Range</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono blur-number">${low52.toFixed(0)}</span>
+                          <div className="flex-1 h-1 bg-muted rounded-full relative">
+                            <div
+                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-sm"
+                              style={{ left: `calc(${rangePct}% - 4px)` }}
+                            />
+                          </div>
+                          <span className="font-mono blur-number">${high52.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {relativeSync && (
+                      <div className="col-span-2 pt-1 border-t border-border/20 text-[9px] flex items-center gap-1">
+                        <RefreshCw className="w-2.5 h-2.5 opacity-60" />
+                        <span>Account Synced {relativeSync}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="p-8 text-center text-muted-foreground/60 italic border border-border/40 rounded-xl bg-card">
+            {holdings.length === 0 
+              ? 'No holdings synced for these investment accounts.' 
+              : 'No holdings match the active search or filter criteria.'}
+          </div>
+        )}
       </div>
     </div>
   );

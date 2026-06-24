@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
 import { TrendingUp, TrendingDown, Minus, BarChart2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -84,7 +84,7 @@ function HoldingCard({ holding, history, quote, color }: HoldingCardProps) {
   const lineColor = historyTrend === false ? 'var(--color-destructive)' : color;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/30 transition-colors group">
+    <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -108,18 +108,25 @@ function HoldingCard({ holding, history, quote, color }: HoldingCardProps) {
       <div className="h-14 w-full -mx-0.5">
         {hasHistory ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={history} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-              <Line
+            <AreaChart data={history} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+              <defs>
+                <linearGradient id={`holdingGrad-${holding.accountId}-${holding.ticker || 'no-ticker'}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={lineColor} stopOpacity={0.2} />
+                  <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
                 type="monotone"
                 dataKey="value"
                 stroke={lineColor}
                 strokeWidth={1.5}
+                fill={`url(#holdingGrad-${holding.accountId}-${holding.ticker || 'no-ticker'})`}
                 dot={false}
                 isAnimationActive={false}
                 activeDot={{ r: 3, fill: lineColor, stroke: lineColor }}
               />
               <Tooltip content={<SparklineTooltip />} />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         ) : (
           <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground/50 italic">
@@ -245,19 +252,20 @@ export function HoldingSparklineCards({ holdings, quotes }: HoldingSparklineCard
           {loading ? (
             <LoadingSpinner category="default" className="h-[120px]" />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="flex sm:grid overflow-x-auto sm:overflow-visible gap-3 sm:grid-cols-3 lg:grid-cols-4 -mx-4 px-4 pb-3 sm:pb-0 sm:mx-0 sm:px-0 scrollbar-none snap-x snap-mandatory">
               {topHoldings.map((holding, idx) => {
                 const key = holding.ticker ?? holding.name;
                 const history = historyMap.get(key) ?? [];
                 const quote = holding.ticker ? quoteMap.get(holding.ticker) : undefined;
                 return (
-                  <HoldingCard
-                    key={`${holding.accountId}-${key}`}
-                    holding={holding}
-                    history={history}
-                    quote={quote}
-                    color={CHART_COLORS[idx % CHART_COLORS.length]}
-                  />
+                  <div key={`${holding.accountId}-${key}`} className="w-[245px] sm:w-auto shrink-0 snap-start">
+                    <HoldingCard
+                      holding={holding}
+                      history={history}
+                      quote={quote}
+                      color={CHART_COLORS[idx % CHART_COLORS.length]}
+                    />
+                  </div>
                 );
               })}
             </div>
