@@ -73,6 +73,14 @@ export function IncomeExpenseChart() {
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
   const [showFilters, setShowFilters] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const numMonths = MONTH_MAP[timeframe] || 12;
   const effectiveEndIdx = useMemo(() => {
@@ -94,6 +102,13 @@ export function IncomeExpenseChart() {
     ...d,
     expenses: -Math.abs(d.expenses),
   })), [data]);
+
+  const xInterval = useMemo(() => {
+    if (isMobile) {
+      return Math.max(0, Math.ceil(data.length / 6) - 1);
+    }
+    return Math.max(0, Math.ceil(data.length / 12) - 1);
+  }, [data.length, isMobile]);
 
   const srSummary = useMemo(() => {
     if (chartData.length === 0) return '';
@@ -144,7 +159,7 @@ export function IncomeExpenseChart() {
         tickLine={false}
         axisLine={{ stroke: 'var(--color-border)' }}
         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-        interval={data.length > 30 ? Math.floor(data.length / 6) : 0}
+        interval={xInterval}
       />
       <YAxis
         tickLine={false}

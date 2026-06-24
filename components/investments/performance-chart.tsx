@@ -314,8 +314,8 @@ export function PerformanceChart() {
 
           <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
             {/* Chart Area */}
-            <div className="flex-1 min-w-0 p-4 sm:p-5">
-              <div className="h-[200px] sm:h-[280px] w-full relative">
+            <div className="flex-1 min-w-0 p-3 sm:p-5">
+              <div className="h-[190px] sm:h-[280px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Portfolio History Area Chart" data={mergedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
@@ -347,6 +347,7 @@ export function PerformanceChart() {
                     <RechartsTooltip
                       content={<CustomTooltip />}
                       cursor={{ stroke: portfolioColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }}
+                      wrapperStyle={{ pointerEvents: 'none' }}
                     />
                     {/* Portfolio area */}
                     <Area
@@ -390,7 +391,7 @@ export function PerformanceChart() {
 
             {/* Stats Panel */}
             {summary && (
-              <div className="w-full md:w-60 shrink-0 p-4 sm:p-5 flex flex-col justify-center space-y-4">
+              <div className="w-full md:w-60 shrink-0 p-3 sm:p-5 flex flex-col justify-center space-y-4">
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
                     {timeframe.toUpperCase()} Change
