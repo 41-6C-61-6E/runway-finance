@@ -58,11 +58,11 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
   if (chartData.length === 0) return null;
 
   return (
-    <div className="h-[320px]">
+    <div className="h-[320px] touch-pan-y">
       <div className="sr-only" aria-live="polite">
         {srSummary}
       </div>
-      <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+      <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
         <div className="min-w-max h-full px-2 pb-2">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
