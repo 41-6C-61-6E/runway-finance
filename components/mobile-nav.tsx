@@ -83,9 +83,8 @@ export function MobileNav() {
 
   return (
     <>
-      {/* Bottom Nav Bar */}
       <nav
-        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/45 backdrop-blur-xl border border-sidebar-border/30 flex items-center justify-around py-3 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
+        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-3 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
         }}
@@ -98,10 +97,10 @@ export function MobileNav() {
             <a
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-2 px-4.5 rounded-full transition-all duration-200 active:scale-95 group ${
+              className={`flex flex-col items-center justify-center p-3.5 rounded-full transition-all duration-200 active:scale-95 group border ${
                 active
-                  ? 'text-primary bg-primary/15 shadow-sm'
-                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
+                  ? 'text-primary bg-primary/20 border-primary/25 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.15),0_1.5px_3px_rgba(0,0,0,0.1)] font-semibold'
+                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5 border-transparent'
               }`}
             >
               <Icon className="h-6 w-6 flex-shrink-0" />
@@ -112,10 +111,10 @@ export function MobileNav() {
         {/* Hamburger Menu Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center py-2 px-4.5 rounded-full transition-all duration-200 active:scale-95 group ${
+          className={`flex flex-col items-center justify-center p-3.5 rounded-full transition-all duration-200 active:scale-95 group border ${
             isOpen
-              ? 'text-primary bg-primary/15 shadow-sm'
-              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
+              ? 'text-primary bg-primary/20 border-primary/25 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.15),0_1.5px_3px_rgba(0,0,0,0.1)] font-semibold'
+              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5 border-transparent'
           }`}
         >
           {isOpen ? <X className="h-6 w-6 flex-shrink-0" /> : <Menu className="h-6 w-6 flex-shrink-0" />}
