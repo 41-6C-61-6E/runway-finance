@@ -285,7 +285,7 @@ export default function DataTable({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto no-scrollbar">
+          <div className="overflow-x-auto no-scrollbar scroll-contain-x">
             <table className="text-sm border-collapse" style={{ tableLayout: 'fixed', width: tableWidth }}>
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (

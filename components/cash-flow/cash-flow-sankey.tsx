@@ -1216,8 +1216,8 @@ export function CashFlowSankey() {
           </CollapsibleFilterPanel>
 
           {/* Chart */}
-          <div style={{ height: chartHeight }} className="w-full">
-            <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+          <div style={{ height: chartHeight }} className="w-full touch-pan-y">
+            <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
               <div className="min-w-max h-full px-2 pb-2">
                 {processedData.nodes.length > 0 && processedData.links.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>

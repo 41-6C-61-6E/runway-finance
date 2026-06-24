@@ -527,7 +527,7 @@ export function NetWorthChart() {
                 <TrendingUp className="w-3.5 h-3.5 text-chart-1" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Net Worth</span>
               </div>
-              <div className="h-[180px] sm:h-[220px] w-full relative">
+              <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Net Worth Over Time Area Chart" data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
@@ -604,7 +604,7 @@ export function NetWorthChart() {
                 <BarChart3 className="w-3.5 h-3.5 text-chart-1" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
               </div>
-              <div className="h-[180px] sm:h-[220px] w-full relative">
+              <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
                     role="img"

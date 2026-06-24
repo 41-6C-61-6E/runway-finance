@@ -28,13 +28,13 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
 
   return (
     <div className="flex items-center gap-1.5">
-      <button onClick={prev} className="px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
+      <button onClick={prev} className="px-3 py-1.5 sm:px-2 sm:py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
         &larr;
       </button>
       <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen(!open)}
-          className="text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+          className="text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 sm:px-1.5 sm:py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
           type="button"
         >
           {label}
@@ -59,7 +59,7 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
       <button
         onClick={next}
         disabled={nextDisabled}
-        className={`px-2 py-0.5 rounded-md text-xs transition-all ${
+        className={`px-3 py-1.5 sm:px-2 sm:py-0.5 rounded-md text-xs transition-all ${
           nextDisabled
             ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
             : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'

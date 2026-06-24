@@ -396,4 +396,38 @@ body:has(input:focus, textarea:focus, select:focus) nav.fixed {
   display: none !important;
 }
 
+/* Mobile gesture conflict prevention utilities */
+.touch-pan-y {
+  touch-action: pan-y !important;
+}
+
+.scroll-contain-x {
+  overscroll-behavior-x: contain !important;
+}
+
+/* Prevent sticky hover backgrounds on mobile touch devices */
+@media (hover: none) {
+  .hover\:bg-muted\/60:hover {
+    background-color: var(--muted) !important;
+    opacity: 0.4 !important;
+  }
+  .hover\:bg-muted\/20:hover {
+    background-color: var(--muted) !important;
+    opacity: 0.1 !important;
+  }
+  .hover\:bg-sidebar-foreground\/5:hover {
+    background-color: transparent !important;
+  }
+  .hover\:bg-sidebar-foreground\/8:hover {
+    background-color: transparent !important;
+  }
+  .hover\:bg-sidebar-foreground\/15:hover {
+    background-color: transparent !important;
+  }
+  .hover\:bg-muted\/50:hover {
+    background-color: transparent !important;
+  }
+}
+
+
 
