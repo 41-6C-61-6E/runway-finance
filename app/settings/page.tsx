@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePlaidLink } from 'react-plaid-link';
@@ -128,6 +128,31 @@ const invalidateAllFinanceQueries = (queryClient: any) => {
   queryClient.invalidateQueries({ queryKey: ['investments'] });
 };
 
+interface PlaidLinkHandlerProps {
+  token: string;
+  onSuccess: (publicToken: string, metadata: any) => void;
+  onExit: () => void;
+}
+
+function PlaidLinkHandler({ token, onSuccess, onExit }: PlaidLinkHandlerProps) {
+  const { open, ready } = usePlaidLink({
+    token,
+    onSuccess,
+    onExit,
+  });
+
+  const openedRef = useRef(false);
+
+  useEffect(() => {
+    if (ready && !openedRef.current) {
+      openedRef.current = true;
+      open();
+    }
+  }, [ready, open]);
+
+  return null;
+}
+
 function SettingsPageBody() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -236,25 +261,9 @@ function SettingsPageBody() {
       setPlaidLinkError('Failed to exchange public token');
     } finally {
       setLoading(false);
+      setPlaidLinkToken(null);
     }
   };
-
-  const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
-    token: plaidLinkToken,
-    onSuccess: (public_token, metadata) => {
-      handleExchangePublicToken(public_token, metadata);
-    },
-    onExit: () => {
-      setPlaidLinkToken(null);
-    },
-  });
-
-  useEffect(() => {
-    if (plaidLinkToken && plaidLinkReady) {
-      openPlaidLink();
-      setPlaidLinkToken(null);
-    }
-  }, [plaidLinkToken, plaidLinkReady, openPlaidLink]);
 
   const handleConnectPlaid = async () => {
     setPlaidLoading(true);
@@ -1068,6 +1077,17 @@ function SettingsPageBody() {
   return (
 
     <div className="min-h-screen w-full">
+      {plaidLinkToken && (
+        <PlaidLinkHandler
+          token={plaidLinkToken}
+          onSuccess={(publicToken, metadata) => {
+            handleExchangePublicToken(publicToken, metadata);
+          }}
+          onExit={() => {
+            setPlaidLinkToken(null);
+          }}
+        />
+      )}
       <PageHeader title="Settings" icon={Settings} />
       <PageContent className="flex flex-col items-center" maxWidth="max-w-6xl">
 
