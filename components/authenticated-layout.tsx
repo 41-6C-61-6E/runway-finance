@@ -11,6 +11,7 @@ import { AccountSubheadingsProvider } from '@/components/account-subheadings-pro
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
 import { UserSettingsProvider } from '@/components/user-settings-provider';
 import { MobileNav } from '@/components/mobile-nav';
+import { SwipeNavProvider } from '@/components/swipe-nav-provider';
 import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -94,7 +95,9 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
         } as React.CSSProperties} 
         className="transition-all duration-200 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
       >
-        {children}
+        <SwipeNavProvider>
+          {children}
+        </SwipeNavProvider>
       </div>
     </>
   );

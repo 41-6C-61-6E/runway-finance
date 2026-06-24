@@ -192,6 +192,12 @@ export default function TransactionTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [prevFilters, setPrevFilters] = useState(filters);
+  const [sorting, setSorting] = useState<SortingState>(
+    filters.sort
+      ? [{ id: filters.sort as string, desc: (filters.order ?? 'desc') === 'desc' }]
+      : [{ id: 'date', desc: true }]
+  );
+  const [prevSorting, setPrevSorting] = useState<SortingState>(sorting);
 
   useEffect(() => {
     return () => {
@@ -205,11 +211,11 @@ export default function TransactionTable({
     setPrevFilters(filters);
     setPage(0);
   }
-  const [sorting, setSorting] = useState<SortingState>(
-    filters.sort
-      ? [{ id: filters.sort as string, desc: (filters.order ?? 'desc') === 'desc' }]
-      : [{ id: 'date', desc: true }]
-  );
+
+  if (JSON.stringify(prevSorting) !== JSON.stringify(sorting)) {
+    setPrevSorting(sorting);
+    setPage(0);
+  }
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     select: true,
     account: true,
@@ -235,6 +241,7 @@ export default function TransactionTable({
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [tableWidth, setTableWidth] = useState<number | string>("100%");
   const limit = 50;
 
@@ -605,13 +612,20 @@ export default function TransactionTable({
         throw new Error(await readErrorMessage(res));
       }
       const data = await res.json();
-      setTransactions(
-        (data.data || []).map((tx: any) => ({
-          ...tx,
-          categoryName: tx.category?.name ?? null,
-          categoryColor: tx.category?.color ?? null,
-        })),
-      );
+      const newTxs = (data.data || []).map((tx: any) => ({
+        ...tx,
+        categoryName: tx.category?.name ?? null,
+        categoryColor: tx.category?.color ?? null,
+      }));
+      setTransactions((prev) => {
+        if (page === 0) {
+          return newTxs;
+        } else {
+          const existingIds = new Set(prev.map((t) => t.id));
+          const filteredNew = newTxs.filter((t: any) => !existingIds.has(t.id));
+          return [...prev, ...filteredNew];
+        }
+      });
       setTotal(data.total ?? 0);
       onTotalChange?.(data.total ?? 0);
 
@@ -747,6 +761,28 @@ export default function TransactionTable({
   useEffect(() => {
     onSelectAll(Array.from(selectedIds));
   }, [selectedIds, onSelectAll]);
+
+  useEffect(() => {
+    const currentSentinel = sentinelRef.current;
+    if (!currentSentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && transactions.length < total) {
+          setPage((p) => p + 1);
+        }
+      },
+      {
+        rootMargin: "200px",
+      }
+    );
+
+    observer.observe(currentSentinel);
+
+    return () => {
+      observer.unobserve(currentSentinel);
+    };
+  }, [loading, transactions.length, total]);
 
   const formatAmount = (amount: string) => {
     const num = parseFloat(amount);
@@ -1377,7 +1413,7 @@ export default function TransactionTable({
         className="bg-card border border-border rounded-xl overflow-hidden"
         ref={containerRef}
       >
-        {loading ? (
+        {loading && page === 0 ? (
           <LoadingSpinner category="transactions" className="p-12" />
         ) : (
           <>
@@ -1788,7 +1824,7 @@ export default function TransactionTable({
                 })}
               </div>
             ) : (
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto no-scrollbar scroll-contain-x">
               <table
                 className="text-sm border-collapse"
                 style={{ tableLayout: "fixed", width: tableWidth }}
@@ -1901,11 +1937,20 @@ export default function TransactionTable({
             </div>
             )}
 
+            {/* Sentinel for infinite scroll */}
+            <div ref={sentinelRef} className="h-1 w-full" />
+
+            {loading && page > 0 && (
+              <div className="flex justify-center py-4 bg-card border-t border-border/50">
+                <div className="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
+              </div>
+            )}
+
             {/* Pagination & Summary */}
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
               <span className="text-xs text-muted-foreground">
                 {total > 0
-                  ? `${page * limit + 1}–${Math.min((page + 1) * limit, total)} of ${total}`
+                  ? `Showing ${transactions.length} of ${total} transactions`
                   : "0 transactions"}
                 {totalAmount === null ? (
                   <span className="ml-3 pl-3 border-l border-border text-muted-foreground animate-pulse">
@@ -1922,26 +1967,6 @@ export default function TransactionTable({
                   </span>
                 ) : null}
               </span>
-              {totalPages > 1 && (
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                    className="px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-md hover:bg-muted"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      setPage((p) => Math.min(totalPages - 1, p + 1))
-                    }
-                    disabled={page >= totalPages - 1}
-                    className="px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-md hover:bg-muted"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
             </div>
           </>
         )}

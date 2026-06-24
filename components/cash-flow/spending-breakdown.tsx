@@ -342,7 +342,7 @@ export function SpendingBreakdown() {
                 }
               />
             ) : (
-              <div className="h-full w-full relative">
+              <div className="h-full w-full relative touch-pan-y">
                 {chartType === 'bar' ? (() => {
                   const maxLabelLen = pieData.length > 0
                     ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
@@ -350,7 +350,7 @@ export function SpendingBreakdown() {
                   const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
                   
                   return (
-                    <div className="overflow-x-auto overflow-y-hidden h-full w-full">
+                    <div className="overflow-x-auto overflow-y-hidden h-full w-full scroll-contain-x">
                       <div className="min-w-max h-full">
                         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                           <BarChart

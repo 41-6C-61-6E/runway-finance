@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -51,6 +51,54 @@ export function MobileNav() {
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
+
+  // Drawer drag-to-dismiss states
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDragOffset(0);
+      setIsDragging(false);
+    }
+  }, [isOpen]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    // Don't initiate drag if clicking interactive targets
+    if (target.closest('a') || target.closest('button')) {
+      return;
+    }
+    setIsDragging(true);
+    startYRef.current = e.clientY;
+    currentYRef.current = e.clientY;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    currentYRef.current = e.clientY;
+    const deltaY = currentYRef.current - startYRef.current;
+    if (deltaY > 0) {
+      setDragOffset(deltaY);
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (dragOffset > 100) {
+      setIsOpen(false);
+    } else {
+      setDragOffset(0);
+    }
+  };
 
   useEffect(() => {
     setPendingHref(null);
@@ -133,7 +181,21 @@ export function MobileNav() {
       <div className={backdropClasses} onClick={() => setIsOpen(false)} />
 
       {/* Slide-up Menu Drawer */}
-      <div className={drawerClasses} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+      <div 
+        className={drawerClasses} 
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{ 
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+          transform: isOpen 
+            ? `translateY(${dragOffset}px)` 
+            : 'translateY(100%)',
+          transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+          touchAction: 'none'
+        }}
+      >
         {/* Drag handle pill */}
         <div className="w-12 h-1 bg-muted-foreground/20 rounded-full mx-auto mb-6" />
 
