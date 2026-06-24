@@ -433,6 +433,11 @@ const SankeyCustomNode = ({
   columnOffsets,
   margin,
   usableHeight,
+  // Discarded Recharts internal props to prevent DOM warnings:
+  depth,
+  index,
+  nodeWidth,
+  nodeHeight,
   ...restProps
 }: any) => {
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
@@ -549,6 +554,18 @@ const SankeyCustomLink = ({
   columnOffsets,
   margin,
   usableHeight,
+  // Discarded Recharts internal props to prevent DOM warnings:
+  sourceRelativeX,
+  sourceRelativeY,
+  targetRelativeX,
+  targetRelativeY,
+  sourceControlX,
+  sourceControlY,
+  targetControlX,
+  targetControlY,
+  source,
+  target,
+  depth,
   ...restProps
 }: any) => {
   const gradId = `link-grad-${index}`;
