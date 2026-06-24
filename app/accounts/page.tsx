@@ -377,7 +377,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
             )}
           </div>
 
-          <div className="h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
+          <div className="flex-1 min-h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
             {visibleMiniData.length === 0 ? (
               <span className="text-[10px] text-muted-foreground/60 italic">No data for this time period</span>
             ) : visibleMiniData.length < 2 ? (
