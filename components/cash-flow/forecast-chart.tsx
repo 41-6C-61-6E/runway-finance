@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
@@ -47,6 +47,21 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
     });
   }, [visibleData]);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const xInterval = useMemo(() => {
+    if (isMobile) {
+      return Math.max(0, Math.ceil(chartData.length / 6) - 1);
+    }
+    return Math.max(0, Math.ceil(chartData.length / 12) - 1);
+  }, [chartData.length, isMobile]);
+
   const srSummary = useMemo(() => {
     if (chartData.length === 0) return '';
     const lastPoint = chartData[chartData.length - 1];
@@ -77,7 +92,7 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
               tickLine={false}
               axisLine={{ stroke: 'var(--color-border)' }}
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-              interval={chartData.length > 30 ? Math.max(4, Math.floor(chartData.length / 6)) : 0}
+              interval={xInterval}
               tickFormatter={(v: string) => {
                 return formatSafeUTCDate(v + '-01', { month: 'short', year: '2-digit' });
               }}

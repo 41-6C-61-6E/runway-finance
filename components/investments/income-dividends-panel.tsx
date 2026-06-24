@@ -44,6 +44,14 @@ export function IncomeDividendsPanel({
   loading,
 }: IncomeDividendsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeDividends');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const chartData = useMemo(() => {
     return monthlyIncome.slice(-12).map((m) => ({
@@ -123,6 +131,7 @@ export function IncomeDividendsPanel({
                         tickLine={false}
                         axisLine={false}
                         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+                        interval={isMobile ? 1 : 0}
                       />
                       <YAxis
                         tickLine={false}

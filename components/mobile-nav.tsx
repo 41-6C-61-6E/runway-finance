@@ -127,7 +127,7 @@ export function MobileNav() {
     return item.pageKey === 'settings' || !isHidden(item.pageKey as HiddenPageKey);
   });
 
-  const backdropClasses = `fixed inset-0 z-30 bg-background/60 backdrop-blur-sm transition-opacity duration-300 ${
+  const backdropClasses = `fixed inset-0 z-30 bg-transparent transition-opacity duration-300 ${
     isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
   }`;
 
