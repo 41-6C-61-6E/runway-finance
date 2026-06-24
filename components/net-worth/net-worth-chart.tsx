@@ -58,6 +58,8 @@ interface ChartResponse {
 
 interface BarDataPoint {
   date: string;
+  startDate: string;
+  endDate: string;
   change: number;
   startNetWorth: number;
   endNetWorth: number;
@@ -127,6 +129,8 @@ function computeChangeBarData(data: ChartPoint[]): { barData: BarDataPoint[]; bu
     for (let i = 1; i < sorted.length; i++) {
       barData.push({
         date: sorted[i].date,
+        startDate: sorted[i].date,
+        endDate: sorted[i].date,
         change: sorted[i].netWorth - sorted[i - 1].netWorth,
         startNetWorth: sorted[i - 1].netWorth,
         endNetWorth: sorted[i].netWorth,
@@ -148,6 +152,8 @@ function computeChangeBarData(data: ChartPoint[]): { barData: BarDataPoint[]; bu
     points.sort((a, b) => a.date.localeCompare(b.date));
     barData.push({
       date: key,
+      startDate: points[0].date,
+      endDate: points[points.length - 1].date,
       change: points[points.length - 1].netWorth - points[0].netWorth,
       startNetWorth: points[0].netWorth,
       endNetWorth: points[points.length - 1].netWorth,
@@ -399,9 +405,19 @@ export function NetWorthChart() {
   const BarTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
     const point = payload[0].payload;
+
+    let dateHeader = '';
+    if (point.startDate && point.endDate && point.startDate !== point.endDate) {
+      const startFormatted = formatSafeUTCDate(point.startDate, { month: 'short', day: 'numeric', year: 'numeric' });
+      const endFormatted = formatSafeUTCDate(point.endDate, { month: 'short', day: 'numeric', year: 'numeric' });
+      dateHeader = `${startFormatted} – ${endFormatted}`;
+    } else {
+      dateHeader = formatSafeUTCDate(point.date || point.startDate, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
     return (
       <ChartTooltip>
-        <TooltipHeader>{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
+        <TooltipHeader>{dateHeader}</TooltipHeader>
         <TooltipRow
           label="Change"
           value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}

@@ -948,7 +948,8 @@ export function CashFlowSankey() {
     <Tooltip
       isAnimationActive={false}
       allowEscapeViewBox={{ x: true, y: true }}
-      content={({ active, payload }) => {
+      content={(props: any) => {
+        const { active, payload, x, y } = props;
         if (!active || !payload || !payload.length) return null;
         const data = payload[0].payload;
 
@@ -964,7 +965,7 @@ export function CashFlowSankey() {
           const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
 
           return (
-            <ChartTooltip>
+            <ChartTooltip x={x} y={y}>
               <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
               <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
               {showPercentages && (
@@ -980,7 +981,7 @@ export function CashFlowSankey() {
             ? `${data.percentage.toFixed(1)}%`
             : formatCurrency(data.value);
           return (
-            <ChartTooltip>
+            <ChartTooltip x={x} y={y}>
               <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
               <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
               {showPercentages && data.value !== undefined && (

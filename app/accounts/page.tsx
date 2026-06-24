@@ -1107,17 +1107,37 @@ export default function AccountsPage() {
   const currentViewStart = viewStart ?? defaultStart;
   const currentViewEnd = viewEnd ?? defaultEnd;
 
+  // ── Track screen width to dynamically limit number of chart bars ────────────
+  const [windowWidth, setWindowWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowWidth(window.innerWidth);
+      const handleResize = () => {
+        setWindowWidth(window.innerWidth);
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  const maxPoints = useMemo(() => {
+    if (windowWidth < 768) return 30;  // Mobile: ~30 points
+    if (windowWidth < 1024) return 60; // Tablet: ~60 points
+    return 100;                        // Desktop: ~100 points
+  }, [windowWidth]);
+
   const visibleData = useMemo(() => {
     if (rechartsData.length === 0) return [];
     const rawVisible = rechartsData.slice(currentViewStart, currentViewEnd + 1);
     
-    // If the visible range is very large (e.g. 'all' timeframe), we downsample the rendered points to 100 points
-    if (rawVisible.length > 150) {
+    // Downsample if the number of visible points is too high for the screen size
+    if (rawVisible.length > maxPoints) {
       const sampled: typeof rawVisible = [];
       const len = rawVisible.length;
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < maxPoints; i++) {
         const index = Math.min(
-          Math.floor((i * (len - 1)) / 99),
+          Math.floor((i * (len - 1)) / (maxPoints - 1)),
           len - 1
         );
         sampled.push(rawVisible[index]);
@@ -1125,7 +1145,7 @@ export default function AccountsPage() {
       return sampled;
     }
     return rawVisible;
-  }, [rechartsData, currentViewStart, currentViewEnd]);
+  }, [rechartsData, currentViewStart, currentViewEnd, maxPoints]);
 
   // Reset viewport whenever timeframe changes
   useEffect(() => {
