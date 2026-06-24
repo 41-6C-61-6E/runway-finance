@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Landmark, 
   Receipt, 
@@ -48,7 +49,12 @@ export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [devMode, setDevMode] = useState<boolean | null>(null);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   useEffect(() => {
     setMounted(true);
@@ -84,19 +90,21 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className="fixed bottom-5 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-3 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
+        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-3 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+          bottom: 'calc(env(safe-area-inset-bottom) + 8px)',
         }}
       >
         {mainNavItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.href) && !isOpen;
+          const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href}
+              onClick={() => setPendingHref(item.href)}
+              onTouchStart={() => {}}
               className={`flex flex-col items-center justify-center p-3.5 rounded-full transition-all duration-200 active:scale-95 group border ${
                 active
                   ? 'text-primary bg-primary/20 border-primary/25 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.15),0_1.5px_3px_rgba(0,0,0,0.1)] font-semibold'
@@ -104,7 +112,7 @@ export function MobileNav() {
               }`}
             >
               <Icon className="h-6 w-6 flex-shrink-0" />
-            </a>
+            </Link>
           );
         })}
 
@@ -146,13 +154,17 @@ export function MobileNav() {
         <div className="grid grid-cols-4 gap-y-5 gap-x-2">
           {visibleDrawerItems.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.href);
+            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
 
             return (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setPendingHref(item.href);
+                  setIsOpen(false);
+                }}
+                onTouchStart={() => {}}
                 className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group"
               >
                 <div className={`p-3 rounded-2xl transition-colors ${
@@ -163,7 +175,7 @@ export function MobileNav() {
                 <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
                   active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
                 }`}>{item.label}</span>
-              </a>
+              </Link>
             );
           })}
         </div>
@@ -178,13 +190,17 @@ export function MobileNav() {
         <div className="grid grid-cols-4 gap-y-5 gap-x-2">
           {planningDrawerItems.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.href);
+            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
 
             return (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setPendingHref(item.href);
+                  setIsOpen(false);
+                }}
+                onTouchStart={() => {}}
                 className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group"
               >
                 <div className={`p-3 rounded-2xl transition-colors ${
@@ -195,7 +211,7 @@ export function MobileNav() {
                 <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
                   active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
                 }`}>{item.label}</span>
-              </a>
+              </Link>
             );
           })}
         </div>
