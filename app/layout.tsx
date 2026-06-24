@@ -25,6 +25,7 @@ export const viewport: Viewport = {
   themeColor: palette.semantic.viewportThemeColor,
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 
