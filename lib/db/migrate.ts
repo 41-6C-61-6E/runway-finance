@@ -184,29 +184,7 @@ async function runSelfHealingChecks(client: any): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
-    }
-
-    // If push_subscriptions exists but migration 0059 is not recorded as applied,
-    // mark it so later migrations (0060+) can proceed without 0059 failing on
-    // "relation already exists".
-    const tagCheck59 = await client.query(`
-      SELECT tag FROM drizzle.__drizzle_migrations WHERE tag = '0059_add_push_notifications_infrastructure'
-    `);
-    if (tagCheck59.rows.length === 0 && tableCheckPush.rows.length > 0) {
-      const drizzleDir = path.join(process.cwd(), 'drizzle');
-      const sqlPath59 = path.join(drizzleDir, '0059_add_push_notifications_infrastructure.sql');
-      if (fs.existsSync(sqlPath59)) {
-        const sql59 = fs.readFileSync(sqlPath59, 'utf-8');
-        const hash59 = crypto.createHash('sha256').update(sql59).digest('hex');
-        await client.query(
-          'INSERT INTO drizzle.__drizzle_migrations (tag, hash, created_at) VALUES ($1, $2, $3)',
-          ['0059_add_push_notifications_infrastructure', hash59, Date.now()]
-        );
-        logger.info('[migrate] [self-heal] Marked migration 0059 as applied (push_subscriptions table already exists)');
-      }
-    }
-
-    // 7. Check if sent_notifications table exists
+ table exists
     const tableCheckSent = await client.query(`
       SELECT table_name FROM information_schema.tables
       WHERE table_name = 'sent_notifications'
@@ -269,6 +247,40 @@ async function runSelfHealingChecks(client: any): Promise<void> {
           ALTER TABLE custom_alert_rules
           ADD COLUMN IF NOT EXISTS conditions JSONB
         `);
+      }
+    }
+
+    // Mark unapplied migrations as applied if their artifacts already exist.
+    // The self-heal above may create tables/columns that later migrations expect
+    // to create, causing "already exists" failures that block subsequent migrations.
+    const drizzleDir = path.join(process.cwd(), 'drizzle');
+    const markerJournalPath = path.join(drizzleDir, 'meta', '_journal.json');
+    const pendingTags = await client.query(`SELECT tag FROM drizzle.__drizzle_migrations`);
+    const appliedTagsMap = new Set(pendingTags.rows.map(r => r.tag));
+    if (fs.existsSync(markerJournalPath)) {
+      const markerJournal = JSON.parse(fs.readFileSync(markerJournalPath, 'utf-8'));
+      const migrationArtifacts = [
+        { tag: '0059_add_push_notifications_infrastructure', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'push_subscriptions'` },
+        { tag: '0060_add_notifications_limiter_and_milestones', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'budget_alert_threshold'` },
+        { tag: '0061_add_custom_alert_rules', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'custom_alert_rules'` },
+        { tag: '0062_lame_starjammers', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_operator'` },
+      ];
+      for (const { tag, check } of migrationArtifacts) {
+        if (appliedTagsMap.has(tag)) continue;
+        const result = await client.query(check);
+        if (result.rows.length > 0) {
+          const entry = markerJournal.entries.find(e => e.tag === tag);
+          if (!entry) continue;
+          const sqlPath = path.join(drizzleDir, entry.tag + '.sql');
+          if (!fs.existsSync(sqlPath)) continue;
+          const sql = fs.readFileSync(sqlPath, 'utf-8');
+          const hash = crypto.createHash('sha256').update(sql).digest('hex');
+          await client.query(
+            'INSERT INTO drizzle.__drizzle_migrations (tag, hash, created_at) VALUES ($1, $2, $3)',
+            [tag, hash, entry.when || Date.now()]
+          );
+          logger.info(`[migrate] [self-heal] Marked migration ${tag} as applied (artifacts already exist)`);
+        }
       }
     }
 
