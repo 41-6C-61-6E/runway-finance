@@ -339,13 +339,13 @@ export default function NotificationsTab() {
     } else if (rule.triggerType === 'account_balance') {
       if (crit.operator === 'greater_than') {
         if (crit.compareType === 'account') {
-          result.push({ field: 'balance_above_account', value: crit.accountId || '', compareAccountId: crit.compareAccountId });
+          result.push({ field: 'balance_above_account', value: String(crit.compareAccountId || ''), compareAccountId: crit.compareAccountId });
         } else {
           result.push({ field: 'balance_above_value', value: crit.value ?? 0 });
         }
       } else {
         if (crit.compareType === 'account') {
-          result.push({ field: 'balance_below_account', value: crit.accountId || '', compareAccountId: crit.compareAccountId });
+          result.push({ field: 'balance_below_account', value: String(crit.compareAccountId || ''), compareAccountId: crit.compareAccountId });
         } else {
           result.push({ field: 'balance_below_value', value: crit.value ?? 0 });
         }

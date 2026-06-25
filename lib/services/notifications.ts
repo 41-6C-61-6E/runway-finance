@@ -140,7 +140,14 @@ export async function sendPushNotification(
         },
       };
 
-      await webpush.sendNotification(pushSubscription, payload);
+      const timeoutMs = 10000;
+      const pushPromise = webpush.sendNotification(pushSubscription, payload);
+      await Promise.race([
+        pushPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Push notification timed out')), timeoutMs)
+        ),
+      ]);
       sentSuccessfully = true;
     } catch (err: any) {
       if (err.statusCode === 410 || err.statusCode === 404) {
@@ -793,7 +800,14 @@ export async function checkSavingsGoalAlerts(
       }
 
       if (matched) {
-        const key = `custom_goal_alert:${rule.id}:${Math.floor(allocatedAmount)}`;
+        // Build a stable dedup key from the rule ID and the matched condition values
+        let dedupSuffix: string;
+        if (rule.conditions && rule.conditions.length > 0) {
+          dedupSuffix = rule.conditions.map((c) => `${c.field}:${c.value}`).join('_');
+        } else {
+          dedupSuffix = `criteria:${rule.criteria?.operator}:${rule.criteria?.value}`;
+        }
+        const key = `custom_goal_alert:${rule.id}:${dedupSuffix}`;
         await sendPushNotification(
           userId,
           `Goal Alert: ${rule.name}`,

@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, criteria, isEnabled } = body;
+    const { name, criteria, isEnabled, conditions, conditionOperator } = body;
 
     const db = getDb();
     
@@ -29,6 +29,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (name !== undefined) updateFields.name = name;
     if (criteria !== undefined) updateFields.criteria = criteria;
     if (isEnabled !== undefined) updateFields.isEnabled = isEnabled;
+    if (conditions !== undefined) updateFields.conditions = conditions;
+    if (conditionOperator !== undefined) updateFields.conditionOperator = conditionOperator;
 
     const [updatedRule] = await db
       .update(customAlertRules)
@@ -47,6 +49,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return Response.json({ rule: updatedRule });
   } catch (err) {
+    console.error('[custom-alerts] Failed to update custom alert rule:', err);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
@@ -77,6 +80,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     return Response.json({ success: true });
   } catch (err) {
+    console.error('[custom-alerts] Failed to delete custom alert rule:', err);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
