@@ -1,13 +1,10 @@
 import { pgTable, text, timestamp, uuid, jsonb, boolean } from 'drizzle-orm/pg-core';
-import { user } from './users';
 
 // ── Push Subscriptions ────────────────────────────────────────────────────────
 // Stores device-specific push subscriptions for users
 export const pushSubscriptions = pgTable('push_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
   endpoint: text('endpoint').notNull(),
   keys: jsonb('keys').notNull().$type<{ p256dh: string; auth: string }>(),
   userAgent: text('user_agent'),
@@ -18,9 +15,7 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
 // Tracks sent alerts to prevent duplicate notifications (e.g. daily budget alerts)
 export const sentNotifications = pgTable('sent_notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
   type: text('type').notNull(), // 'budget_alert' | 'sync_error' | 'large_transaction'
   key: text('key').notNull(), // Unique key e.g., 'budget:2026-06:category_id'
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
@@ -78,9 +73,7 @@ export interface LegacyCriteria {
 // User-defined alerts with custom criteria (transactions, account balances, savings goals, cash flow)
 export const customAlertRules = pgTable('custom_alert_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
   name: text('name').notNull(),
   isEnabled: boolean('is_enabled').notNull().default(true),
   triggerType: text('trigger_type').notNull(), // 'transaction' | 'account_balance' | 'savings_goal' | 'cash_flow'

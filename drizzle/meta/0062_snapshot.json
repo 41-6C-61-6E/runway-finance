@@ -4280,21 +4280,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "custom_alert_rules_user_id_user_id_fk": {
-          "name": "custom_alert_rules_user_id_user_id_fk",
-          "tableFrom": "custom_alert_rules",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -4345,21 +4331,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "push_subscriptions_user_id_user_id_fk": {
-          "name": "push_subscriptions_user_id_user_id_fk",
-          "tableFrom": "push_subscriptions",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -4404,21 +4376,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "sent_notifications_user_id_user_id_fk": {
-          "name": "sent_notifications_user_id_user_id_fk",
-          "tableFrom": "sent_notifications",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
