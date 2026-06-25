@@ -377,11 +377,15 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
         target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
         set: {
           amount: sql`excluded.amount`,
-          transactionCount: sql`excluded.transaction_count`,
-          updatedAt: new Date(),
         },
       });
   }
+
+  // Trigger budget threshold notifications
+  const { checkBudgetsAndNotify } = await import('@/lib/services/notifications');
+  await checkBudgetsAndNotify(userId, dek).catch((e) => {
+    logger.error('[sync] Failed to check budget notifications:', e);
+  });
 
   return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
 }
@@ -543,6 +547,15 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
   logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
   const dataUserId = await resolveDataUserId(userId);
+
+  const [settings] = await getDb()
+    .select({
+      notifyLargeTransactions: userSettings.notifyLargeTransactions,
+      largeTransactionThreshold: userSettings.largeTransactionThreshold,
+    })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
 
   // Get DEK — either from override (cron) or from session (user request)
   let dek: Uint8Array;
@@ -883,6 +896,23 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           } else {
             transactionsNew++;
             acctDetail.transactionsNew++;
+
+            // Large transaction alert check
+            if (settings?.notifyLargeTransactions) {
+              const absAmount = Math.abs(amountNum);
+              if (absAmount >= (settings.largeTransactionThreshold ?? 500)) {
+                const decDesc = sfTx.description;
+                const { sendPushNotification } = await import('@/lib/services/notifications');
+                sendPushNotification(
+                  userId,
+                  `Large Transaction Alert`,
+                  `New transaction of $${absAmount.toFixed(2)} at ${decDesc}.`,
+                  '/transactions'
+                ).catch((e) => {
+                  logger.error('[sync] Failed to send large transaction notification:', e);
+                });
+              }
+            }
           }
           if (sfTx.pending) {
             acctDetail.transactionsPending++;

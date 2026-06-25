@@ -414,6 +414,13 @@
       "when": 1782091376277,
       "tag": "0058_add_issues_table",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1782407295349,
+      "tag": "0059_flippant_spectrum",
+      "breakpoints": true
     }
   ]
 }

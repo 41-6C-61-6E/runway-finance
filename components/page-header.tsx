@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSidebar } from '@/components/sidebar-context';
 import SettingsDropdown from '@/components/settings-dropdown';
 import UserDropdown from '@/components/user-dropdown';
@@ -15,6 +15,33 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeaderProps) {
   const { sidebarWidth } = useSidebar();
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Prevent running logic if user scrolls past top boundary (iOS elastic bounce)
+      if (currentScrollY < 0) {
+        setIsVisible(true);
+        return;
+      }
+
+      // Hide only if we scroll down and are past a minimum threshold
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setIsVisible(false);
+      } else if (currentScrollY < lastScrollY.current) {
+        // Show if we scroll up
+        setIsVisible(true);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <>
@@ -23,7 +50,9 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         style={{
           top: 'calc(env(safe-area-inset-top) + 8px)',
         } as React.CSSProperties}
-        className="fixed right-4 z-40 md:hidden flex items-center gap-1 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md"
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-1 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md transition-all duration-300 ease-out ${
+          isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
+        }`}
       >
         <BugReportingDropdown />
         <SettingsDropdown />

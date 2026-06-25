@@ -60,6 +60,11 @@ export async function GET() {
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+      notifySyncErrors: created?.notifySyncErrors ?? DEFAULTS.notifySyncErrors,
+      notifyBudgetAlerts: created?.notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
+      notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
+      largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+      notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
     });
   }
 
@@ -99,8 +104,13 @@ export async function GET() {
     aiBatchSize: settings[0].aiBatchSize ?? DEFAULTS.aiBatchSize,
     aiAnalysisTimeoutSeconds: settings[0].aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
     aiActiveProviderId: settings[0].aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
-    apiKeys,
+    apiKeys: apiKeys,
     accountTagVisibility: settings[0].accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+    notifySyncErrors: settings[0].notifySyncErrors ?? DEFAULTS.notifySyncErrors,
+    notifyBudgetAlerts: settings[0].notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
+    notifyLargeTransactions: settings[0].notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
+    largeTransactionThreshold: settings[0].largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+    notifyMonthlySummary: settings[0].notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
   });
 }
 
@@ -139,6 +149,11 @@ export async function PATCH(request: Request) {
 	const paystubEnabled = body.paystubEnabled;
 	const accountTagVisibility = body.accountTagVisibility;
 	const useMarketDataForSnapshots = body.useMarketDataForSnapshots;
+	const notifySyncErrors = body.notifySyncErrors;
+	const notifyBudgetAlerts = body.notifyBudgetAlerts;
+	const notifyLargeTransactions = body.notifyLargeTransactions;
+	const largeTransactionThreshold = body.largeTransactionThreshold;
+	const notifyMonthlySummary = body.notifyMonthlySummary;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -279,6 +294,22 @@ export async function PATCH(request: Request) {
 		return Response.json({ error: 'Invalid useMarketDataForSnapshots value' }, { status: 400 });
 	}
 
+	if (notifySyncErrors !== undefined && typeof notifySyncErrors !== 'boolean') {
+		return Response.json({ error: 'Invalid notifySyncErrors value' }, { status: 400 });
+	}
+	if (notifyBudgetAlerts !== undefined && typeof notifyBudgetAlerts !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyBudgetAlerts value' }, { status: 400 });
+	}
+	if (notifyLargeTransactions !== undefined && typeof notifyLargeTransactions !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyLargeTransactions value' }, { status: 400 });
+	}
+	if (largeTransactionThreshold !== undefined && (typeof largeTransactionThreshold !== 'number' || largeTransactionThreshold < 0)) {
+		return Response.json({ error: 'Invalid largeTransactionThreshold value' }, { status: 400 });
+	}
+	if (notifyMonthlySummary !== undefined && typeof notifyMonthlySummary !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyMonthlySummary value' }, { status: 400 });
+	}
+
 	const db = getDb();
 
   let settings = await db
@@ -319,6 +350,11 @@ export async function PATCH(request: Request) {
       showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+      notifySyncErrors: created?.notifySyncErrors ?? DEFAULTS.notifySyncErrors,
+      notifyBudgetAlerts: created?.notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
+      notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
+      largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+      notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
     });
   }
 
@@ -361,6 +397,11 @@ export async function PATCH(request: Request) {
 		const existingVisibility = (settings[0].accountTagVisibility as Record<string, any>) || {};
 		updates.accountTagVisibility = { ...existingVisibility, ...accountTagVisibility };
 	}
+	if (notifySyncErrors !== undefined) updates.notifySyncErrors = notifySyncErrors;
+	if (notifyBudgetAlerts !== undefined) updates.notifyBudgetAlerts = notifyBudgetAlerts;
+	if (notifyLargeTransactions !== undefined) updates.notifyLargeTransactions = notifyLargeTransactions;
+	if (largeTransactionThreshold !== undefined) updates.largeTransactionThreshold = largeTransactionThreshold;
+	if (notifyMonthlySummary !== undefined) updates.notifyMonthlySummary = notifyMonthlySummary;
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -543,5 +584,10 @@ export async function PATCH(request: Request) {
     aiActiveProviderId: updated.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys: updatedApiKeys,
     accountTagVisibility: updated.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+    notifySyncErrors: updated.notifySyncErrors,
+    notifyBudgetAlerts: updated.notifyBudgetAlerts,
+    notifyLargeTransactions: updated.notifyLargeTransactions,
+    largeTransactionThreshold: updated.largeTransactionThreshold,
+    notifyMonthlySummary: updated.notifyMonthlySummary,
   });
 }
