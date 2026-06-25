@@ -33,7 +33,13 @@ async function runSelfHealingChecks(client) {
       { name: 'net_worth_milestone_interval', type: 'INTEGER NOT NULL DEFAULT 100000' },
       { name: 'notify_ai_proposals', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'max_notifications_per_period', type: 'INTEGER NOT NULL DEFAULT 5' },
-      { name: 'notification_limiter_period_minutes', type: 'INTEGER NOT NULL DEFAULT 60' }
+      { name: 'notification_limiter_period_minutes', type: 'INTEGER NOT NULL DEFAULT 60' },
+      // Columns from migration 0059_add_push_notifications_infrastructure
+      { name: 'notify_sync_errors', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_budget_alerts', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_large_transactions', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'large_transaction_threshold', type: 'INTEGER NOT NULL DEFAULT 500' },
+      { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
     ];
 
     for (const col of columnsToCheck) {
@@ -125,6 +131,25 @@ async function runSelfHealingChecks(client) {
       `);
     }
 
+    // If push_subscriptions exists but migration 0059 is not recorded as applied,
+    // mark it so later migrations (0060+) can proceed without 0059 failing on
+    // "relation already exists".
+    const tagCheck59 = await client.query(`
+      SELECT tag FROM drizzle.__drizzle_migrations WHERE tag = '0059_add_push_notifications_infrastructure'
+    `);
+    if (tagCheck59.rows.length === 0 && tableCheckPush.rows.length > 0) {
+      const sqlPath59 = path.join(migrationsFolder, '0059_add_push_notifications_infrastructure.sql');
+      if (fs.existsSync(sqlPath59)) {
+        const sql59 = fs.readFileSync(sqlPath59, 'utf-8');
+        const hash59 = crypto.createHash('sha256').update(sql59).digest('hex');
+        await client.query(
+          'INSERT INTO drizzle.__drizzle_migrations (tag, hash, created_at) VALUES ($1, $2, $3)',
+          ['0059_add_push_notifications_infrastructure', hash59, Date.now()]
+        );
+        console.log('[migrate] [self-heal] Marked migration 0059 as applied (push_subscriptions table already exists)');
+      }
+    }
+
     // 7. Check if sent_notifications table exists
     const tableCheckSent = await client.query(`
       SELECT table_name FROM information_schema.tables
@@ -190,6 +215,13 @@ async function runSelfHealingChecks(client) {
         `);
       }
     }
+
+    // 9. Drop FK constraints that reference the "user" table — the app uses
+    //    the "users" (plural) table with usernames and never populates "user".
+    //    These FKs were removed in migration 0063; self-heal as a safety net.
+    await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
   } catch (err) {
     console.error('[migrate] Self-healing checks failed:', err.message);
     // Don't crash startup on self-healing check failure, but log it
