@@ -92,7 +92,16 @@ export async function GET() {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const cleanEnv = (val?: string) => {
+    if (!val) return null;
+    const trimmed = val.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  };
+
   return Response.json({
-    publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null,
+    publicKey: cleanEnv(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
   });
 }

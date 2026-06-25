@@ -6,9 +6,18 @@ import { logger } from '@/lib/logger';
 import webpush from 'web-push';
 
 // Initialize web-push if VAPID keys are available in process.env
-const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const privateKey = process.env.VAPID_PRIVATE_KEY;
-const subject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+const cleanEnv = (val?: string) => {
+  if (!val) return val;
+  const trimmed = val.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+};
+
+const publicKey = cleanEnv(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+const privateKey = cleanEnv(process.env.VAPID_PRIVATE_KEY);
+const subject = cleanEnv(process.env.VAPID_SUBJECT) || 'mailto:admin@example.com';
 
 let isInitialized = false;
 if (publicKey && privateKey) {

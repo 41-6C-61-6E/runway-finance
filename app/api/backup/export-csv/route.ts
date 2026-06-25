@@ -68,11 +68,12 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
   const dek = await getSessionDEK();
 
   // Load lookup tables to decode IDs
-  const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, userId));
+  const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
   const decryptedAccounts = await Promise.all(
     accountsRaw.map((row) => decryptRow('accounts', row as Record<string, unknown>, dek)),
   );
@@ -80,7 +81,7 @@ export async function GET() {
     decryptedAccounts.map((a) => [a.id as string, a.name as string]),
   );
 
-  const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, userId));
+  const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, dataUserId));
   const decryptedCategories = await Promise.all(
     categoriesRaw.map((row) => decryptRow('categories', row as Record<string, unknown>, dek)),
   );
@@ -88,17 +89,17 @@ export async function GET() {
     decryptedCategories.map((c) => [c.id as string, c.name as string]),
   );
 
-  const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, userId));
+  const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, dataUserId));
   const connectionMap = new Map<string, string>(
     connectionsRaw.map((c) => [c.id as string, c.label as string]),
   );
 
-  const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, userId));
+  const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, dataUserId));
   const importMap = new Map<string, string>(
     importsRaw.map((i) => [i.id as string, i.fileName as string]),
   );
 
-  const tagsRaw = await db.select().from(tags).where(eq(tags.userId, userId));
+  const tagsRaw = await db.select().from(tags).where(eq(tags.userId, dataUserId));
   const decryptedTags = await Promise.all(
     tagsRaw.map((row) => decryptRow('tags', row as Record<string, unknown>, dek)),
   );
@@ -106,7 +107,7 @@ export async function GET() {
     decryptedTags.map((t) => [t.id as string, t.name as string]),
   );
 
-  const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, userId));
+  const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId));
   const paystubMap = new Map<string, string>(
     paystubsRaw.map((p) => [p.id as string, `${p.employerName} (${p.checkDate})`]),
   );
@@ -161,7 +162,8 @@ export async function GET() {
   });
 
   for (const { table, dbName, label } of CSV_TABLES) {
-    const rows = await db.select().from(table).where(eq(table.userId, userId));
+    const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
+    const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
     const decrypted = await Promise.all(
       rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
     );

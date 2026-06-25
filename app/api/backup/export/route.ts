@@ -73,13 +73,15 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
   const dek = await getSessionDEK();
 
   const data: Record<string, unknown[]> = {};
 
   for (const { table, dbName } of USER_TABLES) {
-    const rows = await db.select().from(table).where(eq(table.userId, userId));
+    const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
+    const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
     const decrypted = await Promise.all(
       rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
     );
@@ -94,7 +96,7 @@ export async function GET() {
     })
     .from(transactionTags)
     .innerJoin(tags, eq(transactionTags.tagId, tags.id))
-    .where(eq(tags.userId, userId));
+    .where(eq(tags.userId, dataUserId));
   data.transaction_tags = transactionTagsExport;
 
   const accountTagsExport = await db
@@ -104,7 +106,7 @@ export async function GET() {
     })
     .from(accountTags)
     .innerJoin(tags, eq(accountTags.tagId, tags.id))
-    .where(eq(tags.userId, userId));
+    .where(eq(tags.userId, dataUserId));
   data.account_tags = accountTagsExport;
 
   const budgetTagsExport = await db
@@ -114,7 +116,7 @@ export async function GET() {
     })
     .from(budgetTags)
     .innerJoin(tags, eq(budgetTags.tagId, tags.id))
-    .where(eq(tags.userId, userId));
+    .where(eq(tags.userId, dataUserId));
   data.budget_tags = budgetTagsExport;
 
   const goalTagsExport = await db
@@ -124,7 +126,7 @@ export async function GET() {
     })
     .from(goalTags)
     .innerJoin(tags, eq(goalTags.tagId, tags.id))
-    .where(eq(tags.userId, userId));
+    .where(eq(tags.userId, dataUserId));
   data.goal_tags = goalTagsExport;
 
   const [settings] = await db

@@ -108,6 +108,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
   const dek = await getSessionDEK();
 
@@ -134,12 +135,13 @@ export async function POST(request: Request) {
 
       // Delete existing data
       for (const { table, dbName } of DELETE_ORDER) {
+        const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
         const ids = await tx
           .select({ id: table.id })
           .from(table)
-          .where(eq(table.userId, userId));
+          .where(eq(table.userId, targetUserId));
         if (ids.length > 0) {
-          await tx.delete(table).where(eq(table.userId, userId));
+          await tx.delete(table).where(eq(table.userId, targetUserId));
         }
       }
 
@@ -170,8 +172,9 @@ export async function POST(request: Request) {
 
         const restoredRows = rows.map((row) => restoreTimestamps(row));
 
+        const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
         const encrypted = await Promise.all(
-          restoredRows.map((row) => encryptRow(dbName, { ...row, userId }, dek)),
+          restoredRows.map((row) => encryptRow(dbName, { ...row, userId: targetUserId }, dek)),
         );
         const batchSize = dbName === 'categories' ? encrypted.length : 50;
         for (let i = 0; i < encrypted.length; i += batchSize) {
