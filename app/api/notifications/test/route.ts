@@ -8,12 +8,16 @@ export async function POST() {
   }
 
   try {
-    await sendPushNotification(
+    const result = await sendPushNotification(
       session.user.id,
       'Test Notification',
       'It works! This is a test notification from Runway Finance.',
       '/settings?tab=notifications'
     );
+
+    if (!result.sent) {
+      return Response.json({ success: false, reason: result.reason }, { status: 200 });
+    }
 
     return Response.json({ success: true });
   } catch (err) {
