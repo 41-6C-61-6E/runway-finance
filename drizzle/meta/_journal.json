@@ -419,7 +419,14 @@
       "idx": 59,
       "version": "7",
       "when": 1782407295349,
-      "tag": "0059_flippant_spectrum",
+      "tag": "0059_add_push_notifications_infrastructure",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1782408944246,
+      "tag": "0060_add_notifications_limiter_and_milestones",
       "breakpoints": true
     }
   ]

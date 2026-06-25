@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { financialGoals, accounts, goalAllocationHistory } from '@/lib/db/schema';
+import { financialGoals, accounts, goalAllocationHistory, userSettings } from '@/lib/db/schema';
 import { and, eq, asc, desc, inArray, isNotNull } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
@@ -269,10 +269,42 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
 export async function updateGoalAllocations(userId: string): Promise<void> {
   const allocation = await computeGoalAllocations(userId);
   const dek = await getSessionDEK();
+  const db = getDb();
+
+  // Retrieve user settings
+  const [settings] = await db
+    .select({
+      notifyGoalMilestones: userSettings.notifyGoalMilestones,
+    })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  // Fetch current goals from DB before we update them
+  const persistedGoals = await db
+    .select({
+      id: financialGoals.id,
+      allocatedAmount: financialGoals.allocatedAmount,
+      targetAmount: financialGoals.targetAmount,
+      name: financialGoals.name,
+      status: financialGoals.status,
+    })
+    .from(financialGoals)
+    .where(eq(financialGoals.userId, userId));
+
+  const decryptedPersisted = await Promise.all(
+    persistedGoals.map(async (g) => ({
+      id: g.id,
+      name: await decryptField(g.name, dek),
+      targetAmount: parseFloat(await decryptField(g.targetAmount, dek)) || 0,
+      allocatedAmount: parseFloat(await decryptField(g.allocatedAmount, dek)) || 0,
+      status: g.status,
+    }))
+  );
 
   for (const account of allocation.accounts) {
     for (const goal of account.goals) {
-      await getDb()
+      await db
         .update(financialGoals)
         .set({
           allocatedAmount: String(goal.allocatedAmount),
@@ -282,6 +314,30 @@ export async function updateGoalAllocations(userId: string): Promise<void> {
           eq(financialGoals.id, goal.goalId as any),
           eq(financialGoals.userId, userId)
         ));
+
+      // Check for savings milestone
+      if (settings?.notifyGoalMilestones && goal.status === 'active') {
+        const prev = decryptedPersisted.find((g) => g.id === goal.goalId);
+        if (prev) {
+          const isNowFunded = goal.allocatedAmount >= goal.targetAmount && goal.targetAmount > 0;
+          const wasFunded = prev.allocatedAmount >= prev.targetAmount;
+          if (isNowFunded && !wasFunded) {
+            const milestoneKey = `goal:${goal.goalId}:100`;
+            // Call milestone checker dynamically to avoid circular imports
+            const { sendPushNotification } = await import('@/lib/services/notifications');
+            sendPushNotification(
+              userId,
+              `Savings Goal Reached!`,
+              `Your savings goal "${goal.goalName}" is now fully funded!`,
+              '/goals',
+              'goal_milestone',
+              milestoneKey
+            ).catch((err) => {
+              console.error('[GoalAllocation] Failed to send goal milestone notification:', err);
+            });
+          }
+        }
+      }
     }
   }
 }
