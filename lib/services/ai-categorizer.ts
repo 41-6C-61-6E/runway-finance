@@ -309,6 +309,36 @@ export async function analyzeUncategorized(
 
     onLog?.(`Done: ${proposalsCreated} proposal(s) created, ${autoApproved} auto-approved${errors.length > 0 ? `, ${errors.length} error(s)` : ''}`);
     logger.info(`${LOG_TAG} Analysis complete`, { userId, proposalsCreated, autoApproved, errors: errors.length });
+
+    // Send push notification if there are new pending proposals
+    const pendingCount = proposalsCreated - autoApproved;
+    if (pendingCount > 0) {
+      try {
+        const [settings] = await db
+          .select({
+            notifyAiProposals: userSettings.notifyAiProposals,
+          })
+          .from(userSettings)
+          .where(eq(userSettings.userId, userId))
+          .limit(1);
+
+        if (settings?.notifyAiProposals) {
+          const { sendPushNotification } = await import('@/lib/services/notifications');
+          const uniqueKey = `ai_proposals:${Date.now().toString().slice(0, -5)}`;
+          await sendPushNotification(
+            userId,
+            `AI Proposals Ready`,
+            `AI has generated ${pendingCount} new suggestion${pendingCount > 1 ? 's' : ''} for your transactions.`,
+            '/settings?tab=ai',
+            'ai_proposals',
+            uniqueKey
+          );
+        }
+      } catch (err) {
+        logger.error(`${LOG_TAG} Failed to send AI proposals notification:`, err);
+      }
+    }
+
     return { proposalsCreated, autoApproved, errors };
 
   } catch (err) {

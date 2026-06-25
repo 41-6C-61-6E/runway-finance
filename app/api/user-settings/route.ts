@@ -65,6 +65,13 @@ export async function GET() {
       notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
       largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
       notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
+      budgetAlertThreshold: created?.budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
+      notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
+      notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
+      netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+      notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+      maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
+      notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
     });
   }
 
@@ -111,6 +118,13 @@ export async function GET() {
     notifyLargeTransactions: settings[0].notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
     largeTransactionThreshold: settings[0].largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
     notifyMonthlySummary: settings[0].notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
+    budgetAlertThreshold: settings[0].budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
+    notifyGoalMilestones: settings[0].notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
+    notifyNetWorthMilestones: settings[0].notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
+    netWorthMilestoneInterval: settings[0].netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+    notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+    maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
+    notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
   });
 }
 
@@ -154,6 +168,13 @@ export async function PATCH(request: Request) {
 	const notifyLargeTransactions = body.notifyLargeTransactions;
 	const largeTransactionThreshold = body.largeTransactionThreshold;
 	const notifyMonthlySummary = body.notifyMonthlySummary;
+	const budgetAlertThreshold = body.budgetAlertThreshold;
+	const notifyGoalMilestones = body.notifyGoalMilestones;
+	const notifyNetWorthMilestones = body.notifyNetWorthMilestones;
+	const netWorthMilestoneInterval = body.netWorthMilestoneInterval;
+	const notifyAiProposals = body.notifyAiProposals;
+	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
+	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -309,6 +330,27 @@ export async function PATCH(request: Request) {
 	if (notifyMonthlySummary !== undefined && typeof notifyMonthlySummary !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyMonthlySummary value' }, { status: 400 });
 	}
+	if (budgetAlertThreshold !== undefined && (typeof budgetAlertThreshold !== 'number' || budgetAlertThreshold < 0 || budgetAlertThreshold > 100)) {
+		return Response.json({ error: 'Invalid budgetAlertThreshold value (must be 0-100)' }, { status: 400 });
+	}
+	if (notifyGoalMilestones !== undefined && typeof notifyGoalMilestones !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyGoalMilestones value' }, { status: 400 });
+	}
+	if (notifyNetWorthMilestones !== undefined && typeof notifyNetWorthMilestones !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyNetWorthMilestones value' }, { status: 400 });
+	}
+	if (netWorthMilestoneInterval !== undefined && (typeof netWorthMilestoneInterval !== 'number' || netWorthMilestoneInterval <= 0)) {
+		return Response.json({ error: 'Invalid netWorthMilestoneInterval value' }, { status: 400 });
+	}
+	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
+	}
+	if (maxNotificationsPerPeriod !== undefined && (typeof maxNotificationsPerPeriod !== 'number' || maxNotificationsPerPeriod <= 0)) {
+		return Response.json({ error: 'Invalid maxNotificationsPerPeriod value' }, { status: 400 });
+	}
+	if (notificationLimiterPeriodMinutes !== undefined && (typeof notificationLimiterPeriodMinutes !== 'number' || notificationLimiterPeriodMinutes <= 0)) {
+		return Response.json({ error: 'Invalid notificationLimiterPeriodMinutes value' }, { status: 400 });
+	}
 
 	const db = getDb();
 
@@ -355,6 +397,13 @@ export async function PATCH(request: Request) {
       notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
       largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
       notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
+      budgetAlertThreshold: created?.budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
+      notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
+      notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
+      netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+      notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+      maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
+      notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
     });
   }
 
@@ -402,6 +451,13 @@ export async function PATCH(request: Request) {
 	if (notifyLargeTransactions !== undefined) updates.notifyLargeTransactions = notifyLargeTransactions;
 	if (largeTransactionThreshold !== undefined) updates.largeTransactionThreshold = largeTransactionThreshold;
 	if (notifyMonthlySummary !== undefined) updates.notifyMonthlySummary = notifyMonthlySummary;
+	if (budgetAlertThreshold !== undefined) updates.budgetAlertThreshold = budgetAlertThreshold;
+	if (notifyGoalMilestones !== undefined) updates.notifyGoalMilestones = notifyGoalMilestones;
+	if (notifyNetWorthMilestones !== undefined) updates.notifyNetWorthMilestones = notifyNetWorthMilestones;
+	if (netWorthMilestoneInterval !== undefined) updates.netWorthMilestoneInterval = netWorthMilestoneInterval;
+	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
+	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
+	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
   updates.updatedAt = new Date();
 
   const [updated] = await db
@@ -589,5 +645,12 @@ export async function PATCH(request: Request) {
     notifyLargeTransactions: updated.notifyLargeTransactions,
     largeTransactionThreshold: updated.largeTransactionThreshold,
     notifyMonthlySummary: updated.notifyMonthlySummary,
+    budgetAlertThreshold: updated.budgetAlertThreshold,
+    notifyGoalMilestones: updated.notifyGoalMilestones,
+    notifyNetWorthMilestones: updated.notifyNetWorthMilestones,
+    netWorthMilestoneInterval: updated.netWorthMilestoneInterval,
+    notifyAiProposals: updated.notifyAiProposals,
+    maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
+    notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,
   });
 }

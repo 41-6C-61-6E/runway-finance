@@ -73,6 +73,13 @@ export const NOTIFICATION_DEFAULTS = {
   notifyLargeTransactions: true,
   largeTransactionThreshold: 500,
   notifyMonthlySummary: true,
+  budgetAlertThreshold: 80,
+  notifyGoalMilestones: true,
+  notifyNetWorthMilestones: true,
+  netWorthMilestoneInterval: 100000,
+  notifyAiProposals: true,
+  maxNotificationsPerPeriod: 5,
+  notificationLimiterPeriodMinutes: 60,
 } as const;
 
 // ── API Keys & Endpoints ─────────────────────────────────────────────────────
@@ -220,6 +227,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'notifyLargeTransactions', label: 'Notify Large Transactions', description: 'Enable push notifications for large individual transactions', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyLargeTransactions },
   { key: 'largeTransactionThreshold', label: 'Large Transaction Threshold', description: 'Alert threshold value in standard currency units', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.largeTransactionThreshold },
   { key: 'notifyMonthlySummary', label: 'Notify Monthly Summary', description: 'Enable monthly cash flow and net worth summaries', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyMonthlySummary },
+  { key: 'budgetAlertThreshold', label: 'Budget Alert Threshold %', description: 'Percentage of budget spent to trigger warning alerts (e.g. 80)', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.budgetAlertThreshold },
+  { key: 'notifyGoalMilestones', label: 'Notify Goal Milestones', description: 'Enable push notifications when a savings goal is 100% completed', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyGoalMilestones },
+  { key: 'notifyNetWorthMilestones', label: 'Notify Net Worth Milestones', description: 'Enable push notifications when net worth crosses a milestone interval', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyNetWorthMilestones },
+  { key: 'netWorthMilestoneInterval', label: 'Net Worth Milestone Interval', description: 'Interval threshold in standard currency for net worth milestones (e.g. 100000)', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.netWorthMilestoneInterval },
+  { key: 'notifyAiProposals', label: 'Notify AI Proposals', description: 'Enable push notifications when new AI categorization proposals are generated', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyAiProposals },
+  { key: 'maxNotificationsPerPeriod', label: 'Max Notifications Per Period', description: 'Maximum number of push notifications to send within the sliding window', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.maxNotificationsPerPeriod },
+  { key: 'notificationLimiterPeriodMinutes', label: 'Notification Limiter Window (Minutes)', description: 'Window size in minutes for the notifications rate limiter', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notificationLimiterPeriodMinutes },
 
   // ── API Keys & Endpoints ──
   { key: 'metalsApiUrl', label: 'Metals API URL', description: 'Endpoint URL for gold/silver spot prices (Yahoo Finance by default)', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.metalsApiUrl },

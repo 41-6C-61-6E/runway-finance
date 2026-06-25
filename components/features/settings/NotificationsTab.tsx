@@ -40,6 +40,13 @@ export default function NotificationsTab() {
   const notifyLargeTransactions = settings.notifyLargeTransactions !== false;
   const largeTransactionThreshold = settings.largeTransactionThreshold ?? 500;
   const notifyMonthlySummary = settings.notifyMonthlySummary !== false;
+  const budgetAlertThreshold = settings.budgetAlertThreshold ?? 80;
+  const notifyGoalMilestones = settings.notifyGoalMilestones !== false;
+  const notifyNetWorthMilestones = settings.notifyNetWorthMilestones !== false;
+  const netWorthMilestoneInterval = settings.netWorthMilestoneInterval ?? 100000;
+  const notifyAiProposals = settings.notifyAiProposals !== false;
+  const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
+  const notificationLimiterPeriodMinutes = settings.notificationLimiterPeriodMinutes ?? 60;
 
   const checkDeviceSubscription = async () => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -305,19 +312,37 @@ export default function NotificationsTab() {
             />
           </div>
 
-          {/* Budget Alerts Toggle */}
-          <div className="flex items-center justify-between py-4">
-            <div className="space-y-1 pr-4">
-              <Label htmlFor="notify-budget" className="font-medium text-sm">Budget Limit Exceeded</Label>
-              <p className="text-xs text-muted-foreground">
-                Receive alerts when spending on a category exceeds 100% of your allocated monthly budget.
-              </p>
+          {/* Budget Alerts Toggle & Warning Threshold Input */}
+          <div className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1 pr-4">
+                <Label htmlFor="notify-budget" className="font-medium text-sm">Budget Limit Alerts</Label>
+                <p className="text-xs text-muted-foreground">
+                  Receive alerts when spending exceeds warning threshold and 100% of your allocated monthly budget.
+                </p>
+              </div>
+              <Switch
+                id="notify-budget"
+                checked={notifyBudgetAlerts}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyBudgetAlerts', checked)}
+              />
             </div>
-            <Switch
-              id="notify-budget"
-              checked={notifyBudgetAlerts}
-              onCheckedChange={(checked) => handleUpdateSetting('notifyBudgetAlerts', checked)}
-            />
+            {notifyBudgetAlerts && (
+              <div className="flex items-center gap-3 pl-4 max-w-sm">
+                <Label htmlFor="budget-threshold" className="text-xs text-muted-foreground whitespace-nowrap">
+                  Warning threshold (%)
+                </Label>
+                <Input
+                  id="budget-threshold"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={budgetAlertThreshold}
+                  onChange={(e) => handleUpdateSetting('budgetAlertThreshold', parseInt(e.target.value) || 0)}
+                  className="h-8 max-w-[120px]"
+                />
+              </div>
+            )}
           </div>
 
           {/* Large Transactions Toggle & Input */}
@@ -352,6 +377,68 @@ export default function NotificationsTab() {
             )}
           </div>
 
+          {/* Goal Milestones Toggle */}
+          <div className="flex items-center justify-between py-4">
+            <div className="space-y-1 pr-4">
+              <Label htmlFor="notify-goal-milestones" className="font-medium text-sm">Savings Goal Completed</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive notifications when a savings goal becomes 100% funded.
+              </p>
+            </div>
+            <Switch
+              id="notify-goal-milestones"
+              checked={notifyGoalMilestones}
+              onCheckedChange={(checked) => handleUpdateSetting('notifyGoalMilestones', checked)}
+            />
+          </div>
+
+          {/* Net Worth Milestones Toggle & Input */}
+          <div className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1 pr-4">
+                <Label htmlFor="notify-networth-milestones" className="font-medium text-sm">Net Worth Milestones</Label>
+                <p className="text-xs text-muted-foreground">
+                  Receive congratulatory alerts when your net worth crosses intervals of a set amount.
+                </p>
+              </div>
+              <Switch
+                id="notify-networth-milestones"
+                checked={notifyNetWorthMilestones}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyNetWorthMilestones', checked)}
+              />
+            </div>
+            {notifyNetWorthMilestones && (
+              <div className="flex items-center gap-3 pl-4 max-w-sm">
+                <Label htmlFor="networth-interval" className="text-xs text-muted-foreground whitespace-nowrap">
+                  Milestone interval ($)
+                </Label>
+                <Input
+                  id="networth-interval"
+                  type="number"
+                  min="1000"
+                  value={netWorthMilestoneInterval}
+                  onChange={(e) => handleUpdateSetting('netWorthMilestoneInterval', parseInt(e.target.value) || 0)}
+                  className="h-8 max-w-[120px]"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* AI Proposals Toggle */}
+          <div className="flex items-center justify-between py-4">
+            <div className="space-y-1 pr-4">
+              <Label htmlFor="notify-ai-proposals" className="font-medium text-sm">AI Proposal Recommendations</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive notifications when background transaction auto-categorization finishes and suggestions are ready.
+              </p>
+            </div>
+            <Switch
+              id="notify-ai-proposals"
+              checked={notifyAiProposals}
+              onCheckedChange={(checked) => handleUpdateSetting('notifyAiProposals', checked)}
+            />
+          </div>
+
           {/* Monthly Finance Summary Toggle */}
           <div className="flex items-center justify-between py-4">
             <div className="space-y-1 pr-4">
@@ -365,6 +452,52 @@ export default function NotificationsTab() {
               checked={notifyMonthlySummary}
               onCheckedChange={(checked) => handleUpdateSetting('notifyMonthlySummary', checked)}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Rate Limiter Configuration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
+            Rate Limiter Configuration
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure sliding-window rate limiting to prevent notifications from spamming your devices.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="max-notifications" className="text-sm font-medium">Max alerts allowed</Label>
+              <Input
+                id="max-notifications"
+                type="number"
+                min="1"
+                value={maxNotificationsPerPeriod}
+                onChange={(e) => handleUpdateSetting('maxNotificationsPerPeriod', parseInt(e.target.value) || 1)}
+                className="max-w-xs"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Maximum number of push notifications to dispatch during the time window.
+              </p>
+            </div>
+            
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="limiter-period" className="text-sm font-medium">Time window size (minutes)</Label>
+              <Input
+                id="limiter-period"
+                type="number"
+                min="1"
+                value={notificationLimiterPeriodMinutes}
+                onChange={(e) => handleUpdateSetting('notificationLimiterPeriodMinutes', parseInt(e.target.value) || 1)}
+                className="max-w-xs"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Duration of the sliding window in minutes.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
