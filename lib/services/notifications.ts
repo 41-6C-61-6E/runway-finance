@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots } from '@/lib/db/schema';
+import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow } from '@/lib/db/schema';
 import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
@@ -365,5 +365,315 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
     }
   } catch (err) {
     logger.error('[notifications-service] Error checking net worth milestones:', err);
+  }
+}
+
+// ── Custom Alert Rules Checks ──────────────────────────────────────────────────
+
+export async function checkTransactionAlerts(
+  userId: string,
+  tx: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }
+) {
+  try {
+    const db = getDb();
+    const rules = await db
+      .select()
+      .from(customAlertRules)
+      .where(
+        and(
+          eq(customAlertRules.userId, userId),
+          eq(customAlertRules.isEnabled, true),
+          eq(customAlertRules.triggerType, 'transaction')
+        )
+      );
+
+    if (rules.length === 0) return;
+
+    const txAmount = Math.abs(parseFloat(tx.amount));
+    const txDescLower = tx.description.toLowerCase();
+    const txPayeeLower = tx.payee?.toLowerCase() ?? '';
+    const txMemoLower = tx.memo?.toLowerCase() ?? '';
+
+    for (const rule of rules) {
+      const crit = rule.criteria;
+      
+      // 1. Account match
+      if (crit.accountId && crit.accountId !== tx.accountId) {
+        continue;
+      }
+      // 2. Amount min
+      if (crit.amountMin !== undefined && txAmount < crit.amountMin) {
+        continue;
+      }
+      // 3. Amount max
+      if (crit.amountMax !== undefined && txAmount > crit.amountMax) {
+        continue;
+      }
+      // 4. Keyword match
+      if (crit.keyword) {
+        const kw = crit.keyword.toLowerCase();
+        if (
+          !txDescLower.includes(kw) &&
+          !txPayeeLower.includes(kw) &&
+          !txMemoLower.includes(kw)
+        ) {
+          continue;
+        }
+      }
+
+      // If all matched criteria pass, send alert
+      const key = `custom_tx_alert:${rule.id}:${tx.externalId}`;
+      const amountStr = txAmount.toFixed(2);
+      await sendPushNotification(
+        userId,
+        `Transaction Alert: ${rule.name}`,
+        `New transaction of $${amountStr} at ${tx.description} matched your alert criteria.`,
+        '/transactions',
+        'custom_transaction_alert',
+        key
+      );
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking transaction alerts:', err);
+  }
+}
+
+export async function checkAccountBalanceAlerts(
+  userId: string,
+  accountId: string,
+  currentBalance: number,
+  dek: Uint8Array
+) {
+  try {
+    const db = getDb();
+    const rules = await db
+      .select()
+      .from(customAlertRules)
+      .where(
+        and(
+          eq(customAlertRules.userId, userId),
+          eq(customAlertRules.isEnabled, true),
+          eq(customAlertRules.triggerType, 'account_balance')
+        )
+      );
+
+    if (rules.length === 0) return;
+
+    const [acc] = await db
+      .select({ id: accounts.id, name: accounts.name })
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, accountId)))
+      .limit(1);
+
+    if (!acc) return;
+    const accName = await decryptField(acc.name, dek);
+
+    for (const rule of rules) {
+      const crit = rule.criteria;
+      if (crit.accountId !== accountId) continue;
+
+      let trigger = false;
+      let compareDescription = '';
+
+      if (crit.compareType === 'value') {
+        const val = crit.value ?? 0;
+        if (crit.operator === 'less_than' && currentBalance < val) {
+          trigger = true;
+          compareDescription = `fell below $${val}`;
+        } else if (crit.operator === 'greater_than' && currentBalance > val) {
+          trigger = true;
+          compareDescription = `rose above $${val}`;
+        }
+      } else if (crit.compareType === 'account' && crit.compareAccountId) {
+        const [compAcc] = await db
+          .select({ balance: accounts.balance, name: accounts.name })
+          .from(accounts)
+          .where(and(eq(accounts.userId, userId), eq(accounts.id, crit.compareAccountId)))
+          .limit(1);
+
+        if (compAcc) {
+          const compBalance = parseFloat(await decryptField(compAcc.balance, dek)) || 0;
+          const compName = await decryptField(compAcc.name, dek);
+
+          if (crit.operator === 'less_than' && currentBalance < compBalance) {
+            trigger = true;
+            compareDescription = `fell below ${compName} balance ($${compBalance.toFixed(2)})`;
+          } else if (crit.operator === 'greater_than' && currentBalance > compBalance) {
+            trigger = true;
+            compareDescription = `rose above ${compName} balance ($${compBalance.toFixed(2)})`;
+          }
+        }
+      }
+
+      if (trigger) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const key = `custom_balance_alert:${rule.id}:${todayStr}`;
+
+        await sendPushNotification(
+          userId,
+          `Balance Alert: ${rule.name}`,
+          `Account "${accName}" balance ($${currentBalance.toFixed(2)}) ${compareDescription}.`,
+          '/accounts',
+          'custom_balance_alert',
+          key
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking account balance alerts:', err);
+  }
+}
+
+export async function checkSavingsGoalAlerts(
+  userId: string,
+  goalId: string,
+  goalName: string,
+  allocatedAmount: number,
+  targetAmount: number,
+  prevAllocatedAmount: number
+) {
+  try {
+    const db = getDb();
+    const rules = await db
+      .select()
+      .from(customAlertRules)
+      .where(
+        and(
+          eq(customAlertRules.userId, userId),
+          eq(customAlertRules.isEnabled, true),
+          eq(customAlertRules.triggerType, 'savings_goal')
+        )
+      );
+
+    if (rules.length === 0) return;
+
+    for (const rule of rules) {
+      const crit = rule.criteria;
+      if (crit.goalId && crit.goalId !== goalId) continue;
+
+      let trigger = false;
+      let reason = '';
+
+      if (crit.operator === 'reached_percentage') {
+        const pctThreshold = (crit.value ?? 100) / 100;
+        const currentPct = targetAmount > 0 ? allocatedAmount / targetAmount : 0;
+        const prevPct = targetAmount > 0 ? prevAllocatedAmount / targetAmount : 0;
+
+        if (currentPct >= pctThreshold && prevPct < pctThreshold) {
+          trigger = true;
+          reason = `reached ${crit.value}% of its target`;
+        }
+      } else if (crit.operator === 'reached_amount') {
+        const amtThreshold = crit.value ?? 0;
+        if (allocatedAmount >= amtThreshold && prevAllocatedAmount < amtThreshold) {
+          trigger = true;
+          reason = `reached $${amtThreshold}`;
+        }
+      }
+
+      if (trigger) {
+        const key = `custom_goal_alert:${rule.id}:${Math.floor(allocatedAmount)}`;
+        await sendPushNotification(
+          userId,
+          `Goal Alert: ${rule.name}`,
+          `Savings Goal "${goalName}" has ${reason} (current: $${allocatedAmount.toFixed(2)}).`,
+          '/goals',
+          'custom_goal_alert',
+          key
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking savings goal alerts:', err);
+  }
+}
+
+export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
+  try {
+    const db = getDb();
+    const rules = await db
+      .select()
+      .from(customAlertRules)
+      .where(
+        and(
+          eq(customAlertRules.userId, userId),
+          eq(customAlertRules.isEnabled, true),
+          eq(customAlertRules.triggerType, 'cash_flow')
+        )
+      );
+
+    if (rules.length === 0) return;
+
+    const recentCashFlows = await db
+      .select()
+      .from(monthlyCashFlow)
+      .where(eq(monthlyCashFlow.userId, userId))
+      .orderBy(desc(monthlyCashFlow.yearMonth))
+      .limit(12);
+
+    if (recentCashFlows.length === 0) return;
+
+    const decryptedCashFlows = await Promise.all(
+      recentCashFlows.map(async (cf) => {
+        const netCashFlow = parseFloat(await decryptField(cf.netCashFlow, dek)) || 0;
+        const totalIncome = parseFloat(await decryptField(cf.totalIncome, dek)) || 0;
+        const totalExpenses = parseFloat(await decryptField(cf.totalExpenses, dek)) || 0;
+        const savingsRate = totalIncome > 0 ? (netCashFlow / totalIncome) * 100 : 0;
+
+        return {
+          yearMonth: cf.yearMonth,
+          netCashFlow,
+          savingsRate,
+        };
+      })
+    );
+
+    for (const rule of rules) {
+      const crit = rule.criteria;
+      const metric = crit.metric ?? 'net_savings';
+      const op = crit.operator ?? 'less_than';
+      const val = crit.value ?? 0;
+      const consecMonths = crit.consecutiveMonths ?? 1;
+
+      if (decryptedCashFlows.length < consecMonths) continue;
+
+      let allViolated = true;
+      for (let i = 0; i < consecMonths; i++) {
+        const cf = decryptedCashFlows[i];
+        const metricValue = metric === 'net_savings' ? cf.netCashFlow : cf.savingsRate;
+
+        if (op === 'less_than') {
+          if (metricValue >= val) {
+            allViolated = false;
+            break;
+          }
+        } else if (op === 'greater_than') {
+          if (metricValue <= val) {
+            allViolated = false;
+            break;
+          }
+        }
+      }
+
+      if (allViolated) {
+        const mostRecentMonth = decryptedCashFlows[0].yearMonth;
+        const key = `custom_cash_flow_alert:${rule.id}:${mostRecentMonth}`;
+
+        const metricName = metric === 'net_savings' ? 'Net Cash Flow' : 'Savings Rate';
+        const formattedVal = metric === 'net_savings' ? `$${val}` : `${val}%`;
+        const consecStr = consecMonths > 1 ? ` for ${consecMonths} consecutive months` : '';
+
+        await sendPushNotification(
+          userId,
+          `Cash Flow Alert: ${rule.name}`,
+          `${metricName} is ${op === 'less_than' ? 'below' : 'above'} ${formattedVal}${consecStr} (latest: ${metric === 'net_savings' ? '$' + decryptedCashFlows[0].netCashFlow.toFixed(2) : decryptedCashFlows[0].savingsRate.toFixed(2) + '%'}).`,
+          '/dashboard',
+          'custom_cash_flow_alert',
+          key
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking cash flow alerts:', err);
   }
 }

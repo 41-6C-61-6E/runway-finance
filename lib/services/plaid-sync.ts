@@ -386,6 +386,12 @@ export async function syncPlaidConnection(
 
       externalIdToAccountId.set(plaidAcc.account_id, upserted.id);
 
+      // Trigger custom account balance alerts check
+      const { checkAccountBalanceAlerts } = await import('@/lib/services/notifications');
+      checkAccountBalanceAlerts(dataUserId, upserted.id, parseFloat(balance) || 0, dek).catch((e) => {
+        logger.error('[plaid-sync] Failed to check custom account balance alerts:', e);
+      });
+
       if (holdingsForAccount !== undefined) {
         await getDb()
           .delete(holdings)
@@ -582,6 +588,19 @@ export async function syncPlaidConnection(
         transactionsUpdated++;
       } else {
         transactionsNew++;
+
+        // Trigger custom transaction alerts check
+        const { checkTransactionAlerts } = await import('@/lib/services/notifications');
+        checkTransactionAlerts(dataUserId, {
+          externalId: pt.transaction_id,
+          accountId,
+          description: pt.original_description || pt.name || '',
+          payee: pt.merchant_name || null,
+          memo: pt.payment_meta?.reference_number || null,
+          amount: appAmount,
+        }).catch((e) => {
+          logger.error('[plaid-sync] Failed to run custom transaction alert checks:', e);
+        });
       }
 
       // Update counters in accountDetails
@@ -749,6 +768,12 @@ export async function syncPlaidConnection(
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);
     await updateCategoryIncomeSummaries(dataUserId, dek);
+
+    // Trigger custom cash flow alerts check
+    const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
+    checkCashFlowAlerts(dataUserId, dek).catch((e) => {
+      logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
+    });
 
     if (transactionsNew > 0 || transactionsUpdated > 0) {
       invalidateUserSearchCache(dataUserId);
