@@ -384,6 +384,136 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
 
 // ── Custom Alert Rules Checks ──────────────────────────────────────────────────
 
+import type { AlertCondition, ConditionOperator } from '@/lib/db/schema/notifications';
+
+// ── Generic Multi-Condition Evaluator ─────────────────────────────────────────
+
+interface TransactionContext {
+  accountId: string;
+  amount: number;
+  descriptionLower: string;
+  payeeLower: string;
+  memoLower: string;
+}
+
+function evaluateTransactionCondition(cond: AlertCondition, ctx: TransactionContext): boolean {
+  switch (cond.field) {
+    case 'account':
+      return ctx.accountId === String(cond.value);
+    case 'amount_min':
+      return ctx.amount >= Number(cond.value);
+    case 'amount_max':
+      return ctx.amount <= Number(cond.value);
+    case 'keyword': {
+      const kw = String(cond.value).toLowerCase();
+      return ctx.descriptionLower.includes(kw) || ctx.payeeLower.includes(kw) || ctx.memoLower.includes(kw);
+    }
+    default:
+      return false;
+  }
+}
+
+interface BalanceContext {
+  accountId: string;
+  currentBalance: number;
+  compareAccountBalances: Map<string, number>; // accountId -> balance
+}
+
+function evaluateBalanceCondition(cond: AlertCondition, ctx: BalanceContext): boolean {
+  // All balance conditions require matching the target account
+  // The accountId filter is checked at the rule level, not per-condition
+  switch (cond.field) {
+    case 'balance_below_value':
+      return ctx.currentBalance < Number(cond.value);
+    case 'balance_above_value':
+      return ctx.currentBalance > Number(cond.value);
+    case 'balance_below_account': {
+      const compBalance = ctx.compareAccountBalances.get(String(cond.value));
+      return compBalance !== undefined && ctx.currentBalance < compBalance;
+    }
+    case 'balance_above_account': {
+      const compBalance = ctx.compareAccountBalances.get(String(cond.value));
+      return compBalance !== undefined && ctx.currentBalance > compBalance;
+    }
+    default:
+      return false;
+  }
+}
+
+interface GoalContext {
+  goalId: string;
+  currentPct: number;    // 0-1 ratio
+  prevPct: number;       // 0-1 ratio
+  allocatedAmount: number;
+  prevAllocatedAmount: number;
+}
+
+function evaluateGoalCondition(cond: AlertCondition, ctx: GoalContext): boolean {
+  // goalId matching is optional — if goalId is specified on the condition, filter by it
+  if (cond.goalId && cond.goalId !== ctx.goalId) return false;
+
+  switch (cond.field) {
+    case 'goal_reached_percentage': {
+      const threshold = Number(cond.value) / 100;
+      return ctx.currentPct >= threshold && ctx.prevPct < threshold;
+    }
+    case 'goal_reached_amount': {
+      const threshold = Number(cond.value);
+      return ctx.allocatedAmount >= threshold && ctx.prevAllocatedAmount < threshold;
+    }
+    default:
+      return false;
+  }
+}
+
+interface CashFlowContext {
+  recentMonths: { netCashFlow: number; savingsRate: number }[];
+}
+
+function evaluateCashFlowCondition(cond: AlertCondition, ctx: CashFlowContext): boolean {
+  const val = Number(cond.value);
+  const consecMonths = cond.consecutiveMonths ?? 1;
+  if (ctx.recentMonths.length < consecMonths) return false;
+
+  for (let i = 0; i < consecMonths; i++) {
+    const month = ctx.recentMonths[i];
+    let metricValue: number;
+    let comparison: 'below' | 'above';
+
+    switch (cond.field) {
+      case 'cf_net_savings_below':
+        metricValue = month.netCashFlow; comparison = 'below'; break;
+      case 'cf_net_savings_above':
+        metricValue = month.netCashFlow; comparison = 'above'; break;
+      case 'cf_savings_rate_below':
+        metricValue = month.savingsRate; comparison = 'below'; break;
+      case 'cf_savings_rate_above':
+        metricValue = month.savingsRate; comparison = 'above'; break;
+      default:
+        return false;
+    }
+
+    if (comparison === 'below' && metricValue >= val) return false;
+    if (comparison === 'above' && metricValue <= val) return false;
+  }
+  return true;
+}
+
+function evaluateConditions<T>(
+  conditions: AlertCondition[],
+  operator: ConditionOperator,
+  evaluator: (cond: AlertCondition, ctx: T) => boolean,
+  ctx: T
+): boolean {
+  if (conditions.length === 0) return false;
+  if (operator === 'AND') {
+    return conditions.every((c) => evaluator(c, ctx));
+  }
+  return conditions.some((c) => evaluator(c, ctx));
+}
+
+// ── Check Functions ───────────────────────────────────────────────────────────
+
 export async function checkTransactionAlerts(
   userId: string,
   tx: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }
@@ -409,43 +539,46 @@ export async function checkTransactionAlerts(
     const txMemoLower = tx.memo?.toLowerCase() ?? '';
 
     for (const rule of rules) {
-      const crit = rule.criteria;
-      
-      // 1. Account match
-      if (crit.accountId && crit.accountId !== tx.accountId) {
-        continue;
-      }
-      // 2. Amount min
-      if (crit.amountMin !== undefined && txAmount < crit.amountMin) {
-        continue;
-      }
-      // 3. Amount max
-      if (crit.amountMax !== undefined && txAmount > crit.amountMax) {
-        continue;
-      }
-      // 4. Keyword match
-      if (crit.keyword) {
-        const kw = crit.keyword.toLowerCase();
-        if (
-          !txDescLower.includes(kw) &&
-          !txPayeeLower.includes(kw) &&
-          !txMemoLower.includes(kw)
-        ) {
-          continue;
+      let matched = false;
+
+      if (rule.conditions && rule.conditions.length > 0) {
+        // New multi-condition evaluation
+        const ctx: TransactionContext = {
+          accountId: tx.accountId,
+          amount: txAmount,
+          descriptionLower: txDescLower,
+          payeeLower: txPayeeLower,
+          memoLower: txMemoLower,
+        };
+        matched = evaluateConditions(rule.conditions, rule.conditionOperator ?? 'AND', evaluateTransactionCondition, ctx);
+      } else {
+        // Legacy single-criteria evaluation
+        const crit = rule.criteria;
+        let pass = true;
+        if (crit.accountId && crit.accountId !== tx.accountId) pass = false;
+        if (pass && crit.amountMin !== undefined && txAmount < crit.amountMin) pass = false;
+        if (pass && crit.amountMax !== undefined && txAmount > crit.amountMax) pass = false;
+        if (pass && crit.keyword) {
+          const kw = crit.keyword.toLowerCase();
+          if (!txDescLower.includes(kw) && !txPayeeLower.includes(kw) && !txMemoLower.includes(kw)) {
+            pass = false;
+          }
         }
+        matched = pass;
       }
 
-      // If all matched criteria pass, send alert
-      const key = `custom_tx_alert:${rule.id}:${tx.externalId}`;
-      const amountStr = txAmount.toFixed(2);
-      await sendPushNotification(
-        userId,
-        `Transaction Alert: ${rule.name}`,
-        `New transaction of $${amountStr} at ${tx.description} matched your alert criteria.`,
-        '/transactions',
-        'custom_transaction_alert',
-        key
-      );
+      if (matched) {
+        const key = `custom_tx_alert:${rule.id}:${tx.externalId}`;
+        const amountStr = txAmount.toFixed(2);
+        await sendPushNotification(
+          userId,
+          `Transaction Alert: ${rule.name}`,
+          `New transaction of $${amountStr} at ${tx.description} matched your alert criteria.`,
+          '/transactions',
+          'custom_transaction_alert',
+          key
+        );
+      }
     }
   } catch (err) {
     logger.error('[notifications-service] Error checking transaction alerts:', err);
@@ -483,43 +616,90 @@ export async function checkAccountBalanceAlerts(
     const accName = await decryptField(acc.name, dek);
 
     for (const rule of rules) {
-      const crit = rule.criteria;
-      if (crit.accountId !== accountId) continue;
-
-      let trigger = false;
+      let matched = false;
       let compareDescription = '';
 
-      if (crit.compareType === 'value') {
-        const val = crit.value ?? 0;
-        if (crit.operator === 'less_than' && currentBalance < val) {
-          trigger = true;
-          compareDescription = `fell below $${val}`;
-        } else if (crit.operator === 'greater_than' && currentBalance > val) {
-          trigger = true;
-          compareDescription = `rose above $${val}`;
+      if (rule.conditions && rule.conditions.length > 0) {
+        // New multi-condition evaluation
+        // Collect compare account balances needed by any condition
+        const compareAccountBalances = new Map<string, number>();
+        for (const cond of rule.conditions) {
+          if ((cond.field === 'balance_below_account' || cond.field === 'balance_above_account') && cond.value) {
+            const compId = String(cond.value);
+            if (!compareAccountBalances.has(compId)) {
+              const [compAcc] = await db
+                .select({ balance: accounts.balance, name: accounts.name })
+                .from(accounts)
+                .where(and(eq(accounts.userId, userId), eq(accounts.id, compId)))
+                .limit(1);
+              if (compAcc) {
+                compareAccountBalances.set(compId, parseFloat(await decryptField(compAcc.balance, dek)) || 0);
+              }
+            }
+          }
         }
-      } else if (crit.compareType === 'account' && crit.compareAccountId) {
-        const [compAcc] = await db
-          .select({ balance: accounts.balance, name: accounts.name })
-          .from(accounts)
-          .where(and(eq(accounts.userId, userId), eq(accounts.id, crit.compareAccountId)))
-          .limit(1);
 
-        if (compAcc) {
-          const compBalance = parseFloat(await decryptField(compAcc.balance, dek)) || 0;
-          const compName = await decryptField(compAcc.name, dek);
+        const ctx: BalanceContext = {
+          accountId,
+          currentBalance,
+          compareAccountBalances,
+        };
+        matched = evaluateConditions(rule.conditions, rule.conditionOperator ?? 'AND', evaluateBalanceCondition, ctx);
 
-          if (crit.operator === 'less_than' && currentBalance < compBalance) {
-            trigger = true;
-            compareDescription = `fell below ${compName} balance ($${compBalance.toFixed(2)})`;
-          } else if (crit.operator === 'greater_than' && currentBalance > compBalance) {
-            trigger = true;
-            compareDescription = `rose above ${compName} balance ($${compBalance.toFixed(2)})`;
+        if (matched) {
+          // Build a description from the first matching condition for the notification body
+          for (const cond of rule.conditions) {
+            if (evaluateBalanceCondition(cond, ctx)) {
+              if (cond.field === 'balance_below_value') {
+                compareDescription = `fell below $${cond.value}`;
+              } else if (cond.field === 'balance_above_value') {
+                compareDescription = `rose above $${cond.value}`;
+              } else if (cond.field === 'balance_below_account' || cond.field === 'balance_above_account') {
+                const compBal = compareAccountBalances.get(String(cond.value));
+                const direction = cond.field === 'balance_below_account' ? 'fell below' : 'rose above';
+                compareDescription = `${direction} compared account ($${compBal?.toFixed(2) ?? '?'})`;
+              }
+              break;
+            }
+          }
+        }
+      } else {
+        // Legacy single-criteria evaluation
+        const crit = rule.criteria;
+        if (crit.accountId !== accountId) continue;
+
+        if (crit.compareType === 'value') {
+          const val = crit.value ?? 0;
+          if (crit.operator === 'less_than' && currentBalance < val) {
+            matched = true;
+            compareDescription = `fell below $${val}`;
+          } else if (crit.operator === 'greater_than' && currentBalance > val) {
+            matched = true;
+            compareDescription = `rose above $${val}`;
+          }
+        } else if (crit.compareType === 'account' && crit.compareAccountId) {
+          const [compAcc] = await db
+            .select({ balance: accounts.balance, name: accounts.name })
+            .from(accounts)
+            .where(and(eq(accounts.userId, userId), eq(accounts.id, crit.compareAccountId)))
+            .limit(1);
+
+          if (compAcc) {
+            const compBalance = parseFloat(await decryptField(compAcc.balance, dek)) || 0;
+            const compName = await decryptField(compAcc.name, dek);
+
+            if (crit.operator === 'less_than' && currentBalance < compBalance) {
+              matched = true;
+              compareDescription = `fell below ${compName} balance ($${compBalance.toFixed(2)})`;
+            } else if (crit.operator === 'greater_than' && currentBalance > compBalance) {
+              matched = true;
+              compareDescription = `rose above ${compName} balance ($${compBalance.toFixed(2)})`;
+            }
           }
         }
       }
 
-      if (trigger) {
+      if (matched) {
         const todayStr = new Date().toISOString().split('T')[0];
         const key = `custom_balance_alert:${rule.id}:${todayStr}`;
 
@@ -561,31 +741,58 @@ export async function checkSavingsGoalAlerts(
 
     if (rules.length === 0) return;
 
-    for (const rule of rules) {
-      const crit = rule.criteria;
-      if (crit.goalId && crit.goalId !== goalId) continue;
+    const currentPct = targetAmount > 0 ? allocatedAmount / targetAmount : 0;
+    const prevPct = targetAmount > 0 ? prevAllocatedAmount / targetAmount : 0;
 
-      let trigger = false;
+    for (const rule of rules) {
+      let matched = false;
       let reason = '';
 
-      if (crit.operator === 'reached_percentage') {
-        const pctThreshold = (crit.value ?? 100) / 100;
-        const currentPct = targetAmount > 0 ? allocatedAmount / targetAmount : 0;
-        const prevPct = targetAmount > 0 ? prevAllocatedAmount / targetAmount : 0;
+      if (rule.conditions && rule.conditions.length > 0) {
+        // New multi-condition evaluation
+        const ctx: GoalContext = {
+          goalId,
+          currentPct,
+          prevPct,
+          allocatedAmount,
+          prevAllocatedAmount,
+        };
+        matched = evaluateConditions(rule.conditions, rule.conditionOperator ?? 'AND', evaluateGoalCondition, ctx);
 
-        if (currentPct >= pctThreshold && prevPct < pctThreshold) {
-          trigger = true;
-          reason = `reached ${crit.value}% of its target`;
+        if (matched) {
+          // Build reason from first matching condition
+          for (const cond of rule.conditions) {
+            if (evaluateGoalCondition(cond, ctx)) {
+              if (cond.field === 'goal_reached_percentage') {
+                reason = `reached ${cond.value}% of its target`;
+              } else if (cond.field === 'goal_reached_amount') {
+                reason = `reached $${cond.value}`;
+              }
+              break;
+            }
+          }
         }
-      } else if (crit.operator === 'reached_amount') {
-        const amtThreshold = crit.value ?? 0;
-        if (allocatedAmount >= amtThreshold && prevAllocatedAmount < amtThreshold) {
-          trigger = true;
-          reason = `reached $${amtThreshold}`;
+      } else {
+        // Legacy single-criteria evaluation
+        const crit = rule.criteria;
+        if (crit.goalId && crit.goalId !== goalId) continue;
+
+        if (crit.operator === 'reached_percentage') {
+          const pctThreshold = (crit.value ?? 100) / 100;
+          if (currentPct >= pctThreshold && prevPct < pctThreshold) {
+            matched = true;
+            reason = `reached ${crit.value}% of its target`;
+          }
+        } else if (crit.operator === 'reached_amount') {
+          const amtThreshold = crit.value ?? 0;
+          if (allocatedAmount >= amtThreshold && prevAllocatedAmount < amtThreshold) {
+            matched = true;
+            reason = `reached $${amtThreshold}`;
+          }
         }
       }
 
-      if (trigger) {
+      if (matched) {
         const key = `custom_goal_alert:${rule.id}:${Math.floor(allocatedAmount)}`;
         await sendPushNotification(
           userId,
@@ -643,44 +850,76 @@ export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
     );
 
     for (const rule of rules) {
-      const crit = rule.criteria;
-      const metric = crit.metric ?? 'net_savings';
-      const op = crit.operator ?? 'less_than';
-      const val = crit.value ?? 0;
-      const consecMonths = crit.consecutiveMonths ?? 1;
+      let matched = false;
+      let notificationBody = '';
 
-      if (decryptedCashFlows.length < consecMonths) continue;
+      if (rule.conditions && rule.conditions.length > 0) {
+        // New multi-condition evaluation
+        const ctx: CashFlowContext = {
+          recentMonths: decryptedCashFlows,
+        };
+        matched = evaluateConditions(rule.conditions, rule.conditionOperator ?? 'AND', evaluateCashFlowCondition, ctx);
 
-      let allViolated = true;
-      for (let i = 0; i < consecMonths; i++) {
-        const cf = decryptedCashFlows[i];
-        const metricValue = metric === 'net_savings' ? cf.netCashFlow : cf.savingsRate;
+        if (matched) {
+          // Build notification body from first matching condition
+          for (const cond of rule.conditions) {
+            if (evaluateCashFlowCondition(cond, ctx)) {
+              const val = Number(cond.value);
+              const consecMonths = cond.consecutiveMonths ?? 1;
+              const consecStr = consecMonths > 1 ? ` for ${consecMonths} consecutive months` : '';
+              const latest = decryptedCashFlows[0];
 
-        if (op === 'less_than') {
-          if (metricValue >= val) {
-            allViolated = false;
-            break;
+              if (cond.field.startsWith('cf_net_savings')) {
+                const direction = cond.field.includes('below') ? 'below' : 'above';
+                notificationBody = `Net Cash Flow is ${direction} $${val}${consecStr} (latest: $${latest.netCashFlow.toFixed(2)}).`;
+              } else {
+                const direction = cond.field.includes('below') ? 'below' : 'above';
+                notificationBody = `Savings Rate is ${direction} ${val}%${consecStr} (latest: ${latest.savingsRate.toFixed(2)}%).`;
+              }
+              break;
+            }
           }
-        } else if (op === 'greater_than') {
-          if (metricValue <= val) {
-            allViolated = false;
-            break;
+        }
+      } else {
+        // Legacy single-criteria evaluation
+        const crit = rule.criteria;
+        const metric = crit.metric ?? 'net_savings';
+        const op = crit.operator ?? 'less_than';
+        const val = crit.value ?? 0;
+        const consecMonths = crit.consecutiveMonths ?? 1;
+
+        if (decryptedCashFlows.length < consecMonths) continue;
+
+        let allViolated = true;
+        for (let i = 0; i < consecMonths; i++) {
+          const cf = decryptedCashFlows[i];
+          const metricValue = metric === 'net_savings' ? cf.netCashFlow : cf.savingsRate;
+
+          if (op === 'less_than') {
+            if (metricValue >= val) { allViolated = false; break; }
+          } else if (op === 'greater_than') {
+            if (metricValue <= val) { allViolated = false; break; }
           }
+        }
+        matched = allViolated;
+
+        if (matched) {
+          const metricName = metric === 'net_savings' ? 'Net Cash Flow' : 'Savings Rate';
+          const formattedVal = metric === 'net_savings' ? `$${val}` : `${val}%`;
+          const consecStr = consecMonths > 1 ? ` for ${consecMonths} consecutive months` : '';
+          const latest = decryptedCashFlows[0];
+          notificationBody = `${metricName} is ${op === 'less_than' ? 'below' : 'above'} ${formattedVal}${consecStr} (latest: ${metric === 'net_savings' ? '$' + latest.netCashFlow.toFixed(2) : latest.savingsRate.toFixed(2) + '%'}).`;
         }
       }
 
-      if (allViolated) {
+      if (matched) {
         const mostRecentMonth = decryptedCashFlows[0].yearMonth;
         const key = `custom_cash_flow_alert:${rule.id}:${mostRecentMonth}`;
-
-        const metricName = metric === 'net_savings' ? 'Net Cash Flow' : 'Savings Rate';
-        const formattedVal = metric === 'net_savings' ? `$${val}` : `${val}%`;
-        const consecStr = consecMonths > 1 ? ` for ${consecMonths} consecutive months` : '';
 
         await sendPushNotification(
           userId,
           `Cash Flow Alert: ${rule.name}`,
-          `${metricName} is ${op === 'less_than' ? 'below' : 'above'} ${formattedVal}${consecStr} (latest: ${metric === 'net_savings' ? '$' + decryptedCashFlows[0].netCashFlow.toFixed(2) : decryptedCashFlows[0].savingsRate.toFixed(2) + '%'}).`,
+          notificationBody,
           '/dashboard',
           'custom_cash_flow_alert',
           key

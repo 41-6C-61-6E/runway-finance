@@ -31,10 +31,15 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, triggerType, criteria, isEnabled } = body;
+    const { name, triggerType, criteria, isEnabled, conditions, conditionOperator } = body;
 
-    if (!name || !triggerType || !criteria) {
-      return Response.json({ error: 'Name, trigger type, and criteria are required' }, { status: 400 });
+    if (!name || !triggerType) {
+      return Response.json({ error: 'Name and trigger type are required' }, { status: 400 });
+    }
+
+    // Require either conditions array or legacy criteria
+    if ((!conditions || conditions.length === 0) && (!criteria || Object.keys(criteria).length === 0)) {
+      return Response.json({ error: 'At least one condition or criteria is required' }, { status: 400 });
     }
 
     const db = getDb();
@@ -44,8 +49,10 @@ export async function POST(request: Request) {
         userId: session.user.id,
         name,
         triggerType,
-        criteria,
+        criteria: criteria || {},
         isEnabled: isEnabled !== undefined ? isEnabled : true,
+        conditions: conditions && conditions.length > 0 ? conditions : null,
+        conditionOperator: conditionOperator || 'AND',
       })
       .returning();
 
