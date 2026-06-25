@@ -8,6 +8,7 @@ import { CalculationTraceOverlay } from '@/components/financial-logic/calculatio
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
+import { useGoalInflow } from './goal-inflow-context';
 import { Target, Coins, PiggyBank, TrendingUp, PieChart, ChevronDown, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -283,9 +284,15 @@ function ProjectionPacing() {
     allFundedBy: string | null;
     accounts: Array<{ allFundedBy: string | null; goals: Array<{ willFund: boolean }> }>;
   } | null>(null);
+  const { savedInflow } = useGoalInflow();
 
   useEffect(() => {
-    fetch('/api/goals/projections?projectionMonths=60', { credentials: 'include' })
+    const params = new URLSearchParams();
+    params.set('projectionMonths', '60');
+    if (savedInflow !== null && savedInflow >= 0) {
+      params.set('monthlyInflow', String(savedInflow));
+    }
+    fetch(`/api/goals/projections?${params.toString()}`, { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
         if (!data) return;
@@ -299,7 +306,7 @@ function ProjectionPacing() {
         setProjections({ allFundedBy, accounts: data.accounts });
       })
       .catch(() => {});
-  }, []);
+  }, [savedInflow]);
 
   if (!projections) return null;
 
