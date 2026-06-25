@@ -54,7 +54,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline';",
               "img-src 'self' blob: data:;",
               "font-src 'self' data:;",
-              "connect-src 'self' https://cdn.plaid.com;",
+              "connect-src 'self' https://cdn.plaid.com https://*.push.apple.com https://fcm.googleapis.com https://*.fcm.googleapis.com https://updates.push.services.mozilla.com https://*.notify.windows.com;",
               "frame-src 'self' https://cdn.plaid.com;",
               "object-src 'none';",
               "base-uri 'self';",

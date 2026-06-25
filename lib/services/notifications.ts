@@ -32,6 +32,8 @@ if (publicKey && privateKey) {
   logger.warn('[notifications-service] Web Push VAPID keys are missing from environment. Notifications will be disabled.');
 }
 
+export type PushResult = { sent: boolean; reason?: string };
+
 export async function sendPushNotification(
   userId: string,
   title: string,
@@ -39,10 +41,10 @@ export async function sendPushNotification(
   urlPath?: string,
   type: string = 'generic',
   key?: string
-) {
+): Promise<PushResult> {
   if (!isInitialized) {
     logger.warn('[notifications-service] Cannot send push notification: service not initialized (VAPID keys missing).');
-    return;
+    return { sent: false, reason: 'VAPID keys are not configured on the server.' };
   }
 
   const db = getDb();
@@ -62,7 +64,7 @@ export async function sendPushNotification(
         .limit(1);
       if (existing) {
         logger.debug('[notifications-service] Notification already sent, skipping.', { key });
-        return;
+        return { sent: false, reason: 'Duplicate notification suppressed.' };
       }
     } catch (err) {
       logger.error('[notifications-service] Error checking duplicate notification:', err);
@@ -102,7 +104,7 @@ export async function sendPushNotification(
         maxNotifications,
         periodMinutes,
       });
-      return;
+      return { sent: false, reason: 'Rate limit exceeded.' };
     }
   } catch (err) {
     logger.error('[notifications-service] Error checking rate limit:', err);
@@ -115,8 +117,8 @@ export async function sendPushNotification(
     .where(eq(pushSubscriptions.userId, userId));
 
   if (subs.length === 0) {
-    logger.debug('[notifications-service] No push subscriptions found for user', { userId });
-    return;
+    logger.warn('[notifications-service] No push subscriptions found for user. Ensure at least one device is subscribed.', { userId });
+    return { sent: false, reason: 'No device subscriptions found. Please enable notifications on at least one device.' };
   }
 
   const payload = JSON.stringify({
@@ -170,7 +172,10 @@ export async function sendPushNotification(
     } catch (err) {
       logger.error('[notifications-service] Failed to record sent notification:', err);
     }
+    return { sent: true };
   }
+
+  return { sent: false, reason: 'All subscription endpoints failed or expired.' };
 }
 
 export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
