@@ -7,6 +7,8 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
   Area,
+  Line,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,9 +18,10 @@ import {
   Label,
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle } from 'lucide-react';
+import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils/format';
+import { useGoalInflow } from './goal-inflow-context';
 
 interface GoalProjection {
   goalId: string;
@@ -43,7 +46,7 @@ interface ProjectionPoint {
   totalAllocated: number;
   goalAllocations: Record<string, number>;
   goalFunding: string[];
-  remaining: number;
+  availableAfterFunding: number;
 }
 
 interface AccountProjection {
@@ -96,9 +99,9 @@ function ProjectionChartTooltip({ active, payload }: any) {
   return (
     <ChartTooltip>
       <TooltipHeader>{formatMonthYear(point.date)}</TooltipHeader>
-      <TooltipRow label="Account Balance" value={formatCurrency(point.accountBalance)} color="var(--color-chart-1)" />
-      <TooltipRow label="Total Allocated" value={formatCurrency(point.totalAllocated)} color="var(--color-chart-3)" />
-      <TooltipRow label="Remaining" value={formatCurrency(point.remaining)} color="var(--color-muted-foreground)" />
+      <TooltipRow label="Raw Balance" value={formatCurrency(point.accountBalance)} color="var(--color-chart-1)" />
+      <TooltipRow label="Committed to Goals" value={formatCurrency(point.totalAllocated)} color="var(--color-chart-4)" />
+      <TooltipRow label="Available After Goals" value={formatCurrency(point.availableAfterFunding)} color="var(--color-chart-2)" />
       {point.goalFunding.length > 0 && (
         <div className="mt-1.5 pt-1.5 border-t border-border/50">
           <div className="text-[10px] font-semibold text-status-positive mb-0.5">Funding Milestone</div>
@@ -111,53 +114,25 @@ function ProjectionChartTooltip({ active, payload }: any) {
   );
 }
 
-function LookbackSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const options = [
-    { value: 3, label: '3mo' },
-    { value: 6, label: '6mo' },
-    { value: 12, label: '1yr' },
-    { value: 24, label: '2yr' },
-  ];
-
-  return (
-    <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={cn(
-            'px-2 py-1 rounded-md text-[10px] font-medium transition-all',
-            value === opt.value
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-          )}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function MilestonesProjections() {
   const [collapsed, setCollapsed] = useCardCollapsed('milestonesProjections');
   const [data, setData] = useState<ProjectionsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [monthlyInflow, setMonthlyInflow] = useState<number | null>(null);
-  const [lookbackMonths, setLookbackMonths] = useState(6);
   const [inputValue, setInputValue] = useState('');
-  const [showWhatIf, setShowWhatIf] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingInflow, setPendingInflow] = useState<number | null>(null);
+  const { savedInflow, setSavedInflow } = useGoalInflow();
+  const hasLoadedOnce = useRef(false);
 
-  const fetchProjections = useCallback(async (inflow: number | null, lookback: number) => {
+  const activeInflow = savedInflow !== null ? savedInflow : pendingInflow;
+
+  const fetchProjections = useCallback(async (inflow: number | null) => {
     try {
       setLoading(true);
       setError(null);
       const params = new URLSearchParams();
       if (inflow !== null && inflow >= 0) params.set('monthlyInflow', String(inflow));
-      params.set('lookbackMonths', String(lookback));
       params.set('projectionMonths', '60');
 
       const res = await fetch(`/api/goals/projections?${params.toString()}`, { credentials: 'include' });
@@ -165,55 +140,59 @@ export function MilestonesProjections() {
       const result: ProjectionsResult = await res.json();
       setData(result);
 
-      // When first loaded, set the inflow to the calculated default
-      if (inflow === null) {
-        setMonthlyInflow(result.totalMonthlyInflow);
-        setInputValue(String(result.totalMonthlyInflow));
+      if (!hasLoadedOnce.current) {
+        hasLoadedOnce.current = true;
+        // Use saved value if available, otherwise calculated default
+        if (savedInflow !== null) {
+          setInputValue(String(savedInflow));
+          setPendingInflow(savedInflow);
+        } else {
+          setPendingInflow(result.totalMonthlyInflow);
+          setInputValue(String(result.totalMonthlyInflow));
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [savedInflow]);
 
   useEffect(() => {
-    fetchProjections(monthlyInflow, lookbackMonths);
+    fetchProjections(activeInflow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookbackMonths]);
-
-  const handleInflowChange = (value: string) => {
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const parsed = parseFloat(value);
-      if (!isNaN(parsed) && parsed >= 0) {
-        setMonthlyInflow(parsed);
-        fetchProjections(parsed, lookbackMonths);
-      }
-    }, 300);
-  };
+  }, []);
 
   const adjustInflow = (delta: number) => {
-    const current = monthlyInflow ?? 0;
+    const current = pendingInflow ?? 0;
     const newVal = Math.max(0, Math.round((current + delta) * 100) / 100);
-    setMonthlyInflow(newVal);
+    setPendingInflow(newVal);
     setInputValue(String(newVal));
-    fetchProjections(newVal, lookbackMonths);
+  };
+
+  const handleSaveInflow = () => {
+    if (pendingInflow !== null) {
+      setSavedInflow(pendingInflow);
+      fetchProjections(pendingInflow);
+    }
   };
 
   const resetInflowToDefault = () => {
     if (!data) return;
-    setMonthlyInflow(data.totalMonthlyInflow);
+    setSavedInflow(null);
+    setPendingInflow(data.totalMonthlyInflow);
     setInputValue(String(data.totalMonthlyInflow));
-    fetchProjections(null, lookbackMonths);
+    fetchProjections(null);
   };
+
+  const isDirty = savedInflow === null
+    ? false
+    : pendingInflow !== null && Math.abs(pendingInflow - savedInflow) > 0.01;
 
   // Determine which account to show
   const accountData = useMemo(() => {
     if (!data) return null;
     if (selectedAccountId === 'all') {
-      // Merge all accounts into one view
       const allGoals: GoalProjection[] = [];
       const allPoints = new Map<number, ProjectionPoint>();
       let totalInflow = 0;
@@ -229,13 +208,17 @@ export function MilestonesProjections() {
           if (existing) {
             existing.accountBalance += pt.accountBalance;
             existing.totalAllocated += pt.totalAllocated;
-            existing.remaining += pt.remaining;
+            existing.availableAfterFunding += pt.availableAfterFunding;
             existing.goalFunding.push(...pt.goalFunding);
             for (const [gid, alloc] of Object.entries(pt.goalAllocations)) {
               existing.goalAllocations[gid] = (existing.goalAllocations[gid] || 0) + alloc;
             }
           } else {
-            allPoints.set(pt.month, { ...pt, goalAllocations: { ...pt.goalAllocations }, goalFunding: [...pt.goalFunding] });
+            allPoints.set(pt.month, {
+              ...pt,
+              goalAllocations: { ...pt.goalAllocations },
+              goalFunding: [...pt.goalFunding],
+            });
           }
         }
       }
@@ -313,9 +296,9 @@ export function MilestonesProjections() {
       />
       {!collapsed && (
         <CardContent className="space-y-5">
-          {/* Account and Inflow Controls */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            {data.accounts.length > 1 && (
+          {/* Account Selector */}
+          {data.accounts.length > 1 && (
+            <div className="flex items-center gap-3">
               <select
                 value={selectedAccountId}
                 onChange={(e) => setSelectedAccountId(e.target.value)}
@@ -326,12 +309,8 @@ export function MilestonesProjections() {
                   <option key={a.accountId} value={a.accountId}>{a.accountName}</option>
                 ))}
               </select>
-            )}
-
-            <div className="flex-1" />
-
-            <LookbackSelector value={lookbackMonths} onChange={setLookbackMonths} />
-          </div>
+            </div>
+          )}
 
           {accountData && (
             <>
@@ -359,7 +338,7 @@ export function MilestonesProjections() {
               <div className="bg-muted/20 rounded-lg border border-border/50 p-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-medium text-foreground">Monthly Inflow</span>
+                    <span className="text-xs font-medium text-foreground">Monthly Inflow (90-day avg)</span>
                     <button
                       onClick={resetInflowToDefault}
                       className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors"
@@ -381,7 +360,14 @@ export function MilestonesProjections() {
                       type="text"
                       inputMode="decimal"
                       value={inputValue}
-                      onChange={(e) => handleInflowChange(e.target.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setInputValue(raw);
+                        const parsed = parseFloat(raw);
+                        if (!isNaN(parsed) && parsed >= 0) {
+                          setPendingInflow(parsed);
+                        }
+                      }}
                       className="w-28 px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm font-semibold text-center tabular-nums"
                     />
                     <button
@@ -393,19 +379,18 @@ export function MilestonesProjections() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-auto">
+                  <div className="flex items-center gap-2">
                     <div className="flex gap-1">
                       {[500, 1000, 2500, 5000].map((amount) => (
                         <button
                           key={amount}
                           onClick={() => {
                             setInputValue(String(amount));
-                            setMonthlyInflow(amount);
-                            fetchProjections(amount, lookbackMonths);
+                            setPendingInflow(amount);
                           }}
                           className={cn(
                             'px-2 py-1 rounded-md text-[10px] font-medium transition-all border',
-                            monthlyInflow === amount
+                            pendingInflow === amount
                               ? 'bg-primary/10 text-primary border-primary/20'
                               : 'text-muted-foreground hover:text-foreground border-transparent hover:border-border/50'
                           )}
@@ -415,22 +400,67 @@ export function MilestonesProjections() {
                       ))}
                     </div>
                   </div>
+
+                  <div className="ml-auto">
+                    <button
+                      onClick={handleSaveInflow}
+                      disabled={!isDirty}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                        isDirty
+                          ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-sm'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      )}
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      Save
+                    </button>
+                  </div>
                 </div>
+
+                {savedInflow !== null && (
+                  <div className="mt-2 text-[10px] text-chart-2 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Saved inflow: {formatCurrency(savedInflow)}/mo — used across all projections
+                  </div>
+                )}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-1)' }} />
+                  <span>Raw Balance</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded" style={{ background: 'var(--color-chart-2)' }} />
+                  <span>Available After Funding</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded border border-dashed" style={{ borderColor: 'var(--color-chart-4)' }} />
+                  <span>Committed to Goals</span>
+                </div>
+                {chartGoals.filter(g => g.monthsToFund !== null && g.monthsToFund !== undefined).map((goal, idx) => (
+                  <div key={goal.goalId} className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getGoalColor(idx) }} />
+                    <span>{goal.goalName}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Projection Chart */}
-              <div className="h-[200px] sm:h-[280px] w-full">
+              <div className="h-[200px] sm:h-[300px] w-full">
                 {chartData.length > 0 && (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                    <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="projectionBalanceGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.04} />
+                        <linearGradient id="projBalanceGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.03} />
                         </linearGradient>
-                        <linearGradient id="projectionAllocGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--color-chart-3)" stopOpacity={0.2} />
-                          <stop offset="100%" stopColor="var(--color-chart-3)" stopOpacity={0} />
+                        <linearGradient id="projAvailableGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
 
@@ -464,28 +494,40 @@ export function MilestonesProjections() {
 
                       <RechartsTooltip content={<ProjectionChartTooltip />} cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.4 }} />
 
+                      {/* Raw Balance area (goes up with inflow) */}
                       <Area
                         type="monotone"
                         dataKey="accountBalance"
                         stroke="var(--color-chart-1)"
                         strokeWidth={2}
-                        fill="url(#projectionBalanceGrad)"
+                        fill="url(#projBalanceGrad)"
                         dot={false}
                         activeDot={{ r: 3, fill: 'var(--color-chart-1)', stroke: 'var(--color-chart-1)' }}
                       />
 
+                      {/* Available after funding area — drops when goals are funded */}
                       <Area
                         type="monotone"
-                        dataKey="totalAllocated"
-                        stroke="var(--color-chart-3)"
-                        strokeWidth={1.5}
-                        fill="url(#projectionAllocGrad)"
+                        dataKey="availableAfterFunding"
+                        stroke="var(--color-chart-2)"
+                        strokeWidth={2}
+                        fill="url(#projAvailableGrad)"
                         dot={false}
-                        strokeDasharray="4 3"
-                        activeDot={{ r: 2, fill: 'var(--color-chart-3)', stroke: 'var(--color-chart-3)' }}
+                        activeDot={{ r: 3, fill: 'var(--color-chart-2)', stroke: 'var(--color-chart-2)' }}
                       />
 
-                      {/* Goal funding reference lines */}
+                      {/* Committed to goals line */}
+                      <Line
+                        type="monotone"
+                        dataKey="totalAllocated"
+                        stroke="var(--color-chart-4)"
+                        strokeWidth={1.5}
+                        strokeDasharray="4 3"
+                        dot={false}
+                        activeDot={{ r: 2, fill: 'var(--color-chart-4)', stroke: 'var(--color-chart-4)' }}
+                      />
+
+                      {/* Goal funding reference lines as simple vertical lines — no overlapping labels */}
                       {chartGoals.filter(g => g.monthsToFund !== null && g.monthsToFund !== undefined).map((goal) => {
                         const point = chartData[goal.monthsToFund!];
                         if (!point) return null;
@@ -495,21 +537,12 @@ export function MilestonesProjections() {
                             key={goal.goalId}
                             x={point.date}
                             stroke={getGoalColor(goalIdx)}
-                            strokeWidth={1}
-                            strokeDasharray="4 4"
-                            label={
-                              <Label
-                                value={`${goal.goalName}  ✓`}
-                                position="insideTopRight"
-                                fill={getGoalColor(goalIdx)}
-                                fontSize={9}
-                                fontWeight={600}
-                              />
-                            }
+                            strokeWidth={1.5}
+                            strokeDasharray="6 3"
                           />
                         );
                       })}
-                    </AreaChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 )}
               </div>
@@ -549,7 +582,7 @@ export function MilestonesProjections() {
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                               <span className="blur-number">{formatCurrency(goal.allocatedAmount)}</span>
                               <span>·</span>
-                              <span>{goal.percentage}% of inflow</span>
+                              <span>{goal.percentage}% allocated</span>
                             </div>
                           </div>
 
