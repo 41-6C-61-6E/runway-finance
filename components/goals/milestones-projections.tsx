@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, Save, PiggyBank } from 'lucide-react';
+import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, Save, PiggyBank, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils/format';
 import { useGoalInflow } from './goal-inflow-context';
@@ -139,6 +139,15 @@ export function MilestonesProjections() {
   const [pendingInflow, setPendingInflow] = useState<number | null>(null);
   const { savedInflow, setSavedInflow } = useGoalInflow();
   const hasLoadedOnce = useRef(false);
+  const debounceTimer = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   const activeInflow = savedInflow !== null ? savedInflow : pendingInflow;
 
@@ -183,13 +192,8 @@ export function MilestonesProjections() {
     const newVal = Math.max(0, Math.round((current + delta) * 100) / 100);
     setPendingInflow(newVal);
     setInputValue(String(newVal));
-  };
-
-  const handleSaveInflow = () => {
-    if (pendingInflow !== null) {
-      setSavedInflow(pendingInflow);
-      fetchProjections(pendingInflow);
-    }
+    setSavedInflow(newVal);
+    fetchProjections(newVal);
   };
 
   const resetInflowToDefault = () => {
@@ -199,10 +203,6 @@ export function MilestonesProjections() {
     setInputValue(String(data.totalMonthlyInflow));
     fetchProjections(null);
   };
-
-  const isDirty = savedInflow === null
-    ? false
-    : pendingInflow !== null && Math.abs(pendingInflow - savedInflow) > 0.01;
 
   // Build chart data: either multi-series (all accounts) or single series
   const { chartData, chartAccounts } = useMemo(() => {
@@ -374,6 +374,13 @@ export function MilestonesProjections() {
                     const parsed = parseFloat(raw);
                     if (!isNaN(parsed) && parsed >= 0) {
                       setPendingInflow(parsed);
+                      if (debounceTimer.current) {
+                        clearTimeout(debounceTimer.current);
+                      }
+                      debounceTimer.current = setTimeout(() => {
+                        setSavedInflow(parsed);
+                        fetchProjections(parsed);
+                      }, 500);
                     }
                   }}
                   className="w-28 px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm font-semibold text-center tabular-nums"
@@ -395,6 +402,8 @@ export function MilestonesProjections() {
                       onClick={() => {
                         setInputValue(String(amount));
                         setPendingInflow(amount);
+                        setSavedInflow(amount);
+                        fetchProjections(amount);
                       }}
                       className={cn(
                         'px-2 py-1 rounded-md text-[10px] font-medium transition-all border',
@@ -409,20 +418,20 @@ export function MilestonesProjections() {
                 </div>
               </div>
 
-              <div className="ml-auto">
-                <button
-                  onClick={handleSaveInflow}
-                  disabled={!isDirty}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                    isDirty
-                      ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-sm'
-                      : 'bg-muted text-muted-foreground cursor-not-allowed'
-                  )}
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  Save
-                </button>
+              <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground font-medium h-8">
+                {loading ? (
+                  <span className="flex items-center gap-1 text-muted-foreground animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Saving...
+                  </span>
+                ) : savedInflow !== null ? (
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
+                    <Check className="w-3.5 h-3.5" />
+                    Auto-saved
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">Using default</span>
+                )}
               </div>
             </div>
 
