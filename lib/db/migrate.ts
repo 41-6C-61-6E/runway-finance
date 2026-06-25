@@ -79,20 +79,33 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
-    // 1b. Check if use_market_data_for_snapshots column exists on user_settings
-    const colCheck2 = await client.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'user_settings' AND column_name = 'use_market_data_for_snapshots'
-    `);
-    if (colCheck2.rows.length === 0) {
-      logger.info('[migrate] [self-heal] Adding missing use_market_data_for_snapshots column to user_settings...');
-      await client.query(`
-        ALTER TABLE user_settings
-        ADD COLUMN IF NOT EXISTS use_market_data_for_snapshots BOOLEAN NOT NULL DEFAULT FALSE
+    // 2. Check missing columns in user_settings
+    const columnsToCheck = [
+      { name: 'use_market_data_for_snapshots', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+      { name: 'budget_alert_threshold', type: 'INTEGER NOT NULL DEFAULT 80' },
+      { name: 'notify_goal_milestones', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_net_worth_milestones', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'net_worth_milestone_interval', type: 'INTEGER NOT NULL DEFAULT 100000' },
+      { name: 'notify_ai_proposals', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'max_notifications_per_period', type: 'INTEGER NOT NULL DEFAULT 5' },
+      { name: 'notification_limiter_period_minutes', type: 'INTEGER NOT NULL DEFAULT 60' }
+    ];
+
+    for (const col of columnsToCheck) {
+      const colCheck = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'user_settings' AND column_name = '${col.name}'
       `);
+      if (colCheck.rows.length === 0) {
+        logger.info(`[migrate] [self-heal] Adding missing ${col.name} column to user_settings...`);
+        await client.query(`
+          ALTER TABLE user_settings
+          ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}
+        `);
+      }
     }
 
-    // 1c. Check if json_mode column exists on ai_providers
+    // 3. Check if json_mode column exists on ai_providers
     const colCheck3 = await client.query(`
       SELECT column_name FROM information_schema.columns
       WHERE table_name = 'ai_providers' AND column_name = 'json_mode'
@@ -105,7 +118,7 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
-    // 2. Check if account_sharing_invitations table exists
+    // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables
       WHERE table_name = 'account_sharing_invitations'
@@ -126,7 +139,7 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
-    // 3. Check if account_share_members table exists
+    // 5. Check if account_share_members table exists
     const tableCheck2 = await client.query(`
       SELECT table_name FROM information_schema.tables
       WHERE table_name = 'account_share_members'
@@ -144,6 +157,27 @@ async function runSelfHealingChecks(client: any): Promise<void> {
           removed_at      TIMESTAMPTZ,
           removed_by      TEXT,
           UNIQUE (primary_user_id, member_user_id)
+        )
+      `);
+    }
+
+    // 6. Check if custom_alert_rules table exists
+    const tableCheckCustom = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'custom_alert_rules'
+    `);
+    if (tableCheckCustom.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Creating missing custom_alert_rules table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS custom_alert_rules (
+          id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id      TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          name         TEXT NOT NULL,
+          is_enabled   BOOLEAN NOT NULL DEFAULT TRUE,
+          trigger_type TEXT NOT NULL,
+          criteria     JSONB NOT NULL,
+          created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
     }
