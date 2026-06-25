@@ -129,7 +129,9 @@ async function runSelfHealingChecks(client) {
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
- table exists
+    }
+
+    // 7. Check if sent_notifications table exists
     const tableCheckSent = await client.query(`
       SELECT table_name FROM information_schema.tables
       WHERE table_name = 'sent_notifications'
