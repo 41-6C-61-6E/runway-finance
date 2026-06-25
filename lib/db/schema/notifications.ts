@@ -78,7 +78,7 @@ export const customAlertRules = pgTable('custom_alert_rules', {
   isEnabled: boolean('is_enabled').notNull().default(true),
   triggerType: text('trigger_type').notNull(), // 'transaction' | 'account_balance' | 'savings_goal' | 'cash_flow'
   // Legacy single-criteria field (kept for backward compatibility with existing rules)
-  criteria: jsonb('criteria').notNull().$type<LegacyCriteria>(),
+  criteria: jsonb('criteria').notNull().default({}).$type<LegacyCriteria>(),
   // New multi-condition fields
   conditionOperator: text('condition_operator').$type<ConditionOperator>().default('AND'),
   conditions: jsonb('conditions').$type<AlertCondition[]>(),

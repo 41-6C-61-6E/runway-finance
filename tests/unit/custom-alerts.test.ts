@@ -1,5 +1,4 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { inspect } from 'node:util';
 
 const { mockSendNotification } = vi.hoisted(() => ({
   mockSendNotification: vi.fn<(sub: any, payload: string) => any>(async () => ({ statusCode: 201 })),
@@ -31,7 +30,6 @@ function getTableName(table: any): string | null {
   return null;
 }
 
-// Mock DB queries
 let mockRulesResponse: any[] = [];
 let mockAccountsResponse: any[] = [];
 let mockCashFlowResponse: any[] = [];
@@ -40,7 +38,7 @@ let mockSentResponse: any[] = [];
 
 class MockDbQueryBuilder {
   private table: any;
-  private filterId: string | null = null;
+  private accountQueryIndex = 0;
 
   constructor(table?: any) {
     this.table = table;
@@ -60,12 +58,6 @@ class MockDbQueryBuilder {
   }
 
   where(...args: any[]) {
-    const str = inspect(args, { depth: null });
-    if (str.includes('checking_id')) {
-      this.filterId = 'checking_id';
-    } else if (str.includes('credit_id')) {
-      this.filterId = 'credit_id';
-    }
     return this;
   }
 
@@ -95,19 +87,19 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  returning() {
+    return this;
+  }
+
   async then(onfulfilled?: (value: any) => any) {
     let result: any[] = [];
     const tableName = getTableName(this.table);
-    console.log('[DEBUG MockDB] Table Name:', tableName, 'Filter ID:', this.filterId);
 
     if (tableName === 'custom_alert_rules') {
       result = mockRulesResponse;
     } else if (tableName === 'accounts') {
-      if (this.filterId) {
-        result = mockAccountsResponse.filter((a) => a.id === this.filterId);
-      } else {
-        result = mockAccountsResponse;
-      }
+      const idx = this.accountQueryIndex++;
+      result = idx < mockAccountsResponse.length ? [mockAccountsResponse[idx]] : [];
     } else if (tableName === 'monthly_cash_flow') {
       result = mockCashFlowResponse;
     } else if (tableName === 'push_subscriptions') {
@@ -126,7 +118,6 @@ vi.mock('@/lib/db', () => ({
   getDb: () => new MockDbQueryBuilder(),
 }));
 
-// Import target functions
 import {
   checkTransactionAlerts,
   checkAccountBalanceAlerts,
@@ -143,9 +134,10 @@ describe('Custom Event Alert Engine', () => {
     mockSentResponse = [];
   });
 
+  // ── Transaction Alerts ──────────────────────────────────────────────────
+
   describe('checkTransactionAlerts', () => {
-    it('should trigger alert when transaction matches rule filters', async () => {
-      // Setup transaction alert rule: checking account AND amount >= $100 AND keyword "netflix"
+    it('should trigger alert when transaction matches legacy rule filters', async () => {
       mockRulesResponse = [
         {
           id: 'rule_1',
@@ -160,25 +152,24 @@ describe('Custom Event Alert Engine', () => {
         },
       ];
 
-      // Test matching transaction
       const tx = {
         externalId: 'tx_123',
         accountId: 'checking_id',
         description: 'Netflix subscription renewal',
         payee: 'Netflix Inc',
         memo: null,
-        amount: '-150.00', // absolute amount is 150
+        amount: '-150.00',
       };
 
       await checkTransactionAlerts('user_123', tx);
       expect(mockSendNotification).toHaveBeenCalledTimes(1);
-      
+
       const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
       expect(payload.title).toContain('Transaction Alert: Netflix Checking Alert');
       expect(payload.body).toContain('$150.00');
     });
 
-    it('should not trigger if transaction does not match criteria', async () => {
+    it('should not trigger if transaction does not match legacy criteria', async () => {
       mockRulesResponse = [
         {
           id: 'rule_1',
@@ -186,7 +177,7 @@ describe('Custom Event Alert Engine', () => {
           triggerType: 'transaction',
           criteria: {
             accountId: 'checking_id',
-            amountMin: 200, // min amount $200
+            amountMin: 200,
           },
           isEnabled: true,
         },
@@ -204,10 +195,131 @@ describe('Custom Event Alert Engine', () => {
       await checkTransactionAlerts('user_123', tx);
       expect(mockSendNotification).not.toHaveBeenCalled();
     });
+
+    it('should trigger with multi-conditions (AND - all match)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_1',
+          name: 'Large food expense',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'amount_min', value: 50, goalId: undefined },
+            { field: 'keyword', value: 'restaurant', goalId: undefined },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_456',
+        accountId: 'acct_1',
+        description: 'Italian restaurant dinner',
+        payee: 'Mario Ristorante',
+        memo: null,
+        amount: '-120.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.title).toContain('Large food expense');
+    });
+
+    it('should trigger with multi-conditions (OR - one matches)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_1',
+          name: 'Big or Amazon',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'amount_min', value: 5000, goalId: undefined },
+            { field: 'keyword', value: 'amazon', goalId: undefined },
+          ],
+          conditionOperator: 'OR',
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_789',
+        accountId: 'acct_1',
+        description: 'Amazon.com purchase',
+        payee: 'Amazon',
+        memo: null,
+        amount: '-45.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not trigger with AND conditions when one fails', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_1',
+          name: 'Large food expense',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'amount_min', value: 100, goalId: undefined },
+            { field: 'keyword', value: 'restaurant', goalId: undefined },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_999',
+        accountId: 'acct_1',
+        description: 'Small coffee purchase',
+        payee: 'Starbucks',
+        memo: null,
+        amount: '-5.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger with OR conditions when none match', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_1',
+          name: 'Big or Amazon',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'amount_min', value: 5000, goalId: undefined },
+            { field: 'keyword', value: 'netflix', goalId: undefined },
+          ],
+          conditionOperator: 'OR',
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_abc',
+        accountId: 'acct_1',
+        description: 'Small grocery purchase',
+        payee: 'Kroger',
+        memo: null,
+        amount: '-35.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
   });
 
+  // ── Account Balance Alerts ─────────────────────────────────────────────
+
   describe('checkAccountBalanceAlerts', () => {
-    it('should trigger when account balance falls below a fixed threshold', async () => {
+    it('should trigger when account balance falls below a fixed threshold (legacy)', async () => {
       mockRulesResponse = [
         {
           id: 'rule_2',
@@ -229,14 +341,14 @@ describe('Custom Event Alert Engine', () => {
 
       const dek = new Uint8Array(32);
       await checkAccountBalanceAlerts('user_123', 'checking_id', 450, dek);
-      
+
       expect(mockSendNotification).toHaveBeenCalledTimes(1);
       const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
       expect(payload.body).toContain('Checking Account');
       expect(payload.body).toContain('fell below $500');
     });
 
-    it('should trigger when account balance is higher than another account balance', async () => {
+    it('should trigger when account balance is higher than another account (legacy)', async () => {
       mockRulesResponse = [
         {
           id: 'rule_3',
@@ -252,7 +364,6 @@ describe('Custom Event Alert Engine', () => {
         },
       ];
 
-      // Second database mock lookup inside for compare account balance
       mockAccountsResponse = [
         { id: 'credit_id', name: 'Credit Card', balance: '1200.00' },
         { id: 'checking_id', name: 'Checking Account', balance: '1000.00' },
@@ -266,10 +377,92 @@ describe('Custom Event Alert Engine', () => {
       expect(payload.title).toContain('Credit card over checking warning');
       expect(payload.body).toContain('rose above Checking Account balance ($1000.00)');
     });
+
+    it('should trigger with multi-conditions (balance_below_value)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_6',
+          name: 'Low balance alert',
+          triggerType: 'account_balance',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'balance_below_value', value: 300 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockAccountsResponse = [
+        { id: 'checking_id', name: 'Checking Account' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkAccountBalanceAlerts('user_123', 'checking_id', 250, dek);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('fell below $300');
+    });
+
+    it('should trigger with multi-conditions (balance_above_account)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_7',
+          name: 'Checking above savings',
+          triggerType: 'account_balance',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'balance_above_account', value: 'savings_id' },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockAccountsResponse = [
+        { id: 'checking_id', name: 'Checking Account', balance: '2000.00' },
+        { id: 'savings_id', name: 'Savings Account', balance: '1500.00' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkAccountBalanceAlerts('user_123', 'checking_id', 2000, dek);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('rose above');
+    });
+
+    it('should not trigger when conditions are not met', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_6',
+          name: 'Low balance alert',
+          triggerType: 'account_balance',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'balance_below_value', value: 300 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockAccountsResponse = [
+        { id: 'checking_id', name: 'Checking Account' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkAccountBalanceAlerts('user_123', 'checking_id', 500, dek);
+
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
   });
 
+  // ── Savings Goal Alerts ────────────────────────────────────────────────
+
   describe('checkSavingsGoalAlerts', () => {
-    it('should trigger when goal newly reaches threshold percentage', async () => {
+    it('should trigger when goal newly reaches threshold percentage (legacy)', async () => {
       mockRulesResponse = [
         {
           id: 'rule_4',
@@ -284,8 +477,6 @@ describe('Custom Event Alert Engine', () => {
         },
       ];
 
-      // Target reaches 50% (allocated 500 / target 1000)
-      // Previous was 40% (allocated 400 / target 1000)
       await checkSavingsGoalAlerts('user_123', 'goal_123', 'House Fund', 500, 1000, 400);
 
       expect(mockSendNotification).toHaveBeenCalledTimes(1);
@@ -294,7 +485,7 @@ describe('Custom Event Alert Engine', () => {
       expect(payload.body).toContain('reached 50% of its target');
     });
 
-    it('should not trigger if goal was already above percentage threshold', async () => {
+    it('should not trigger if goal was already above percentage threshold (legacy)', async () => {
       mockRulesResponse = [
         {
           id: 'rule_4',
@@ -309,14 +500,80 @@ describe('Custom Event Alert Engine', () => {
         },
       ];
 
-      // Current 60%, Previous 55%
       await checkSavingsGoalAlerts('user_123', 'goal_123', 'House Fund', 600, 1000, 550);
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
+
+    it('should trigger with multi-conditions (goal_reached_percentage)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_8',
+          name: 'Halfway alert',
+          triggerType: 'savings_goal',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'goal_reached_percentage', value: 50, goalId: 'goal_123' },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      await checkSavingsGoalAlerts('user_123', 'goal_123', 'Vacation Fund', 500, 1000, 400);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('Vacation Fund');
+      expect(payload.body).toContain('reached 50%');
+    });
+
+    it('should trigger with multi-conditions (goal_reached_amount)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_9',
+          name: 'Reached $1000',
+          triggerType: 'savings_goal',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'goal_reached_amount', value: 1000, goalId: 'goal_456' },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      await checkSavingsGoalAlerts('user_123', 'goal_456', 'Emergency Fund', 1100, 5000, 900);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('reached $1000');
+    });
+
+    it('should not trigger with multi-conditions when threshold not newly crossed', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_8',
+          name: 'Halfway alert',
+          triggerType: 'savings_goal',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'goal_reached_percentage', value: 50, goalId: 'goal_123' },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      // Already past 50%, previous was also past 50%
+      await checkSavingsGoalAlerts('user_123', 'goal_123', 'Vacation Fund', 700, 1000, 600);
       expect(mockSendNotification).not.toHaveBeenCalled();
     });
   });
 
+  // ── Cash Flow Alerts ───────────────────────────────────────────────────
+
   describe('checkCashFlowAlerts', () => {
-    it('should trigger when net savings is negative for N consecutive months', async () => {
+    it('should trigger when net savings is negative for N consecutive months (legacy)', async () => {
       mockRulesResponse = [
         {
           id: 'rule_5',
@@ -332,7 +589,6 @@ describe('Custom Event Alert Engine', () => {
         },
       ];
 
-      // Last 2 months are negative
       mockCashFlowResponse = [
         { yearMonth: '2026-06', netCashFlow: '-200.00', totalIncome: '3000.00', totalExpenses: '3200.00' },
         { yearMonth: '2026-05', netCashFlow: '-100.00', totalIncome: '3000.00', totalExpenses: '3100.00' },
@@ -344,6 +600,113 @@ describe('Custom Event Alert Engine', () => {
       expect(mockSendNotification).toHaveBeenCalledTimes(1);
       const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
       expect(payload.body).toContain('below $0 for 2 consecutive months');
+    });
+
+    it('should trigger with multi-conditions (cf_net_savings_below)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_10',
+          name: 'Negative cash flow',
+          triggerType: 'cash_flow',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'cf_net_savings_below', value: 0, consecutiveMonths: 1 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockCashFlowResponse = [
+        { yearMonth: '2026-06', netCashFlow: '-150.00', totalIncome: '3000.00', totalExpenses: '3150.00' },
+        { yearMonth: '2026-05', netCashFlow: '200.00', totalIncome: '3000.00', totalExpenses: '2800.00' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkCashFlowAlerts('user_123', dek);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('below $0');
+    });
+
+    it('should trigger with multi-conditions (cf_savings_rate_below consecutive months)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_11',
+          name: 'Low savings rate',
+          triggerType: 'cash_flow',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'cf_savings_rate_below', value: 10, consecutiveMonths: 2 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockCashFlowResponse = [
+        { yearMonth: '2026-06', netCashFlow: '100.00', totalIncome: '3000.00', totalExpenses: '2900.00' },
+        { yearMonth: '2026-05', netCashFlow: '200.00', totalIncome: '3000.00', totalExpenses: '2800.00' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkCashFlowAlerts('user_123', dek);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('below 10% for 2 consecutive months');
+    });
+
+    it('should trigger with multi-conditions (cf_net_savings_above)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_12',
+          name: 'Good cash flow',
+          triggerType: 'cash_flow',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'cf_net_savings_above', value: 500, consecutiveMonths: 1 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockCashFlowResponse = [
+        { yearMonth: '2026-06', netCashFlow: '800.00', totalIncome: '4000.00', totalExpenses: '3200.00' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkCashFlowAlerts('user_123', dek);
+
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.body).toContain('above $500');
+    });
+
+    it('should not trigger when cash flow conditions not met', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_10',
+          name: 'Negative cash flow',
+          triggerType: 'cash_flow',
+          criteria: {},
+          isEnabled: true,
+          conditions: [
+            { field: 'cf_net_savings_below', value: 0, consecutiveMonths: 1 },
+          ],
+          conditionOperator: 'AND',
+        },
+      ];
+
+      mockCashFlowResponse = [
+        { yearMonth: '2026-06', netCashFlow: '500.00', totalIncome: '3000.00', totalExpenses: '2500.00' },
+      ];
+
+      const dek = new Uint8Array(32);
+      await checkCashFlowAlerts('user_123', dek);
+      expect(mockSendNotification).not.toHaveBeenCalled();
     });
   });
 });

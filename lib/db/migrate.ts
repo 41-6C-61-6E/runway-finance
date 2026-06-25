@@ -286,7 +286,44 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       }
     }
 
-    // 9. Drop FK constraints that reference the "user" table — the app uses
+    // 9a. Add unique constraint on sent_notifications(user_id, key) for dedup safety
+    const uniqueKeyCheck = await client.query(`
+      SELECT constraint_name FROM information_schema.table_constraints
+      WHERE table_name = 'sent_notifications' AND constraint_type = 'UNIQUE'
+        AND constraint_name = 'sent_notifications_user_id_key_unique'
+    `);
+    if (uniqueKeyCheck.rows.length === 0) {
+      // Delete any existing duplicates before adding the constraint
+      await client.query(`
+        DELETE FROM sent_notifications
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id, row_number() OVER (PARTITION BY user_id, key ORDER BY sent_at DESC) AS rn
+            FROM sent_notifications
+          ) dup
+          WHERE dup.rn > 1
+        )
+      `);
+      await client.query(`
+        ALTER TABLE sent_notifications
+        ADD CONSTRAINT sent_notifications_user_id_key_unique UNIQUE (user_id, key)
+      `);
+      logger.info('[migrate] [self-heal] Added unique constraint on sent_notifications(user_id, key)');
+    }
+
+    // 9b. Add index on sent_notifications(user_id, sent_at) for rate limiter
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sent_notifications_user_sent_at
+      ON sent_notifications (user_id, sent_at)
+    `);
+
+    // 9c. Add index on push_subscriptions(user_id) for subscription lookups
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id
+      ON push_subscriptions (user_id)
+    `);
+
+    // 10. Drop FK constraints that reference the "user" table — the app uses
     //    the "users" (plural) table with usernames and never populates "user".
     //    These FKs were removed in migration 0063; self-heal as a safety net.
     await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_user_id_fk`);
