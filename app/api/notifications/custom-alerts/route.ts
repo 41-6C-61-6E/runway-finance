@@ -19,6 +19,7 @@ export async function GET() {
 
     return Response.json({ rules });
   } catch (err) {
+    console.error('[custom-alerts] Failed to fetch custom alert rules:', err);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
@@ -35,6 +36,11 @@ export async function POST(request: Request) {
 
     if (!name || !triggerType) {
       return Response.json({ error: 'Name and trigger type are required' }, { status: 400 });
+    }
+
+    const allowedTriggerTypes = ['transaction', 'account_balance', 'savings_goal', 'cash_flow'];
+    if (!allowedTriggerTypes.includes(triggerType)) {
+      return Response.json({ error: 'Invalid trigger type. Must be one of: transaction, account_balance, savings_goal, cash_flow' }, { status: 400 });
     }
 
     // Require either conditions array or legacy criteria
@@ -58,6 +64,7 @@ export async function POST(request: Request) {
 
     return Response.json({ rule: newRule });
   } catch (err) {
+    console.error('[custom-alerts] Failed to create custom alert rule:', err);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
