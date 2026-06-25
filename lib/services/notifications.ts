@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
-import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, or, isNull, gte, lt, inArray } from 'drizzle-orm';
+import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots } from '@/lib/db/schema';
+import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import webpush from 'web-push';
@@ -27,7 +27,9 @@ export async function sendPushNotification(
   userId: string,
   title: string,
   body: string,
-  urlPath?: string
+  urlPath?: string,
+  type: string = 'generic',
+  key?: string
 ) {
   if (!isInitialized) {
     logger.warn('[notifications-service] Cannot send push notification: service not initialized (VAPID keys missing).');
@@ -35,6 +37,69 @@ export async function sendPushNotification(
   }
 
   const db = getDb();
+
+  // 1. Deduplication check
+  if (key) {
+    try {
+      const [existing] = await db
+        .select({ id: sentNotifications.id })
+        .from(sentNotifications)
+        .where(
+          and(
+            eq(sentNotifications.userId, userId),
+            eq(sentNotifications.key, key)
+          )
+        )
+        .limit(1);
+      if (existing) {
+        logger.debug('[notifications-service] Notification already sent, skipping.', { key });
+        return;
+      }
+    } catch (err) {
+      logger.error('[notifications-service] Error checking duplicate notification:', err);
+    }
+  }
+
+  // 2. Rate Limiting Check
+  try {
+    const [settings] = await db
+      .select({
+        maxNotificationsPerPeriod: userSettings.maxNotificationsPerPeriod,
+        notificationLimiterPeriodMinutes: userSettings.notificationLimiterPeriodMinutes,
+      })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    const maxNotifications = settings?.maxNotificationsPerPeriod ?? 5;
+    const periodMinutes = settings?.notificationLimiterPeriodMinutes ?? 60;
+
+    const periodStart = new Date(Date.now() - periodMinutes * 60 * 1000);
+    const [countRes] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(sentNotifications)
+      .where(
+        and(
+          eq(sentNotifications.userId, userId),
+          gte(sentNotifications.sentAt, periodStart)
+        )
+      );
+
+    const sentCount = Number(countRes?.count ?? 0);
+    if (sentCount >= maxNotifications) {
+      logger.warn('[notifications-service] Rate limit exceeded. Suppressing push notification.', {
+        userId,
+        sentCount,
+        maxNotifications,
+        periodMinutes,
+      });
+      return;
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking rate limit:', err);
+  }
+
+  // 3. Send notifications to all active subscriptions
   const subs = await db
     .select()
     .from(pushSubscriptions)
@@ -51,9 +116,10 @@ export async function sendPushNotification(
     url: urlPath || '/',
   });
 
+  let sentSuccessfully = false;
+
   const promises = subs.map(async (sub) => {
     try {
-      // Parse the keys from jsonb
       const keys = sub.keys as { p256dh: string; auth: string };
       const pushSubscription = {
         endpoint: sub.endpoint,
@@ -64,8 +130,8 @@ export async function sendPushNotification(
       };
 
       await webpush.sendNotification(pushSubscription, payload);
+      sentSuccessfully = true;
     } catch (err: any) {
-      // 404 (Not Found) or 410 (Gone) indicates the subscription has expired or been revoked
       if (err.statusCode === 410 || err.statusCode === 404) {
         logger.info('[notifications-service] Deleting expired or invalid push subscription', {
           id: sub.id,
@@ -82,6 +148,20 @@ export async function sendPushNotification(
   });
 
   await Promise.all(promises);
+
+  // 4. Log sent notification
+  if (sentSuccessfully) {
+    try {
+      const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
+      await db.insert(sentNotifications).values({
+        userId,
+        type,
+        key: finalKey,
+      });
+    } catch (err) {
+      logger.error('[notifications-service] Failed to record sent notification:', err);
+    }
+  }
 }
 
 export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
@@ -194,42 +274,96 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
       }
       actualSpent = Math.abs(actualSpent);
 
+      const threshold = settings.budgetAlertThreshold ?? 80;
+      const warningThresholdAmount = budget.amount * (threshold / 100);
+
       if (actualSpent >= budget.amount) {
-        // Check if alert already sent this month
-        const notificationKey = `budget:${currentMonth}:${budgetCatId}`;
-        const [existing] = await db
-          .select()
-          .from(sentNotifications)
-          .where(
-            and(
-              eq(sentNotifications.userId, userId),
-              eq(sentNotifications.type, 'budget_alert'),
-              eq(sentNotifications.key, notificationKey)
-            )
-          )
-          .limit(1);
-
-        if (!existing) {
-          // Record as sent
-          await db.insert(sentNotifications).values({
-            userId,
-            type: 'budget_alert',
-            key: notificationKey,
-          });
-
-          // Dispatch notification
-          const roundedActual = Math.round(actualSpent);
-          const roundedBudget = Math.round(budget.amount);
-          await sendPushNotification(
-            userId,
-            `Budget Exceeded: ${budget.categoryName}`,
-            `You've spent $${roundedActual} of your $${roundedBudget} budget for ${budget.categoryName}.`,
-            '/budgets'
-          );
-        }
+        const exceededKey = `budget:${currentMonth}:${budgetCatId}:100`;
+        const roundedActual = Math.round(actualSpent);
+        const roundedBudget = Math.round(budget.amount);
+        await sendPushNotification(
+          userId,
+          `Budget Exceeded: ${budget.categoryName}`,
+          `You've spent $${roundedActual} of your $${roundedBudget} budget for ${budget.categoryName}.`,
+          '/budgets',
+          'budget_alert',
+          exceededKey
+        );
+      } else if (actualSpent >= warningThresholdAmount) {
+        const warningKey = `budget:${currentMonth}:${budgetCatId}:threshold`;
+        const roundedActual = Math.round(actualSpent);
+        const roundedBudget = Math.round(budget.amount);
+        await sendPushNotification(
+          userId,
+          `Budget Warning: ${budget.categoryName}`,
+          `You've spent $${roundedActual} (${threshold}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
+          '/budgets',
+          'budget_alert',
+          warningKey
+        );
       }
     }
   } catch (err) {
     logger.error('[notifications-service] Error checking budget thresholds:', err);
+  }
+}
+
+export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint8Array) {
+  try {
+    const db = getDb();
+    const [settings] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings || !settings.notifyNetWorthMilestones) return;
+
+    // Fetch the 2 most recent snapshots
+    const snapshots = await db
+      .select({
+        netWorth: netWorthSnapshots.netWorth,
+        snapshotDate: netWorthSnapshots.snapshotDate,
+      })
+      .from(netWorthSnapshots)
+      .where(eq(netWorthSnapshots.userId, userId))
+      .orderBy(desc(netWorthSnapshots.snapshotDate))
+      .limit(2);
+
+    if (snapshots.length < 2) return;
+
+    const currentNetWorth = parseFloat(await decryptField(snapshots[0].netWorth, dek));
+    const previousNetWorth = parseFloat(await decryptField(snapshots[1].netWorth, dek));
+
+    if (isNaN(currentNetWorth) || isNaN(previousNetWorth)) return;
+
+    const interval = settings.netWorthMilestoneInterval ?? 100000;
+    if (interval <= 0) return;
+
+    const prevMilestoneIndex = Math.floor(previousNetWorth / interval);
+    const currMilestoneIndex = Math.floor(currentNetWorth / interval);
+
+    if (currMilestoneIndex > prevMilestoneIndex) {
+      const milestoneValue = currMilestoneIndex * interval;
+      const key = `net_worth_milestone:${milestoneValue}`;
+
+      // format the milestone amount nicely
+      const formattedAmount = new Intl.NumberFormat(settings.locale || 'en-US', {
+        style: 'currency',
+        currency: settings.currency || 'USD',
+        maximumFractionDigits: 0,
+      }).format(milestoneValue);
+
+      await sendPushNotification(
+        userId,
+        `Net Worth Milestone Reached!`,
+        `Congratulations, your net worth has crossed ${formattedAmount}!`,
+        '/net-worth',
+        'net_worth_milestone',
+        key
+      );
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error checking net worth milestones:', err);
   }
 }

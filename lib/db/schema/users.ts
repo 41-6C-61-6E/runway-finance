@@ -161,6 +161,13 @@ export const userSettings = pgTable('user_settings', {
   notifyLargeTransactions: boolean('notify_large_transactions').notNull().default(true),
   largeTransactionThreshold: integer('large_transaction_threshold').notNull().default(500),
   notifyMonthlySummary: boolean('notify_monthly_summary').notNull().default(true),
+  budgetAlertThreshold: integer('budget_alert_threshold').notNull().default(80),
+  notifyGoalMilestones: boolean('notify_goal_milestones').notNull().default(true),
+  notifyNetWorthMilestones: boolean('notify_net_worth_milestones').notNull().default(true),
+  netWorthMilestoneInterval: integer('net_worth_milestone_interval').notNull().default(100000),
+  notifyAiProposals: boolean('notify_ai_proposals').notNull().default(true),
+  maxNotificationsPerPeriod: integer('max_notifications_per_period').notNull().default(5),
+  notificationLimiterPeriodMinutes: integer('notification_limiter_period_minutes').notNull().default(60),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
