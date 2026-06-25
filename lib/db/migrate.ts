@@ -161,7 +161,44 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
-    // 6. Check if custom_alert_rules table exists
+    // 6. Check if push_subscriptions table exists
+    const tableCheckPush = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'push_subscriptions'
+    `);
+    if (tableCheckPush.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Creating missing push_subscriptions table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id    TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          endpoint   TEXT NOT NULL,
+          keys       JSONB NOT NULL,
+          user_agent TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // 7. Check if sent_notifications table exists
+    const tableCheckSent = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'sent_notifications'
+    `);
+    if (tableCheckSent.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Creating missing sent_notifications table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sent_notifications (
+          id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          type    TEXT NOT NULL,
+          key     TEXT NOT NULL,
+          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // 8. Check if custom_alert_rules table exists
     const tableCheckCustom = await client.query(`
       SELECT table_name FROM information_schema.tables
       WHERE table_name = 'custom_alert_rules'
@@ -170,16 +207,43 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       logger.info('[migrate] [self-heal] Creating missing custom_alert_rules table...');
       await client.query(`
         CREATE TABLE IF NOT EXISTS custom_alert_rules (
-          id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id      TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-          name         TEXT NOT NULL,
-          is_enabled   BOOLEAN NOT NULL DEFAULT TRUE,
-          trigger_type TEXT NOT NULL,
-          criteria     JSONB NOT NULL,
-          created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id            TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          name               TEXT NOT NULL,
+          is_enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+          trigger_type       TEXT NOT NULL,
+          criteria           JSONB NOT NULL,
+          condition_operator TEXT DEFAULT 'AND',
+          conditions         JSONB,
+          created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+    } else {
+      // Ensure condition_operator and conditions columns exist (migration 0062)
+      const colCheckOperator = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_operator'
+      `);
+      if (colCheckOperator.rows.length === 0) {
+        logger.info('[migrate] [self-heal] Adding missing condition_operator column to custom_alert_rules...');
+        await client.query(`
+          ALTER TABLE custom_alert_rules
+          ADD COLUMN IF NOT EXISTS condition_operator TEXT DEFAULT 'AND'
+        `);
+      }
+
+      const colCheckConditions = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'custom_alert_rules' AND column_name = 'conditions'
+      `);
+      if (colCheckConditions.rows.length === 0) {
+        logger.info('[migrate] [self-heal] Adding missing conditions column to custom_alert_rules...');
+        await client.query(`
+          ALTER TABLE custom_alert_rules
+          ADD COLUMN IF NOT EXISTS conditions JSONB
+        `);
+      }
     }
   } catch (err) {
     logger.error('[migrate] Self-healing checks failed', { error: err instanceof Error ? err.message : String(err) });
