@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { financialGoals, accounts, accountSnapshots } from '@/lib/db/schema';
+import { financialGoals, accounts, accountSnapshots, goalAllocationHistory } from '@/lib/db/schema';
 import { and, eq, asc, gte, desc, isNotNull } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
@@ -27,7 +27,7 @@ export interface ProjectionPoint {
   totalAllocated: number;
   goalAllocations: Record<string, number>;
   goalFunding: string[];
-  remaining: number;
+  availableAfterFunding: number;
 }
 
 export interface AccountProjection {
@@ -50,18 +50,21 @@ export interface ProjectionsResult {
 }
 
 /**
- * Calculate average monthly inflow for an account over a lookback period.
- * Positive = net savings, negative = net spending.
+ * Calculate average monthly net inflow for an account over the last ~90 days.
+ * Uses account snapshots first, falls back to goal allocation history, then current balance.
  */
 export async function calculateMonthlyInflow(
   accountId: string,
-  userId: string,
-  lookbackMonths: number = 6
+  userId: string
 ): Promise<number> {
   const dek = await getSessionDEK();
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - lookbackMonths);
+  const now = new Date();
+  const cutoff90d = new Date(now);
+  cutoff90d.setDate(cutoff90d.getDate() - 90);
 
+  const cutoffStr = cutoff90d.toISOString().split('T')[0];
+
+  // Try accountSnapshots first (most accurate)
   const snapshots = await getDb()
     .select({
       balance: accountSnapshots.balance,
@@ -71,32 +74,67 @@ export async function calculateMonthlyInflow(
     .where(and(
       eq(accountSnapshots.accountId, accountId as any),
       eq(accountSnapshots.userId, userId),
-      gte(accountSnapshots.snapshotDate, cutoff.toISOString().split('T')[0])
+      gte(accountSnapshots.snapshotDate, cutoffStr)
     ))
     .orderBy(asc(accountSnapshots.snapshotDate));
 
-  if (snapshots.length < 2) {
-    return 0;
+  if (snapshots.length >= 2) {
+    const decrypted = await Promise.all(
+      snapshots.map(async (s) => ({
+        date: new Date(s.snapshotDate),
+        balance: parseFloat(await decryptField(s.balance, dek)) || 0,
+      }))
+    );
+
+    const oldest = decrypted[0];
+    const newest = decrypted[decrypted.length - 1];
+    const daysDiff = (newest.date.getTime() - oldest.date.getTime()) / (1000 * 60 * 60 * 24);
+    const balanceChange = newest.balance - oldest.balance;
+
+    if (daysDiff >= 7) {
+      // Annualize the monthly rate: (change / days) * 30.5
+      return Math.round((balanceChange / daysDiff) * 30.5 * 100) / 100;
+    }
   }
 
-  const decrypted = await Promise.all(
-    snapshots.map(async (s) => ({
-      date: s.snapshotDate,
-      balance: parseFloat(await decryptField(s.balance, dek)) || 0,
-    }))
-  );
+  // Fallback: try goal allocation history (tracks account balances on allocation snapshots)
+  const allocHistory = await getDb()
+    .select({
+      accountBalance: goalAllocationHistory.accountBalance,
+      snapshotDate: goalAllocationHistory.snapshotDate,
+    })
+    .from(goalAllocationHistory)
+    .where(and(
+      eq(goalAllocationHistory.accountId, accountId as any),
+      eq(goalAllocationHistory.userId, userId),
+      gte(goalAllocationHistory.snapshotDate, cutoffStr)
+    ))
+    .orderBy(asc(goalAllocationHistory.snapshotDate));
 
-  let totalChange = 0;
-  for (let i = 1; i < decrypted.length; i++) {
-    totalChange += decrypted[i].balance - decrypted[i - 1].balance;
+  if (allocHistory.length >= 2) {
+    const decrypted = await Promise.all(
+      allocHistory.map(async (h) => ({
+        date: new Date(h.snapshotDate),
+        balance: parseFloat(await decryptField(h.accountBalance, dek)) || 0,
+      }))
+    );
+
+    const oldest = decrypted[0];
+    const newest = decrypted[decrypted.length - 1];
+    const daysDiff = (newest.date.getTime() - oldest.date.getTime()) / (1000 * 60 * 60 * 24);
+    const balanceChange = newest.balance - oldest.balance;
+
+    if (daysDiff >= 7) {
+      return Math.round((balanceChange / daysDiff) * 30.5 * 100) / 100;
+    }
   }
 
-  const monthsSpan = decrypted.length - 1;
-  return monthsSpan > 0 ? Math.round((totalChange / monthsSpan) * 100) / 100 : 0;
+  // No data — return 0 so the user sees inflow defaults to 0 and can set it manually
+  return 0;
 }
 
 /**
- * Compute allocations for a set of goals against a given account balance.
+ * Compute how much of the current balance gets allocated to each goal.
  * Pure function — no DB access.
  */
 function computeAllocationsForBalance(
@@ -107,15 +145,18 @@ function computeAllocationsForBalance(
     percentage: number;
     reserve: number;
     sortOrder: number;
+    alreadyFunded: boolean;
   }>,
   accountBalance: number,
   totalReserve: number
 ): Map<string, number> {
-  const sorted = [...goals].sort((a, b) => a.sortOrder - b.sortOrder || a.goalId.localeCompare(b.goalId));
+  const unfunded = goals.filter(g => !g.alreadyFunded)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.goalId.localeCompare(b.goalId));
+
   const allocations = new Map<string, number>();
   let remaining = Math.max(0, accountBalance - totalReserve);
 
-  for (const goal of sorted) {
+  for (const goal of unfunded) {
     const availableBalance = Math.max(0, accountBalance - totalReserve);
     const desiredAllocation = availableBalance * (goal.percentage / 100);
     const allocatedAmount = Math.min(desiredAllocation, remaining, Math.max(0, goal.targetAmount));
@@ -125,22 +166,34 @@ function computeAllocationsForBalance(
     remaining = Math.max(0, remaining - allocated);
   }
 
+  // Already-funded goals get 0 new allocation
+  for (const g of goals) {
+    if (g.alreadyFunded) {
+      allocations.set(g.goalId, 0);
+    }
+  }
+
   return allocations;
 }
 
 /**
  * Compute goal projections for all linked accounts.
+ *
+ * Algorithm per month:
+ * 1. Add monthly inflow to balance
+ * 2. Compute allocations from available balance (unfunded goals only, by priority)
+ * 3. Deduct allocations from balance (money goes toward goals, reducing available funds)
+ * 4. Check if any goals reach their target → mark as funded
+ * 5. Record the state
  */
 export async function computeGoalProjections(
   userId: string,
   overrides?: {
     monthlyInflow?: number;
-    lookbackMonths?: number;
     projectionMonths?: number;
   }
 ): Promise<ProjectionsResult> {
   const dek = await getSessionDEK();
-  const lookbackMonths = overrides?.lookbackMonths ?? 6;
   const projectionMonths = overrides?.projectionMonths ?? 60;
 
   const goals = await getDb()
@@ -156,6 +209,7 @@ export async function computeGoalProjections(
     );
 
   const decryptedGoals = await decryptRows('financial_goals', goals, dek);
+  // Only project for active goals — paused/completed/pending goals are excluded
   const activeGoals = decryptedGoals.filter(g => g.status === 'active');
 
   // Group by account
@@ -192,7 +246,7 @@ export async function computeGoalProjections(
 
     const monthlyInflow = overrides?.monthlyInflow !== undefined
       ? overrides.monthlyInflow
-      : await calculateMonthlyInflow(accountId, userId, lookbackMonths);
+      : await calculateMonthlyInflow(accountId, userId);
 
     totalMonthlyInflow += monthlyInflow;
 
@@ -205,46 +259,81 @@ export async function computeGoalProjections(
       percentage: parseFloat(g.percentage) || 100,
       reserve: parseFloat(g.reserve) || 0,
       sortOrder: g.sortOrder,
+      alreadyFunded: false,
     }));
 
-    // Track cumulative allocations per goal
+    // Track state
     const cumulativeAllocations = new Map<string, number>();
     const goalFundingMonth = new Map<string, number>();
     const fundedGoals = new Set<string>();
 
     const points: ProjectionPoint[] = [];
     let runningBalance = currentBalance;
-
-    // Start with current state
-    const initialAllocations = computeAllocationsForBalance(goalDefs, runningBalance, totalReserve);
-    for (const g of goalDefs) {
-      cumulativeAllocations.set(g.goalId, initialAllocations.get(g.goalId) || 0);
-    }
-
+    let runningAvailable = currentBalance; // available after deductions
     const now = new Date();
 
-    for (let month = 0; month <= projectionMonths; month++) {
-      const projDate = new Date(now);
-      projDate.setMonth(projDate.getMonth() + month);
+    // Month 0: current state snapshot
+    const month0Allocs = computeAllocationsForBalance(
+      goalDefs.map(g => ({ ...g, alreadyFunded: fundedGoals.has(g.goalId) })),
+      runningBalance,
+      totalReserve
+    );
 
-      const runningAllocations = computeAllocationsForBalance(goalDefs, runningBalance, totalReserve);
+    const initEvents: string[] = [];
+    for (const g of goalDefs) {
+      const alloc = month0Allocs.get(g.goalId) || 0;
+      cumulativeAllocations.set(g.goalId, alloc);
+      runningBalance -= alloc;
+    }
 
+    points.push({
+      month: 0,
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+      accountBalance: currentBalance,
+      totalAllocated: Array.from(cumulativeAllocations.values()).reduce((s, v) => s + v, 0),
+      goalAllocations: Object.fromEntries(cumulativeAllocations),
+      goalFunding: initEvents,
+      availableAfterFunding: Math.max(0, runningBalance),
+    });
+
+    // Remaining months: add inflow, allocate, deduct, check funding
+    for (let month = 1; month <= projectionMonths; month++) {
+      // Add monthly inflow
+      runningBalance = Math.round((runningBalance + monthlyInflow) * 100) / 100;
+
+      // Compute monthly allocations (only unfunded goals get allocation)
+      const monthlyAllocs = computeAllocationsForBalance(
+        goalDefs.map(g => ({ ...g, alreadyFunded: fundedGoals.has(g.goalId) })),
+        runningBalance,
+        totalReserve
+      );
+
+      // Deduct allocations from balance (money earmarked for goals leaves the available pool)
+      let monthlyAllocTotal = 0;
       for (const g of goalDefs) {
-        cumulativeAllocations.set(g.goalId, runningAllocations.get(g.goalId) || 0);
+        const alloc = monthlyAllocs.get(g.goalId) || 0;
+        if (!fundedGoals.has(g.goalId)) {
+          cumulativeAllocations.set(g.goalId, (cumulativeAllocations.get(g.goalId) || 0) + alloc);
+          monthlyAllocTotal += alloc;
+        }
       }
+      runningBalance = Math.round((runningBalance - monthlyAllocTotal) * 100) / 100;
 
+      // Check for newly funded goals
       const fundingEvents: string[] = [];
-
       for (const g of goalDefs) {
         if (!fundedGoals.has(g.goalId)) {
-          const alloc = cumulativeAllocations.get(g.goalId) || 0;
-          if (alloc >= g.targetAmount && g.targetAmount > 0) {
+          const cumAlloc = cumulativeAllocations.get(g.goalId) || 0;
+          if (cumAlloc >= g.targetAmount && g.targetAmount > 0) {
             fundedGoals.add(g.goalId);
             goalFundingMonth.set(g.goalId, month);
             fundingEvents.push(g.goalName);
           }
         }
       }
+
+      const projDate = new Date(now);
+      projDate.setMonth(projDate.getMonth() + month);
 
       const goalAllocRecord: Record<string, number> = {};
       for (const [gid, alloc] of cumulativeAllocations) {
@@ -256,17 +345,14 @@ export async function computeGoalProjections(
       points.push({
         month,
         date: `${projDate.getFullYear()}-${String(projDate.getMonth() + 1).padStart(2, '0')}`,
-        accountBalance: runningBalance,
+        accountBalance: Math.max(0, runningBalance + totalAlloc), // raw balance (what's in the account)
         totalAllocated: Math.round(totalAlloc * 100) / 100,
         goalAllocations: goalAllocRecord,
         goalFunding: fundingEvents,
-        remaining: Math.round(Math.max(0, runningBalance - totalAlloc) * 100) / 100,
+        availableAfterFunding: Math.max(0, runningBalance), // free money after goal commitments
       });
 
-      // Advance the balance by one month's inflow
-      runningBalance = Math.round((runningBalance + monthlyInflow) * 100) / 100;
-
-      // Stop if all goals are funded and we have 12 extra months to show the steady state
+      // Stop early if all goals funded + 12 steady-state months
       if (fundedGoals.size === goalDefs.length && month > 12) {
         break;
       }
@@ -327,7 +413,7 @@ export async function computeGoalProjections(
   return {
     accounts: accountProjections,
     totalMonthlyInflow,
-    lookbackMonths,
+    lookbackMonths: 3,
     projectionMonths,
   };
 }

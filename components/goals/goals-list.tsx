@@ -6,6 +6,7 @@ import { GoalFormDialog } from './goal-form-drawer';
 import { WaterfallVisualization } from './waterfall-visualization';
 import { GoalReorder } from './goal-reorder';
 import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
+import { useGoalInflow } from './goal-inflow-context';
 
 interface Goal {
   id: string;
@@ -55,14 +56,20 @@ export function GoalsList() {
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const [projections, setProjections] = useState<Map<string, GoalProjection>>(new Map());
+  const { savedInflow } = useGoalInflow();
 
   const fetchGoals = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      const projParams = new URLSearchParams();
+      projParams.set('projectionMonths', '60');
+      if (savedInflow !== null && savedInflow >= 0) {
+        projParams.set('monthlyInflow', String(savedInflow));
+      }
       const [goalsRes, projRes] = await Promise.all([
         fetch('/api/financial-goals', { credentials: 'include' }),
-        fetch('/api/goals/projections?projectionMonths=60', { credentials: 'include' }),
+        fetch(`/api/goals/projections?${projParams.toString()}`, { credentials: 'include' }),
       ]);
       if (!goalsRes.ok) throw new Error('Failed to fetch goals');
       const goalsData = await goalsRes.json();
@@ -83,7 +90,7 @@ export function GoalsList() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [savedInflow]);
 
   useEffect(() => {
     fetchGoals();
