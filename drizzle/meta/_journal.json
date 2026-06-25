@@ -435,6 +435,13 @@
       "when": 1782410480320,
       "tag": "0061_add_custom_alert_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1782413438745,
+      "tag": "0062_lame_starjammers",
+      "breakpoints": true
     }
   ]
 }

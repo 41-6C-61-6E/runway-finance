@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { Bell, BellOff, Info, AlertTriangle, Play } from 'lucide-react';
+import { Bell, BellOff, Info, AlertTriangle, Play, Trash2 } from 'lucide-react';
+import type { AlertCondition, AlertConditionField, ConditionOperator } from '@/lib/db/schema/notifications';
 
 function urlBase64ToUint8Array(base64String: string) {
   let cleanStr = base64String.trim();
@@ -48,30 +49,10 @@ export default function NotificationsTab() {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState('');
   const [triggerType, setTriggerType] = useState<'transaction' | 'account_balance' | 'savings_goal' | 'cash_flow'>('transaction');
-  
-  // Transaction criteria states
-  const [txAccountId, setTxAccountId] = useState('');
-  const [txAmountMin, setTxAmountMin] = useState('');
-  const [txAmountMax, setTxAmountMax] = useState('');
-  const [txKeyword, setTxKeyword] = useState('');
 
-  // Account balance criteria states
-  const [balAccountId, setBalAccountId] = useState('');
-  const [balOperator, setBalOperator] = useState<'less_than' | 'greater_than'>('less_than');
-  const [balCompareType, setBalCompareType] = useState<'value' | 'account'>('value');
-  const [balValue, setBalValue] = useState('');
-  const [balCompareAccountId, setBalCompareAccountId] = useState('');
-
-  // Savings goal criteria states
-  const [goalId, setGoalId] = useState('');
-  const [goalOperator, setGoalOperator] = useState<'reached_percentage' | 'reached_amount'>('reached_percentage');
-  const [goalValue, setGoalValue] = useState('');
-
-  // Cash flow criteria states
-  const [cfMetric, setCfMetric] = useState<'net_savings' | 'savings_rate'>('net_savings');
-  const [cfOperator, setCfOperator] = useState<'less_than' | 'greater_than'>('less_than');
-  const [cfValue, setCfValue] = useState('');
-  const [cfConsecutiveMonths, setCfConsecutiveMonths] = useState(1);
+  // Multi-condition states
+  const [conditions, setConditions] = useState<AlertCondition[]>([]);
+  const [conditionOperator, setConditionOperator] = useState<ConditionOperator>('AND');
 
   // Read preferences from DB settings
   const notifySyncErrors = settings.notifySyncErrors !== false;
@@ -279,64 +260,40 @@ export default function NotificationsTab() {
       return;
     }
 
-    let criteria: any = {};
-    if (triggerType === 'transaction') {
-      if (txAccountId) criteria.accountId = txAccountId;
-      if (txAmountMin) criteria.amountMin = parseFloat(txAmountMin);
-      if (txAmountMax) criteria.amountMax = parseFloat(txAmountMax);
-      if (txKeyword) criteria.keyword = txKeyword;
+    if (conditions.length === 0) {
+      toast.error('Please add at least one condition.');
+      return;
+    }
 
-      if (!txAccountId && !txAmountMin && !txAmountMax && !txKeyword) {
-        toast.error('Please specify at least one criteria filter for the transaction alert.');
+    const accountFields: AlertConditionField[] = ['account', 'balance_above_account', 'balance_below_account'];
+    const goalFields: AlertConditionField[] = ['goal_reached_percentage', 'goal_reached_amount'];
+
+    for (let i = 0; i < conditions.length; i++) {
+      const cond = conditions[i];
+      if (!cond.field) {
+        toast.error(`Condition ${i + 1}: Please select a field.`);
         return;
       }
-    } else if (triggerType === 'account_balance') {
-      if (!balAccountId) {
-        toast.error('Please select a source account.');
-        return;
-      }
-      criteria.accountId = balAccountId;
-      criteria.operator = balOperator;
-      criteria.compareType = balCompareType;
-
-      if (balCompareType === 'value') {
-        if (!balValue) {
-          toast.error('Please enter a target balance threshold.');
+      if (accountFields.includes(cond.field)) {
+        if (!cond.value) {
+          toast.error(`Condition ${i + 1}: Please select an account.`);
           return;
         }
-        criteria.value = parseFloat(balValue);
+      } else if (goalFields.includes(cond.field)) {
+        if (!cond.goalId) {
+          toast.error(`Condition ${i + 1}: Please select a goal.`);
+          return;
+        }
+        if (cond.value === '' || cond.value === undefined) {
+          toast.error(`Condition ${i + 1}: Please enter a value.`);
+          return;
+        }
       } else {
-        if (!balCompareAccountId) {
-          toast.error('Please select an account to compare against.');
+        if (cond.value === '' || cond.value === undefined) {
+          toast.error(`Condition ${i + 1}: Please enter a value.`);
           return;
         }
-        if (balAccountId === balCompareAccountId) {
-          toast.error('Cannot compare an account to itself.');
-          return;
-        }
-        criteria.compareAccountId = balCompareAccountId;
       }
-    } else if (triggerType === 'savings_goal') {
-      if (!goalId) {
-        toast.error('Please select a savings goal.');
-        return;
-      }
-      if (!goalValue) {
-        toast.error('Please enter a goal threshold value.');
-        return;
-      }
-      criteria.goalId = goalId;
-      criteria.operator = goalOperator;
-      criteria.value = parseFloat(goalValue);
-    } else if (triggerType === 'cash_flow') {
-      if (!cfValue) {
-        toast.error('Please enter a cash flow metric threshold.');
-        return;
-      }
-      criteria.metric = cfMetric;
-      criteria.operator = cfOperator;
-      criteria.value = parseFloat(cfValue);
-      criteria.consecutiveMonths = cfConsecutiveMonths;
     }
 
     try {
@@ -351,7 +308,9 @@ export default function NotificationsTab() {
         body: JSON.stringify({
           name: ruleName,
           triggerType,
-          criteria,
+          conditionOperator,
+          conditions,
+          criteria: {},
         }),
       });
 
@@ -368,34 +327,61 @@ export default function NotificationsTab() {
     }
   };
 
+  const convertLegacyCriteriaToConditions = (rule: any): AlertCondition[] => {
+    const crit = rule.criteria;
+    const result: AlertCondition[] = [];
+
+    if (rule.triggerType === 'transaction') {
+      if (crit.accountId) result.push({ field: 'account', value: crit.accountId });
+      if (crit.amountMin !== undefined) result.push({ field: 'amount_min', value: crit.amountMin });
+      if (crit.amountMax !== undefined) result.push({ field: 'amount_max', value: crit.amountMax });
+      if (crit.keyword) result.push({ field: 'keyword', value: crit.keyword });
+    } else if (rule.triggerType === 'account_balance') {
+      if (crit.operator === 'greater_than') {
+        if (crit.compareType === 'account') {
+          result.push({ field: 'balance_above_account', value: crit.accountId || '', compareAccountId: crit.compareAccountId });
+        } else {
+          result.push({ field: 'balance_above_value', value: crit.value ?? 0 });
+        }
+      } else {
+        if (crit.compareType === 'account') {
+          result.push({ field: 'balance_below_account', value: crit.accountId || '', compareAccountId: crit.compareAccountId });
+        } else {
+          result.push({ field: 'balance_below_value', value: crit.value ?? 0 });
+        }
+      }
+    } else if (rule.triggerType === 'savings_goal') {
+      if (crit.operator === 'reached_percentage') {
+        result.push({ field: 'goal_reached_percentage', value: crit.value ?? 0, goalId: crit.goalId });
+      } else {
+        result.push({ field: 'goal_reached_amount', value: crit.value ?? 0, goalId: crit.goalId });
+      }
+    } else if (rule.triggerType === 'cash_flow') {
+      const metric = crit.metric || 'net_savings';
+      const op = crit.operator || 'less_than';
+      let field: AlertConditionField;
+      if (metric === 'net_savings') {
+        field = op === 'less_than' ? 'cf_net_savings_below' : 'cf_net_savings_above';
+      } else {
+        field = op === 'less_than' ? 'cf_savings_rate_below' : 'cf_savings_rate_above';
+      }
+      result.push({ field, value: crit.value ?? 0, consecutiveMonths: crit.consecutiveMonths || 1 });
+    }
+
+    return result;
+  };
+
   const handleEditRule = (rule: any) => {
     setEditingRuleId(rule.id);
     setRuleName(rule.name);
     setTriggerType(rule.triggerType);
-    
-    resetCriteriaFields();
 
-    const crit = rule.criteria;
-    if (rule.triggerType === 'transaction') {
-      setTxAccountId(crit.accountId || '');
-      setTxAmountMin(crit.amountMin !== undefined ? String(crit.amountMin) : '');
-      setTxAmountMax(crit.amountMax !== undefined ? String(crit.amountMax) : '');
-      setTxKeyword(crit.keyword || '');
-    } else if (rule.triggerType === 'account_balance') {
-      setBalAccountId(crit.accountId || '');
-      setBalOperator(crit.operator || 'less_than');
-      setBalCompareType(crit.compareType || 'value');
-      setBalValue(crit.value !== undefined ? String(crit.value) : '');
-      setBalCompareAccountId(crit.compareAccountId || '');
-    } else if (rule.triggerType === 'savings_goal') {
-      setGoalId(crit.goalId || '');
-      setGoalOperator(crit.operator || 'reached_percentage');
-      setGoalValue(crit.value !== undefined ? String(crit.value) : '');
-    } else if (rule.triggerType === 'cash_flow') {
-      setCfMetric(crit.metric || 'net_savings');
-      setCfOperator(crit.operator || 'less_than');
-      setCfValue(crit.value !== undefined ? String(crit.value) : '');
-      setCfConsecutiveMonths(crit.consecutiveMonths || 1);
+    if (rule.conditions && rule.conditions.length > 0) {
+      setConditions(rule.conditions);
+      setConditionOperator(rule.conditionOperator || 'AND');
+    } else {
+      setConditions(convertLegacyCriteriaToConditions(rule));
+      setConditionOperator('AND');
     }
 
     setShowAddForm(true);
@@ -444,33 +430,59 @@ export default function NotificationsTab() {
     setEditingRuleId(null);
     setRuleName('');
     setTriggerType('transaction');
-    resetCriteriaFields();
+    setConditions([]);
+    setConditionOperator('AND');
   };
 
-  const resetCriteriaFields = () => {
-    setTxAccountId('');
-    setTxAmountMin('');
-    setTxAmountMax('');
-    setTxKeyword('');
+  const getFieldLabel = (field: AlertConditionField): string => {
+    const labels: Record<AlertConditionField, string> = {
+      account: 'Account',
+      amount_min: 'Amount Min ($)',
+      amount_max: 'Amount Max ($)',
+      keyword: 'Keyword',
+      balance_above_value: 'Balance Above Value ($)',
+      balance_below_value: 'Balance Below Value ($)',
+      balance_above_account: 'Balance Above Account',
+      balance_below_account: 'Balance Below Account',
+      goal_reached_percentage: 'Goal Reached Percentage (%)',
+      goal_reached_amount: 'Goal Reached Amount ($)',
+      cf_net_savings_below: 'Net Savings Below ($)',
+      cf_net_savings_above: 'Net Savings Above ($)',
+      cf_savings_rate_below: 'Savings Rate Below (%)',
+      cf_savings_rate_above: 'Savings Rate Above (%)',
+    };
+    return labels[field] || field;
+  };
 
-    setBalAccountId('');
-    setBalOperator('less_than');
-    setBalCompareType('value');
-    setBalValue('');
-    setBalCompareAccountId('');
+  const getFieldsForTrigger = (trigger: string): AlertConditionField[] => {
+    switch (trigger) {
+      case 'transaction':
+        return ['account', 'amount_min', 'amount_max', 'keyword'];
+      case 'account_balance':
+        return ['balance_above_value', 'balance_below_value', 'balance_above_account', 'balance_below_account'];
+      case 'savings_goal':
+        return ['goal_reached_percentage', 'goal_reached_amount'];
+      case 'cash_flow':
+        return ['cf_net_savings_below', 'cf_net_savings_above', 'cf_savings_rate_below', 'cf_savings_rate_above'];
+      default:
+        return [];
+    }
+  };
 
-    setGoalId('');
-    setGoalOperator('reached_percentage');
-    setGoalValue('');
+  const updateCondition = (index: number, updates: Partial<AlertCondition>) => {
+    setConditions((prev) => prev.map((c, i) => (i === index ? { ...c, ...updates } : c)));
+  };
 
-    setCfMetric('net_savings');
-    setCfOperator('less_than');
-    setCfValue('');
-    setCfConsecutiveMonths(1);
+  const removeCondition = (index: number) => {
+    setConditions((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addCondition = () => {
+    const fields = getFieldsForTrigger(triggerType);
+    setConditions((prev) => [...prev, { field: fields[0], value: '' }]);
   };
 
   const getRuleSummary = (rule: any) => {
-    const crit = rule.criteria;
     const getAccountName = (id: string) => {
       const acc = accountsList.find((a) => a.id === id);
       return acc ? acc.name : 'Unknown Account';
@@ -479,6 +491,58 @@ export default function NotificationsTab() {
       const g = goalsList.find((x) => x.id === id);
       return g ? g.name : 'Unknown Goal';
     };
+
+    // New multi-condition summary
+    if (rule.conditions && rule.conditions.length > 0) {
+      const op = rule.conditionOperator || 'AND';
+      const parts = rule.conditions.map((cond: AlertCondition) => {
+        switch (cond.field) {
+          case 'account':
+            return `Account = ${getAccountName(String(cond.value))}`;
+          case 'amount_min':
+            return `Amount ≥ $${cond.value}`;
+          case 'amount_max':
+            return `Amount ≤ $${cond.value}`;
+          case 'keyword':
+            return `Keyword contains '${cond.value}'`;
+          case 'balance_above_value':
+            return `Balance rises above $${cond.value}`;
+          case 'balance_below_value':
+            return `Balance falls below $${cond.value}`;
+          case 'balance_above_account':
+            return `Balance rises above ${getAccountName(cond.compareAccountId || String(cond.value))}`;
+          case 'balance_below_account':
+            return `Balance falls below ${getAccountName(cond.compareAccountId || String(cond.value))}`;
+          case 'goal_reached_percentage':
+            return `Goal "${getGoalName(cond.goalId || '')}" reaches ${cond.value}%`;
+          case 'goal_reached_amount':
+            return `Goal "${getGoalName(cond.goalId || '')}" reaches $${cond.value}`;
+          case 'cf_net_savings_below': {
+            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+            return `Net Savings falls below $${cond.value}${consec}`;
+          }
+          case 'cf_net_savings_above': {
+            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+            return `Net Savings rises above $${cond.value}${consec}`;
+          }
+          case 'cf_savings_rate_below': {
+            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+            return `Savings Rate falls below ${cond.value}%${consec}`;
+          }
+          case 'cf_savings_rate_above': {
+            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+            return `Savings Rate rises above ${cond.value}%${consec}`;
+          }
+          default:
+            return String(cond.value);
+        }
+      });
+      return parts.join(` ${op} `);
+    }
+
+    // Legacy criteria summary
+    const crit = rule.criteria;
+    if (!crit) return 'Unknown Trigger Rule';
 
     switch (rule.triggerType) {
       case 'transaction': {
@@ -866,7 +930,7 @@ export default function NotificationsTab() {
             <h3 className="text-sm font-semibold text-foreground">
               {editingRuleId ? 'Edit Alert Rule' : 'New Custom Alert Rule'}
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="rule-name" className="text-xs font-semibold">Rule Name</Label>
@@ -887,7 +951,8 @@ export default function NotificationsTab() {
                   value={triggerType}
                   onChange={(e: any) => {
                     setTriggerType(e.target.value);
-                    resetCriteriaFields();
+                    setConditions([]);
+                    setConditionOperator('AND');
                   }}
                   className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
                 >
@@ -899,254 +964,191 @@ export default function NotificationsTab() {
               </div>
             </div>
 
-            {/* Transaction Fields */}
-            {triggerType === 'transaction' && (
-              <div className="space-y-3 p-4 rounded-lg bg-muted/10 border border-border/50">
-                <p className="text-xs text-muted-foreground mb-2">
-                  Match incoming transactions when they meet <strong>all</strong> of the filters below. Leave any filter empty to ignore it.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tx-account" className="text-xs font-semibold">Source Account</Label>
-                    <select
-                      id="tx-account"
-                      value={txAccountId}
-                      onChange={(e) => setTxAccountId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="">Any Account</option>
-                      {accountsList.map((acc) => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tx-keyword" className="text-xs font-semibold">Keyword Match</Label>
-                    <Input
-                      id="tx-keyword"
-                      type="text"
-                      placeholder="e.g. Walmart, Netflix"
-                      value={txKeyword}
-                      onChange={(e) => setTxKeyword(e.target.value)}
-                      className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tx-min" className="text-xs font-semibold">Min Amount ($)</Label>
-                    <Input
-                      id="tx-min"
-                      type="number"
-                      placeholder="0.00"
-                      value={txAmountMin}
-                      onChange={(e) => setTxAmountMin(e.target.value)}
-                      className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tx-max" className="text-xs font-semibold">Max Amount ($)</Label>
-                    <Input
-                      id="tx-max"
-                      type="number"
-                      placeholder="No limit"
-                      value={txAmountMax}
-                      onChange={(e) => setTxAmountMax(e.target.value)}
-                      className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
+            {/* AND / OR toggle */}
+            {conditions.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">Match:</span>
+                <div className="inline-flex rounded-lg overflow-hidden border border-border">
+                  <button
+                    type="button"
+                    id="cond-op-and"
+                    onClick={() => setConditionOperator('AND')}
+                    className={`px-3 py-1 text-xs font-bold transition-colors ${
+                      conditionOperator === 'AND'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    AND
+                  </button>
+                  <button
+                    type="button"
+                    id="cond-op-or"
+                    onClick={() => setConditionOperator('OR')}
+                    className={`px-3 py-1 text-xs font-bold transition-colors ${
+                      conditionOperator === 'OR'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    OR
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Account Balance Fields */}
-            {triggerType === 'account_balance' && (
-              <div className="space-y-3 p-4 rounded-lg bg-muted/10 border border-border/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="bal-account" className="text-xs font-semibold">Target Account</Label>
-                    <select
-                      id="bal-account"
-                      value={balAccountId}
-                      onChange={(e) => setBalAccountId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="">Select Account...</option>
-                      {accountsList.map((acc) => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                  </div>
+            {/* Condition rows */}
+            <div className="space-y-0">
+              {conditions.map((cond, idx) => {
+                const isCashFlow = cond.field.startsWith('cf_');
+                const isAccountField = cond.field === 'account' || cond.field === 'balance_above_account' || cond.field === 'balance_below_account';
+                const isGoalField = cond.field === 'goal_reached_percentage' || cond.field === 'goal_reached_amount';
+                const isPercentField = cond.field === 'goal_reached_percentage' || cond.field === 'cf_savings_rate_below' || cond.field === 'cf_savings_rate_above';
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="bal-op" className="text-xs font-semibold">Alert Condition</Label>
-                    <select
-                      id="bal-op"
-                      value={balOperator}
-                      onChange={(e: any) => setBalOperator(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="less_than">Falls Below</option>
-                      <option value="greater_than">Rises Above</option>
-                    </select>
-                  </div>
+                return (
+                  <div key={idx}>
+                    <div className="flex items-end gap-3 p-3 rounded-lg bg-muted/10 border border-border/50">
+                      {/* Field dropdown */}
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor={`cond-field-${idx}`} className="text-xs font-semibold">Field</Label>
+                        <select
+                          id={`cond-field-${idx}`}
+                          value={cond.field}
+                          onChange={(e) => {
+                            const newField = e.target.value as AlertConditionField;
+                            updateCondition(idx, { field: newField, value: '', compareAccountId: undefined, goalId: undefined, consecutiveMonths: undefined });
+                          }}
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                        >
+                          {getFieldsForTrigger(triggerType).map((f) => (
+                            <option key={f} value={f}>{getFieldLabel(f)}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="bal-compare" className="text-xs font-semibold">Compare Against</Label>
-                    <select
-                      id="bal-compare"
-                      value={balCompareType}
-                      onChange={(e: any) => setBalCompareType(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="value">A Fixed Dollar Value</option>
-                      <option value="account">Another Account's Balance</option>
-                    </select>
-                  </div>
+                      {/* Goal selector (for goal fields) */}
+                      {isGoalField && (
+                        <div className="flex-1 space-y-1.5">
+                          <Label htmlFor={`cond-goal-${idx}`} className="text-xs font-semibold">Goal</Label>
+                          <select
+                            id={`cond-goal-${idx}`}
+                            value={cond.goalId || ''}
+                            onChange={(e) => updateCondition(idx, { goalId: e.target.value })}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                          >
+                            <option value="">Select Goal...</option>
+                            {goalsList.map((g) => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                  {balCompareType === 'value' ? (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="bal-val" className="text-xs font-semibold">Threshold Amount ($)</Label>
-                      <Input
-                        id="bal-val"
-                        type="number"
-                        placeholder="500"
-                        value={balValue}
-                        onChange={(e) => setBalValue(e.target.value)}
-                        className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
+                      {/* Value input */}
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor={`cond-value-${idx}`} className="text-xs font-semibold">Value</Label>
+                        {isAccountField ? (
+                          <select
+                            id={`cond-value-${idx}`}
+                            value={cond.field === 'account' ? String(cond.value) : (cond.compareAccountId || '')}
+                            onChange={(e) => {
+                              if (cond.field === 'account') {
+                                updateCondition(idx, { value: e.target.value });
+                              } else {
+                                updateCondition(idx, { compareAccountId: e.target.value, value: e.target.value });
+                              }
+                            }}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                          >
+                            <option value="">Select Account...</option>
+                            {accountsList.map((acc) => (
+                              <option key={acc.id} value={acc.id}>{acc.name}</option>
+                            ))}
+                          </select>
+                        ) : cond.field === 'keyword' ? (
+                          <Input
+                            id={`cond-value-${idx}`}
+                            type="text"
+                            placeholder="e.g. Netflix"
+                            value={String(cond.value)}
+                            onChange={(e) => updateCondition(idx, { value: e.target.value })}
+                            className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                        ) : (
+                          <div className="relative">
+                            <Input
+                              id={`cond-value-${idx}`}
+                              type="number"
+                              placeholder="0"
+                              value={cond.value === '' ? '' : String(cond.value)}
+                              onChange={(e) => updateCondition(idx, { value: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                              className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                            {isPercentField && (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Consecutive Months (cash flow only) */}
+                      {isCashFlow && (
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`cond-months-${idx}`} className="text-xs font-semibold whitespace-nowrap">Months</Label>
+                          <select
+                            id={`cond-months-${idx}`}
+                            value={cond.consecutiveMonths || 1}
+                            onChange={(e) => updateCondition(idx, { consecutiveMonths: parseInt(e.target.value) || 1 })}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                          >
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Remove button */}
+                      {conditions.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          id={`cond-remove-${idx}`}
+                          onClick={() => removeCondition(idx)}
+                          className="h-9 px-2 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="bal-comp-acc" className="text-xs font-semibold">Compare Account</Label>
-                      <select
-                        id="bal-comp-acc"
-                        value={balCompareAccountId}
-                        onChange={(e) => setBalCompareAccountId(e.target.value)}
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                      >
-                        <option value="">Select Compare Account...</option>
-                        {accountsList.map((acc) => (
-                          <option key={acc.id} value={acc.id}>{acc.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Savings Goal Fields */}
-            {triggerType === 'savings_goal' && (
-              <div className="space-y-3 p-4 rounded-lg bg-muted/10 border border-border/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="goal-select" className="text-xs font-semibold">Goal</Label>
-                    <select
-                      id="goal-select"
-                      value={goalId}
-                      onChange={(e) => setGoalId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="">Select Savings Goal...</option>
-                      {goalsList.map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
+                    {/* AND/OR connector label */}
+                    {conditions.length > 1 && idx < conditions.length - 1 && (
+                      <div className="flex justify-center py-1.5">
+                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          {conditionOperator}
+                        </span>
+                      </div>
+                    )}
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="goal-op" className="text-xs font-semibold">Condition</Label>
-                    <select
-                      id="goal-op"
-                      value={goalOperator}
-                      onChange={(e: any) => setGoalOperator(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="reached_percentage">Reaches Percentage (%)</option>
-                      <option value="reached_amount">Reaches Amount ($)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="goal-val" className="text-xs font-semibold">
-                      {goalOperator === 'reached_percentage' ? 'Percentage Value (%)' : 'Amount Value ($)'}
-                    </Label>
-                    <Input
-                      id="goal-val"
-                      type="number"
-                      placeholder={goalOperator === 'reached_percentage' ? '50' : '1000'}
-                      value={goalValue}
-                      onChange={(e) => setGoalValue(e.target.value)}
-                      className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Cash Flow Fields */}
-            {triggerType === 'cash_flow' && (
-              <div className="space-y-3 p-4 rounded-lg bg-muted/10 border border-border/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cf-metric" className="text-xs font-semibold">Metric</Label>
-                    <select
-                      id="cf-metric"
-                      value={cfMetric}
-                      onChange={(e: any) => setCfMetric(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="net_savings">Net Savings Amount ($)</option>
-                      <option value="savings_rate">Savings Rate (%)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cf-op" className="text-xs font-semibold">Condition</Label>
-                    <select
-                      id="cf-op"
-                      value={cfOperator}
-                      onChange={(e: any) => setCfOperator(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="less_than">Falls Below</option>
-                      <option value="greater_than">Rises Above</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cf-val" className="text-xs font-semibold">
-                      {cfMetric === 'net_savings' ? 'Amount ($)' : 'Rate (%)'}
-                    </Label>
-                    <Input
-                      id="cf-val"
-                      type="number"
-                      placeholder={cfMetric === 'net_savings' ? '0' : '15'}
-                      value={cfValue}
-                      onChange={(e) => setCfValue(e.target.value)}
-                      className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cf-months" className="text-xs font-semibold">Consecutive Months</Label>
-                    <select
-                      id="cf-months"
-                      value={cfConsecutiveMonths}
-                      onChange={(e: any) => setCfConsecutiveMonths(parseInt(e.target.value) || 1)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                    >
-                      <option value="1">1 Month</option>
-                      <option value="2">2 Months</option>
-                      <option value="3">3 Months</option>
-                      <option value="6">6 Months</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Add condition button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              id="add-condition"
+              onClick={addCondition}
+            >
+              + Add Condition
+            </Button>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={resetForm}>
