@@ -128,7 +128,7 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
   milestonesProjections: {
     title: 'Milestones & Projections',
     description:
-      'Projects account balance growth month-by-month using a configurable monthly inflow. Each month, the allocation engine redistributes funds across linked goals by priority. A goal is marked as funded when its cumulative allocation reaches its target. The projection runs up to 60 months (5 years) or until all goals are funded. Inflow defaults to the average monthly net change in account balance over the selected lookback period (3mo, 6mo, 1yr, 2yr).',
+      'Projects account balance growth month-by-month using a configurable monthly inflow. Each month, the allocation engine redistributes funds across linked goals by sort order. A goal is marked as funded when its cumulative allocation reaches its target. The projection runs up to 120 months (10 years) or until all goals are funded. Inflow defaults to the average monthly net change in account balance over the selected lookback period (3mo, 6mo, 1yr, 2yr).',
   },
 
   // ── Investments ───────────────────────────────────────────────
