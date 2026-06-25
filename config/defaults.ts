@@ -65,6 +65,16 @@ export const AI_DEFAULTS = {
   aiActiveProviderId: null,
 } as const;
 
+// ── Notification Defaults ────────────────────────────────────────────────────
+
+export const NOTIFICATION_DEFAULTS = {
+  notifySyncErrors: true,
+  notifyBudgetAlerts: true,
+  notifyLargeTransactions: true,
+  largeTransactionThreshold: 500,
+  notifyMonthlySummary: true,
+} as const;
+
 // ── API Keys & Endpoints ─────────────────────────────────────────────────────
 
 export const API_KEY_DEFAULTS: Record<string, string> = {
@@ -148,6 +158,7 @@ export const DEFAULTS = {
   ...GENERAL_DEFAULTS,
   ...ANALYTICS_DEFAULTS,
   ...AI_DEFAULTS,
+  ...NOTIFICATION_DEFAULTS,
   apiKeys: { ...API_KEY_DEFAULTS },
 } as const;
 
@@ -160,7 +171,7 @@ export type SettingDefinition = {
   label: string;
   description: string;
   type: SettingType;
-  group: 'General' | 'Analytics' | 'AI' | 'API Keys & Endpoints';
+  group: 'General' | 'Analytics' | 'AI' | 'Notifications' | 'API Keys & Endpoints';
   defaultValue: unknown;
 };
 
@@ -202,6 +213,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'aiAnalysisTimeoutSeconds', label: 'AI Analysis Timeout', description: 'Maximum seconds for entire analysis to complete (60-3600)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAnalysisTimeoutSeconds },
   { key: 'aiSystemPrompt', label: 'AI System Prompt', description: 'Custom system prompt for the AI model (null = use default)', type: 'string', group: 'AI', defaultValue: AI_DEFAULTS.aiSystemPrompt },
   { key: 'aiActiveProviderId', label: 'Active AI Provider ID', description: 'UUID of the active AI provider', type: 'string', group: 'AI', defaultValue: AI_DEFAULTS.aiActiveProviderId },
+
+  // ── Notifications ──
+  { key: 'notifySyncErrors', label: 'Notify Sync Errors', description: 'Enable push notifications when account syncing fails', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifySyncErrors },
+  { key: 'notifyBudgetAlerts', label: 'Notify Budget Alerts', description: 'Enable push notifications when spending exceeds category budgets', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyBudgetAlerts },
+  { key: 'notifyLargeTransactions', label: 'Notify Large Transactions', description: 'Enable push notifications for large individual transactions', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyLargeTransactions },
+  { key: 'largeTransactionThreshold', label: 'Large Transaction Threshold', description: 'Alert threshold value in standard currency units', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.largeTransactionThreshold },
+  { key: 'notifyMonthlySummary', label: 'Notify Monthly Summary', description: 'Enable monthly cash flow and net worth summaries', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyMonthlySummary },
 
   // ── API Keys & Endpoints ──
   { key: 'metalsApiUrl', label: 'Metals API URL', description: 'Endpoint URL for gold/silver spot prices (Yahoo Finance by default)', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.metalsApiUrl },

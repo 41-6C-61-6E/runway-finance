@@ -156,6 +156,11 @@ export const userSettings = pgTable('user_settings', {
     forecast: true,
     suggestions: true,
   }),
+  notifySyncErrors: boolean('notify_sync_errors').notNull().default(true),
+  notifyBudgetAlerts: boolean('notify_budget_alerts').notNull().default(true),
+  notifyLargeTransactions: boolean('notify_large_transactions').notNull().default(true),
+  largeTransactionThreshold: integer('large_transaction_threshold').notNull().default(500),
+  notifyMonthlySummary: boolean('notify_monthly_summary').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
