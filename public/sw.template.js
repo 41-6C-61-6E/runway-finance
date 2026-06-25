@@ -93,3 +93,46 @@ async function networkFirstWithFallback(request) {
     return new Response("Offline", { status: 503 });
   }
 }
+
+// ── Web Push Event Listeners ──────────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: data.icon || "/icons/icon-192x192.png",
+      badge: data.badge || "/icons/icon-96x96.png",
+      vibrate: data.vibrate || [100, 50, 100],
+      data: {
+        url: data.url || "/"
+      }
+    };
+    event.waitUntil(
+      self.registration.showNotification(data.title || "Runway Finance", options)
+    );
+  } catch (err) {
+    console.error("Error displaying push notification:", err);
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const urlToOpen = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // If there is an existing client matching this origin/URL, focus it
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url === urlToOpen && "focus" in client) {
+          return client.focus();
+        }
+      }
+      // If not, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+

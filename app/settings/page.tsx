@@ -29,7 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   Link2,
-  ArrowUpDown
+  ArrowUpDown,
+  Bell
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
@@ -44,6 +45,7 @@ import AccentPicker from '@/components/features/settings/AccentPicker';
 import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
 import AiTab from '@/components/features/settings/AiTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
+import NotificationsTab from '@/components/features/settings/NotificationsTab';
 import ImportTab from '@/components/features/settings/ImportTab';
 import PayrollTab from '@/components/features/settings/PayrollTab';
 import TagsTab from '@/components/features/settings/TagsTab';
@@ -115,6 +117,7 @@ const SETTINGS_TABS = [
   { id: 'import' as const, label: 'Import', description: 'Manually upload statement files (CSV/OFX)', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
   { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
+  { id: 'notifications' as const, label: 'Notifications', description: 'Configure push notifications and alert preferences', icon: Bell },
   { id: 'advanced' as const, label: 'Advanced', description: 'Backups, dev tools, and database settings', icon: ShieldAlert },
 ];
 
@@ -362,8 +365,8 @@ function SettingsPageBody() {
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
-  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'sharing', 'advanced'].includes(urlTab)
-    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'sharing' | 'advanced')
+  const activeTab = urlTab && ['general', 'accounts', 'categories', 'rules', 'tags', 'analytics', 'ai', 'import', 'payroll', 'sharing', 'notifications', 'advanced'].includes(urlTab)
+    ? (urlTab as 'general' | 'accounts' | 'categories' | 'rules' | 'tags' | 'analytics' | 'ai' | 'import' | 'payroll' | 'sharing' | 'notifications' | 'advanced')
     : 'general';
 
   const goToTab = useCallback((tab: typeof activeTab, subTab?: string) => {
@@ -2254,6 +2257,12 @@ function SettingsPageBody() {
       {activeTab === 'advanced' && (
         <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
           <AdvancedTab />
+        </div>
+      )}
+
+      {activeTab === 'notifications' && (
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
+          <NotificationsTab />
         </div>
       )}
 
