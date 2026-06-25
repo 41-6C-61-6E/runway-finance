@@ -316,26 +316,42 @@ export async function updateGoalAllocations(userId: string): Promise<void> {
         ));
 
       // Check for savings milestone
-      if (settings?.notifyGoalMilestones && goal.status === 'active') {
+      if (goal.status === 'active') {
         const prev = decryptedPersisted.find((g) => g.id === goal.goalId);
         if (prev) {
-          const isNowFunded = goal.allocatedAmount >= goal.targetAmount && goal.targetAmount > 0;
-          const wasFunded = prev.allocatedAmount >= prev.targetAmount;
-          if (isNowFunded && !wasFunded) {
-            const milestoneKey = `goal:${goal.goalId}:100`;
-            // Call milestone checker dynamically to avoid circular imports
-            const { sendPushNotification } = await import('@/lib/services/notifications');
-            sendPushNotification(
-              userId,
-              `Savings Goal Reached!`,
-              `Your savings goal "${goal.goalName}" is now fully funded!`,
-              '/goals',
-              'goal_milestone',
-              milestoneKey
-            ).catch((err) => {
-              console.error('[GoalAllocation] Failed to send goal milestone notification:', err);
-            });
+          // Standard system milestone
+          if (settings?.notifyGoalMilestones) {
+            const isNowFunded = goal.allocatedAmount >= goal.targetAmount && goal.targetAmount > 0;
+            const wasFunded = prev.allocatedAmount >= prev.targetAmount;
+            if (isNowFunded && !wasFunded) {
+              const milestoneKey = `goal:${goal.goalId}:100`;
+              // Call milestone checker dynamically to avoid circular imports
+              const { sendPushNotification } = await import('@/lib/services/notifications');
+              sendPushNotification(
+                userId,
+                `Savings Goal Reached!`,
+                `Your savings goal "${goal.goalName}" is now fully funded!`,
+                '/goals',
+                'goal_milestone',
+                milestoneKey
+              ).catch((err) => {
+                console.error('[GoalAllocation] Failed to send goal milestone notification:', err);
+              });
+            }
           }
+
+          // Custom savings goal alerts
+          const { checkSavingsGoalAlerts } = await import('@/lib/services/notifications');
+          checkSavingsGoalAlerts(
+            userId,
+            goal.goalId,
+            goal.goalName,
+            goal.allocatedAmount,
+            goal.targetAmount,
+            prev.allocatedAmount
+          ).catch((e) => {
+            console.error('[GoalAllocation] Failed to check custom savings goal alerts:', e);
+          });
         }
       }
     }

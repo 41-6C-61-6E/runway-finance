@@ -810,6 +810,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       externalIdToAccountId.set(sfAccount.id, upserted.id);
       accountsSynced++;
 
+      // Trigger custom account balance alerts check
+      const { checkAccountBalanceAlerts } = await import('@/lib/services/notifications');
+      checkAccountBalanceAlerts(dataUserId, upserted.id, balanceNum, dek).catch((e) => {
+        logger.error('[sync] Failed to check custom account balance alerts:', e);
+      });
+
       const wasNewAccount = !orphanedAccount && !existingExternalIds.has(sfAccount.id);
       const acctDetail: {
         externalId: string;
@@ -902,6 +908,19 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
           } else {
             transactionsNew++;
             acctDetail.transactionsNew++;
+
+            // Custom transaction alerts check
+            const { checkTransactionAlerts } = await import('@/lib/services/notifications');
+            checkTransactionAlerts(dataUserId, {
+              externalId: sfTx.id,
+              accountId,
+              description: sfTx.description,
+              payee: sfTx.payee ?? null,
+              memo: sfTx.memo ?? null,
+              amount: String(amountNum),
+            }).catch((e) => {
+              logger.error('[sync] Failed to run custom transaction alert checks:', e);
+            });
 
             // Large transaction alert check
             if (settings?.notifyLargeTransactions) {
@@ -1105,6 +1124,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);
     await updateCategoryIncomeSummaries(dataUserId, dek);
+
+    // Trigger custom cash flow alerts check
+    const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
+    checkCashFlowAlerts(dataUserId, dek).catch((e) => {
+      logger.error('[sync] Failed to check cash flow alerts:', e);
+    });
 
     const totalDurationMs = Date.now() - startedAt;
     if (transactionsNew > 0 || transactionsUpdated > 0) {

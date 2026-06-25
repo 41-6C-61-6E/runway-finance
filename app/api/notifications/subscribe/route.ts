@@ -85,3 +85,14 @@ export async function DELETE(request: Request) {
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  return Response.json({
+    publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null,
+  });
+}
