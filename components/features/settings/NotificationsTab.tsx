@@ -177,7 +177,7 @@ export default function NotificationsTab() {
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
 
-        await fetch('/api/notifications/subscribe', {
+        const res = await fetch('/api/notifications/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -185,6 +185,12 @@ export default function NotificationsTab() {
             userAgent: navigator.userAgent,
           }),
         });
+
+        if (!res.ok) {
+          // Subscription was created in the browser but failed to save server-side
+          await sub.unsubscribe();
+          throw new Error('Failed to save subscription to the server. Please try again.');
+        }
 
         setIsSubscribed(true);
         toast.success('Successfully enabled notifications on this device!');
@@ -206,7 +212,12 @@ export default function NotificationsTab() {
         method: 'POST',
       });
       if (res.ok) {
-        toast.success('Test notification dispatched. It should arrive shortly.');
+        const data = await res.json();
+        if (data.success) {
+          toast.success('Test notification dispatched. It should arrive shortly.');
+        } else {
+          toast.warning(data.reason || 'Notification was not sent. Check server configuration.');
+        }
       } else {
         throw new Error('Server returned an error');
       }
