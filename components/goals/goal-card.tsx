@@ -31,12 +31,20 @@ interface Goal {
   updatedAt: string;
 }
 
+interface GoalProjection {
+  projectedFundDate: string | null;
+  monthsToFund: number | null;
+  isFunded: boolean;
+  willFund: boolean;
+}
+
 interface GoalCardProps {
   goal: Goal;
   onEdit: (goal: Goal) => void;
   onDelete: (id: string) => void;
   percentage?: number;
   reserve?: number;
+  projection?: GoalProjection | null;
 }
 
 function getStatusBadge(status: string) {
@@ -77,7 +85,13 @@ function getStatusBadge(status: string) {
   }
 }
 
-export function GoalCard({ goal, onEdit, onDelete, percentage, reserve }: GoalCardProps) {
+function formatProjectedDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + '-01');
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projection }: GoalCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const target = parseFloat(goal.targetAmount);
@@ -228,6 +242,16 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve }: GoalCa
               )}
               {monthlySavings !== null && (
                 <span className="text-muted-foreground blur-number">Save {formatCurrency(monthlySavings)}/mo</span>
+              )}
+              {projection && projection.willFund && projection.projectedFundDate && (
+                <span className="text-chart-2 font-medium text-[10px]" title="Based on current savings rate">
+                  Est. by {formatProjectedDate(projection.projectedFundDate)}
+                </span>
+              )}
+              {projection && !projection.willFund && (
+                <span className="text-amber-500 font-medium text-[10px]">
+                  5+ yrs at current rate
+                </span>
               )}
             </>
           )}
