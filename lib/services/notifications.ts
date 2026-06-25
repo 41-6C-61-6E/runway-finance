@@ -391,7 +391,7 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
 
 // ── Custom Alert Rules Checks ──────────────────────────────────────────────────
 
-import type { AlertCondition, ConditionOperator } from '@/lib/db/schema/notifications';
+import type { AlertCondition, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';
 
 // ── Generic Multi-Condition Evaluator ─────────────────────────────────────────
 
@@ -519,6 +519,111 @@ function evaluateConditions<T>(
   return conditions.some((c) => evaluator(c, ctx));
 }
 
+// ── Recursive Condition Tree Evaluator ─────────────────────────────────────────
+
+export function evaluateConditionTree<T>(
+  tree: ConditionTreeNode,
+  evaluator: (cond: AlertCondition, ctx: T) => boolean,
+  ctx: T
+): boolean {
+  const directResults = tree.conditions.map(c => evaluator(c, ctx));
+  const nestedResults = (tree.subGroups || []).map(g => evaluateConditionTree(g, evaluator, ctx));
+  const allResults = [...directResults, ...nestedResults];
+
+  if (allResults.length === 0) return false;
+
+  return tree.operator === 'AND' ? allResults.every(Boolean) : allResults.some(Boolean);
+}
+
+/** Collect all balance comparison account IDs from a condition tree (recursively). */
+function collectBalanceAccountIds(tree: ConditionTreeNode): string[] {
+  const ids: string[] = [];
+  for (const cond of tree.conditions) {
+    if ((cond.field === 'balance_below_account' || cond.field === 'balance_above_account') && cond.value) {
+      ids.push(String(cond.value));
+    }
+  }
+  for (const group of tree.subGroups || []) {
+    ids.push(...collectBalanceAccountIds(group));
+  }
+  return ids;
+}
+
+/** Build a human-readable balance notification description from the first matching condition in a tree. */
+function buildBalanceNotificationBody(tree: ConditionTreeNode, compareAccountBalances: Map<string, number>): string {
+  for (const cond of tree.conditions) {
+    if (cond.field === 'balance_below_value') {
+      return `fell below $${cond.value}`;
+    } else if (cond.field === 'balance_above_value') {
+      return `rose above $${cond.value}`;
+    } else if (cond.field === 'balance_below_account' || cond.field === 'balance_above_account') {
+      const compBal = compareAccountBalances.get(String(cond.value));
+      const direction = cond.field === 'balance_below_account' ? 'fell below' : 'rose above';
+      return `${direction} compared account ($${compBal?.toFixed(2) ?? '?'})`;
+    }
+  }
+  for (const group of tree.subGroups || []) {
+    const result = buildBalanceNotificationBody(group, compareAccountBalances);
+    if (result) return result;
+  }
+  return '';
+}
+
+/** Build notification reason string from first matching condition in a goal tree. */
+function buildGoalNotificationBody(tree: ConditionTreeNode, ctx: GoalContext): string {
+  for (const cond of tree.conditions) {
+    if (cond.field === 'goal_reached_percentage') {
+      return `reached ${cond.value}% of its target`;
+    } else if (cond.field === 'goal_reached_amount') {
+      return `reached $${cond.value}`;
+    }
+  }
+  for (const group of tree.subGroups || []) {
+    const result = buildGoalNotificationBody(group, ctx);
+    if (result) return result;
+  }
+  return '';
+}
+
+/** Build a dedup key suffix from all leaf conditions in a goal tree. */
+function buildGoalTreeDedupKey(tree: ConditionTreeNode): string {
+  const parts: string[] = [];
+  for (const cond of tree.conditions) {
+    parts.push(`${cond.field}:${cond.value}`);
+  }
+  for (const group of tree.subGroups || []) {
+    parts.push(buildGoalTreeDedupKey(group));
+  }
+  return parts.join('_');
+}
+
+/** Build notification body from first matching condition in a cash flow tree. */
+function buildCashFlowNotificationBody(
+  tree: ConditionTreeNode,
+  ctx: CashFlowContext,
+  decryptedCashFlows: { yearMonth: string; netCashFlow: number; savingsRate: number }[]
+): string {
+  for (const cond of tree.conditions) {
+    const val = Number(cond.value);
+    const consecMonths = cond.consecutiveMonths ?? 1;
+    const consecStr = consecMonths > 1 ? ` for ${consecMonths} consecutive months` : '';
+    const latest = decryptedCashFlows[0];
+
+    if (cond.field.startsWith('cf_net_savings')) {
+      const direction = cond.field.includes('below') ? 'below' : 'above';
+      return `Net Cash Flow is ${direction} $${val}${consecStr} (latest: $${latest.netCashFlow.toFixed(2)}).`;
+    } else {
+      const direction = cond.field.includes('below') ? 'below' : 'above';
+      return `Savings Rate is ${direction} ${val}%${consecStr} (latest: ${latest.savingsRate.toFixed(2)}%).`;
+    }
+  }
+  for (const group of tree.subGroups || []) {
+    const result = buildCashFlowNotificationBody(group, ctx, decryptedCashFlows);
+    if (result) return result;
+  }
+  return '';
+}
+
 // ── Check Functions ───────────────────────────────────────────────────────────
 
 export async function checkTransactionAlerts(
@@ -548,7 +653,16 @@ export async function checkTransactionAlerts(
     for (const rule of rules) {
       let matched = false;
 
-      if (rule.conditions && rule.conditions.length > 0) {
+      if (rule.conditionTree) {
+        const ctx: TransactionContext = {
+          accountId: tx.accountId,
+          amount: txAmount,
+          descriptionLower: txDescLower,
+          payeeLower: txPayeeLower,
+          memoLower: txMemoLower,
+        };
+        matched = evaluateConditionTree(rule.conditionTree, evaluateTransactionCondition, ctx);
+      } else if (rule.conditions && rule.conditions.length > 0) {
         // New multi-condition evaluation
         const ctx: TransactionContext = {
           accountId: tx.accountId,
@@ -626,7 +740,33 @@ export async function checkAccountBalanceAlerts(
       let matched = false;
       let compareDescription = '';
 
-      if (rule.conditions && rule.conditions.length > 0) {
+      if (rule.conditionTree) {
+        const compareAccountBalances = new Map<string, number>();
+        const balanceIds = collectBalanceAccountIds(rule.conditionTree);
+        for (const compId of balanceIds) {
+          if (!compareAccountBalances.has(compId)) {
+            const [compAcc] = await db
+              .select({ balance: accounts.balance, name: accounts.name })
+              .from(accounts)
+              .where(and(eq(accounts.userId, userId), eq(accounts.id, compId)))
+              .limit(1);
+            if (compAcc) {
+              compareAccountBalances.set(compId, parseFloat(await decryptField(compAcc.balance, dek)) || 0);
+            }
+          }
+        }
+
+        const ctx: BalanceContext = {
+          accountId,
+          currentBalance,
+          compareAccountBalances,
+        };
+        matched = evaluateConditionTree(rule.conditionTree, evaluateBalanceCondition, ctx);
+
+        if (matched) {
+          compareDescription = buildBalanceNotificationBody(rule.conditionTree, compareAccountBalances);
+        }
+      } else if (rule.conditions && rule.conditions.length > 0) {
         // New multi-condition evaluation
         // Collect compare account balances needed by any condition
         const compareAccountBalances = new Map<string, number>();
@@ -755,7 +895,20 @@ export async function checkSavingsGoalAlerts(
       let matched = false;
       let reason = '';
 
-      if (rule.conditions && rule.conditions.length > 0) {
+      if (rule.conditionTree) {
+        const ctx: GoalContext = {
+          goalId,
+          currentPct,
+          prevPct,
+          allocatedAmount,
+          prevAllocatedAmount,
+        };
+        matched = evaluateConditionTree(rule.conditionTree, evaluateGoalCondition, ctx);
+
+        if (matched) {
+          reason = buildGoalNotificationBody(rule.conditionTree, ctx);
+        }
+      } else if (rule.conditions && rule.conditions.length > 0) {
         // New multi-condition evaluation
         const ctx: GoalContext = {
           goalId,
@@ -802,7 +955,9 @@ export async function checkSavingsGoalAlerts(
       if (matched) {
         // Build a stable dedup key from the rule ID and the matched condition values
         let dedupSuffix: string;
-        if (rule.conditions && rule.conditions.length > 0) {
+        if (rule.conditionTree) {
+          dedupSuffix = buildGoalTreeDedupKey(rule.conditionTree);
+        } else if (rule.conditions && rule.conditions.length > 0) {
           dedupSuffix = rule.conditions.map((c) => `${c.field}:${c.value}`).join('_');
         } else {
           dedupSuffix = `criteria:${rule.criteria?.operator}:${rule.criteria?.value}`;
@@ -867,7 +1022,16 @@ export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
       let matched = false;
       let notificationBody = '';
 
-      if (rule.conditions && rule.conditions.length > 0) {
+      if (rule.conditionTree) {
+        const ctx: CashFlowContext = {
+          recentMonths: decryptedCashFlows,
+        };
+        matched = evaluateConditionTree(rule.conditionTree, evaluateCashFlowCondition, ctx);
+
+        if (matched) {
+          notificationBody = buildCashFlowNotificationBody(rule.conditionTree, ctx, decryptedCashFlows);
+        }
+      } else if (rule.conditions && rule.conditions.length > 0) {
         // New multi-condition evaluation
         const ctx: CashFlowContext = {
           recentMonths: decryptedCashFlows,

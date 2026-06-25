@@ -122,7 +122,8 @@ import {
   checkTransactionAlerts,
   checkAccountBalanceAlerts,
   checkSavingsGoalAlerts,
-  checkCashFlowAlerts
+  checkCashFlowAlerts,
+  evaluateConditionTree,
 } from '@/lib/services/notifications';
 
 describe('Custom Event Alert Engine', () => {
@@ -685,6 +686,85 @@ describe('Custom Event Alert Engine', () => {
       expect(payload.body).toContain('above $500');
     });
 
+    // ── Full integration: conditionTree-based transaction alerts ────────
+
+    it('should trigger using conditionTree (single level AND)', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_tree_1',
+          name: 'Tree AND rule',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditionTree: {
+            operator: 'AND',
+            conditions: [
+              { field: 'amount_min', value: 50 },
+              { field: 'keyword', value: 'restaurant' },
+            ],
+            subGroups: [],
+          },
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_tree_1',
+        accountId: 'acct_1',
+        description: 'Fancy restaurant dinner',
+        payee: 'French Bistro',
+        memo: null,
+        amount: '-120.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.title).toContain('Tree AND rule');
+    });
+
+    it('should trigger using conditionTree with nested OR group inside AND', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_tree_2',
+          name: 'Nested tree rule',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditionTree: {
+            operator: 'AND',
+            conditions: [
+              { field: 'amount_min', value: 50 },
+            ],
+            subGroups: [
+              {
+                operator: 'OR',
+                conditions: [
+                  { field: 'keyword', value: 'restaurant' },
+                  { field: 'keyword', value: 'uber' },
+                ],
+                subGroups: [],
+              },
+            ],
+          },
+        },
+      ];
+
+      // Matches amount_min (AND) and keyword 'uber' (OR sub-group)
+      const tx = {
+        externalId: 'tx_tree_2',
+        accountId: 'acct_1',
+        description: 'Uber ride to airport',
+        payee: 'Uber Technologies',
+        memo: null,
+        amount: '-65.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+      expect(payload.title).toContain('Nested tree rule');
+    });
+
     it('should not trigger when cash flow conditions not met', async () => {
       mockRulesResponse = [
         {
@@ -707,6 +787,281 @@ describe('Custom Event Alert Engine', () => {
       const dek = new Uint8Array(32);
       await checkCashFlowAlerts('user_123', dek);
       expect(mockSendNotification).not.toHaveBeenCalled();
+    });
+
+    it('should NOT trigger with conditionTree when nested OR group fails', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_tree_3',
+          name: 'Nested fail',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditionTree: {
+            operator: 'AND',
+            conditions: [
+              { field: 'amount_min', value: 50 },
+            ],
+            subGroups: [
+              {
+                operator: 'OR',
+                conditions: [
+                  { field: 'keyword', value: 'restaurant' },
+                  { field: 'keyword', value: 'uber' },
+                ],
+                subGroups: [],
+              },
+            ],
+          },
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_tree_3',
+        accountId: 'acct_1',
+        description: 'Grocery store run',
+        payee: 'Kroger',
+        memo: null,
+        amount: '-120.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
+
+    it('should trigger using conditionTree with deeply nested groups', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_tree_4',
+          name: 'Deep nest',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditionTree: {
+            operator: 'AND',
+            conditions: [],
+            subGroups: [
+              {
+                operator: 'OR',
+                conditions: [
+                  { field: 'keyword', value: 'amazon' },
+                ],
+                subGroups: [
+                  {
+                    operator: 'AND',
+                    conditions: [
+                      { field: 'amount_min', value: 20 },
+                      { field: 'amount_max', value: 200 },
+                    ],
+                    subGroups: [],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_tree_4',
+        accountId: 'acct_1',
+        description: 'Amazon order',
+        payee: 'Amazon.com',
+        memo: null,
+        amount: '-45.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not trigger when conditionTree conditions are empty', async () => {
+      mockRulesResponse = [
+        {
+          id: 'rule_tree_5',
+          name: 'Empty tree',
+          triggerType: 'transaction',
+          criteria: {},
+          isEnabled: true,
+          conditionTree: {
+            operator: 'AND',
+            conditions: [],
+            subGroups: [],
+          },
+        },
+      ];
+
+      const tx = {
+        externalId: 'tx_tree_5',
+        accountId: 'acct_1',
+        description: 'Any transaction',
+        payee: 'Whoever',
+        memo: null,
+        amount: '-10.00',
+      };
+
+      await checkTransactionAlerts('user_123', tx);
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Condition Tree Unit Tests (no DB mocks needed) ─────────────────────
+
+  describe('evaluateConditionTree', () => {
+    const mockEvaluator = (cond: any, ctx: any) => {
+      if (cond.field === 'always_true') return true;
+      if (cond.field === 'always_false') return false;
+      if (cond.field === 'keyword') {
+        return ctx.text?.toLowerCase().includes(String(cond.value).toLowerCase());
+      }
+      return false;
+    };
+
+    it('should return true when AND tree has all matching conditions', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [
+          { field: 'always_true', value: '' },
+          { field: 'always_true', value: '' },
+        ],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+    });
+
+    it('should return false when AND tree has one failing condition', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [
+          { field: 'always_true', value: '' },
+          { field: 'always_false', value: '' },
+        ],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+    });
+
+    it('should return true when OR tree has at least one matching condition', () => {
+      const tree = {
+        operator: 'OR' as const,
+        conditions: [
+          { field: 'always_false', value: '' },
+          { field: 'always_true', value: '' },
+        ],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+    });
+
+    it('should return false when OR tree has no matching conditions', () => {
+      const tree = {
+        operator: 'OR' as const,
+        conditions: [
+          { field: 'always_false', value: '' },
+          { field: 'always_false', value: '' },
+        ],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+    });
+
+    it('should return false for empty tree', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+    });
+
+    it('should correctly evaluate nested AND under OR', () => {
+      const tree = {
+        operator: 'OR' as const,
+        conditions: [{ field: 'always_false', value: '' }],
+        subGroups: [
+          {
+            operator: 'AND' as const,
+            conditions: [
+              { field: 'always_true', value: '' },
+              { field: 'always_true', value: '' },
+            ],
+            subGroups: [],
+          },
+        ],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+    });
+
+    it('should correctly evaluate nested OR under AND', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [{ field: 'always_true', value: '' }],
+        subGroups: [
+          {
+            operator: 'OR' as const,
+            conditions: [
+              { field: 'always_false', value: '' },
+              { field: 'always_true', value: '' },
+            ],
+            subGroups: [],
+          },
+        ],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+    });
+
+    it('should return false when nested OR under AND fails', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [{ field: 'always_true', value: '' }],
+        subGroups: [
+          {
+            operator: 'OR' as const,
+            conditions: [
+              { field: 'always_false', value: '' },
+              { field: 'always_false', value: '' },
+            ],
+            subGroups: [],
+          },
+        ],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+    });
+
+    it('should evaluate deep nesting', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [{ field: 'always_true', value: '' }],
+        subGroups: [
+          {
+            operator: 'OR' as const,
+            conditions: [],
+            subGroups: [
+              {
+                operator: 'AND' as const,
+                conditions: [
+                  { field: 'always_true', value: '' },
+                  { field: 'always_true', value: '' },
+                ],
+                subGroups: [],
+              },
+            ],
+          },
+        ],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+    });
+
+    it('should use context in evaluator', () => {
+      const tree = {
+        operator: 'AND' as const,
+        conditions: [
+          { field: 'keyword', value: 'hello' },
+        ],
+        subGroups: [],
+      };
+      expect(evaluateConditionTree(tree, mockEvaluator, { text: 'hello world' })).toBe(true);
+      expect(evaluateConditionTree(tree, mockEvaluator, { text: 'goodbye' })).toBe(false);
     });
   });
 });
