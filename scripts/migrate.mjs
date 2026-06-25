@@ -116,7 +116,7 @@ async function runSelfHealingChecks(client) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS push_subscriptions (
           id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id    TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          user_id    TEXT NOT NULL,
           endpoint   TEXT NOT NULL,
           keys       JSONB NOT NULL,
           user_agent TEXT,
@@ -135,7 +135,7 @@ async function runSelfHealingChecks(client) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS sent_notifications (
           id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL,
           type    TEXT NOT NULL,
           key     TEXT NOT NULL,
           sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -153,7 +153,7 @@ async function runSelfHealingChecks(client) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS custom_alert_rules (
           id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id            TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          user_id            TEXT NOT NULL,
           name               TEXT NOT NULL,
           is_enabled         BOOLEAN NOT NULL DEFAULT TRUE,
           trigger_type       TEXT NOT NULL,
