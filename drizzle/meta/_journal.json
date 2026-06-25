@@ -449,6 +449,13 @@
       "when": 1750888800000,
       "tag": "0063_drop_notifications_user_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1782426560324,
+      "tag": "0064_burly_mentallo",
+      "breakpoints": true
     }
   ]
 }

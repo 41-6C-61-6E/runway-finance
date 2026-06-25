@@ -26,7 +26,6 @@ interface Goal {
   linkedAccountId: string | null;
   percentage: string;
   reserve: string;
-  priority: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,18 +150,6 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projecti
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="text-base font-semibold text-foreground truncate leading-snug">{goal.name}</h4>
-              {goal.priority > 0 && (() => {
-                const colors = 
-                  goal.priority === 1 ? 'bg-destructive/10 text-destructive border-destructive/20 dark:bg-destructive/20' :
-                  goal.priority === 2 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:bg-amber-500/20' :
-                  'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:bg-blue-500/20';
-                const label = goal.priority === 1 ? 'High' : goal.priority === 2 ? 'Medium' : 'Low';
-                return (
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase tracking-wider ${colors}`}>
-                    {label}
-                  </span>
-                );
-              })()}
               {getStatusBadge(goal.status)}
             </div>
 

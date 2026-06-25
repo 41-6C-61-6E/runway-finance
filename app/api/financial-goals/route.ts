@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const userId = session.user.id;
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-    const { name, description, type, targetAmount, currentAmount, targetDate, categoryId, tagIds, priority, status, linkedAccountId, percentage, reserve, sortOrder } = body;
+    const { name, description, type, targetAmount, currentAmount, targetDate, categoryId, tagIds, status, linkedAccountId, percentage, reserve, sortOrder } = body;
 
     if (!name || !type || !targetAmount) {
       return NextResponse.json({ error: 'name, type, and targetAmount are required' }, { status: 400 });
@@ -141,7 +141,6 @@ export async function POST(req: NextRequest) {
       currentAmount: String(currentAmount || 0),
       targetDate: targetDate || null,
       categoryId: categoryId || null,
-      priority: priority || 0,
       status: status || 'active',
       linkedAccountId: linkedAccountId || null,
       percentage: percentage != null ? String(percentage) : '100',
@@ -210,7 +209,6 @@ export async function PATCH(req: NextRequest) {
     if (updates.percentage !== undefined) updateData.percentage = String(updates.percentage);
     if (updates.reserve !== undefined) updateData.reserve = String(updates.reserve);
     if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.priority !== undefined) updateData.priority = updates.priority;
     if (updates.sortOrder !== undefined) updateData.sortOrder = Number(updates.sortOrder);
     if (updates.linkedAccountId !== undefined) updateData.linkedAccountId = updates.linkedAccountId || null;
 

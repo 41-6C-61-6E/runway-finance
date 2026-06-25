@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GoalCard } from './goal-card';
 import { GoalFormDialog } from './goal-form-drawer';
-import { WaterfallVisualization } from './waterfall-visualization';
 import { GoalReorder } from './goal-reorder';
 import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
 import { useGoalInflow } from './goal-inflow-context';
@@ -23,7 +22,6 @@ interface Goal {
   percentage: string;
   reserve: string;
   sortOrder: number;
-  priority: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -356,13 +354,6 @@ export function GoalsList() {
         </div>
       )}
 
-      {/* Waterfall Visualization - show when there are shared accounts */}
-      {goals.some((g) => g.linkedAccountId) && (
-        <div className="mt-6">
-          <WaterfallVisualization projections={projections} />
-        </div>
-      )}
-
       {/* Goal Reorder - show when there are multiple active goals */}
       {goals.filter((g) => g.status === 'active').length > 1 && (
         <div className="mt-4">
@@ -392,7 +383,6 @@ export function GoalsList() {
           percentage: editingGoal.percentage,
           reserve: editingGoal.reserve,
           sortOrder: editingGoal.sortOrder,
-          priority: editingGoal.priority,
           tags: editingGoal.tags,
         } : undefined}
       />
