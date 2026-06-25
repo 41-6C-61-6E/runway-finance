@@ -157,7 +157,7 @@ export function MilestonesProjections() {
       setError(null);
       const params = new URLSearchParams();
       if (inflow !== null && inflow >= 0) params.set('monthlyInflow', String(inflow));
-      params.set('projectionMonths', '60');
+      params.set('projectionMonths', '120');
 
       const res = await fetch(`/api/goals/projections?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load projections');
@@ -603,7 +603,7 @@ export function MilestonesProjections() {
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
                   <span className="text-xs text-amber-500 font-medium">
-                    Some goals may not be fully funded within 5 years at the current savings rate
+                    Some goals may not be fully funded within 10 years at the current savings rate
                   </span>
                 </div>
               )}

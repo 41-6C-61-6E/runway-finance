@@ -288,7 +288,7 @@ function ProjectionPacing() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    params.set('projectionMonths', '60');
+    params.set('projectionMonths', '120');
     if (savedInflow !== null && savedInflow >= 0) {
       params.set('monthlyInflow', String(savedInflow));
     }
@@ -331,7 +331,7 @@ function ProjectionPacing() {
       <div className="flex items-center gap-2">
         <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
         <span className="text-xs text-muted-foreground">
-          Some goals may not fund within 5 years at current savings rate
+          Some goals may not fund within 10 years at current savings rate
         </span>
       </div>
     );

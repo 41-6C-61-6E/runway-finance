@@ -61,7 +61,7 @@ export function GoalsList() {
       setLoading(true);
       setError(null);
       const projParams = new URLSearchParams();
-      projParams.set('projectionMonths', '60');
+      projParams.set('projectionMonths', '120');
       if (savedInflow !== null && savedInflow >= 0) {
         projParams.set('monthlyInflow', String(savedInflow));
       }
