@@ -54,6 +54,7 @@ export async function POST(request: Request) {
 
     return Response.json({ success: true });
   } catch (err) {
+    console.error('[subscribe] Failed to save push subscription:', err);
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
