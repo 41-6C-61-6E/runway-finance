@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     env: {
       ENCRYPTION_KEY: 'a'.repeat(64), // 64-char hex for tests only
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: '***REMOVED-VAPID_PUBLIC_KEY***',
+      VAPID_PRIVATE_KEY: '***REMOVED-VAPID_PRIVATE_KEY***',
+      VAPID_SUBJECT: 'mailto:admin@example.com',
     },
     include: ['tests/unit/**/*.test.{ts,tsx}'],
   },
