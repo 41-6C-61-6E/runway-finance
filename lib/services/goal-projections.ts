@@ -151,7 +151,7 @@ export async function computeGoalProjections(
   }
 ): Promise<ProjectionsResult> {
   const dek = await getSessionDEK();
-  const projectionMonths = overrides?.projectionMonths ?? 60;
+  const projectionMonths = overrides?.projectionMonths ?? 120;
 
   const goals = await getDb()
     .select()
