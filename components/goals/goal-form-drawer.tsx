@@ -20,7 +20,6 @@ interface GoalFormData {
   percentage: string;
   reserve: string;
   sortOrder: number;
-  priority: number;
 }
 
 interface Category {
@@ -55,7 +54,6 @@ interface GoalFormDialogProps {
     percentage: string;
     reserve: string;
     sortOrder: number;
-    priority?: number;
     tags?: Array<{ id: string; name: string; color: string }>;
   };
 }
@@ -104,7 +102,6 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
     percentage: '100',
     reserve: '0',
     sortOrder: 0,
-    priority: 0,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -164,7 +161,6 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
         percentage: editGoal.percentage || '100',
         reserve: editGoal.reserve || '0',
         sortOrder: editGoal.sortOrder ?? 0,
-        priority: editGoal.priority ?? 0,
       });
     } else {
       setForm({
@@ -181,7 +177,6 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
         percentage: '100',
         reserve: '0',
         sortOrder: 0,
-        priority: 0,
       });
     }
     setError('');
@@ -553,22 +548,6 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
                 </>
               )}
             </div>
-          </div>
-
-          {/* Priority */}
-          <div className="space-y-1.5">
-            <Label htmlFor="goal-priority">Priority</Label>
-            <select
-              id="goal-priority"
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) || 0 })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
-            >
-              <option value={0}>None (P0)</option>
-              <option value={1}>High (P1)</option>
-              <option value={2}>Medium (P2)</option>
-              <option value={3}>Low (P3)</option>
-            </select>
           </div>
 
           {/* Status */}

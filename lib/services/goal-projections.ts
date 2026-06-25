@@ -134,56 +134,13 @@ export async function calculateMonthlyInflow(
 }
 
 /**
- * Compute how much of the current balance gets allocated to each goal.
- * Pure function — no DB access.
- */
-function computeAllocationsForBalance(
-  goals: Array<{
-    goalId: string;
-    goalName: string;
-    targetAmount: number;
-    percentage: number;
-    reserve: number;
-    sortOrder: number;
-    alreadyFunded: boolean;
-  }>,
-  accountBalance: number,
-  totalReserve: number
-): Map<string, number> {
-  const unfunded = goals.filter(g => !g.alreadyFunded)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.goalId.localeCompare(b.goalId));
-
-  const allocations = new Map<string, number>();
-  let remaining = Math.max(0, accountBalance - totalReserve);
-
-  for (const goal of unfunded) {
-    const availableBalance = Math.max(0, accountBalance - totalReserve);
-    const desiredAllocation = availableBalance * (goal.percentage / 100);
-    const allocatedAmount = Math.min(desiredAllocation, remaining, Math.max(0, goal.targetAmount));
-    const allocated = Math.round(allocatedAmount * 100) / 100;
-
-    allocations.set(goal.goalId, allocated);
-    remaining = Math.max(0, remaining - allocated);
-  }
-
-  // Already-funded goals get 0 new allocation
-  for (const g of goals) {
-    if (g.alreadyFunded) {
-      allocations.set(g.goalId, 0);
-    }
-  }
-
-  return allocations;
-}
-
-/**
  * Compute goal projections for all linked accounts.
  *
- * Algorithm per month:
+ * Sawtooth model per month:
  * 1. Add monthly inflow to balance
- * 2. Compute allocations from available balance (unfunded goals only, by priority)
- * 3. Deduct allocations from balance (money goes toward goals, reducing available funds)
- * 4. Check if any goals reach their target → mark as funded
+ * 2. From available balance (after reserve), compute monthly allocation per goal by priority
+ * 3. Track goal savings buckets (cumulative allocation per goal)
+ * 4. When a goal's bucket reaches target → deduct full target from balance (the drop)
  * 5. Record the state
  */
 export async function computeGoalProjections(
@@ -209,10 +166,8 @@ export async function computeGoalProjections(
     );
 
   const decryptedGoals = await decryptRows('financial_goals', goals, dek);
-  // Only project for active goals — paused/completed/pending goals are excluded
   const activeGoals = decryptedGoals.filter(g => g.status === 'active');
 
-  // Group by account
   const goalsByAccount = new Map<string, typeof activeGoals>();
   for (const goal of activeGoals) {
     if (!goal.linkedAccountId) continue;
@@ -259,115 +214,123 @@ export async function computeGoalProjections(
       percentage: parseFloat(g.percentage) || 100,
       reserve: parseFloat(g.reserve) || 0,
       sortOrder: g.sortOrder,
-      alreadyFunded: false,
+      initialAllocation: parseFloat(g.allocatedAmount) || 0,
     }));
 
-    // Track state
-    const cumulativeAllocations = new Map<string, number>();
+    const goalSavings = new Map<string, number>();
     const goalFundingMonth = new Map<string, number>();
     const fundedGoals = new Set<string>();
 
-    const points: ProjectionPoint[] = [];
-    let runningBalance = currentBalance;
-    let runningAvailable = currentBalance; // available after deductions
-    const now = new Date();
-
-    // Month 0: current state snapshot
-    const month0Allocs = computeAllocationsForBalance(
-      goalDefs.map(g => ({ ...g, alreadyFunded: fundedGoals.has(g.goalId) })),
-      runningBalance,
-      totalReserve
-    );
-
-    const initEvents: string[] = [];
     for (const g of goalDefs) {
-      const alloc = month0Allocs.get(g.goalId) || 0;
-      cumulativeAllocations.set(g.goalId, alloc);
-      runningBalance -= alloc;
+      goalSavings.set(g.goalId, g.initialAllocation);
+      if (g.initialAllocation >= g.targetAmount && g.targetAmount > 0) {
+        fundedGoals.add(g.goalId);
+        goalFundingMonth.set(g.goalId, 0);
+      }
     }
 
+    const points: ProjectionPoint[] = [];
+    let runningBalance = currentBalance;
+    const now = new Date();
+
+    const initialAllocations = Object.fromEntries(goalSavings);
+    const initialAllocatedTotal = Array.from(goalSavings.values()).reduce((s, v) => s + v, 0);
+
+    // Month 0: current state snapshot
     points.push({
       month: 0,
       date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
       accountBalance: currentBalance,
-      totalAllocated: Array.from(cumulativeAllocations.values()).reduce((s, v) => s + v, 0),
-      goalAllocations: Object.fromEntries(cumulativeAllocations),
-      goalFunding: initEvents,
-      availableAfterFunding: Math.max(0, runningBalance),
+      totalAllocated: Math.round(initialAllocatedTotal * 100) / 100,
+      goalAllocations: initialAllocations,
+      goalFunding: [],
+      availableAfterFunding: currentBalance,
     });
 
-    // Remaining months: add inflow, allocate, deduct, check funding
-    for (let month = 1; month <= projectionMonths; month++) {
-      // Add monthly inflow
+    // Remaining months: sequential allocation model matching static engine
+    let stopMonth = projectionMonths;
+    let allGoalsFundedDetected = false;
+
+    for (let month = 1; month <= stopMonth; month++) {
       runningBalance = Math.round((runningBalance + monthlyInflow) * 100) / 100;
 
-      // Compute monthly allocations (only unfunded goals get allocation)
-      const monthlyAllocs = computeAllocationsForBalance(
-        goalDefs.map(g => ({ ...g, alreadyFunded: fundedGoals.has(g.goalId) })),
-        runningBalance,
-        totalReserve
-      );
+      const activeGoals = goalDefs.filter(g => !fundedGoals.has(g.goalId) && g.targetAmount > 0);
+      const reserveUsed = activeGoals.reduce((sum, g) => sum + g.reserve, 0);
 
-      // Deduct allocations from balance (money earmarked for goals leaves the available pool)
-      let monthlyAllocTotal = 0;
-      for (const g of goalDefs) {
-        const alloc = monthlyAllocs.get(g.goalId) || 0;
-        if (!fundedGoals.has(g.goalId)) {
-          cumulativeAllocations.set(g.goalId, (cumulativeAllocations.get(g.goalId) || 0) + alloc);
-          monthlyAllocTotal += alloc;
-        }
-      }
-      runningBalance = Math.round((runningBalance - monthlyAllocTotal) * 100) / 100;
+      const availableBalance = Math.max(0, runningBalance - reserveUsed);
+      let remaining = availableBalance;
 
-      // Check for newly funded goals
       const fundingEvents: string[] = [];
-      for (const g of goalDefs) {
-        if (!fundedGoals.has(g.goalId)) {
-          const cumAlloc = cumulativeAllocations.get(g.goalId) || 0;
-          if (cumAlloc >= g.targetAmount && g.targetAmount > 0) {
-            fundedGoals.add(g.goalId);
-            goalFundingMonth.set(g.goalId, month);
-            fundingEvents.push(g.goalName);
-          }
+
+      // Sort active goals by sortOrder (higher priority first)
+      const sortedActive = [...activeGoals].sort((a, b) => a.sortOrder - b.sortOrder || a.goalId.localeCompare(b.goalId));
+
+      for (const g of sortedActive) {
+        const desiredAllocation = availableBalance * (g.percentage / 100);
+        const computed = Math.round(Math.min(desiredAllocation, remaining, g.targetAmount) * 100) / 100;
+        
+        const prev = goalSavings.get(g.goalId) || 0;
+        const allocated = Math.round(Math.min(Math.max(prev, computed), remaining) * 100) / 100;
+
+        goalSavings.set(g.goalId, allocated);
+        remaining = Math.max(0, remaining - allocated);
+
+        // Check if funded
+        if (allocated >= g.targetAmount) {
+          fundedGoals.add(g.goalId);
+          goalFundingMonth.set(g.goalId, month);
+          fundingEvents.push(g.goalName);
         }
       }
 
       const projDate = new Date(now);
       projDate.setMonth(projDate.getMonth() + month);
 
-      const goalAllocRecord: Record<string, number> = {};
-      for (const [gid, alloc] of cumulativeAllocations) {
-        goalAllocRecord[gid] = alloc;
-      }
+      const activeOrJustFunded = goalDefs.filter(g => !fundedGoals.has(g.goalId) || goalFundingMonth.get(g.goalId) === month);
+      const totalAlloc = activeOrJustFunded.reduce((s, g) => s + (goalSavings.get(g.goalId) || 0), 0);
 
-      const totalAlloc = Array.from(cumulativeAllocations.values()).reduce((s, v) => s + v, 0);
-
+      // Record point at the PEAK (before deduction) so funding markers appear at the right place
       points.push({
         month,
         date: `${projDate.getFullYear()}-${String(projDate.getMonth() + 1).padStart(2, '0')}`,
-        accountBalance: Math.max(0, runningBalance + totalAlloc), // raw balance (what's in the account)
+        accountBalance: Math.max(0, runningBalance),
         totalAllocated: Math.round(totalAlloc * 100) / 100,
-        goalAllocations: goalAllocRecord,
+        goalAllocations: Object.fromEntries(
+          goalDefs
+            .filter(g => !fundedGoals.has(g.goalId) || goalFundingMonth.get(g.goalId) === month)
+            .map(g => [g.goalId, goalSavings.get(g.goalId) || 0])
+        ),
         goalFunding: fundingEvents,
-        availableAfterFunding: Math.max(0, runningBalance), // free money after goal commitments
+        availableAfterFunding: Math.max(0, runningBalance),
       });
 
-      // Stop early if all goals funded + 12 steady-state months
-      if (fundedGoals.size === goalDefs.length && month > 12) {
-        break;
+      // Deduct full targets from balance AFTER recording the point (the sawtooth drop)
+      for (const g of activeGoals) {
+        if (goalFundingMonth.get(g.goalId) === month) {
+          runningBalance = Math.round((runningBalance - g.targetAmount) * 100) / 100;
+        }
+      }
+
+      // Check if all goals are now funded
+      const remainingUnfunded = goalDefs.filter(g => !fundedGoals.has(g.goalId) && g.targetAmount > 0);
+      if (remainingUnfunded.length === 0 && !allGoalsFundedDetected) {
+        allGoalsFundedDetected = true;
+        stopMonth = Math.min(projectionMonths, month + 12);
       }
     }
 
     const goalProjections: GoalProjection[] = goalDefs.map(g => {
       const fundMonth = goalFundingMonth.get(g.goalId);
-      const allocated = cumulativeAllocations.get(g.goalId) || 0;
+      const allocated = goalSavings.get(g.goalId) || 0;
       const isFunded = fundedGoals.has(g.goalId);
 
       let fundDate: string | null = null;
-      if (fundMonth !== undefined) {
+      if (fundMonth !== undefined && fundMonth > 0) {
         const d = new Date(now);
         d.setMonth(d.getMonth() + fundMonth);
         fundDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      } else if (fundMonth === 0) {
+        fundDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       }
 
       return {
@@ -387,7 +350,7 @@ export async function computeGoalProjections(
       };
     });
 
-    const fundedMonths = Array.from(goalFundingMonth.values());
+    const fundedMonths = Array.from(goalFundingMonth.values()).filter(m => m > 0);
     const maxFundMonth = fundedMonths.length > 0 ? Math.max(...fundedMonths) : null;
     const allFundedBy = maxFundMonth !== null
       ? (() => {
@@ -406,7 +369,7 @@ export async function computeGoalProjections(
       points,
       allFundedBy,
       totalTarget: goalDefs.reduce((s, g) => s + g.targetAmount, 0),
-      totalCurrent: Array.from(cumulativeAllocations.values()).reduce((s, v) => s + v, 0),
+      totalCurrent: Array.from(goalSavings.values()).reduce((s, v) => s + (v as number), 0),
     });
   }
 
