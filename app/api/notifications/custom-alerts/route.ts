@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, triggerType, criteria, isEnabled, conditions, conditionOperator } = body;
+    const { name, triggerType, criteria, isEnabled, conditions, conditionOperator, conditionTree } = body;
 
     if (!name || !triggerType) {
       return Response.json({ error: 'Name and trigger type are required' }, { status: 400 });
@@ -43,9 +43,11 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid trigger type. Must be one of: transaction, account_balance, savings_goal, cash_flow' }, { status: 400 });
     }
 
-    // Require either conditions array or legacy criteria
-    if ((!conditions || conditions.length === 0) && (!criteria || Object.keys(criteria).length === 0)) {
-      return Response.json({ error: 'At least one condition or criteria is required' }, { status: 400 });
+    // Require conditionTree, conditions array, or legacy criteria
+    const hasConditions = conditions && conditions.length > 0;
+    const hasTree = conditionTree && (conditionTree.conditions?.length > 0 || conditionTree.subGroups?.length > 0);
+    if (!hasTree && !hasConditions && (!criteria || Object.keys(criteria).length === 0)) {
+      return Response.json({ error: 'At least one condition, conditionTree, or criteria is required' }, { status: 400 });
     }
 
     const db = getDb();
@@ -57,8 +59,9 @@ export async function POST(request: Request) {
         triggerType,
         criteria: criteria || {},
         isEnabled: isEnabled !== undefined ? isEnabled : true,
-        conditions: conditions && conditions.length > 0 ? conditions : null,
+        conditions: hasConditions ? conditions : null,
         conditionOperator: conditionOperator || 'AND',
+        conditionTree: hasTree ? conditionTree : null,
       })
       .returning();
 

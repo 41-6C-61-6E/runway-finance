@@ -54,6 +54,13 @@ export interface AlertCondition {
   consecutiveMonths?: number;       // For cash flow conditions
 }
 
+// Recursive condition tree node for mixed AND/OR expressions
+export interface ConditionTreeNode {
+  operator: ConditionOperator;
+  conditions: AlertCondition[];
+  subGroups?: ConditionTreeNode[];
+}
+
 // Legacy criteria type for backward compatibility with existing rules
 export interface LegacyCriteria {
   accountId?: string;
@@ -81,6 +88,7 @@ export const customAlertRules = pgTable('custom_alert_rules', {
   criteria: jsonb('criteria').notNull().default({}).$type<LegacyCriteria>(),
   // New multi-condition fields
   conditionOperator: text('condition_operator').$type<ConditionOperator>().default('AND'),
+  conditionTree: jsonb('condition_tree').$type<ConditionTreeNode | null>(),
   conditions: jsonb('conditions').$type<AlertCondition[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

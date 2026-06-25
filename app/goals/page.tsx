@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { GoalsSummary } from '@/components/goals/goals-summary';
 import { GoalsList } from '@/components/goals/goals-list';
+import { MilestonesProjections } from '@/components/goals/milestones-projections';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Target } from 'lucide-react';
@@ -33,6 +34,17 @@ function GoalsContent() {
               <div>
                 <GoalsList />
                 <MathDescription chartId="goalsList" />
+              </div>
+            </Suspense>
+          </div>
+        )}
+
+        {isVisible('milestonesProjections') && (
+          <div className="mt-5 sm:mt-6">
+            <Suspense fallback={<LoadingSpinner category="summary" />}>
+              <div>
+                <MilestonesProjections />
+                <MathDescription chartId="milestonesProjections" />
               </div>
             </Suspense>
           </div>

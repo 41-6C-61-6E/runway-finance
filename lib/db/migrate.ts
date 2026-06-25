@@ -250,6 +250,18 @@ async function runSelfHealingChecks(client: any): Promise<void> {
           ADD COLUMN IF NOT EXISTS conditions JSONB
         `);
       }
+
+      const colCheckTree = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_tree'
+      `);
+      if (colCheckTree.rows.length === 0) {
+        logger.info('[migrate] [self-heal] Adding missing condition_tree column to custom_alert_rules...');
+        await client.query(`
+          ALTER TABLE custom_alert_rules
+          ADD COLUMN IF NOT EXISTS condition_tree JSONB
+        `);
+      }
     }
 
     // Mark unapplied migrations as applied if their artifacts already exist.

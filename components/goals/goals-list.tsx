@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GoalCard } from './goal-card';
 import { GoalFormDialog } from './goal-form-drawer';
 import { WaterfallVisualization } from './waterfall-visualization';
@@ -30,6 +30,22 @@ interface Goal {
 type FilterStatus = 'all' | 'active' | 'completed' | 'paused' | 'pending';
 type SortBy = 'sortOrder' | 'targetDate' | 'name' | 'progress';
 
+interface GoalProjection {
+  goalId: string;
+  goalName: string;
+  projectedFundDate: string | null;
+  monthsToFund: number | null;
+  isFunded: boolean;
+  willFund: boolean;
+}
+
+interface ProjectionsData {
+  accounts: Array<{
+    accountId: string;
+    goals: GoalProjection[];
+  }>;
+}
+
 export function GoalsList() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,15 +54,30 @@ export function GoalsList() {
   const [sortBy, setSortBy] = useState<SortBy>('sortOrder');
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
+  const [projections, setProjections] = useState<Map<string, GoalProjection>>(new Map());
 
   const fetchGoals = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/financial-goals', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch goals');
-      const data = await res.json();
-      setGoals(data);
+      const [goalsRes, projRes] = await Promise.all([
+        fetch('/api/financial-goals', { credentials: 'include' }),
+        fetch('/api/goals/projections?projectionMonths=60', { credentials: 'include' }),
+      ]);
+      if (!goalsRes.ok) throw new Error('Failed to fetch goals');
+      const goalsData = await goalsRes.json();
+      setGoals(goalsData);
+
+      if (projRes.ok) {
+        const projData: ProjectionsData = await projRes.json();
+        const projMap = new Map<string, GoalProjection>();
+        for (const account of projData.accounts) {
+          for (const gp of account.goals) {
+            projMap.set(gp.goalId, gp);
+          }
+        }
+        setProjections(projMap);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -262,6 +293,7 @@ export function GoalsList() {
                   onDelete={handleDelete}
                   percentage={parseFloat(goal.percentage)}
                   reserve={parseFloat(goal.reserve)}
+                  projection={projections.get(goal.id) || null}
                 />
               ))}
             </div>
@@ -304,6 +336,7 @@ export function GoalsList() {
                 onDelete={handleDelete}
                 percentage={parseFloat(goal.percentage)}
                 reserve={parseFloat(goal.reserve)}
+                projection={projections.get(goal.id) || null}
               />
             ))}
           </div>
@@ -319,7 +352,7 @@ export function GoalsList() {
       {/* Waterfall Visualization - show when there are shared accounts */}
       {goals.some((g) => g.linkedAccountId) && (
         <div className="mt-6">
-          <WaterfallVisualization />
+          <WaterfallVisualization projections={projections} />
         </div>
       )}
 

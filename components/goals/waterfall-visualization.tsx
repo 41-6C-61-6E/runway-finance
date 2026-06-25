@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { TrendingUp, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, CheckCircle2, Calendar, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface GoalWaterfallItem {
@@ -30,7 +30,23 @@ interface AccountWaterfall {
   releasedFromCompleted: number;
 }
 
-export function WaterfallVisualization() {
+interface GoalProjectionInfo {
+  goalId: string;
+  projectedFundDate: string | null;
+  willFund: boolean;
+}
+
+interface WaterfallVisualizationProps {
+  projections?: Map<string, GoalProjectionInfo>;
+}
+
+function formatProjDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + '-01');
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+export function WaterfallVisualization({ projections }: WaterfallVisualizationProps) {
   const [collapsed, setCollapsed] = useCardCollapsed('waterfallVisualization');
   const [accounts, setAccounts] = useState<AccountWaterfall[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +106,7 @@ export function WaterfallVisualization() {
       {!collapsed && (
         <CardContent className="space-y-6">
           {accounts.map((account) => (
-            <AccountWaterfallCard key={account.accountId} account={account} />
+            <AccountWaterfallCard key={account.accountId} account={account} projections={projections} />
           ))}
         </CardContent>
       )}
@@ -98,8 +114,16 @@ export function WaterfallVisualization() {
   );
 }
 
-function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
+function AccountWaterfallCard({ account, projections }: { account: AccountWaterfall; projections?: Map<string, GoalProjectionInfo> }) {
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const willAllFund = account.goals
+    .filter(g => g.status === 'active')
+    .every(g => projections?.get(g.goalId)?.willFund ?? false);
+
+  const hasUnfundable = account.goals
+    .filter(g => g.status === 'active')
+    .some(g => !(projections?.get(g.goalId)?.willFund ?? true));
 
   return (
     <div className="space-y-3">
@@ -111,6 +135,32 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
           <span className="font-medium blur-number">${account.accountBalance.toLocaleString()}</span>
         </div>
       </div>
+
+      {/* Projection Summary Banner */}
+      {projections && (willAllFund || hasUnfundable) && (
+        <div className={cn(
+          "flex items-center gap-2 p-2 rounded-lg border",
+          willAllFund
+            ? "bg-chart-1/10 border-chart-1/20"
+            : "bg-amber-500/10 border-amber-500/20"
+        )}>
+          {willAllFund ? (
+            <>
+              <Calendar className="w-4 h-4 text-chart-1 shrink-0" />
+              <span className="text-xs text-chart-1">
+                All goals projected to fund at current savings rate
+              </span>
+            </>
+          ) : hasUnfundable ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="text-xs text-amber-500">
+                Some goals may not fund within 5 years at current rate
+              </span>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* Released Funds Banner */}
       {account.releasedFromCompleted > 0 && !bannerDismissed && (
@@ -134,6 +184,7 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
           const target = goal.targetAmount || 0;
           const allocated = goal.allocatedAmount || 0;
           const progressPercent = target > 0 ? Math.min((allocated / target) * 100, 100) : 0;
+          const proj = projections?.get(goal.goalId);
 
           return (
             <div key={goal.goalId} className="space-y-1">
@@ -153,6 +204,16 @@ function AccountWaterfallCard({ account }: { account: AccountWaterfall }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
+                  {proj && proj.willFund && proj.projectedFundDate && (
+                    <span className="text-chart-2 font-medium text-[10px] hidden sm:inline">
+                      Est. {formatProjDate(proj.projectedFundDate)}
+                    </span>
+                  )}
+                  {proj && !proj.willFund && (
+                    <span className="text-amber-500 font-medium text-[10px] hidden sm:inline">
+                      5+ yrs
+                    </span>
+                  )}
                   <span className="text-muted-foreground">
                     ${allocated.toLocaleString()} / ${target.toLocaleString()}
                   </span>

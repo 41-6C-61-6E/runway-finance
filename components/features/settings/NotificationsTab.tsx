@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Bell, BellOff, Info, AlertTriangle, Play, Trash2 } from 'lucide-react';
-import type { AlertCondition, AlertConditionField, ConditionOperator } from '@/lib/db/schema/notifications';
+import type { AlertCondition, AlertConditionField, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';
 
 function urlBase64ToUint8Array(base64String: string) {
   let cleanStr = base64String.trim();
@@ -50,9 +50,11 @@ export default function NotificationsTab() {
   const [ruleName, setRuleName] = useState('');
   const [triggerType, setTriggerType] = useState<'transaction' | 'account_balance' | 'savings_goal' | 'cash_flow'>('transaction');
 
-  // Multi-condition states
+  // Condition states (flat for backward compat, tree for mixed expressions)
   const [conditions, setConditions] = useState<AlertCondition[]>([]);
   const [conditionOperator, setConditionOperator] = useState<ConditionOperator>('AND');
+  const [conditionTree, setConditionTree] = useState<ConditionTreeNode | null>(null);
+  const [useTreeMode, setUseTreeMode] = useState(false);
 
   // Read preferences from DB settings
   const notifySyncErrors = settings.notifySyncErrors !== false;
@@ -260,38 +262,48 @@ export default function NotificationsTab() {
       return;
     }
 
-    if (conditions.length === 0) {
-      toast.error('Please add at least one condition.');
-      return;
-    }
-
     const accountFields: AlertConditionField[] = ['account', 'balance_above_account', 'balance_below_account'];
     const goalFields: AlertConditionField[] = ['goal_reached_percentage', 'goal_reached_amount'];
 
-    for (let i = 0; i < conditions.length; i++) {
-      const cond = conditions[i];
-      if (!cond.field) {
-        toast.error(`Condition ${i + 1}: Please select a field.`);
+    if (useTreeMode && conditionTree) {
+      // Validate tree
+      if (conditionTree.conditions.length === 0 && (!conditionTree.subGroups || conditionTree.subGroups.length === 0)) {
+        toast.error('Please add at least one condition.');
         return;
       }
-      if (accountFields.includes(cond.field)) {
-        if (!cond.value) {
-          toast.error(`Condition ${i + 1}: Please select an account.`);
+      const err = validateTreeConditions(conditionTree);
+      if (err) { toast.error(err); return; }
+    } else {
+      // Validate flat conditions
+      if (conditions.length === 0) {
+        toast.error('Please add at least one condition.');
+        return;
+      }
+      for (let i = 0; i < conditions.length; i++) {
+        const cond = conditions[i];
+        if (!cond.field) {
+          toast.error(`Condition ${i + 1}: Please select a field.`);
           return;
         }
-      } else if (goalFields.includes(cond.field)) {
-        if (!cond.goalId) {
-          toast.error(`Condition ${i + 1}: Please select a goal.`);
-          return;
-        }
-        if (cond.value === '' || cond.value === undefined) {
-          toast.error(`Condition ${i + 1}: Please enter a value.`);
-          return;
-        }
-      } else {
-        if (cond.value === '' || cond.value === undefined) {
-          toast.error(`Condition ${i + 1}: Please enter a value.`);
-          return;
+        if (accountFields.includes(cond.field)) {
+          if (!cond.value) {
+            toast.error(`Condition ${i + 1}: Please select an account.`);
+            return;
+          }
+        } else if (goalFields.includes(cond.field)) {
+          if (!cond.goalId) {
+            toast.error(`Condition ${i + 1}: Please select a goal.`);
+            return;
+          }
+          if (cond.value === '' || cond.value === undefined) {
+            toast.error(`Condition ${i + 1}: Please enter a value.`);
+            return;
+          }
+        } else {
+          if (cond.value === '' || cond.value === undefined) {
+            toast.error(`Condition ${i + 1}: Please enter a value.`);
+            return;
+          }
         }
       }
     }
@@ -302,16 +314,26 @@ export default function NotificationsTab() {
         : '/api/notifications/custom-alerts';
       const method = editingRuleId ? 'PATCH' : 'POST';
 
+      const body: Record<string, any> = {
+        name: ruleName,
+        triggerType,
+        criteria: {},
+      };
+
+      if (useTreeMode && conditionTree) {
+        body.conditionTree = conditionTree;
+        // Populate flat fields from root for backward compat
+        body.conditions = conditionTree.conditions;
+        body.conditionOperator = conditionTree.operator;
+      } else {
+        body.conditions = conditions;
+        body.conditionOperator = conditionOperator;
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: ruleName,
-          triggerType,
-          conditionOperator,
-          conditions,
-          criteria: {},
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
@@ -376,12 +398,21 @@ export default function NotificationsTab() {
     setRuleName(rule.name);
     setTriggerType(rule.triggerType);
 
-    if (rule.conditions && rule.conditions.length > 0) {
+    if (rule.conditionTree && (rule.conditionTree.conditions?.length > 0 || rule.conditionTree.subGroups?.length > 0)) {
+      setConditionTree(rule.conditionTree);
+      setUseTreeMode(true);
+      setConditions(rule.conditionTree.conditions || []);
+      setConditionOperator(rule.conditionTree.operator || 'AND');
+    } else if (rule.conditions && rule.conditions.length > 0) {
       setConditions(rule.conditions);
       setConditionOperator(rule.conditionOperator || 'AND');
+      setConditionTree(null);
+      setUseTreeMode(false);
     } else {
       setConditions(convertLegacyCriteriaToConditions(rule));
       setConditionOperator('AND');
+      setConditionTree(null);
+      setUseTreeMode(false);
     }
 
     setShowAddForm(true);
@@ -432,6 +463,8 @@ export default function NotificationsTab() {
     setTriggerType('transaction');
     setConditions([]);
     setConditionOperator('AND');
+    setConditionTree(null);
+    setUseTreeMode(false);
   };
 
   const getFieldLabel = (field: AlertConditionField): string => {
@@ -482,6 +515,358 @@ export default function NotificationsTab() {
     setConditions((prev) => [...prev, { field: fields[0], value: '' }]);
   };
 
+  // ── Condition Tree Helpers ─────────────────────────────────────────────────
+
+  function setTreeAtPath(
+    tree: ConditionTreeNode,
+    path: number[],
+    updater: (node: ConditionTreeNode) => ConditionTreeNode
+  ): ConditionTreeNode {
+    if (path.length === 0) return updater(tree);
+    const [idx, ...rest] = path;
+    return {
+      ...tree,
+      subGroups: (tree.subGroups || []).map((g, i) =>
+        i === idx ? setTreeAtPath(g, rest, updater) : g
+      ),
+    };
+  }
+
+  function addTreeCondition(path: number[]) {
+    const fields = getFieldsForTrigger(triggerType);
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, path, node => ({
+        ...node,
+        conditions: [...node.conditions, { field: fields[0], value: '' }],
+      }));
+    });
+  }
+
+  function updateTreeCondition(path: number[], condIdx: number, updates: Partial<AlertCondition>) {
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, path, node => ({
+        ...node,
+        conditions: node.conditions.map((c, i) =>
+          i === condIdx ? { ...c, ...updates } : c
+        ),
+      }));
+    });
+  }
+
+  function removeTreeCondition(path: number[], condIdx: number) {
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, path, node => ({
+        ...node,
+        conditions: node.conditions.filter((_, i) => i !== condIdx),
+      }));
+    });
+  }
+
+  function addSubGroup(path: number[]) {
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, path, node => ({
+        ...node,
+        subGroups: [...(node.subGroups || []), { operator: 'AND' as ConditionOperator, conditions: [], subGroups: [] }],
+      }));
+    });
+  }
+
+  function removeSubGroup(path: number[]) {
+    if (path.length === 0) return;
+    const parentPath = path.slice(0, -1);
+    const groupIdx = path[path.length - 1];
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, parentPath, node => ({
+        ...node,
+        subGroups: (node.subGroups || []).filter((_, i) => i !== groupIdx),
+      }));
+    });
+  }
+
+  function setTreeOperator(path: number[], operator: ConditionOperator) {
+    setConditionTree(prev => {
+      if (!prev) return null;
+      return setTreeAtPath(prev, path, node => ({
+        ...node,
+        operator,
+      }));
+    });
+  }
+
+  /** Recursively validate all conditions in a tree. Returns error message or null. */
+  function validateTreeConditions(node: ConditionTreeNode): string | null {
+    const accountFields: AlertConditionField[] = ['account', 'balance_above_account', 'balance_below_account'];
+    const goalFields: AlertConditionField[] = ['goal_reached_percentage', 'goal_reached_amount'];
+
+    for (let i = 0; i < node.conditions.length; i++) {
+      const cond = node.conditions[i];
+      if (!cond.field) return `Please select a field.`;
+      if (accountFields.includes(cond.field) && !cond.value) return `Please select an account.`;
+      if (goalFields.includes(cond.field)) {
+        if (!cond.goalId) return `Please select a goal.`;
+        if (cond.value === '' || cond.value === undefined) return `Please enter a value.`;
+      }
+      if (!accountFields.includes(cond.field) && !goalFields.includes(cond.field) && !cond.field.startsWith('cf_')) {
+        if (cond.value === '' || cond.value === undefined && cond.field !== 'keyword') return `Please enter a value.`;
+      }
+    }
+    for (const group of node.subGroups || []) {
+      const err = validateTreeConditions(group);
+      if (err) return err;
+    }
+    return null;
+  }
+
+  const convertToTreeMode = () => {
+    if (conditionTree) return; // already in tree mode
+    setConditionTree({
+      operator: conditionOperator,
+      conditions: [...conditions],
+      subGroups: [],
+    });
+    setUseTreeMode(true);
+  };
+
+  const renderConditionGroup = (node: ConditionTreeNode, path: number[], depth: number = 0) => {
+    const groupConditions = node.conditions || [];
+    const groupSubGroups = node.subGroups || [];
+
+    return (
+      <div key={`group-${path.join('-')}`} className="space-y-2" style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
+        {/* Group header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">Match:</span>
+            <div className="inline-flex rounded-lg overflow-hidden border border-border">
+              <button
+                type="button"
+                onClick={() => setTreeOperator(path, 'AND')}
+                className={`px-3 py-1 text-xs font-bold transition-colors ${
+                  node.operator === 'AND'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                AND
+              </button>
+              <button
+                type="button"
+                onClick={() => setTreeOperator(path, 'OR')}
+                className={`px-3 py-1 text-xs font-bold transition-colors ${
+                  node.operator === 'OR'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                OR
+              </button>
+            </div>
+          </div>
+          {depth > 0 && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => removeSubGroup(path)} className="h-7 px-2 text-destructive hover:bg-destructive/10">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Group body */}
+        <div className="border border-border/50 rounded-lg p-3 bg-muted/10 space-y-2">
+          {groupConditions.map((cond, condIdx) => {
+            const isCashFlow = cond.field.startsWith('cf_');
+            const isAccountField = cond.field === 'account' || cond.field === 'balance_above_account' || cond.field === 'balance_below_account';
+            const isGoalField = cond.field === 'goal_reached_percentage' || cond.field === 'goal_reached_amount';
+            const isPercentField = cond.field === 'goal_reached_percentage' || cond.field === 'cf_savings_rate_below' || cond.field === 'cf_savings_rate_above';
+
+            return (
+              <div key={condIdx}>
+                <div className="flex items-end gap-3 p-2.5 rounded-md bg-background/50 border border-border/30">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-[10px] font-semibold">Field</Label>
+                    <select
+                      value={cond.field}
+                      onChange={(e) => {
+                        const newField = e.target.value as AlertConditionField;
+                        updateTreeCondition(path, condIdx, { field: newField, value: '', compareAccountId: undefined, goalId: undefined, consecutiveMonths: undefined });
+                      }}
+                      className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                    >
+                      {getFieldsForTrigger(triggerType).map((f) => (
+                        <option key={f} value={f}>{getFieldLabel(f)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {isGoalField && (
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[10px] font-semibold">Goal</Label>
+                      <select
+                        value={cond.goalId || ''}
+                        onChange={(e) => updateTreeCondition(path, condIdx, { goalId: e.target.value })}
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                      >
+                        <option value="">Select Goal...</option>
+                        {goalsList.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-[10px] font-semibold">Value</Label>
+                    {isAccountField ? (
+                      <select
+                        value={cond.field === 'account' ? String(cond.value) : (cond.compareAccountId || '')}
+                        onChange={(e) => {
+                          if (cond.field === 'account') {
+                            updateTreeCondition(path, condIdx, { value: e.target.value });
+                          } else {
+                            updateTreeCondition(path, condIdx, { compareAccountId: e.target.value, value: e.target.value });
+                          }
+                        }}
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                      >
+                        <option value="">Select Account...</option>
+                        {accountsList.map((acc) => (
+                          <option key={acc.id} value={acc.id}>{acc.name}</option>
+                        ))}
+                      </select>
+                    ) : cond.field === 'keyword' ? (
+                      <Input
+                        type="text"
+                        placeholder="e.g. Netflix"
+                        value={String(cond.value)}
+                        onChange={(e) => updateTreeCondition(path, condIdx, { value: e.target.value })}
+                        className="h-8 bg-background border border-input rounded text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    ) : (
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={cond.value === '' ? '' : String(cond.value)}
+                          onChange={(e) => updateTreeCondition(path, condIdx, { value: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="h-8 bg-background border border-input rounded text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        {isPercentField && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">%</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {isCashFlow && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold whitespace-nowrap">Months</Label>
+                      <select
+                        value={cond.consecutiveMonths || 1}
+                        onChange={(e) => updateTreeCondition(path, condIdx, { consecutiveMonths: parseInt(e.target.value) || 1 })}
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                      >
+                        {[1,2,3,4,5,6].map(n => (<option key={n} value={n}>{n}</option>))}
+                      </select>
+                    </div>
+                  )}
+
+                  {groupConditions.length > 1 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeTreeCondition(path, condIdx)} className="h-8 px-2 text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+
+                {node.operator && condIdx < groupConditions.length - 1 && (
+                  <div className="flex justify-center py-1">
+                    <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">{node.operator}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {groupConditions.length > 0 && groupSubGroups.length > 0 && (
+            <div className="flex justify-center py-1">
+              <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">{node.operator}</span>
+            </div>
+          )}
+
+          {groupSubGroups.map((sg, sgIdx) => (
+            <div key={sgIdx}>
+              {renderConditionGroup(sg, [...path, sgIdx], depth + 1)}
+              {sgIdx < groupSubGroups.length - 1 && (
+                <div className="flex justify-center py-1">
+                  <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">{node.operator}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mt-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => addTreeCondition(path)} className="h-7 text-xs">+ Condition</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => addSubGroup(path)} className="h-7 text-xs">+ Sub-Group</Button>
+        </div>
+      </div>
+    );
+  };
+
+  const getConditionSummary = (cond: AlertCondition): string => {
+    const getAccountName = (id: string) => {
+      const acc = accountsList.find((a) => a.id === id);
+      return acc ? acc.name : 'Unknown Account';
+    };
+    const getGoalName = (id: string) => {
+      const g = goalsList.find((x) => x.id === id);
+      return g ? g.name : 'Unknown Goal';
+    };
+
+    switch (cond.field) {
+      case 'account': return `Account = ${getAccountName(String(cond.value))}`;
+      case 'amount_min': return `Amount ≥ $${cond.value}`;
+      case 'amount_max': return `Amount ≤ $${cond.value}`;
+      case 'keyword': return `Keyword contains '${cond.value}'`;
+      case 'balance_above_value': return `Balance rises above $${cond.value}`;
+      case 'balance_below_value': return `Balance falls below $${cond.value}`;
+      case 'balance_above_account': return `Balance rises above ${getAccountName(cond.compareAccountId || String(cond.value))}`;
+      case 'balance_below_account': return `Balance falls below ${getAccountName(cond.compareAccountId || String(cond.value))}`;
+      case 'goal_reached_percentage': return `Goal "${getGoalName(cond.goalId || '')}" reaches ${cond.value}%`;
+      case 'goal_reached_amount': return `Goal "${getGoalName(cond.goalId || '')}" reaches $${cond.value}`;
+      case 'cf_net_savings_below': {
+        const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+        return `Net Savings falls below $${cond.value}${consec}`;
+      }
+      case 'cf_net_savings_above': {
+        const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+        return `Net Savings rises above $${cond.value}${consec}`;
+      }
+      case 'cf_savings_rate_below': {
+        const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+        return `Savings Rate falls below ${cond.value}%${consec}`;
+      }
+      case 'cf_savings_rate_above': {
+        const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
+        return `Savings Rate rises above ${cond.value}%${consec}`;
+      }
+      default: return String(cond.value);
+    }
+  };
+
+  const getTreeSummary = (node: ConditionTreeNode, depth: number = 0): string => {
+    const parts: string[] = [];
+    for (const cond of node.conditions) {
+      parts.push(getConditionSummary(cond));
+    }
+    for (const group of node.subGroups || []) {
+      parts.push(`(${getTreeSummary(group, depth + 1)})`);
+    }
+    return parts.join(` ${node.operator} `);
+  };
+
   const getRuleSummary = (rule: any) => {
     const getAccountName = (id: string) => {
       const acc = accountsList.find((a) => a.id === id);
@@ -492,51 +877,15 @@ export default function NotificationsTab() {
       return g ? g.name : 'Unknown Goal';
     };
 
+    // Condition tree summary
+    if (rule.conditionTree && (rule.conditionTree.conditions?.length > 0 || rule.conditionTree.subGroups?.length > 0)) {
+      return getTreeSummary(rule.conditionTree);
+    }
+
     // New multi-condition summary
     if (rule.conditions && rule.conditions.length > 0) {
       const op = rule.conditionOperator || 'AND';
-      const parts = rule.conditions.map((cond: AlertCondition) => {
-        switch (cond.field) {
-          case 'account':
-            return `Account = ${getAccountName(String(cond.value))}`;
-          case 'amount_min':
-            return `Amount ≥ $${cond.value}`;
-          case 'amount_max':
-            return `Amount ≤ $${cond.value}`;
-          case 'keyword':
-            return `Keyword contains '${cond.value}'`;
-          case 'balance_above_value':
-            return `Balance rises above $${cond.value}`;
-          case 'balance_below_value':
-            return `Balance falls below $${cond.value}`;
-          case 'balance_above_account':
-            return `Balance rises above ${getAccountName(cond.compareAccountId || String(cond.value))}`;
-          case 'balance_below_account':
-            return `Balance falls below ${getAccountName(cond.compareAccountId || String(cond.value))}`;
-          case 'goal_reached_percentage':
-            return `Goal "${getGoalName(cond.goalId || '')}" reaches ${cond.value}%`;
-          case 'goal_reached_amount':
-            return `Goal "${getGoalName(cond.goalId || '')}" reaches $${cond.value}`;
-          case 'cf_net_savings_below': {
-            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
-            return `Net Savings falls below $${cond.value}${consec}`;
-          }
-          case 'cf_net_savings_above': {
-            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
-            return `Net Savings rises above $${cond.value}${consec}`;
-          }
-          case 'cf_savings_rate_below': {
-            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
-            return `Savings Rate falls below ${cond.value}%${consec}`;
-          }
-          case 'cf_savings_rate_above': {
-            const consec = cond.consecutiveMonths && cond.consecutiveMonths > 1 ? ` for ${cond.consecutiveMonths}mo` : '';
-            return `Savings Rate rises above ${cond.value}%${consec}`;
-          }
-          default:
-            return String(cond.value);
-        }
-      });
+      const parts = rule.conditions.map((cond: AlertCondition) => getConditionSummary(cond));
       return parts.join(` ${op} `);
     }
 
@@ -953,6 +1302,8 @@ export default function NotificationsTab() {
                     setTriggerType(e.target.value);
                     setConditions([]);
                     setConditionOperator('AND');
+                    setConditionTree(null);
+                    setUseTreeMode(false);
                   }}
                   className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
                 >
@@ -964,191 +1315,189 @@ export default function NotificationsTab() {
               </div>
             </div>
 
-            {/* AND / OR toggle */}
-            {conditions.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">Match:</span>
-                <div className="inline-flex rounded-lg overflow-hidden border border-border">
-                  <button
-                    type="button"
-                    id="cond-op-and"
-                    onClick={() => setConditionOperator('AND')}
-                    className={`px-3 py-1 text-xs font-bold transition-colors ${
-                      conditionOperator === 'AND'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    AND
-                  </button>
-                  <button
-                    type="button"
-                    id="cond-op-or"
-                    onClick={() => setConditionOperator('OR')}
-                    className={`px-3 py-1 text-xs font-bold transition-colors ${
-                      conditionOperator === 'OR'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    OR
-                  </button>
-                </div>
-              </div>
-            )}
+            {useTreeMode && conditionTree ? (
+              renderConditionGroup(conditionTree, [], 0)
+            ) : (
+              <>
+                {/* AND / OR toggle */}
+                {conditions.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Match:</span>
+                    <div className="inline-flex rounded-lg overflow-hidden border border-border">
+                      <button
+                        type="button"
+                        id="cond-op-and"
+                        onClick={() => setConditionOperator('AND')}
+                        className={`px-3 py-1 text-xs font-bold transition-colors ${
+                          conditionOperator === 'AND'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        AND
+                      </button>
+                      <button
+                        type="button"
+                        id="cond-op-or"
+                        onClick={() => setConditionOperator('OR')}
+                        className={`px-3 py-1 text-xs font-bold transition-colors ${
+                          conditionOperator === 'OR'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        OR
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-            {/* Condition rows */}
-            <div className="space-y-0">
-              {conditions.map((cond, idx) => {
-                const isCashFlow = cond.field.startsWith('cf_');
-                const isAccountField = cond.field === 'account' || cond.field === 'balance_above_account' || cond.field === 'balance_below_account';
-                const isGoalField = cond.field === 'goal_reached_percentage' || cond.field === 'goal_reached_amount';
-                const isPercentField = cond.field === 'goal_reached_percentage' || cond.field === 'cf_savings_rate_below' || cond.field === 'cf_savings_rate_above';
+                {/* Condition rows */}
+                <div className="space-y-0">
+                  {conditions.map((cond, idx) => {
+                    const isCashFlow = cond.field.startsWith('cf_');
+                    const isAccountField = cond.field === 'account' || cond.field === 'balance_above_account' || cond.field === 'balance_below_account';
+                    const isGoalField = cond.field === 'goal_reached_percentage' || cond.field === 'goal_reached_amount';
+                    const isPercentField = cond.field === 'goal_reached_percentage' || cond.field === 'cf_savings_rate_below' || cond.field === 'cf_savings_rate_above';
 
-                return (
-                  <div key={idx}>
-                    <div className="flex items-end gap-3 p-3 rounded-lg bg-muted/10 border border-border/50">
-                      {/* Field dropdown */}
-                      <div className="flex-1 space-y-1.5">
-                        <Label htmlFor={`cond-field-${idx}`} className="text-xs font-semibold">Field</Label>
-                        <select
-                          id={`cond-field-${idx}`}
-                          value={cond.field}
-                          onChange={(e) => {
-                            const newField = e.target.value as AlertConditionField;
-                            updateCondition(idx, { field: newField, value: '', compareAccountId: undefined, goalId: undefined, consecutiveMonths: undefined });
-                          }}
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                        >
-                          {getFieldsForTrigger(triggerType).map((f) => (
-                            <option key={f} value={f}>{getFieldLabel(f)}</option>
-                          ))}
-                        </select>
-                      </div>
+                    return (
+                      <div key={idx}>
+                        <div className="flex items-end gap-3 p-3 rounded-lg bg-muted/10 border border-border/50">
+                          <div className="flex-1 space-y-1.5">
+                            <Label htmlFor={`cond-field-${idx}`} className="text-xs font-semibold">Field</Label>
+                            <select
+                              id={`cond-field-${idx}`}
+                              value={cond.field}
+                              onChange={(e) => {
+                                const newField = e.target.value as AlertConditionField;
+                                updateCondition(idx, { field: newField, value: '', compareAccountId: undefined, goalId: undefined, consecutiveMonths: undefined });
+                              }}
+                              className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                            >
+                              {getFieldsForTrigger(triggerType).map((f) => (
+                                <option key={f} value={f}>{getFieldLabel(f)}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                      {/* Goal selector (for goal fields) */}
-                      {isGoalField && (
-                        <div className="flex-1 space-y-1.5">
-                          <Label htmlFor={`cond-goal-${idx}`} className="text-xs font-semibold">Goal</Label>
-                          <select
-                            id={`cond-goal-${idx}`}
-                            value={cond.goalId || ''}
-                            onChange={(e) => updateCondition(idx, { goalId: e.target.value })}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                          >
-                            <option value="">Select Goal...</option>
-                            {goalsList.map((g) => (
-                              <option key={g.id} value={g.id}>{g.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                          {isGoalField && (
+                            <div className="flex-1 space-y-1.5">
+                              <Label htmlFor={`cond-goal-${idx}`} className="text-xs font-semibold">Goal</Label>
+                              <select
+                                id={`cond-goal-${idx}`}
+                                value={cond.goalId || ''}
+                                onChange={(e) => updateCondition(idx, { goalId: e.target.value })}
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                              >
+                                <option value="">Select Goal...</option>
+                                {goalsList.map((g) => (
+                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
-                      {/* Value input */}
-                      <div className="flex-1 space-y-1.5">
-                        <Label htmlFor={`cond-value-${idx}`} className="text-xs font-semibold">Value</Label>
-                        {isAccountField ? (
-                          <select
-                            id={`cond-value-${idx}`}
-                            value={cond.field === 'account' ? String(cond.value) : (cond.compareAccountId || '')}
-                            onChange={(e) => {
-                              if (cond.field === 'account') {
-                                updateCondition(idx, { value: e.target.value });
-                              } else {
-                                updateCondition(idx, { compareAccountId: e.target.value, value: e.target.value });
-                              }
-                            }}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                          >
-                            <option value="">Select Account...</option>
-                            {accountsList.map((acc) => (
-                              <option key={acc.id} value={acc.id}>{acc.name}</option>
-                            ))}
-                          </select>
-                        ) : cond.field === 'keyword' ? (
-                          <Input
-                            id={`cond-value-${idx}`}
-                            type="text"
-                            placeholder="e.g. Netflix"
-                            value={String(cond.value)}
-                            onChange={(e) => updateCondition(idx, { value: e.target.value })}
-                            className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                          />
-                        ) : (
-                          <div className="relative">
-                            <Input
-                              id={`cond-value-${idx}`}
-                              type="number"
-                              placeholder="0"
-                              value={cond.value === '' ? '' : String(cond.value)}
-                              onChange={(e) => updateCondition(idx, { value: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                              className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
-                            {isPercentField && (
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
+                          <div className="flex-1 space-y-1.5">
+                            <Label htmlFor={`cond-value-${idx}`} className="text-xs font-semibold">Value</Label>
+                            {isAccountField ? (
+                              <select
+                                id={`cond-value-${idx}`}
+                                value={cond.field === 'account' ? String(cond.value) : (cond.compareAccountId || '')}
+                                onChange={(e) => {
+                                  if (cond.field === 'account') {
+                                    updateCondition(idx, { value: e.target.value });
+                                  } else {
+                                    updateCondition(idx, { compareAccountId: e.target.value, value: e.target.value });
+                                  }
+                                }}
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                              >
+                                <option value="">Select Account...</option>
+                                {accountsList.map((acc) => (
+                                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                ))}
+                              </select>
+                            ) : cond.field === 'keyword' ? (
+                              <Input
+                                id={`cond-value-${idx}`}
+                                type="text"
+                                placeholder="e.g. Netflix"
+                                value={String(cond.value)}
+                                onChange={(e) => updateCondition(idx, { value: e.target.value })}
+                                className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                              />
+                            ) : (
+                              <div className="relative">
+                                <Input
+                                  id={`cond-value-${idx}`}
+                                  type="number"
+                                  placeholder="0"
+                                  value={cond.value === '' ? '' : String(cond.value)}
+                                  onChange={(e) => updateCondition(idx, { value: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                                  className="h-9 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                                />
+                                {isPercentField && (
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
+                                )}
+                              </div>
                             )}
+                          </div>
+
+                          {isCashFlow && (
+                            <div className="space-y-1.5">
+                              <Label htmlFor={`cond-months-${idx}`} className="text-xs font-semibold whitespace-nowrap">Months</Label>
+                              <select
+                                id={`cond-months-${idx}`}
+                                value={cond.consecutiveMonths || 1}
+                                onChange={(e) => updateCondition(idx, { consecutiveMonths: parseInt(e.target.value) || 1 })}
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                              >
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {conditions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              id={`cond-remove-${idx}`}
+                              onClick={() => removeCondition(idx)}
+                              className="h-9 px-2 text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {conditions.length > 1 && idx < conditions.length - 1 && (
+                          <div className="flex justify-center py-1.5">
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {conditionOperator}
+                            </span>
                           </div>
                         )}
                       </div>
+                    );
+                  })}
+                </div>
 
-                      {/* Consecutive Months (cash flow only) */}
-                      {isCashFlow && (
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`cond-months-${idx}`} className="text-xs font-semibold whitespace-nowrap">Months</Label>
-                          <select
-                            id={`cond-months-${idx}`}
-                            value={cond.consecutiveMonths || 1}
-                            onChange={(e) => updateCondition(idx, { consecutiveMonths: parseInt(e.target.value) || 1 })}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
-                          >
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Remove button */}
-                      {conditions.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          id={`cond-remove-${idx}`}
-                          onClick={() => removeCondition(idx)}
-                          className="h-9 px-2 text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* AND/OR connector label */}
-                    {conditions.length > 1 && idx < conditions.length - 1 && (
-                      <div className="flex justify-center py-1.5">
-                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                          {conditionOperator}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Add condition button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              id="add-condition"
-              onClick={addCondition}
-            >
-              + Add Condition
-            </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" id="add-condition" onClick={addCondition}>
+                    + Add Condition
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={convertToTreeMode}>
+                    + Sub-Group (Advanced)
+                  </Button>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={resetForm}>

@@ -8,7 +8,7 @@ import { CalculationTraceOverlay } from '@/components/financial-logic/calculatio
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Target, Coins, PiggyBank, TrendingUp, PieChart, ChevronDown } from 'lucide-react';
+import { Target, Coins, PiggyBank, TrendingUp, PieChart, ChevronDown, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Goal {
@@ -216,6 +216,13 @@ export function GoalsSummary() {
               </div>
             </div>
 
+            {/* Projection Pacing Indicator */}
+            {data.activeGoals > 0 && (
+              <div className="border-t border-border mt-3 pt-3">
+                <ProjectionPacing />
+              </div>
+            )}
+
             {/* Breakdown by Type (collapsible) */}
             {Object.keys(data.byType).length > 1 && (
               <div className="border-t border-border mt-4 pt-3">
@@ -269,4 +276,59 @@ export function GoalsSummary() {
       {showMath && goalsTrace && <CalculationTraceOverlay trace={goalsTrace} />}
     </div>
   );
+}
+
+function ProjectionPacing() {
+  const [projections, setProjections] = useState<{
+    allFundedBy: string | null;
+    accounts: Array<{ allFundedBy: string | null; goals: Array<{ willFund: boolean }> }>;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/goals/projections?projectionMonths=60', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const allFundedBy = data.accounts.length > 0
+          ? data.accounts.reduce((latest: string | null, a: { allFundedBy: string | null }) => {
+              if (!a.allFundedBy) return latest;
+              if (!latest || a.allFundedBy > latest) return a.allFundedBy;
+              return latest;
+            }, null as string | null)
+          : null;
+        setProjections({ allFundedBy, accounts: data.accounts });
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!projections) return null;
+
+  const allGoalsFund = projections.accounts.every(a => a.goals.every(g => g.willFund));
+  const someWontFund = projections.accounts.some(a => a.goals.some(g => !g.willFund));
+
+  if (allGoalsFund && projections.allFundedBy) {
+    const d = new Date(projections.allFundedBy + '-01');
+    const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return (
+      <div className="flex items-center gap-2">
+        <Clock className="w-3.5 h-3.5 text-chart-1 shrink-0" />
+        <span className="text-xs text-muted-foreground">
+          At current savings rate, all goals funded by <span className="font-semibold text-chart-1">{label}</span>
+        </span>
+      </div>
+    );
+  }
+
+  if (someWontFund) {
+    return (
+      <div className="flex items-center gap-2">
+        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <span className="text-xs text-muted-foreground">
+          Some goals may not fund within 5 years at current savings rate
+        </span>
+      </div>
+    );
+  }
+
+  return null;
 }

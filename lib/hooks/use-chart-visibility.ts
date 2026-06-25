@@ -55,6 +55,7 @@ export const CHARTS = {
     charts: {
       goalsSummary: 'Summary Cards',
       goalsList: 'Goals List',
+      milestonesProjections: 'Milestones & Projections',
     },
   },
   investments: {

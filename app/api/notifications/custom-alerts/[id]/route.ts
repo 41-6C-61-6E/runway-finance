@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, criteria, isEnabled, conditions, conditionOperator } = body;
+    const { name, criteria, isEnabled, conditions, conditionOperator, conditionTree } = body;
 
     const db = getDb();
     
@@ -31,6 +31,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (isEnabled !== undefined) updateFields.isEnabled = isEnabled;
     if (conditions !== undefined) updateFields.conditions = conditions;
     if (conditionOperator !== undefined) updateFields.conditionOperator = conditionOperator;
+    if (conditionTree !== undefined) updateFields.conditionTree = conditionTree;
 
     const [updatedRule] = await db
       .update(customAlertRules)
