@@ -82,7 +82,7 @@ const ACCOUNT_COLORS = [
   'var(--color-chart-5)',
 ];
 
-function ProjectionChartTooltip({ active, payload }: any) {
+function ProjectionChartTooltip({ active, payload, goals }: any) {
   if (!active || !payload || !payload.length) return null;
 
   const point = payload[0]?.payload as any;
@@ -104,11 +104,30 @@ function ProjectionChartTooltip({ active, payload }: any) {
         );
       })}
       {point.fundEvents && point.fundEvents.length > 0 && (
-        <div className="mt-1.5 pt-1.5 border-t border-border/50">
-          <div className="text-[10px] font-semibold text-status-positive mb-0.5">Funding Milestone</div>
-          {point.fundEvents.map((e: { goal: string; account: string }, i: number) => (
-            <TooltipRow key={i} label={`${e.goal} (${e.account})`} value="Funded!" color="var(--color-status-positive)" />
-          ))}
+        <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
+          <div className="text-[10px] font-bold text-status-positive uppercase tracking-wider">
+            🎉 Goal Funded
+          </div>
+          {point.fundEvents.map((e: { goal: string; account: string }, i: number) => {
+            const goalDetail = goals?.find((g: any) => g.goalName === e.goal);
+            return (
+              <div key={i} className="text-[10px] space-y-0.5 bg-status-positive/5 p-1.5 rounded border border-status-positive/10">
+                <div className="font-semibold text-foreground flex items-center gap-1">
+                  <Target className="w-3 h-3 text-status-positive" />
+                  {e.goal}
+                </div>
+                <div className="grid grid-cols-1 gap-y-0.5 text-muted-foreground">
+                  <div>Account: <span className="font-medium text-foreground">{e.account}</span></div>
+                  {goalDetail && (
+                    <>
+                      <div>Target: <span className="font-medium text-foreground">{formatCurrency(goalDetail.targetAmount)}</span></div>
+                      <div>Time to Fund: <span className="font-medium text-foreground">{goalDetail.monthsToFund !== null ? `${goalDetail.monthsToFund}mo` : 'N/A'}</span></div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </ChartTooltip>
@@ -119,11 +138,24 @@ function FundEventDot({ cx, cy, payload, eventKey }: any) {
   if (!payload?.fundEvents?.length) return null;
   const matching = payload.fundEvents.filter((e: any) => e.accountKey === eventKey);
   if (!matching.length) return null;
+  const text = matching[0].goal;
+  const rectWidth = text.length * 5.2 + 6;
   return (
     <g>
       <circle cx={cx} cy={cy} r={5} fill="var(--color-status-positive)" stroke="white" strokeWidth={2} />
+      <rect
+        x={cx + 5}
+        y={cy - 6.5}
+        width={rectWidth}
+        height={13}
+        rx={3}
+        fill="var(--color-card)"
+        stroke="var(--color-status-positive)"
+        strokeWidth={0.5}
+        opacity={1}
+      />
       <text x={cx + 8} y={cy + 1} fontSize={9} fontWeight={600} fill="var(--color-status-positive)" dominantBaseline="middle">
-        {matching[0].goal}
+        {text}
       </text>
     </g>
   );
@@ -492,7 +524,7 @@ export function MilestonesProjections() {
                     }}
                   />
 
-                  <RechartsTooltip content={<ProjectionChartTooltip />} cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.4 }} />
+                  <RechartsTooltip content={<ProjectionChartTooltip goals={allGoals} />} cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.4 }} />
 
                   {chartAccounts.map((acct: any, i: number) => {
                     const color = ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
