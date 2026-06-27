@@ -252,32 +252,26 @@ export function DebtBreakdown() {
             </div>
           </CollapsibleFilterPanel>
           <div className="px-3 sm:px-5 py-4">
-          <div className="flex gap-4 mb-5 border-b border-border">
+          <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 w-full gap-1 mb-5 sm:mb-6">
             <button
               onClick={() => setActiveTab('assets')}
-              className={`pb-2 text-sm font-medium transition-colors relative ${
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'assets'
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
               }`}
             >
               Assets
-              {activeTab === 'assets' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
-              )}
             </button>
             <button
               onClick={() => setActiveTab('debt')}
-              className={`pb-2 text-sm font-medium transition-colors relative ${
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'debt'
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
               }`}
             >
               Debt
-              {activeTab === 'debt' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
-              )}
             </button>
           </div>
 

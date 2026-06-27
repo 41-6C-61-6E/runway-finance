@@ -142,26 +142,24 @@ export default function InvestmentsPage() {
             )}
 
             {/* ── Tabs Selector ── */}
-            <div className="border-b border-border/60 pb-px">
-              <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 max-w-full overflow-x-auto scrollbar-none snap-x snap-mandatory gap-1">
-                {([
-                  { id: 'overview', label: 'Overview' },
-                  { id: 'holdings', label: 'Holdings & Portfolio' },
-                  { id: 'income', label: 'Income & Activity' },
-                ] as const).map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 min-w-[125px] snap-start text-center py-2 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                      activeTab === tab.id
-                        ? 'bg-primary text-primary-foreground shadow-sm font-bold'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+            <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 w-full overflow-x-auto scrollbar-none snap-x snap-mandatory gap-1 mb-5 sm:mb-6">
+              {([
+                { id: 'overview', label: 'Overview' },
+                { id: 'holdings', label: 'Holdings & Portfolio' },
+                { id: 'income', label: 'Income & Activity' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 min-w-[125px] snap-start text-center py-2 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                    activeTab === tab.id
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             {/* ── Overview Tab Content ── */}

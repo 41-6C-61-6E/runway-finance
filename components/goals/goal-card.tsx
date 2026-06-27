@@ -122,7 +122,7 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projecti
 
   return (
     <div
-      className={`relative bg-card hover:bg-card/85 rounded-xl border border-border transition-all duration-200 p-5 ${
+      className={`relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-5 ${
         isCompleted ? 'opacity-80' : ''
       } ${isOverdue ? 'border-destructive/50 shadow-sm shadow-destructive/5' : ''}`}
     >
@@ -140,10 +140,32 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projecti
         </div>
       )}
 
+      {/* Edit & Delete Quick Actions in top right */}
+      <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
+        <button
+          onClick={() => onEdit(goal)}
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background transition-colors border border-transparent hover:border-border/60"
+          title="Edit goal"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+        <button
+          onClick={handleDelete}
+          className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-destructive/20"
+          title="Delete goal"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+
       {/* Responsive Horizontal Layout */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
         {/* Column 1: Info (Name, Description, Metadata) + Progress Ring */}
-        <div className="flex items-center gap-4 min-w-0 flex-[1.5]">
+        <div className="flex items-center gap-4 min-w-0 flex-[1.5] pr-16 md:pr-0">
           <div className="shrink-0">
             <GoalProgressRing progress={isCompleted ? 100 : progress} size={56} strokeWidth={4} />
           </div>
@@ -217,7 +239,7 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projecti
         </div>
 
         {/* Column 3: Stats & Savings Needed */}
-        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-1 text-xs shrink-0 md:text-right">
+        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-1 text-xs shrink-0 md:text-right md:pr-16">
           {isCompleted ? (
             <span className="text-status-positive font-semibold uppercase tracking-wider text-[10px]">Fully Funded</span>
           ) : (
@@ -242,28 +264,6 @@ export function GoalCard({ goal, onEdit, onDelete, percentage, reserve, projecti
               )}
             </>
           )}
-        </div>
-
-        {/* Column 4: Quick Actions */}
-        <div className="flex items-center justify-end gap-1.5 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-border/40">
-          <button
-            onClick={() => onEdit(goal)}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border/60"
-            title="Edit goal"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          <button
-            onClick={handleDelete}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-destructive/20"
-            title="Delete goal"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
         </div>
       </div>
     </div>

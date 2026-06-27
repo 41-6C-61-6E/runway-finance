@@ -131,7 +131,7 @@ export default function AnalyticsTab() {
   return (
     <div>
       {/* Sub-Tabs */}
-      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-6 overflow-hidden">
+      <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5 max-w-md mb-6">
         {([
           { key: 'general' as const, label: 'General' },
           { key: 'data' as const, label: 'Data Sources' },
@@ -140,10 +140,10 @@ export default function AnalyticsTab() {
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
               activeSubTab === tab.key
-                ? 'bg-primary text-primary-foreground border-primary/30'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}
