@@ -1336,7 +1336,7 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex flex-wrap rounded-lg bg-card border border-border overflow-hidden mb-5 sm:mb-6 settings-accounts-toggle">
+          <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5 w-full mb-5 sm:mb-6">
             <button
               onClick={() => {
                 setAccountSubTab('connections');
@@ -1344,8 +1344,10 @@ function SettingsPageBody() {
                 params.set('sub', 'connections');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
-                accountSubTab === 'connections' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                accountSubTab === 'connections'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Connections
@@ -1357,8 +1359,10 @@ function SettingsPageBody() {
                 params.set('sub', 'automatic');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
-                accountSubTab === 'automatic' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                accountSubTab === 'automatic'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Automatic Accounts
@@ -1370,8 +1374,10 @@ function SettingsPageBody() {
                 params.set('sub', 'manual');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
-                accountSubTab === 'manual' ? 'bg-primary text-primary-foreground border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                accountSubTab === 'manual'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Manual Accounts

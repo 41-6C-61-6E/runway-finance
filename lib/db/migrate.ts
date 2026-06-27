@@ -335,6 +335,12 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       ON push_subscriptions (user_id)
     `);
 
+    // 9d. Add index on custom_alert_rules(user_id) to prevent full-table scans during sync
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS custom_alert_rules_user_id_idx
+      ON custom_alert_rules (user_id)
+    `);
+
     // 10. Drop FK constraints that reference the "user" table — the app uses
     //    the "users" (plural) table with usernames and never populates "user".
     //    These FKs were removed in migration 0063; self-heal as a safety net.

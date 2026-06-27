@@ -178,15 +178,15 @@ export function GoalsList() {
           <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
         </div>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-card border border-border rounded-xl p-5 shadow-sm animate-pulse">
+          <div key={i} className="bg-muted border border-border rounded-xl p-5 shadow-sm animate-pulse">
             <div className="flex items-center gap-5 mb-4">
-              <div className="w-18 h-18 bg-muted rounded-full" />
+              <div className="w-18 h-18 bg-muted/60 rounded-full" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-muted rounded w-40" />
-                <div className="h-3 bg-muted rounded w-24" />
+                <div className="h-4 bg-muted/60 rounded w-40" />
+                <div className="h-3 bg-muted/60 rounded w-24" />
               </div>
             </div>
-            <div className="h-2.5 bg-muted rounded w-full" />
+            <div className="h-2.5 bg-muted/60 rounded w-full" />
           </div>
         ))}
       </div>
