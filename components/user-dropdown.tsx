@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Star, Key, LogOut } from 'lucide-react';
+import { Sun, Moon, Star, Key, LogOut, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { SEMANTIC } from '@/lib/colors/palette';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { handleSignOut } from '@/components/server-actions';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
+import { toast } from 'sonner';
 
 export default function UserDropdown() {
   const { data: session } = useSession();
@@ -17,6 +18,10 @@ export default function UserDropdown() {
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
   const [open, setOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [manualAccounts, setManualAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const formatBuildTime = (dateStr?: string) => {
@@ -52,6 +57,116 @@ export default function UserDropdown() {
     };
   }, [open]);
 
+  const fetchSyncData = async () => {
+    setLoading(true);
+    try {
+      const [connRes, accRes] = await Promise.all([
+        fetch('/api/connections'),
+        fetch('/api/manual-accounts'),
+      ]);
+      if (connRes.ok) {
+        const connData = await connRes.json();
+        setConnections(connData);
+      }
+      if (accRes.ok) {
+        const accData = await accRes.json();
+        setManualAccounts(accData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sync data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchSyncData();
+    }
+  }, [open]);
+
+  const syncableManualAccounts = manualAccounts.filter((acc: any) => {
+    const type = acc.type;
+    const meta = acc.metadata || {};
+
+    const isRealEstate = [
+      'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+      'single-family', 'condo', 'townhouse', 'multi-family'
+    ].includes(type);
+    if (isRealEstate && meta.address) return true;
+    if (type === 'crypto' && meta.xpub) return true;
+    if (type === 'metals' && meta.amountOz && parseFloat(meta.amountOz) > 0) return true;
+
+    return false;
+  });
+
+  const getLatestSyncTime = () => {
+    const connTimes = connections
+      .map((c) => (c.lastSyncAt ? new Date(c.lastSyncAt).getTime() : 0))
+      .filter((t) => t > 0);
+    const accTimes = syncableManualAccounts
+      .map((a) => (a.balanceDate ? new Date(a.balanceDate).getTime() : 0))
+      .filter((t) => t > 0);
+    const allTimes = [...connTimes, ...accTimes];
+    if (allTimes.length === 0) return null;
+    return new Date(Math.max(...allTimes));
+  };
+
+  const lastSyncTime = getLatestSyncTime();
+
+  const formatRelativeTime = (dateInput: Date | null) => {
+    if (!dateInput) return 'Never';
+    const now = new Date();
+    const diffMs = now.getTime() - dateInput.getTime();
+
+    if (diffMs < 0) {
+      return 'Just now';
+    }
+
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+      return 'Just now';
+    } else if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else {
+      return dateInput.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    const toastId = toast.loading('Syncing all connections...');
+    try {
+      const res = await fetch('/api/connections/sync', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.status !== 'error') {
+        if (data.status === 'partial') {
+          toast.warning('Sync completed with some errors.', { id: toastId });
+        } else {
+          toast.success('Successfully synced all connections!', { id: toastId });
+        }
+        await fetchSyncData();
+      } else {
+        toast.error(data.message || 'Failed to sync connections', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('An error occurred during sync', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const initial = session?.user?.name?.charAt(0)?.toUpperCase() ?? '?';
 
   return (
@@ -71,9 +186,51 @@ export default function UserDropdown() {
       </Tooltip>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
-          <div className="px-3 py-2">
+          <div className="px-3 py-2 flex flex-col gap-2">
             <div className="text-sm font-medium text-foreground truncate">{session?.user?.name}</div>
-            <div className="text-xs text-muted-foreground truncate">{session?.user?.email}</div>
+            
+            <div className="flex items-center justify-between text-xs border-t border-border/40 pt-2 mt-0.5">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Last sync</span>
+                <span className="text-foreground font-medium">
+                  {loading ? (
+                    <span className="text-muted-foreground/50 animate-pulse">Loading...</span>
+                  ) : (
+                    formatRelativeTime(lastSyncTime)
+                  )}
+                </span>
+              </div>
+              {connections.length > 0 || syncableManualAccounts.length > 0 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={handleSyncAll}
+                      disabled={isSyncing || loading}
+                      className="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                      aria-label="Sync All"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Sync All</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      disabled
+                      className="w-7 h-7 rounded-full bg-muted text-muted-foreground opacity-50 flex items-center justify-center cursor-not-allowed"
+                      aria-label="No Connections"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">No syncable connections</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
 
           <div className="h-px bg-border mx-2" />
@@ -124,6 +281,8 @@ export default function UserDropdown() {
               disabled={privacyModeLoading}
             />
           </div>
+
+
 
           <div className="h-px bg-border mx-2" />
 
