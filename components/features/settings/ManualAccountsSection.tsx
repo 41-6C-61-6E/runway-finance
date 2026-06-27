@@ -320,6 +320,7 @@ export default function ManualAccountsSection() {
           bedrooms: meta.bedrooms || undefined,
           bathrooms: meta.bathrooms || undefined,
           squareFootage: meta.squareFootage || undefined,
+          valuationMethod: meta.valuationMethod || undefined,
         }),
       });
       const data = await res.json();
@@ -376,6 +377,7 @@ export default function ManualAccountsSection() {
         if (createMeta.linkedMortgageId) {
           metadata.mortgageAccountIds = [createMeta.linkedMortgageId];
         }
+        metadata.valuationMethod = createMeta.valuationMethod || 'normal';
       }
       if (createType === 'mortgage') {
         metadata.originalLoanAmount = parseFloat(createMeta.originalLoanAmount || '0');
@@ -588,6 +590,7 @@ export default function ManualAccountsSection() {
           metadata.mortgageAccountIds = [];
         }
         metadata.syncFrequency = editMeta.syncFrequency || 'manual';
+        metadata.valuationMethod = editMeta.valuationMethod || 'normal';
       }
 
       else if (editAccount.type === 'mortgage') {
@@ -686,6 +689,20 @@ export default function ManualAccountsSection() {
     </div>
   );
 
+  const valuationMethodField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (RentCast)</label>
+      <select
+        value={meta.valuationMethod || 'normal'}
+        onChange={(e) => setMeta({ ...meta, valuationMethod: e.target.value })}
+        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <option value="conservative">Conservative (Low Range)</option>
+        <option value="normal">Normal (Estimated Value)</option>
+        <option value="optimistic">Optimistic (High Range)</option>
+      </select>
+    </div>
+  );
   const linkedMortgageField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => {
     const alreadyLinked = new Set(
       realEstateAccounts.flatMap((re) => {
@@ -778,6 +795,7 @@ export default function ManualAccountsSection() {
               </p>
             )}
           </div>
+          {valuationMethodField(createMeta, setCreateMeta)}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Beds</label>
@@ -1438,6 +1456,7 @@ export default function ManualAccountsSection() {
                     </p>
                   )}
                 </div>
+                {valuationMethodField(editMeta, (m) => setEditMeta(m))}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Beds</label>

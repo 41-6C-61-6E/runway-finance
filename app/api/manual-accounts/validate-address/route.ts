@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     bedrooms?: string | number;
     bathrooms?: string | number;
     squareFootage?: string | number;
+    valuationMethod?: 'conservative' | 'normal' | 'optimistic';
   };
 
   try {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       bedrooms,
       bathrooms,
       squareFootage,
+      valuationMethod: body.valuationMethod || undefined,
     }, apiConfig);
 
     return NextResponse.json({ valid: true, price });
