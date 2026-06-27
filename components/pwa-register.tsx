@@ -26,7 +26,7 @@ export function PWARegister() {
           if (installing) {
             installing.addEventListener("statechange", () => {
               if (installing.state === "installed" && navigator.serviceWorker.controller) {
-                toast.info("A new version of Runway Finance is available!", {
+                toast.info("A new version of Personal Finance is available!", {
                   description: "Click update to load the latest changes.",
                   action: {
                     label: "Update",

@@ -5,6 +5,7 @@ import { useSidebar } from '@/components/sidebar-context';
 import SettingsDropdown from '@/components/settings-dropdown';
 import UserDropdown from '@/components/user-dropdown';
 import BugReportingDropdown from '@/components/bug-reporting-dropdown';
+import NotificationsDropdown from '@/components/notifications-dropdown';
 
 interface PageHeaderProps {
   title: string;
@@ -55,6 +56,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         }`}
       >
         <BugReportingDropdown />
+        <NotificationsDropdown />
         <SettingsDropdown />
         <UserDropdown />
       </div>
@@ -94,6 +96,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
         <div className="flex items-center gap-1">
           <BugReportingDropdown />
+          <NotificationsDropdown />
           <SettingsDropdown />
           <UserDropdown />
         </div>

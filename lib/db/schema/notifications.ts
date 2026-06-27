@@ -93,3 +93,18 @@ export const customAlertRules = pgTable('custom_alert_rules', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── Persistent User Notifications Inbox ───────────────────────────────────────
+// Stores individual user notifications with status tracking
+export const userNotifications = pgTable('user_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  urlPath: text('url_path'),
+  type: text('type').notNull(), // 'budget_alert' | 'sync_error' | 'large_transaction' | 'generic'
+  isRead: boolean('is_read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp('read_at', { withTimezone: true }),
+});
+

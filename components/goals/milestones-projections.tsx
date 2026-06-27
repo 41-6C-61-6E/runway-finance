@@ -181,8 +181,6 @@ export function MilestonesProjections() {
     };
   }, []);
 
-  const activeInflow = savedInflow !== null ? savedInflow : pendingInflow;
-
   const fetchProjections = useCallback(async (inflow: number | null) => {
     try {
       setLoading(true);
@@ -199,7 +197,7 @@ export function MilestonesProjections() {
       if (!hasLoadedOnce.current) {
         hasLoadedOnce.current = true;
         // Use saved value if available, otherwise calculated default
-        if (savedInflow !== null) {
+        if (savedInflow !== null && savedInflow !== undefined) {
           setInputValue(String(savedInflow));
           setPendingInflow(savedInflow);
         } else {
@@ -215,9 +213,9 @@ export function MilestonesProjections() {
   }, [savedInflow]);
 
   useEffect(() => {
-    fetchProjections(activeInflow);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (savedInflow === undefined) return;
+    fetchProjections(savedInflow);
+  }, [savedInflow, fetchProjections]);
 
   const adjustInflow = (delta: number) => {
     const current = pendingInflow ?? 0;
@@ -225,7 +223,6 @@ export function MilestonesProjections() {
     setPendingInflow(newVal);
     setInputValue(String(newVal));
     setSavedInflow(newVal);
-    fetchProjections(newVal);
   };
 
   const resetInflowToDefault = () => {
@@ -233,7 +230,6 @@ export function MilestonesProjections() {
     setSavedInflow(null);
     setPendingInflow(data.totalMonthlyInflow);
     setInputValue(String(data.totalMonthlyInflow));
-    fetchProjections(null);
   };
 
   // Build chart data: either multi-series (all accounts) or single series
@@ -378,7 +374,7 @@ export function MilestonesProjections() {
           <div className="bg-muted/20 rounded-lg border border-border/50 p-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium text-foreground">Monthly Inflow (90-day avg)</span>
+                <span className="text-xs font-medium text-foreground">Monthly Inflow</span>
                 <button
                   onClick={resetInflowToDefault}
                   className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors"
@@ -411,7 +407,6 @@ export function MilestonesProjections() {
                       }
                       debounceTimer.current = setTimeout(() => {
                         setSavedInflow(parsed);
-                        fetchProjections(parsed);
                       }, 500);
                     }
                   }}
@@ -435,7 +430,6 @@ export function MilestonesProjections() {
                         setInputValue(String(amount));
                         setPendingInflow(amount);
                         setSavedInflow(amount);
-                        fetchProjections(amount);
                       }}
                       className={cn(
                         'px-2 py-1 rounded-md text-[10px] font-medium transition-all border',

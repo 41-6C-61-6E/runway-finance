@@ -3,19 +3,19 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 interface InflowContextValue {
-  savedInflow: number | null;
+  savedInflow: number | null | undefined;
   setSavedInflow: (value: number | null) => void;
 }
 
 const InflowContext = createContext<InflowContextValue>({
-  savedInflow: null,
+  savedInflow: undefined,
   setSavedInflow: () => {},
 });
 
 const STORAGE_KEY = 'rf-goal-saved-inflow';
 
 export function GoalInflowProvider({ children }: { children: ReactNode }) {
-  const [savedInflow, setSavedInflowState] = useState<number | null>(null);
+  const [savedInflow, setSavedInflowState] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -23,8 +23,10 @@ export function GoalInflowProvider({ children }: { children: ReactNode }) {
       const parsed = parseFloat(stored);
       if (!isNaN(parsed) && parsed >= 0) {
         setSavedInflowState(parsed);
+        return;
       }
     }
+    setSavedInflowState(null);
   }, []);
 
   const setSavedInflow = useCallback((value: number | null) => {

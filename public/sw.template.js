@@ -105,11 +105,12 @@ self.addEventListener("push", (event) => {
       badge: data.badge || "/icons/icon-96x96.png",
       vibrate: data.vibrate || [100, 50, 100],
       data: {
+        id: data.id,
         url: data.url || "/"
       }
     };
     event.waitUntil(
-      self.registration.showNotification(data.title || "Runway Finance", options)
+      self.registration.showNotification(data.title || "Personal Finance", options)
     );
   } catch (err) {
     console.error("Error displaying push notification:", err);
@@ -118,21 +119,37 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const notificationId = event.notification.data?.id;
   const urlToOpen = new URL(event.notification.data?.url || "/", self.location.origin).href;
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // If there is an existing client matching this origin/URL, focus it
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url === urlToOpen && "focus" in client) {
-          return client.focus();
-        }
+
+  const promises = [];
+
+  // Report read state back to the app server
+  if (notificationId) {
+    promises.push(
+      fetch(`/api/notifications/${notificationId}/read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      }).catch(err => console.error("Error updating read status in service worker:", err))
+    );
+  }
+
+  // Open or focus window
+  const navigatePromise = clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+    // If there is an existing client matching this origin/URL, focus it
+    for (let i = 0; i < windowClients.length; i++) {
+      const client = windowClients[i];
+      if (client.url === urlToOpen && "focus" in client) {
+        return client.focus();
       }
-      // If not, open a new window
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+    }
+    // If not, open a new window
+    if (clients.openWindow) {
+      return clients.openWindow(urlToOpen);
+    }
+  });
+  promises.push(navigatePromise);
+
+  event.waitUntil(Promise.all(promises));
 });
 
