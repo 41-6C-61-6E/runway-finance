@@ -198,6 +198,13 @@ export default function NotificationsTab() {
         const data = await res.json();
         if (data.success) {
           toast.success('Test notification dispatched. It should arrive shortly.');
+          try {
+            const bc = new BroadcastChannel('notification-updates');
+            bc.postMessage({ type: 'REFRESH' });
+            bc.close();
+          } catch (e) {
+            console.warn('BroadcastChannel failed to post message:', e);
+          }
         } else {
           toast.warning(data.reason || 'Notification was not sent. Check server configuration.');
         }

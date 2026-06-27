@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Bell, Check, ExternalLink, Inbox, Settings } from 'lucide-react';
+import { Bell, Check, ExternalLink, Inbox, Settings, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserNotification {
@@ -94,9 +94,22 @@ export default function NotificationsDropdown() {
     };
     window.addEventListener('focus', handleFocus);
 
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('notification-updates');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'REFRESH') {
+          fetchNotifications();
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel not initialized:', e);
+    }
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -153,22 +166,66 @@ export default function NotificationsDropdown() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (notifications.length === 0) return;
+    if (!confirm('Are you sure you want to clear all notifications?')) return;
+
+    // Optimistic UI update
+    setNotifications([]);
+
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        toast.success('All notifications cleared.');
+      } else {
+        throw new Error('Failed to delete on server');
+      }
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+      fetchNotifications();
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    // Optimistic UI update
+    setNotifications(prev => prev.filter(n => n.id !== id));
+
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete on server');
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      fetchNotifications();
+    }
+  };
+
+  const handleToggleOpen = () => {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen) {
+      fetchNotifications();
+    }
+  };
+
   return (
     <div className="relative" ref={ref}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={() => setOpen(!open)}
+            onClick={handleToggleOpen}
             className="relative p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="Notifications"
           >
             <Bell className={`w-5 h-5 ${shouldWiggle ? 'animate-bounce' : ''}`} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
-              </span>
+              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive" />
             )}
           </button>
         </TooltipTrigger>
@@ -189,6 +246,16 @@ export default function NotificationsDropdown() {
                 >
                   <Check className="w-3.5 h-3.5" />
                   Mark all read
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus:outline-none"
+                  aria-label="Clear all notifications"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
               <button
@@ -218,7 +285,7 @@ export default function NotificationsDropdown() {
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`flex gap-3 px-4 py-3 text-left transition-colors cursor-pointer hover:bg-muted/50 ${
+                  className={`group/notif flex gap-3 px-4 py-3 text-left transition-colors cursor-pointer hover:bg-muted/50 ${
                     !n.isRead ? 'bg-primary/5 hover:bg-primary/10' : ''
                   }`}
                 >
@@ -241,11 +308,22 @@ export default function NotificationsDropdown() {
                       </span>
                     )}
                   </div>
-                  {!n.isRead && (
-                    <div className="flex-shrink-0 self-center">
-                      <span className="block w-1.5 h-1.5 rounded-full bg-primary" />
-                    </div>
-                  )}
+                  <div className="flex-shrink-0 self-center flex items-center gap-1.5 min-w-[24px] justify-end">
+                    {!n.isRead && (
+                      <span className="block w-1.5 h-1.5 rounded-full bg-primary group-hover/notif:hidden" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteNotification(n.id);
+                      }}
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover/notif:opacity-100 transition-opacity focus:opacity-100 focus:outline-none"
+                      aria-label="Delete notification"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
