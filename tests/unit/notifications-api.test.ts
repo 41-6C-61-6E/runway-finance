@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { GET as getList, POST as readAll } from '@/app/api/notifications/route';
+import { GET as getList, POST as readAll, DELETE as clearAll } from '@/app/api/notifications/route';
 import { POST as markRead } from '@/app/api/notifications/[id]/read/route';
+import { DELETE as deleteOne } from '@/app/api/notifications/[id]/route';
 import { userNotifications } from '@/lib/db/schema';
 
 // Mock auth
@@ -17,6 +18,7 @@ const mockOrderBy = vi.fn();
 const mockLimit = vi.fn();
 const mockUpdate = vi.fn();
 const mockSet = vi.fn();
+const mockDelete = vi.fn();
 
 let mockResolvedVal: any = [];
 
@@ -28,6 +30,7 @@ const mockDb = {
   limit: mockLimit,
   update: mockUpdate,
   set: mockSet,
+  delete: mockDelete,
   then: (onfulfilled?: (value: any) => any) => {
     return Promise.resolve(mockResolvedVal).then(onfulfilled);
   }
@@ -49,6 +52,7 @@ describe('Notifications API Routes', () => {
     mockLimit.mockReturnValue(mockDb);
     mockUpdate.mockReturnValue(mockDb);
     mockSet.mockReturnValue(mockDb);
+    mockDelete.mockReturnValue(mockDb);
     
     mockResolvedVal = [];
   });
@@ -118,6 +122,42 @@ describe('Notifications API Routes', () => {
       
       expect(mockUpdate).toHaveBeenCalledWith(userNotifications);
       expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ isRead: true }));
+    });
+  });
+
+  describe('DELETE /api/notifications (clear all)', () => {
+    it('should return 401 if unauthorized', async () => {
+      mockAuth.mockResolvedValue(null);
+      const res = await clearAll();
+      expect(res.status).toBe(401);
+    });
+
+    it('should delete all notifications for the user', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockResolvedVal = { count: 5 };
+
+      const res = await clearAll();
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+    });
+  });
+
+  describe('DELETE /api/notifications/[id]', () => {
+    it('should return 401 if unauthorized', async () => {
+      mockAuth.mockResolvedValue(null);
+      const res = await deleteOne(new Request('http://localhost'), { params: Promise.resolve({ id: 'n1' }) });
+      expect(res.status).toBe(401);
+    });
+
+    it('should delete a single notification', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockResolvedVal = { count: 1 };
+
+      const res = await deleteOne(new Request('http://localhost'), { params: Promise.resolve({ id: 'n1' }) });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
     });
   });
 });
