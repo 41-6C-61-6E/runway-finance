@@ -345,8 +345,11 @@ async function runSelfHealingChecks(client: any): Promise<void> {
     //    the "users" (plural) table with usernames and never populates "user".
     //    These FKs were removed in migration 0063; self-heal as a safety net.
     await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_fkey`);
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_fkey`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_fkey`);
   } catch (err) {
     logger.error('[migrate] Self-healing checks failed', { error: err instanceof Error ? err.message : String(err) });
     // Don't crash startup on self-healing check failure, but log it
