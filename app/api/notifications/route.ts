@@ -43,3 +43,21 @@ export async function POST() {
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const db = getDb();
+    await db
+      .delete(userNotifications)
+      .where(eq(userNotifications.userId, session.user.id));
+
+    return Response.json({ success: true });
+  } catch (err) {
+    return Response.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
