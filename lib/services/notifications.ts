@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow } from '@/lib/db/schema';
+import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow, userNotifications } from '@/lib/db/schema';
 import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
@@ -42,11 +42,6 @@ export async function sendPushNotification(
   type: string = 'generic',
   key?: string
 ): Promise<PushResult> {
-  if (!isInitialized) {
-    logger.warn('[notifications-service] Cannot send push notification: service not initialized (VAPID keys missing).');
-    return { sent: false, reason: 'VAPID keys are not configured on the server.' };
-  }
-
   const db = getDb();
 
   // 1. Deduplication check
@@ -110,18 +105,54 @@ export async function sendPushNotification(
     logger.error('[notifications-service] Error checking rate limit:', err);
   }
 
-  // 3. Send notifications to all active subscriptions
+  // 3. Save notification to userNotifications inbox table
+  let dbNotificationId: string | undefined = undefined;
+  try {
+    const [newNotif] = await db
+      .insert(userNotifications)
+      .values({
+        userId,
+        title,
+        body,
+        urlPath: urlPath || '/',
+        type,
+      })
+      .returning({ id: userNotifications.id });
+    dbNotificationId = newNotif?.id;
+  } catch (dbErr) {
+    logger.error('[notifications-service] Failed to save in-app notification to DB:', dbErr);
+  }
+
+  // 4. Log to sentNotifications to enable deduplication for subsequent runs
+  const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
+  try {
+    await db.insert(sentNotifications).values({
+      userId,
+      type,
+      key: finalKey,
+    });
+  } catch (err) {
+    logger.error('[notifications-service] Failed to record sent notification log:', err);
+  }
+
+  // 5. Send push notification to all active devices (if configured)
+  if (!isInitialized) {
+    logger.warn('[notifications-service] VAPID keys missing. Saved in-app notification only.');
+    return { sent: true, reason: 'VAPID keys not configured. Saved in-app only.' };
+  }
+
   const subs = await db
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.userId, userId));
 
   if (subs.length === 0) {
-    logger.warn('[notifications-service] No push subscriptions found for user. Ensure at least one device is subscribed.', { userId });
-    return { sent: false, reason: 'No device subscriptions found. Please enable notifications on at least one device.' };
+    logger.info('[notifications-service] No push subscriptions found. Saved in-app notification.');
+    return { sent: true, reason: 'No registered push devices. Saved in-app only.' };
   }
 
   const payload = JSON.stringify({
+    id: dbNotificationId,
     title,
     body,
     url: urlPath || '/',
@@ -167,22 +198,11 @@ export async function sendPushNotification(
 
   await Promise.all(promises);
 
-  // 4. Log sent notification
   if (sentSuccessfully) {
-    try {
-      const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
-      await db.insert(sentNotifications).values({
-        userId,
-        type,
-        key: finalKey,
-      });
-    } catch (err) {
-      logger.error('[notifications-service] Failed to record sent notification:', err);
-    }
     return { sent: true };
   }
 
-  return { sent: false, reason: 'All subscription endpoints failed or expired.' };
+  return { sent: true, reason: 'All push subscription endpoints failed/expired. Saved in-app only.' };
 }
 
 export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {

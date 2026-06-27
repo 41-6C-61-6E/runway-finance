@@ -11,7 +11,7 @@ export async function POST() {
     const result = await sendPushNotification(
       session.user.id,
       'Test Notification',
-      'It works! This is a test notification from Runway Finance.',
+      'It works! This is a test notification from Personal Finance.',
       '/settings?tab=notifications'
     );
 
