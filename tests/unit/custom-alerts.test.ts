@@ -926,7 +926,7 @@ describe('Custom Event Alert Engine', () => {
         ],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(true);
     });
 
     it('should return false when AND tree has one failing condition', () => {
@@ -938,7 +938,7 @@ describe('Custom Event Alert Engine', () => {
         ],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(false);
     });
 
     it('should return true when OR tree has at least one matching condition', () => {
@@ -950,7 +950,7 @@ describe('Custom Event Alert Engine', () => {
         ],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(true);
     });
 
     it('should return false when OR tree has no matching conditions', () => {
@@ -962,7 +962,7 @@ describe('Custom Event Alert Engine', () => {
         ],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(false);
     });
 
     it('should return false for empty tree', () => {
@@ -971,7 +971,7 @@ describe('Custom Event Alert Engine', () => {
         conditions: [],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(false);
     });
 
     it('should correctly evaluate nested AND under OR', () => {
@@ -989,7 +989,7 @@ describe('Custom Event Alert Engine', () => {
           },
         ],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(true);
     });
 
     it('should correctly evaluate nested OR under AND', () => {
@@ -1007,7 +1007,7 @@ describe('Custom Event Alert Engine', () => {
           },
         ],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(true);
     });
 
     it('should return false when nested OR under AND fails', () => {
@@ -1025,7 +1025,7 @@ describe('Custom Event Alert Engine', () => {
           },
         ],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(false);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(false);
     });
 
     it('should evaluate deep nesting', () => {
@@ -1049,7 +1049,7 @@ describe('Custom Event Alert Engine', () => {
           },
         ],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, {})).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, {})).toBe(true);
     });
 
     it('should use context in evaluator', () => {
@@ -1060,8 +1060,8 @@ describe('Custom Event Alert Engine', () => {
         ],
         subGroups: [],
       };
-      expect(evaluateConditionTree(tree, mockEvaluator, { text: 'hello world' })).toBe(true);
-      expect(evaluateConditionTree(tree, mockEvaluator, { text: 'goodbye' })).toBe(false);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, { text: 'hello world' })).toBe(true);
+      expect(evaluateConditionTree(tree as any, mockEvaluator, { text: 'goodbye' })).toBe(false);
     });
   });
 });

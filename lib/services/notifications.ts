@@ -761,6 +761,9 @@ export async function checkAccountBalanceAlerts(
       let compareDescription = '';
 
       if (rule.conditionTree) {
+        // Account scoping: if criteria.accountId is set, only evaluate for that account
+        if (rule.criteria?.accountId && rule.criteria.accountId !== accountId) continue;
+
         const compareAccountBalances = new Map<string, number>();
         const balanceIds = collectBalanceAccountIds(rule.conditionTree);
         for (const compId of balanceIds) {
@@ -787,6 +790,9 @@ export async function checkAccountBalanceAlerts(
           compareDescription = buildBalanceNotificationBody(rule.conditionTree, compareAccountBalances);
         }
       } else if (rule.conditions && rule.conditions.length > 0) {
+        // Account scoping: if criteria.accountId is set, only evaluate for that account
+        if (rule.criteria?.accountId && rule.criteria.accountId !== accountId) continue;
+
         // New multi-condition evaluation
         // Collect compare account balances needed by any condition
         const compareAccountBalances = new Map<string, number>();
@@ -866,18 +872,33 @@ export async function checkAccountBalanceAlerts(
         }
       }
 
-      if (matched) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const key = `custom_balance_alert:${rule.id}:${todayStr}`;
+      // Threshold-crossing dedup: use a stable key per rule+account (no date component).
+      // The dedup key persists in sentNotifications while the condition is violated, preventing
+      // re-firing every sync. When the condition recovers (matched=false), we delete the key so
+      // the alert can fire again the next time the threshold is crossed.
+      const crossingKey = `custom_balance_alert:${rule.id}:${accountId}:in_violation`;
 
+      if (matched) {
         await sendPushNotification(
           userId,
           `Balance Alert: ${rule.name}`,
           `Account "${accName}" balance ($${currentBalance.toFixed(2)}) ${compareDescription}.`,
           '/accounts',
           'custom_balance_alert',
-          key
+          crossingKey
         );
+      } else {
+        // Condition recovered — clear the dedup key so the alert can re-arm
+        try {
+          await db.delete(sentNotifications).where(
+            and(
+              eq(sentNotifications.userId, userId),
+              eq(sentNotifications.key, crossingKey)
+            )
+          );
+        } catch (clearErr) {
+          logger.debug('[notifications-service] Could not clear balance alert dedup key (non-critical)', { crossingKey });
+        }
       }
     }
   } catch (err) {
@@ -1021,7 +1042,10 @@ export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
       .orderBy(desc(monthlyCashFlow.yearMonth))
       .limit(12);
 
-    if (recentCashFlows.length === 0) return;
+    if (recentCashFlows.length === 0) {
+      logger.info('[notifications-service] No monthly cash flow data found — cash flow alert rules will not be evaluated.', { userId });
+      return;
+    }
 
     const decryptedCashFlows = await Promise.all(
       recentCashFlows.map(async (cf) => {
