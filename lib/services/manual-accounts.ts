@@ -97,6 +97,7 @@ export async function fetchRentcastValue(
     bedrooms?: number;
     bathrooms?: number;
     squareFootage?: number;
+    valuationMethod?: 'conservative' | 'normal' | 'optimistic';
   },
   apiConfig?: ApiConfig
 ): Promise<number> {
@@ -147,12 +148,22 @@ export async function fetchRentcastValue(
     throw new Error(`RentCast HTTP ${res.status}\n  URL: ${url}\n  response: ${body.slice(0, 300)}`);
   }
 
-  const data = await res.json() as { price?: number };
-  if (data.price === undefined || data.price === null) {
-    throw new Error(`RentCast parse error: No price field returned in response.\n  Response: ${JSON.stringify(data).slice(0, 300)}`);
+  const data = await res.json() as { price?: number; priceRangeLow?: number; priceRangeHigh?: number };
+  
+  let selectedValue: number | undefined;
+  if (params.valuationMethod === 'conservative') {
+    selectedValue = data.priceRangeLow ?? data.price;
+  } else if (params.valuationMethod === 'optimistic') {
+    selectedValue = data.priceRangeHigh ?? data.price;
+  } else {
+    selectedValue = data.price;
   }
 
-  return data.price;
+  if (selectedValue === undefined || selectedValue === null) {
+    throw new Error(`RentCast parse error: No valid valuation field returned in response.\n  Response: ${JSON.stringify(data).slice(0, 300)}`);
+  }
+
+  return selectedValue;
 }
 
 
@@ -459,6 +470,7 @@ export async function syncManualAccount(
           bedrooms: meta.bedrooms !== undefined && meta.bedrooms !== null ? parseFloat(String(meta.bedrooms)) : undefined,
           bathrooms: meta.bathrooms !== undefined && meta.bathrooms !== null ? parseFloat(String(meta.bathrooms)) : undefined,
           squareFootage: meta.squareFootage !== undefined && meta.squareFootage !== null ? parseFloat(String(meta.squareFootage)) : undefined,
+          valuationMethod: meta.valuationMethod as 'conservative' | 'normal' | 'optimistic' | undefined,
         }, apiConfig);
         break;
       }

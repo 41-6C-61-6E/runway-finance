@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { Bell, BellOff, Info, AlertTriangle, Play, Trash2 } from 'lucide-react';
+import { Bell, BellOff, AlertTriangle, Play, Trash2 } from 'lucide-react';
 import type { AlertCondition, AlertConditionField, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';
 import CustomAlertRuleList from './CustomAlertRuleList';
 
@@ -354,15 +354,6 @@ export default function NotificationsTab() {
                 </div>
               </>
             )}
-
-            <div className="flex items-start gap-2.5 text-xs text-muted-foreground p-3 rounded-lg border border-dashed bg-muted/10">
-              <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-              <p>
-                Personal Finance uses W3C standard Web Push. All alert payloads are fully encrypted 
-                locally on the device before transmission through third-party hubs (Apple APNs / Google FCM), 
-                ensuring your financial privacy remains 100% secure.
-              </p>
-            </div>
           </div>
         </div>
       )}

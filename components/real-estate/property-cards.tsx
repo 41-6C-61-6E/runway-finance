@@ -123,6 +123,7 @@ export function PropertyCards() {
           bedrooms: propertyEditMeta.bedrooms || undefined,
           bathrooms: propertyEditMeta.bathrooms || undefined,
           squareFootage: propertyEditMeta.squareFootage || undefined,
+          valuationMethod: propertyEditMeta.valuationMethod || undefined,
         }),
       });
       const data = await res.json();
@@ -252,7 +253,8 @@ export function PropertyCards() {
       else delete metadata.zipCode;
       if (propertyEditMeta.initialValue) metadata.initialValue = parseFloat(propertyEditMeta.initialValue);
       else delete metadata.initialValue;
-
+      if (propertyEditMeta.valuationMethod) metadata.valuationMethod = propertyEditMeta.valuationMethod;
+      else delete metadata.valuationMethod;
       
       metadata.mortgageAccountIds = selectedMortgageIds;
 
@@ -514,6 +516,18 @@ export function PropertyCards() {
                   {validationResult.message}
                 </p>
               )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (RentCast)</label>
+              <select
+                value={propertyEditMeta.valuationMethod || 'normal'}
+                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, valuationMethod: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="conservative">Conservative (Low Range)</option>
+                <option value="normal">Normal (Estimated Value)</option>
+                <option value="optimistic">Optimistic (High Range)</option>
+              </select>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
