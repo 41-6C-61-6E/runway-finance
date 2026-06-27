@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Bell, Check, ExternalLink, Inbox, Settings, Trash2, X } from 'lucide-react';
+import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserNotification {
@@ -267,7 +267,7 @@ export default function NotificationsDropdown() {
                 className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus:outline-none"
                 aria-label="Notification settings"
               >
-                <Settings className="w-3.5 h-3.5" />
+                <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
