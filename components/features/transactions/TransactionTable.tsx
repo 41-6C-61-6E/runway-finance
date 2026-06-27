@@ -28,6 +28,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   ChevronUp,
   ChevronDown,
@@ -236,7 +238,6 @@ export default function TransactionTable({
     categoryId: string;
     categoryName: string;
   } | null>(null);
-  const [creatingAndRunningRule, setCreatingAndRunningRule] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -695,19 +696,22 @@ export default function TransactionTable({
 
   const handleCreateAndRunRule = useCallback(async () => {
     if (!proposedRule) return;
-    setCreatingAndRunningRule(true);
-    try {
+
+    const ruleInfo = { ...proposedRule };
+    setProposedRule(null);
+
+    const runRulePromise = (async () => {
       // Create the rule
       const createRes = await fetch("/api/category-rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: `Auto-rule: ${proposedRule.payee}`,
+          name: `Auto-rule: ${ruleInfo.payee}`,
           conditionField: "payee",
           conditionOperator: "contains",
-          conditionValue: proposedRule.payee,
-          setCategoryId: proposedRule.categoryId,
+          conditionValue: ruleInfo.payee,
+          setCategoryId: ruleInfo.categoryId,
         }),
       });
 
@@ -733,12 +737,13 @@ export default function TransactionTable({
       } else {
         await fetchTransactions();
       }
-      setProposedRule(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCreatingAndRunningRule(false);
-    }
+    })();
+
+    toast.promise(runRulePromise, {
+      loading: `Creating and applying auto-tag rule for "${ruleInfo.payee}"...`,
+      success: `Rule created and applied successfully to past transactions!`,
+      error: (err) => `Failed to create/apply rule: ${err.message || err}`,
+    });
   }, [proposedRule, page, fetchTransactions]);
 
   useEffect(() => {
@@ -1979,7 +1984,7 @@ export default function TransactionTable({
         open={!!proposedRule}
         onOpenChange={(open) => !open && setProposedRule(null)}
       >
-        <AlertDialogContent className="max-w-sm">
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Create Auto-Tag Rule?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -2013,23 +2018,24 @@ export default function TransactionTable({
               </div>
             </div>
           )}
-          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:justify-between sm:items-end">
-            <AlertDialogCancel className="w-full sm:w-auto">No thanks</AlertDialogCancel>
-            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
-              <button
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center">
+            <AlertDialogCancel className="h-10 w-full sm:w-auto px-4 py-2 text-sm font-semibold rounded-lg">
+              No thanks
+            </AlertDialogCancel>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:w-auto">
+              <Button
+                variant="outline"
                 onClick={handleCreateRule}
-                disabled={creatingAndRunningRule}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors w-full sm:w-auto disabled:opacity-50"
+                className="h-10 w-full sm:w-auto rounded-lg font-semibold border-border hover:bg-muted"
               >
                 Create Rule
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleCreateAndRunRule}
-                disabled={creatingAndRunningRule}
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity w-full sm:w-auto disabled:opacity-50"
+                className="h-10 w-full sm:w-auto rounded-lg font-semibold"
               >
-                {creatingAndRunningRule ? "Running..." : "Create and Run Now"}
-              </button>
+                Create and Run Now
+              </Button>
             </div>
           </AlertDialogFooter>
         </AlertDialogContent>

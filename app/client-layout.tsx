@@ -10,6 +10,14 @@ import { Analytics } from '@vercel/analytics/next';
 import { ChartColorSchemeInitializer } from '@/components/chart-color-scheme-initializer';
 import { ClientErrorReporter } from '@/components/client-error-reporter';
 import { Toaster } from 'sonner';
+import { useTheme } from 'next-themes';
+
+function ThemedToaster() {
+  const { theme } = useTheme();
+  // Map custom moonlight/dark themes to dark, daylight to light
+  const toastTheme = theme === 'light' ? 'light' : 'dark';
+  return <Toaster richColors position="top-right" theme={toastTheme} />;
+}
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   return (
@@ -18,7 +26,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         <SessionProvider>
           <TooltipProvider delayDuration={300}>
             <ClientErrorReporter>
-              <Toaster richColors position="top-right" />
+              <ThemedToaster />
               <ChartColorSchemeInitializer />
               <div className="min-h-[100dvh] flex flex-col">
                 <Suspense fallback={null}>
