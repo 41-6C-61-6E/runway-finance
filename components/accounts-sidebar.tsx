@@ -211,11 +211,11 @@ export default function AccountsSidebar() {
     return (
       <button
         onClick={toggleAccountsCollapsed}
-        className="fixed top-0 z-50 flex items-center justify-center w-6 h-10 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer hidden md:flex"
+        className="fixed top-0 z-50 flex items-center justify-center w-5 h-8 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer hidden md:flex"
         style={{ left: `${sidebarWidth}px` }}
         title="Expand accounts sidebar"
       >
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-3.5 h-3.5" />
       </button>
     );
   }

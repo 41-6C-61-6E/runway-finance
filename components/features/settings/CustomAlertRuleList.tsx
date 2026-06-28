@@ -433,6 +433,12 @@ function PreviewModal({
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="rounded-xl border-2 border-dashed border-border p-8 text-center space-y-4">
+      <div className="flex justify-center">
+        <Button variant="outline" size="sm" onClick={onAdd}>
+          <Plus className="h-4 w-4 mr-1.5" />
+          Create your first rule
+        </Button>
+      </div>
       <Bell className="h-8 w-8 text-muted-foreground mx-auto" />
       <div className="space-y-1">
         <p className="font-semibold text-foreground">No custom alert rules yet</p>
@@ -449,10 +455,6 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           <li>Alert when monthly net savings falls below $0 for 2 months</li>
         </ul>
       </div>
-      <Button variant="outline" size="sm" onClick={onAdd} className="mt-2">
-        <Plus className="h-4 w-4 mr-1.5" />
-        Create your first rule
-      </Button>
     </div>
   );
 }
