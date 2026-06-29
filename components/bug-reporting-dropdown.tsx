@@ -11,7 +11,8 @@ import {
   MessageSquare, 
   Check, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  Copy
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -47,6 +48,7 @@ export default function BugReportingDropdown() {
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -200,6 +202,35 @@ export default function BugReportingDropdown() {
       title: title.trim(),
       description: description.trim(),
     });
+  };
+
+  const handleCopyOpenIssues = async () => {
+    if (openIssues.length === 0) {
+      toast.error('No open issues to copy');
+      return;
+    }
+
+    const formattedIssues = openIssues.map((issue) => ({
+      id: issue.id,
+      type: issue.type,
+      title: issue.title,
+      description: issue.description,
+      status: issue.status,
+      reporter: issue.reporterName || issue.userId || 'Unknown',
+      createdAt: issue.createdAt,
+    }));
+
+    const text = JSON.stringify(formattedIssues, null, 2);
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success('Open issues copied to clipboard as JSON!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy issues to clipboard');
+      console.error(err);
+    }
   };
 
   const getStatusStyles = (status: string) => {
@@ -361,6 +392,25 @@ export default function BugReportingDropdown() {
           ) : (
             /* Tab Content: Track List */
             <div className="space-y-3">
+              {openIssues.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCopyOpenIssues}
+                  className="w-full py-1.5 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 mb-1"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      Copied {openIssues.length} open issue{openIssues.length === 1 ? '' : 's'}!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy all open issues ({openIssues.length})
+                    </>
+                  )}
+                </button>
+              )}
               {listLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 space-y-2 text-muted-foreground">
                   <Loader2 className="w-6 h-6 animate-spin" />
