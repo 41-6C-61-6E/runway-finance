@@ -540,82 +540,9 @@ export function MilestonesProjections() {
             )}
           </div>
 
-          {/* Goal Funding Timeline */}
+          {/* Projections Summary Alerts */}
           {chartGoals.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span className="text-xs font-semibold text-foreground">Goal Funding Timeline</span>
-              </div>
-
-              <div className="space-y-1.5">
-                {chartGoals.map((goal, idx) => {
-                  const isFunded = goal.isFunded;
-                  const willFund = goal.willFund;
-                  const months = goal.monthsToFund;
-
-                  return (
-                    <div
-                      key={goal.goalId}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/15 border border-border/30"
-                    >
-                      <PiggyBank className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-foreground truncate">{goal.goalName}</span>
-                          <span className="text-[10px] text-muted-foreground blur-number">
-                            {formatCurrency(goal.targetAmount)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span>{goal.accountName}</span>
-                          <span>·</span>
-                          <span>{goal.percentage}% allocated</span>
-                          {goal.reserve > 0 && (
-                            <>
-                              <span>·</span>
-                              <span>${goal.reserve} reserve</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        {isFunded ? (
-                          <div className="flex items-center gap-1 text-status-positive">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-semibold">
-                              {goal.projectedFundDate ? formatMonthYear(goal.projectedFundDate) : 'Funded'}
-                            </span>
-                          </div>
-                        ) : willFund && goal.projectedFundDate ? (
-                          <div className="flex items-center gap-1 text-foreground">
-                            <Target className="w-3 h-3 text-chart-2" />
-                            <span className="text-[10px] font-semibold">
-                              {formatMonthYear(goal.projectedFundDate)}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <AlertCircle className="w-3 h-3" />
-                            <span className="text-[10px]">5+ years</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {months !== null && months !== undefined && (
-                        <div className="w-16 text-right shrink-0">
-                          <span className="text-[10px] font-medium text-muted-foreground">
-                            {months === 0 ? 'Now' : `${months}mo`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
               {overallFundedBy && (
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-chart-1/10 border border-chart-1/20">
                   <CheckCircle2 className="w-4 h-4 text-chart-1 shrink-0" />
