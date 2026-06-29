@@ -225,7 +225,7 @@ export async function analyzeUncategorized(
           accountType = await decryptField(row.account.type, dek);
         }
         decryptedTxns.push({
-          index: i,
+          index: i + 1,
           id: tx.id,
           description: tx.description,
           payee: tx.payee,
@@ -402,6 +402,7 @@ function buildPrompt(
 
   prompt += '\n## Instructions\n';
   prompt += 'Analyze the transactions above and suggest categorizations, new categories, and rules. ';
+  prompt += 'For "categorize" suggestions, transactionIndex must be the 1-based Index matching the transaction from the table above. ';
   prompt += 'Use the category IDs from the table above when referencing existing categories. ';
   prompt += 'Respond with valid JSON only.\n';
 
@@ -605,7 +606,10 @@ function buildPayload(
 
   switch (suggestion.type) {
     case 'categorize': {
-      const tx = txns[suggestion.transactionIndex];
+      let tx = txns.find((t) => t.index === suggestion.transactionIndex);
+      if (!tx && typeof suggestion.transactionIndex === 'number') {
+        tx = txns[suggestion.transactionIndex - 1] ?? txns[suggestion.transactionIndex];
+      }
       if (!tx) return null;
 
       const categoryId = normalize(suggestion.categoryId);
