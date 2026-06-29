@@ -172,15 +172,16 @@ export async function runBackgroundRecalculation(
       }
 
       if (specificType === 'summaries' || !specificUserId) {
-        await Promise.all([
-          updateMonthlyCashFlowSummaries(userId, dek),
-          updateCategorySpendingSummaries(userId, dek),
-          updateCategoryIncomeSummaries(userId, dek),
-        ]).catch((err) => {
+        // Run sequentially to avoid saturating the connection pool
+        try {
+          await updateMonthlyCashFlowSummaries(userId, dek);
+          await updateCategorySpendingSummaries(userId, dek);
+          await updateCategoryIncomeSummaries(userId, dek);
+        } catch (err) {
           const errMsg = `Summaries: ${formatRecalculationError(err)}`;
           recalculationStatus.errors.push(errMsg);
           logger.error('[startup-recalculation] Failed to update summaries', { userId, error: err });
-        });
+        }
       }
 
       invalidateUserSearchCache(userId);

@@ -94,7 +94,8 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       { name: 'notify_budget_alerts', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'notify_large_transactions', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'large_transaction_threshold', type: 'INTEGER NOT NULL DEFAULT 500' },
-      { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
+      { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_daily_net_worth_change', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
     ];
 
     for (const col of columnsToCheck) {

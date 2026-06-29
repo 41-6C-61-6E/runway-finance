@@ -409,6 +409,62 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
   }
 }
 
+export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uint8Array) {
+  try {
+    const db = getDb();
+    const [settings] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings || !settings.notifyDailyNetWorthChange) return;
+
+    // Fetch the 2 most recent snapshots
+    const snapshots = await db
+      .select({
+        netWorth: netWorthSnapshots.netWorth,
+        snapshotDate: netWorthSnapshots.snapshotDate,
+      })
+      .from(netWorthSnapshots)
+      .where(eq(netWorthSnapshots.userId, userId))
+      .orderBy(desc(netWorthSnapshots.snapshotDate))
+      .limit(2);
+
+    if (snapshots.length < 2) return;
+
+    const currentNetWorth = parseFloat(await decryptField(snapshots[0].netWorth, dek));
+    const previousNetWorth = parseFloat(await decryptField(snapshots[1].netWorth, dek));
+
+    if (isNaN(currentNetWorth) || isNaN(previousNetWorth)) return;
+
+    const diff = currentNetWorth - previousNetWorth;
+    if (diff === 0) return;
+
+    const todayStr = snapshots[0].snapshotDate; // e.g. YYYY-MM-DD
+    const key = `daily_net_worth_change:${todayStr}`;
+
+    const formattedDiff = new Intl.NumberFormat(settings.locale || 'en-US', {
+      style: 'currency',
+      currency: settings.currency || 'USD',
+    }).format(Math.abs(diff));
+
+    const direction = diff > 0 ? 'increased' : 'decreased';
+    const arrow = diff > 0 ? '📈' : '📉';
+
+    await sendPushNotification(
+      userId,
+      `Daily Net Worth Alert ${arrow}`,
+      `Your net worth ${direction} by ${formattedDiff} today.`,
+      '/net-worth',
+      'daily_net_worth_change',
+      key
+    );
+  } catch (err) {
+    logger.error('[notifications-service] Error checking daily net worth changes:', err);
+  }
+}
+
 // ── Custom Alert Rules Checks ──────────────────────────────────────────────────
 
 import type { AlertCondition, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';

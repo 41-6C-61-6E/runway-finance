@@ -69,6 +69,7 @@ export async function GET() {
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+      notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -122,6 +123,7 @@ export async function GET() {
     notifyGoalMilestones: settings[0].notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
     notifyNetWorthMilestones: settings[0].notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
     netWorthMilestoneInterval: settings[0].netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+    notifyDailyNetWorthChange: settings[0].notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -172,6 +174,7 @@ export async function PATCH(request: Request) {
 	const notifyGoalMilestones = body.notifyGoalMilestones;
 	const notifyNetWorthMilestones = body.notifyNetWorthMilestones;
 	const netWorthMilestoneInterval = body.netWorthMilestoneInterval;
+	const notifyDailyNetWorthChange = body.notifyDailyNetWorthChange;
 	const notifyAiProposals = body.notifyAiProposals;
 	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
@@ -342,6 +345,9 @@ export async function PATCH(request: Request) {
 	if (netWorthMilestoneInterval !== undefined && (typeof netWorthMilestoneInterval !== 'number' || netWorthMilestoneInterval <= 0)) {
 		return Response.json({ error: 'Invalid netWorthMilestoneInterval value' }, { status: 400 });
 	}
+	if (notifyDailyNetWorthChange !== undefined && typeof notifyDailyNetWorthChange !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyDailyNetWorthChange value' }, { status: 400 });
+	}
 	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
 	}
@@ -401,6 +407,7 @@ export async function PATCH(request: Request) {
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
+      notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -455,6 +462,7 @@ export async function PATCH(request: Request) {
 	if (notifyGoalMilestones !== undefined) updates.notifyGoalMilestones = notifyGoalMilestones;
 	if (notifyNetWorthMilestones !== undefined) updates.notifyNetWorthMilestones = notifyNetWorthMilestones;
 	if (netWorthMilestoneInterval !== undefined) updates.netWorthMilestoneInterval = netWorthMilestoneInterval;
+	if (notifyDailyNetWorthChange !== undefined) updates.notifyDailyNetWorthChange = notifyDailyNetWorthChange;
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
 	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
 	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
@@ -649,6 +657,7 @@ export async function PATCH(request: Request) {
     notifyGoalMilestones: updated.notifyGoalMilestones,
     notifyNetWorthMilestones: updated.notifyNetWorthMilestones,
     netWorthMilestoneInterval: updated.netWorthMilestoneInterval,
+    notifyDailyNetWorthChange: updated.notifyDailyNetWorthChange,
     notifyAiProposals: updated.notifyAiProposals,
     maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,

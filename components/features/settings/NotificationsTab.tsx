@@ -54,6 +54,7 @@ export default function NotificationsTab() {
   const notifyGoalMilestones = settings.notifyGoalMilestones !== false;
   const notifyNetWorthMilestones = settings.notifyNetWorthMilestones !== false;
   const netWorthMilestoneInterval = settings.netWorthMilestoneInterval ?? 100000;
+  const notifyDailyNetWorthChange = settings.notifyDailyNetWorthChange !== false;
   const notifyAiProposals = settings.notifyAiProposals !== false;
   const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
   const notificationLimiterPeriodMinutes = settings.notificationLimiterPeriodMinutes ?? 60;
@@ -497,6 +498,22 @@ export default function NotificationsTab() {
                   />
                 </div>
               )}
+            </div>
+
+
+            {/* Daily Net Worth Change Toggle */}
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-1 pr-4">
+                <Label htmlFor="notify-daily-networth" className="font-medium text-sm text-foreground cursor-pointer">Daily Net Worth Change Alert</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receive an alert when your net worth changes from the previous day.
+                </p>
+              </div>
+              <Switch
+                id="notify-daily-networth"
+                checked={notifyDailyNetWorthChange}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyDailyNetWorthChange', checked)}
+              />
             </div>
 
             {/* AI Proposals Toggle */}
