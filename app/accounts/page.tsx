@@ -1122,10 +1122,38 @@ export default function AccountsPage() {
   }, []);
 
   const maxPoints = useMemo(() => {
-    if (windowWidth < 768) return 30;  // Mobile: ~30 points
-    if (windowWidth < 1024) return 60; // Tablet: ~60 points
-    return 100;                        // Desktop: ~100 points
-  }, [windowWidth]);
+    const isBar = chartType === 'bar';
+    if (!isBar) {
+      if (windowWidth < 768) return 30;  // Mobile: ~30 points
+      if (windowWidth < 1024) return 60; // Tablet: ~60 points
+      return 100;                        // Desktop: ~100 points
+    }
+
+    // For bar charts: limit points based on timeframe to avoid clutter, while respecting screen width
+    let limit = 30; // default
+    if (timeframe === '1m') {
+      limit = 31; // Show daily bars for 1 month
+    } else if (timeframe === '3m') {
+      limit = 30; // ~3 bars per week
+    } else if (timeframe === '6m') {
+      limit = 26; // ~1 bar per week (26 weeks)
+    } else if (timeframe === '1y' || timeframe === 'ytd') {
+      limit = 24; // ~2 bars per month
+    } else if (timeframe === '5y') {
+      limit = 30; // ~1 bar every 2 months
+    } else { // 'all'
+      limit = 30;
+    }
+
+    // Scale down for smaller screens
+    if (windowWidth < 768) {
+      return Math.min(limit, 15); // Mobile: max 15 bars
+    }
+    if (windowWidth < 1024) {
+      return Math.min(limit, 22); // Tablet: max 22 bars
+    }
+    return limit; // Desktop
+  }, [windowWidth, chartType, timeframe]);
 
   const visibleData = useMemo(() => {
     if (rechartsData.length === 0) return [];
@@ -2081,6 +2109,7 @@ export default function AccountsPage() {
                                   data={visibleData}
                                   stackOffset="sign"
                                   margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
+                                  barCategoryGap="20%"
                                 >
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                                   <XAxis
@@ -2134,6 +2163,7 @@ export default function AccountsPage() {
                                         stackId="stack"
                                         fill={info?.color || 'var(--color-chart-1)'}
                                         radius={[0, 0, 0, 0]}
+                                        maxBarSize={32}
                                       />
                                     );
                                   })}
@@ -2148,6 +2178,7 @@ export default function AccountsPage() {
                                         stackId="stack"
                                         fill={info?.color || 'var(--color-destructive)'}
                                         radius={[0, 0, 0, 0]}
+                                        maxBarSize={32}
                                       />
                                     );
                                   })}
