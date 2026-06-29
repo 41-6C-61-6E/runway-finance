@@ -322,9 +322,22 @@ export function EquityOverTimeChart() {
     return synthFiltered.filter((pt) => pt.date >= startStr && pt.date <= endStr);
   }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeframe, monthRange.start, monthRange.end]);
 
+  // Downsample the timeline to at most `maxPoints` evenly-spaced entries so
+  // the basis spline has room to curve smoothly on dense "all" timelines.
+  const displayTimeline = useMemo(() => {
+    const maxPoints = 60;
+    if (activeTimeline.length <= maxPoints) return activeTimeline;
+    const result = [];
+    const step = (activeTimeline.length - 1) / (maxPoints - 1);
+    for (let i = 0; i < maxPoints; i++) {
+      result.push(activeTimeline[Math.round(i * step)]);
+    }
+    return result;
+  }, [activeTimeline]);
+
   const xAxisTicks = useMemo(() => {
-    return getChartXTicks(activeTimeline, timeframe, 'date');
-  }, [activeTimeline, timeframe]);
+    return getChartXTicks(displayTimeline, timeframe, 'date');
+  }, [displayTimeline, timeframe]);
 
   // Map mortgage account IDs to their readable names
   const mortgageNamesMap = useMemo(() => {
@@ -340,7 +353,7 @@ export function EquityOverTimeChart() {
   // Gather all unique mortgage keys present in the filtered timeline
   const activeMortgageKeys = useMemo(() => {
     const keysSet = new Set<string>();
-    for (const point of activeTimeline) {
+    for (const point of displayTimeline) {
       for (const key of Object.keys(point)) {
         if (key.startsWith('mortgage_') && (point[key] as number) > 0) {
           keysSet.add(key);
@@ -348,7 +361,7 @@ export function EquityOverTimeChart() {
       }
     }
     return Array.from(keysSet).sort();
-  }, [activeTimeline]);
+  }, [displayTimeline]);
 
   // Color palette for individual mortgages
   const mortgageColors = useMemo(() => [
@@ -358,16 +371,16 @@ export function EquityOverTimeChart() {
   ], []);
 
   const srSummary = useMemo(() => {
-    if (activeTimeline.length === 0) return '';
-    const latestPoint = activeTimeline[activeTimeline.length - 1];
-    const firstPoint = activeTimeline[0];
+    if (displayTimeline.length === 0) return '';
+    const latestPoint = displayTimeline[displayTimeline.length - 1];
+    const firstPoint = displayTimeline[0];
     const diff = latestPoint.equity - firstPoint.equity;
     const direction = diff >= 0 ? 'increased' : 'decreased';
 
     let summaryStr = `Real estate value is currently ${formatCurrency(latestPoint.homeValue)} with ${formatCurrency(latestPoint.equity)} in equity and ${formatCurrency(latestPoint.mortgage)} in outstanding mortgages.`;
     summaryStr += ` Over the selected timeframe, your equity has ${direction} by ${formatCurrency(Math.abs(diff))}.`;
     return summaryStr;
-  }, [activeTimeline]);
+  }, [displayTimeline]);
 
   if (loading) {
     return (
@@ -449,8 +462,8 @@ export function EquityOverTimeChart() {
     );
   }
 
-  const hasEstimated = showSynth && activeTimeline.some((pt) => pt.isSynthetic);
-  const maxVal = Math.max(...activeTimeline.map((pt) => pt.homeValue), 1);
+  const hasEstimated = showSynth && displayTimeline.some((pt) => pt.isSynthetic);
+  const maxVal = Math.max(...displayTimeline.map((pt) => pt.homeValue), 1);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -574,7 +587,7 @@ export function EquityOverTimeChart() {
                 <ComposedChart
                   role="img"
                   aria-label="Equity Over Time Composed Chart"
-                  data={activeTimeline}
+                  data={displayTimeline}
                   margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
                 >
                   <defs>
@@ -633,7 +646,7 @@ export function EquityOverTimeChart() {
                   
                   {/* Home Value Area (renders behind) */}
                   <Area
-                    type="monotone"
+                    type="basis"
                     dataKey="homeValue"
                     name="Home Value"
                     stroke="var(--color-chart-2)"
@@ -644,7 +657,7 @@ export function EquityOverTimeChart() {
                   
                   {/* Equity Area (renders in front) */}
                   <Area
-                    type="monotone"
+                    type="basis"
                     dataKey="equity"
                     name="Equity"
                     stroke="var(--color-chart-1)"
@@ -660,7 +673,7 @@ export function EquityOverTimeChart() {
                     return (
                       <Area
                         key={key}
-                        type="monotone"
+                        type="basis"
                         dataKey={key}
                         name={name}
                         stroke={color}

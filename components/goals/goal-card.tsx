@@ -325,7 +325,7 @@ export function GoalCard({
                     {projection.isFunded ? (
                       <div className="flex items-center gap-1 text-status-positive text-[10px] font-semibold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{projection.projectedFundDate ? formatProjectedDate(projection.projectedFundDate) : 'Funded'} (Now)</span>
+                        <span>{projection.projectedFundDate ? formatProjectedDate(projection.projectedFundDate) : 'Funded'}</span>
                       </div>
                     ) : projection.willFund && projection.projectedFundDate ? (
                       <div className="flex flex-col items-center md:items-end">
