@@ -122,7 +122,7 @@ Respond with ONLY valid JSON matching this schema:
   "suggestions": [
     {
       "type": "categorize",
-      "transactionIndex": number,
+      "transactionIndex": number, // 1-based index matching the Index column in the Uncategorized Transactions table
       "categoryId": string | null,
       "categoryName": string | null,
       "confidence": number,
