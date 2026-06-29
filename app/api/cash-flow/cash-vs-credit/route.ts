@@ -62,6 +62,7 @@ export async function GET(request: Request) {
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
   const startMonth = searchParams.get('startMonth');
   const endMonth = searchParams.get('endMonth');
+  const includeSavings = searchParams.get('includeSavings') !== 'false';
 
   let startDate: Date;
   let endDate: Date;
@@ -103,7 +104,13 @@ export async function GET(request: Request) {
     const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
     const cashAccounts = reportableAccounts.filter(
-      (a: any) => CASH_TYPES.includes(a.type.toLowerCase())
+      (a: any) => {
+        const type = a.type.toLowerCase();
+        if (type === 'savings') {
+          return includeSavings;
+        }
+        return type === 'checking' || type === 'other';
+      }
     );
     const creditAccounts = reportableAccounts.filter(
       (a: any) => CREDIT_TYPES.includes(a.type.toLowerCase())

@@ -25,6 +25,7 @@ import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Landmark, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { getMonthRange } from '@/lib/utils/date-window';
 
 interface HistoryPoint {
@@ -113,13 +114,35 @@ export function CashVsCreditCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [includeSavings, setIncludeSavings] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('finance:cash-vs-credit:include-savings');
+      return saved !== 'false';
+    }
+    return true;
+  });
+
+  const [showNetPosition, setShowNetPosition] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('finance:cash-vs-credit:show-net-position');
+      return saved !== 'false';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('finance:cash-vs-credit:include-savings', String(includeSavings));
+  }, [includeSavings]);
+
+  useEffect(() => {
+    localStorage.setItem('finance:cash-vs-credit:show-net-position', String(showNetPosition));
+  }, [showNetPosition]);
+
   const queryParams = useMemo(() => {
     const range = getMonthRange(timeframe, windowEnd);
-    if (timeframe === 'all') {
-      return 'timeframe=all';
-    }
-    return `startMonth=${range.start}&endMonth=${range.end}`;
-  }, [timeframe, windowEnd]);
+    const base = timeframe === 'all' ? 'timeframe=all' : `startMonth=${range.start}&endMonth=${range.end}`;
+    return `${base}&includeSavings=${includeSavings}`;
+  }, [timeframe, windowEnd, includeSavings]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -188,7 +211,13 @@ export function CashVsCreditCard() {
     return (netChange / Math.abs(prevValues.netPosition)) * 100;
   }, [netChange, prevValues]);
 
-  const allValues = chartData.flatMap((d) => [d.cashOnHand, d.creditCardDebt, d.netPosition]);
+  const allValues = useMemo(() => {
+    return chartData.flatMap((d) => {
+      const vals = [d.cashOnHand, d.creditCardDebt];
+      if (showNetPosition) vals.push(d.netPosition);
+      return vals;
+    });
+  }, [chartData, showNetPosition]);
   const minVal = Math.min(...allValues, 0);
   const maxVal = Math.max(...allValues, 1);
   const yDomain: [number, number] = [minVal * 1.15, maxVal * 1.15];
@@ -233,10 +262,12 @@ export function CashVsCreditCard() {
         </TooltipHeader>
         <TooltipRow label="Cash on Hand" value={formatCurrency(point.cashOnHand)} color="var(--color-chart-1)" />
         <TooltipRow label="Credit Card Debt" value={formatCurrency(point.creditDisplay)} color="var(--color-destructive)" />
-        <TooltipRow label="Net Position" value={formatCurrency(point.netPosition)} color="var(--color-primary)" />
+        {showNetPosition && (
+          <TooltipRow label="Net Position" value={formatCurrency(point.netPosition)} color="var(--color-primary)" />
+        )}
       </ChartTooltip>
     );
-  }, []);
+  }, [showNetPosition]);
 
   if (loading) {
     return (
@@ -340,9 +371,31 @@ export function CashVsCreditCard() {
               )
             }
           >
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
-              <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
+                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="include-savings"
+                  checked={includeSavings}
+                  onCheckedChange={setIncludeSavings}
+                />
+                <label htmlFor="include-savings" className="text-xs font-medium text-foreground cursor-pointer select-none">
+                  Include Savings
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-net-position"
+                  checked={showNetPosition}
+                  onCheckedChange={setShowNetPosition}
+                />
+                <label htmlFor="show-net-position" className="text-xs font-medium text-foreground cursor-pointer select-none">
+                  Net Position
+                </label>
+              </div>
             </div>
           </CollapsibleFilterPanel>
 
@@ -454,15 +507,17 @@ export function CashVsCreditCard() {
                           strokeWidth={2}
                           activeDot={{ r: 4 }}
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="netPosition"
-                          name="Net Position"
-                          stroke="var(--color-primary)"
-                          strokeWidth={2}
-                          dot={false}
-                          activeDot={{ r: 4 }}
-                        />
+                        {showNetPosition && (
+                          <Line
+                            type="monotone"
+                            dataKey="netPosition"
+                            name="Net Position"
+                            stroke="var(--color-primary)"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                          />
+                        )}
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>

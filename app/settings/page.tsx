@@ -1099,29 +1099,7 @@ function SettingsPageBody() {
             <OnboardingChecklist />
           </div>
 
-          {/* Mobile Tab Navigation */}
-          <div className="lg:hidden mb-5 sm:mb-6">
-            <div className="flex flex-wrap gap-1.5">
-              {SETTINGS_TABS.map((tab) => {
-                const TabIcon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => goToTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border ${
-                      isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20 border-primary/50'
-                      : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
-                    }`}
-                  >
-                    <TabIcon className="w-3.5 h-3.5" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+
 
           <div className="flex flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full">
 
