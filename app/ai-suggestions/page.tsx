@@ -845,16 +845,7 @@ export default function AiSuggestionsPage() {
       }
     };
 
-    if (isEditing) {
-      confirmAction({
-        title: 'Approve Suggestion',
-        description: 'Are you sure you want to approve this suggestion with your edits? This will apply the change to your financial data.',
-        actionLabel: 'Approve',
-        onConfirm: performApproval,
-      });
-    } else {
-      await performApproval();
-    }
+    await performApproval();
   };
 
   const handleReject = async (id: string) => {
