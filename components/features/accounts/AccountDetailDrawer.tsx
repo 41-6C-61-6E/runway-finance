@@ -282,14 +282,19 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         payload.metadata = account.metadata || null;
       }
 
-      await fetch(`/api/accounts/${account.id}`, {
+      onSuccess();
+      fetch(`/api/accounts/${account.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload),
-      });
-      invalidateAllFinanceQueries(queryClient);
-      onSuccess();
+      })
+        .then(() => {
+          invalidateAllFinanceQueries(queryClient);
+        })
+        .catch((err) => {
+          console.error('Failed to update account details in background:', err);
+        });
     } finally {
       setSaving(false);
     }

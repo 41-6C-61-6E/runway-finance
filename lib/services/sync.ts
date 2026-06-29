@@ -22,7 +22,12 @@ function ms(start: number): number {
   return Date.now() - start;
 }
 
-export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, snapshotDate: string) {
+export async function createNetWorthSnapshot(
+  userId: string,
+  dek: Uint8Array,
+  snapshotDate: string,
+  options?: { skipNotifications?: boolean }
+) {
   const userAccounts = await getDb()
     .select()
     .from(accounts)
@@ -84,14 +89,16 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
       },
     });
 
-  // Call milestone checker dynamically to avoid circular imports
-  const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
-  checkNetWorthMilestonesAndNotify(userId, dek).catch((err) => {
-    logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
-  });
-  checkDailyNetWorthChangeAndNotify(userId, dek).catch((err) => {
-    logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
-  });
+  if (!options?.skipNotifications) {
+    // Call milestone checker dynamically to avoid circular imports
+    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
+    checkNetWorthMilestonesAndNotify(userId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
+    });
+    checkDailyNetWorthChangeAndNotify(userId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
+    });
+  }
 }
 
 export async function createAccountSnapshots(userId: string, dek: Uint8Array, snapshotDate: string) {
@@ -677,6 +684,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     const disabledAccounts = connection.disabledAccounts || [];
 
+    let hasNewAccounts = false;
+
     for (const sfAccount of data.accounts) {
       if (disabledAccounts.includes(sfAccount.id)) {
         logger.debug(`${LOG_TAG} Skipping sync-disabled SimpleFIN account: ${sfAccount.name} (${sfAccount.id})`);
@@ -820,6 +829,9 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       });
 
       const wasNewAccount = !orphanedAccount && !existingExternalIds.has(sfAccount.id);
+      if (wasNewAccount) {
+        hasNewAccounts = true;
+      }
       const acctDetail: {
         externalId: string;
         name: string;
@@ -1087,7 +1099,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(syncLogs.id, log.id));
 
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today);
+    await createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true });
     logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
     await createAccountSnapshots(dataUserId, dek, today);
@@ -1124,6 +1136,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       }
     }
 
+    if (hasNewAccounts) {
+      const { recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+      await recalculateNetWorthSnapshots(dataUserId, dek);
+      logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new accounts`, { userId });
+    }
+
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);
     await updateCategoryIncomeSummaries(dataUserId, dek);
@@ -1132,6 +1150,15 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[sync] Failed to check cash flow alerts:', e);
+    });
+
+    // Trigger net worth milestones and daily change alerts after all history is recalculated
+    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
+    checkNetWorthMilestonesAndNotify(dataUserId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
+    });
+    checkDailyNetWorthChangeAndNotify(dataUserId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
     });
 
     const totalDurationMs = Date.now() - startedAt;

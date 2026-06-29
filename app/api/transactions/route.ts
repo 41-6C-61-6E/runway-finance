@@ -380,12 +380,16 @@ export async function GET(request: Request) {
           const accDec = row.accountName
             ? (await decryptField(row.accountName, dek)).toLowerCase()
             : "";
+          const amountDec = decryptedAmt.toString();
+          const absAmountDec = amount.toString();
           matchesSearch =
             descDec.includes(q) ||
             payeeDec.includes(q) ||
             notesDec.includes(q) ||
             catDec.includes(q) ||
-            accDec.includes(q);
+            accDec.includes(q) ||
+            amountDec.includes(q) ||
+            absAmountDec.includes(q);
         }
         let matchesType = true;
         if (filters.type === "income") {
@@ -404,7 +408,7 @@ export async function GET(request: Request) {
       filtered = filtered.filter((f) => f.matchesType);
     }
     if (filters.minAmount !== undefined) {
-      filtered = filtered.filter((f) => f.amount > filters.minAmount!);
+      filtered = filtered.filter((f) => f.amount >= filters.minAmount!);
     }
     if (filters.maxAmount !== undefined) {
       filtered = filtered.filter((f) => f.amount <= filters.maxAmount!);
@@ -461,12 +465,16 @@ export async function GET(request: Request) {
           const accDec = row.accountName
             ? (await decryptField(row.accountName, dek)).toLowerCase()
             : "";
+          const amountDec = decryptedAmt.toString();
+          const absAmountDec = amount.toString();
           matchesSearch =
             descDec.includes(q) ||
             payeeDec.includes(q) ||
             notesDec.includes(q) ||
             catDec.includes(q) ||
-            accDec.includes(q);
+            accDec.includes(q) ||
+            amountDec.includes(q) ||
+            absAmountDec.includes(q);
         }
         let matchesType = true;
         if (filters.type === "income") {
@@ -485,7 +493,7 @@ export async function GET(request: Request) {
       filtered = filtered.filter((f) => f.matchesType);
     }
     if (filters.minAmount !== undefined) {
-      filtered = filtered.filter((f) => f.amount > filters.minAmount!);
+      filtered = filtered.filter((f) => f.amount >= filters.minAmount!);
     }
     if (filters.maxAmount !== undefined) {
       filtered = filtered.filter((f) => f.amount <= filters.maxAmount!);
@@ -695,14 +703,19 @@ export async function GET(request: Request) {
   let filtered = decryptedTxns;
   if (filters.search) {
     const q = filters.search.toLowerCase();
-    filtered = filtered.filter(
-      (t: any) =>
+    filtered = filtered.filter((t: any) => {
+      const amountDec = String(t.amount ?? "");
+      const absAmountDec = String(Math.abs(parseFloat(t.amount) || 0));
+      return (
         (String(t.description ?? "").toLowerCase().includes(q)) ||
         (String(t.payee ?? "").toLowerCase().includes(q)) ||
         (String(t.notes ?? "").toLowerCase().includes(q)) ||
         (String(t.category?.name ?? "").toLowerCase().includes(q)) ||
-        (String(t.accountName ?? "").toLowerCase().includes(q)),
-    );
+        (String(t.accountName ?? "").toLowerCase().includes(q)) ||
+        amountDec.includes(q) ||
+        absAmountDec.includes(q)
+      );
+    });
   }
 
   // Apply type filter in memory
@@ -715,7 +728,7 @@ export async function GET(request: Request) {
   // Apply amount filters in memory
   if (filters.minAmount !== undefined) {
     filtered = filtered.filter(
-      (t: any) => Math.abs(parseFloat(t.amount) || 0) > filters.minAmount!,
+      (t: any) => Math.abs(parseFloat(t.amount) || 0) >= filters.minAmount!,
     );
   }
   if (filters.maxAmount !== undefined) {
@@ -1046,11 +1059,15 @@ export async function PATCH(request: Request) {
             const catDec = row.categoryName
               ? (await decryptField(row.categoryName, dek)).toLowerCase()
               : "";
+            const amountDec = decryptedAmt.toString();
+            const absAmountDec = amount.toString();
             matchesSearch =
               descDec.includes(q) ||
               payeeDec.includes(q) ||
               notesDec.includes(q) ||
-              catDec.includes(q);
+              catDec.includes(q) ||
+              amountDec.includes(q) ||
+              absAmountDec.includes(q);
           }
           let matchesType = true;
           if (filterFields.type === "income") {
@@ -1070,7 +1087,7 @@ export async function PATCH(request: Request) {
       }
       if (filterFields.minAmount) {
         filtered = filtered.filter(
-          (f) => f.amount > parseFloat(filterFields.minAmount!),
+          (f) => f.amount >= parseFloat(filterFields.minAmount!),
         );
       }
       if (filterFields.maxAmount) {
@@ -1422,11 +1439,15 @@ export async function DELETE(request: Request) {
             const catDec = row.categoryName
               ? (await decryptField(row.categoryName, dek)).toLowerCase()
               : "";
+            const amountDec = decryptedAmt.toString();
+            const absAmountDec = amount.toString();
             matchesSearch =
               descDec.includes(q) ||
               payeeDec.includes(q) ||
               notesDec.includes(q) ||
-              catDec.includes(q);
+              catDec.includes(q) ||
+              amountDec.includes(q) ||
+              absAmountDec.includes(q);
           }
           let matchesType = true;
           if (filterFields.type === "income") {
@@ -1446,7 +1467,7 @@ export async function DELETE(request: Request) {
       }
       if (filterFields.minAmount) {
         filtered = filtered.filter(
-          (f) => f.amount > parseFloat(filterFields.minAmount!),
+          (f) => f.amount >= parseFloat(filterFields.minAmount!),
         );
       }
       if (filterFields.maxAmount) {

@@ -292,6 +292,8 @@ export async function syncPlaidConnection(
 
     const disabledAccounts = connection.disabledAccounts || [];
 
+    let hasNewAccounts = false;
+
     // 1. Process and sync accounts
     for (const plaidAcc of plaidAccountsList) {
       if (disabledAccounts.includes(plaidAcc.account_id)) {
@@ -385,6 +387,11 @@ export async function syncPlaidConnection(
       }
 
       externalIdToAccountId.set(plaidAcc.account_id, upserted.id);
+
+      const wasNewAccount = !orphanedAccount && !existingExternalIds.has(plaidAcc.account_id);
+      if (wasNewAccount) {
+        hasNewAccounts = true;
+      }
 
       // Trigger custom account balance alerts check
       const { checkAccountBalanceAlerts } = await import('@/lib/services/notifications');
@@ -504,7 +511,6 @@ export async function syncPlaidConnection(
 
       accountsSynced++;
 
-      const wasNewAccount = !orphanedAccount && !existingExternalIds.has(plaidAcc.account_id);
       accountDetails.push({
         externalId: plaidAcc.account_id,
         name: plaidAcc.name,
@@ -735,7 +741,7 @@ export async function syncPlaidConnection(
 
     // 6. Recalculate downstream calculations
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today);
+    await createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true });
     await createAccountSnapshots(dataUserId, dek, today);
 
     // Historical snapshot generation
@@ -765,6 +771,12 @@ export async function syncPlaidConnection(
       }
     }
 
+    if (hasNewAccounts) {
+      const { recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
+      await recalculateNetWorthSnapshots(dataUserId, dek);
+      logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new Plaid accounts`, { userId });
+    }
+
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);
     await updateCategoryIncomeSummaries(dataUserId, dek);
@@ -773,6 +785,15 @@ export async function syncPlaidConnection(
     const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
+    });
+
+    // Trigger net worth milestones and daily change alerts after all history is recalculated
+    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
+    checkNetWorthMilestonesAndNotify(dataUserId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
+    });
+    checkDailyNetWorthChangeAndNotify(dataUserId, dek).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
     });
 
     if (transactionsNew > 0 || transactionsUpdated > 0) {

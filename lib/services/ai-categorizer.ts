@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 import { resolveDataUserId } from '@/lib/sharing';
 import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
-import { eq, and, isNull, asc, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, asc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
@@ -155,7 +155,21 @@ export async function analyzeUncategorized(
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(transactions)
-      .where(and(eq(transactions.userId, dataUserId), isNull(transactions.categoryId), eq(transactions.deleted, false)));
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .where(
+        and(
+          eq(transactions.userId, dataUserId),
+          isNull(transactions.categoryId),
+          eq(transactions.deleted, false),
+          or(
+            and(
+              eq(accounts.isHidden, false),
+              eq(accounts.isExcludedFromNetWorth, false)
+            ),
+            eq(accounts.type, 'paystub')
+          )
+        )
+      );
     const totalUncategorized = Number(countResult[0]?.count ?? 0);
     onProgress?.(0, totalUncategorized);
     onLog?.(`Found ${totalUncategorized} uncategorized transaction(s)`);
@@ -180,11 +194,20 @@ export async function analyzeUncategorized(
         })
         .from(transactions)
         .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-        .where(and(
-          eq(transactions.userId, dataUserId),
-          isNull(transactions.categoryId),
-          eq(transactions.deleted, false),
-        ))
+        .where(
+          and(
+            eq(transactions.userId, dataUserId),
+            isNull(transactions.categoryId),
+            eq(transactions.deleted, false),
+            or(
+              and(
+                eq(accounts.isHidden, false),
+                eq(accounts.isExcludedFromNetWorth, false)
+              ),
+              eq(accounts.type, 'paystub')
+            )
+          )
+        )
         .orderBy(asc(transactions.date))
         .limit(batchSize)
         .offset(offset);

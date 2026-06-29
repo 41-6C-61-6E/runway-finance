@@ -185,7 +185,7 @@ export default function UserDropdown() {
         <TooltipContent side="bottom">User menu</TooltipContent>
       </Tooltip>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
+        <div className="absolute right-[-12px] sm:right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
           <div className="px-3 py-2 flex flex-col gap-2">
             <div className="text-sm font-medium text-foreground truncate">{session?.user?.name}</div>
             

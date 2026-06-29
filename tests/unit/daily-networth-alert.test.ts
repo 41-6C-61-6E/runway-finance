@@ -178,4 +178,30 @@ describe('Daily Net Worth Change Alert', () => {
     expect(parsedPayload.title).toContain('Daily Net Worth Alert 📉');
     expect(parsedPayload.body).toContain('decreased by $5,000.00 today');
   });
+
+  it('should not notify if snapshots are not consecutive days (e.g. 3 days apart)', async () => {
+    mockSnapshotsResponse = [
+      { netWorth: '105000', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-25' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('should notify if snapshots are 2 days apart (e.g. to handle timezone shifts)', async () => {
+    mockSnapshotsResponse = [
+      { netWorth: '105000', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-26' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).toHaveBeenCalled();
+    const [sub, payload] = mockSendNotification.mock.calls[0];
+    const parsedPayload = JSON.parse(payload);
+    expect(parsedPayload.title).toContain('Daily Net Worth Alert 📈');
+    expect(parsedPayload.body).toContain('increased by $5,000.00 today');
+  });
 });

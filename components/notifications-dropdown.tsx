@@ -5,6 +5,17 @@ import { useState, useRef, useEffect } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface UserNotification {
   id: string;
@@ -68,7 +79,11 @@ export default function NotificationsDropdown() {
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      if (target.closest('[role="dialog"]') || target.closest('[data-radix-portal]')) {
+        return;
+      }
+      if (ref.current && !ref.current.contains(target)) {
         setOpen(false);
       }
     }
@@ -168,7 +183,6 @@ export default function NotificationsDropdown() {
 
   const handleClearAll = async () => {
     if (notifications.length === 0) return;
-    if (!confirm('Are you sure you want to clear all notifications?')) return;
 
     // Optimistic UI update
     setNotifications([]);
@@ -233,7 +247,7 @@ export default function NotificationsDropdown() {
       </Tooltip>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[420px] text-foreground">
+        <div className="absolute right-[-80px] sm:right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[420px] text-foreground">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
             <span className="font-semibold text-sm">Notifications</span>
@@ -249,14 +263,29 @@ export default function NotificationsDropdown() {
                 </button>
               )}
               {notifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus:outline-none"
-                  aria-label="Clear all notifications"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus:outline-none"
+                      aria-label="Clear all notifications"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear All Notifications</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to permanently clear all notifications? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearAll}>Clear All</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
               <button
                 type="button"

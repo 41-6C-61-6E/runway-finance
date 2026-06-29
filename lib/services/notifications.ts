@@ -433,6 +433,21 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
 
     if (snapshots.length < 2) return;
 
+    // Enforce that the two snapshots are consecutive days (at most 2 days apart to handle timezone/DST offsets)
+    const date0 = new Date(snapshots[0].snapshotDate);
+    const date1 = new Date(snapshots[1].snapshotDate);
+    const diffTime = Math.abs(date0.getTime() - date1.getTime());
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    if (diffDays > 2) {
+      logger.info('[notifications-service] Skipping daily net worth change alert: snapshots are not consecutive', {
+        userId,
+        date0: snapshots[0].snapshotDate,
+        date1: snapshots[1].snapshotDate,
+        diffDays,
+      });
+      return;
+    }
+
     const currentNetWorth = parseFloat(await decryptField(snapshots[0].netWorth, dek));
     const previousNetWorth = parseFloat(await decryptField(snapshots[1].netWorth, dek));
 

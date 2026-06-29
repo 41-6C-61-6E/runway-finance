@@ -293,63 +293,64 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (body.metadata !== undefined && updated) {
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
-    const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
-    if (SNAPSHOT_TYPES.includes(decrypted.type)) {
+    // Run historical snapshots regeneration in background
+    (async () => {
       try {
-        const { readApiConfig } = await import('@/lib/services/manual-accounts');
-        const { generateAssetHistorySnapshots } = await import('@/lib/services/asset-estimator');
-        const apiConfig = await readApiConfig(userId);
-        const oldDecrypted = await decryptRow('accounts', account, dek);
-        const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
-        await generateAssetHistorySnapshots(
-          id,
-          dataUserId,
-          decrypted.type,
-          meta,
-          apiConfig,
-          dek,
-          oldMeta.purchaseDate as string | undefined,
-          oldMeta.purchasePrice as number | undefined
-        );
-      } catch (err) {
-        logger.warn(`Failed to regenerate history snapshots on PATCH for account ${id}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    } else {
-      const { isInvestmentAccount } = await import('@/lib/utils/account-scope');
-      if (isInvestmentAccount(decrypted.type)) {
-        try {
-          const { userSettings } = await import('@/lib/db/schema');
-          const [settings] = await getDb()
-            .select({ showSyntheticData: userSettings.showSyntheticData })
-            .from(userSettings)
-            .where(eq(userSettings.userId, userId))
-            .limit(1);
-          const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
-          const investmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
+        const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
+        if (SNAPSHOT_TYPES.includes(decrypted.type)) {
+          const { readApiConfig } = await import('@/lib/services/manual-accounts');
+          const { generateAssetHistorySnapshots } = await import('@/lib/services/asset-estimator');
+          const apiConfig = await readApiConfig(userId);
+          const oldDecrypted = await decryptRow('accounts', account, dek);
+          const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
+          await generateAssetHistorySnapshots(
+            id,
+            dataUserId,
+            decrypted.type,
+            meta,
+            apiConfig,
+            dek,
+            oldMeta.purchaseDate as string | undefined,
+            oldMeta.purchasePrice as number | undefined
+          );
+        } else {
+          const { isInvestmentAccount } = await import('@/lib/utils/account-scope');
+          if (isInvestmentAccount(decrypted.type)) {
+            const { userSettings } = await import('@/lib/db/schema');
+            const [settings] = await getDb()
+              .select({ showSyntheticData: userSettings.showSyntheticData })
+              .from(userSettings)
+              .where(eq(userSettings.userId, userId))
+              .limit(1);
+            const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
+            const investmentsEnabled = showSynthetic?.global !== false && showSynthetic?.investments !== false;
 
-          if (investmentsEnabled) {
-            const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } = await import('@/lib/services/account-history');
-            const today = new Date().toISOString().split('T')[0];
-            const fromDate = await getAccountEarliestCalculationDate(
-              id,
-              dataUserId,
-              decrypted.metadata,
-              dek
-            );
-            await generateHistoricalAccountSnapshots(
-              id,
-              dataUserId,
-              fromDate,
-              today,
-              dek
-            );
-            await recalculateNetWorthSnapshots(dataUserId, dek);
+            if (investmentsEnabled) {
+              const { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, getAccountEarliestCalculationDate } = await import('@/lib/services/account-history');
+              const today = new Date().toISOString().split('T')[0];
+              const fromDate = await getAccountEarliestCalculationDate(
+                id,
+                dataUserId,
+                decrypted.metadata,
+                dek
+              );
+              await generateHistoricalAccountSnapshots(
+                id,
+                dataUserId,
+                fromDate,
+                today,
+                dek
+              );
+              await recalculateNetWorthSnapshots(dataUserId, dek);
+            }
           }
-        } catch (err) {
-          logger.warn(`Failed to regenerate history snapshots on PATCH for investment account ${id}: ${err instanceof Error ? err.message : String(err)}`);
         }
+      } catch (err) {
+        logger.error(`Failed to regenerate history snapshots on PATCH in background for account ${id}`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
-    }
+    })();
   }
 
   if (

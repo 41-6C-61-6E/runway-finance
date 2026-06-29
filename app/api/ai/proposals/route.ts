@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { aiProposals, transactions, accounts, accountTags, tags } from '@/lib/db/schema';
-import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, desc, sql, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptRow, decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -19,7 +19,17 @@ export async function GET(request: Request) {
   const status = searchParams.get('status'); // optional filter
   const type = searchParams.get('type'); // optional filter
 
-  const whereConditions = [eq(aiProposals.userId, dataUserId)];
+  const whereConditions = [
+    eq(aiProposals.userId, dataUserId),
+    or(
+      isNull(accounts.id),
+      and(
+        eq(accounts.isHidden, false),
+        eq(accounts.isExcludedFromNetWorth, false)
+      ),
+      eq(accounts.type, 'paystub')
+    )
+  ];
   if (status) {
     whereConditions.push(eq(aiProposals.status, status));
   }

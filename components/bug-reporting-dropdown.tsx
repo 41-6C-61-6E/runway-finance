@@ -288,7 +288,7 @@ export default function BugReportingDropdown() {
           >
             <MessageSquare className="w-5 h-5" />
             {hasActiveIssues && (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-destructive rounded-full ring-2 ring-background" />
+              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive" />
             )}
           </button>
         </TooltipTrigger>
@@ -296,7 +296,7 @@ export default function BugReportingDropdown() {
       </Tooltip>
 
       {open && (
-        <div className="absolute right-[-72px] sm:right-0 top-full mt-1 w-[calc(100vw-32px)] sm:w-96 p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
+        <div className="absolute right-[-120px] sm:right-0 top-full mt-1 w-[calc(100vw-32px)] sm:w-96 p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
           {/* Header Tab Buttons */}
           <div className="flex p-0.5 rounded-lg bg-muted mb-4">
             <button
