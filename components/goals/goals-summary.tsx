@@ -284,13 +284,13 @@ function ProjectionPacing() {
     allFundedBy: string | null;
     accounts: Array<{ allFundedBy: string | null; goals: Array<{ willFund: boolean }> }>;
   } | null>(null);
-  const { savedInflow } = useGoalInflow();
+  const { savedInflows } = useGoalInflow();
 
   useEffect(() => {
     const params = new URLSearchParams();
     params.set('projectionMonths', '120');
-    if (savedInflow !== null && savedInflow >= 0) {
-      params.set('monthlyInflow', String(savedInflow));
+    if (savedInflows && Object.keys(savedInflows).length > 0) {
+      params.set('accountInflows', JSON.stringify(savedInflows));
     }
     fetch(`/api/goals/projections?${params.toString()}`, { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
@@ -298,15 +298,15 @@ function ProjectionPacing() {
         if (!data) return;
         const allFundedBy = data.accounts.length > 0
           ? data.accounts.reduce((latest: string | null, a: { allFundedBy: string | null }) => {
-              if (!a.allFundedBy) return latest;
-              if (!latest || a.allFundedBy > latest) return a.allFundedBy;
-              return latest;
-            }, null as string | null)
+               if (!a.allFundedBy) return latest;
+               if (!latest || a.allFundedBy > latest) return a.allFundedBy;
+               return latest;
+             }, null as string | null)
           : null;
         setProjections({ allFundedBy, accounts: data.accounts });
       })
       .catch(() => {});
-  }, [savedInflow]);
+  }, [savedInflows]);
 
   if (!projections) return null;
 

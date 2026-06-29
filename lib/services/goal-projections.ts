@@ -147,6 +147,7 @@ export async function computeGoalProjections(
   userId: string,
   overrides?: {
     monthlyInflow?: number;
+    accountInflows?: Record<string, number>;
     projectionMonths?: number;
   }
 ): Promise<ProjectionsResult> {
@@ -199,9 +200,11 @@ export async function computeGoalProjections(
     const currentBalance = parseFloat(await decryptField(accountData[0].balance, dek)) || 0;
     const accountName = await decryptField(accountData[0].name, dek);
 
-    const monthlyInflow = overrides?.monthlyInflow !== undefined
-      ? overrides.monthlyInflow
-      : await calculateMonthlyInflow(accountId, userId);
+    const monthlyInflow = overrides?.accountInflows?.[accountId] !== undefined
+      ? overrides.accountInflows[accountId]
+      : overrides?.monthlyInflow !== undefined
+        ? overrides.monthlyInflow
+        : await calculateMonthlyInflow(accountId, userId);
 
     totalMonthlyInflow += monthlyInflow;
 

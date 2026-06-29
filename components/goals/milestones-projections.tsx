@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, Save, PiggyBank, Loader2, Check } from 'lucide-react';
+import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, PiggyBank, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils/format';
 import { useGoalInflow } from './goal-inflow-context';
@@ -167,26 +167,28 @@ export function MilestonesProjections() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [inputValue, setInputValue] = useState('');
-  const [pendingInflow, setPendingInflow] = useState<number | null>(null);
-  const { savedInflow, setSavedInflow } = useGoalInflow();
+  // Per-account pending inflow inputs: accountId -> string (raw input)
+  const [pendingInputs, setPendingInputs] = useState<Record<string, string>>({});
+  const { savedInflows, setSavedInflow } = useGoalInflow();
   const hasLoadedOnce = useRef(false);
-  const debounceTimer = useRef<any>(null);
+  const debounceTimers = useRef<Record<string, any>>({});
 
   useEffect(() => {
     return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
+      for (const t of Object.values(debounceTimers.current)) {
+        clearTimeout(t);
       }
     };
   }, []);
 
-  const fetchProjections = useCallback(async (inflow: number | null) => {
+  const fetchProjections = useCallback(async (inflows: Record<string, number> | undefined) => {
     try {
       setLoading(true);
       setError(null);
       const params = new URLSearchParams();
-      if (inflow !== null && inflow >= 0) params.set('monthlyInflow', String(inflow));
+      if (inflows && Object.keys(inflows).length > 0) {
+        params.set('accountInflows', JSON.stringify(inflows));
+      }
       params.set('projectionMonths', '120');
 
       const res = await fetch(`/api/goals/projections?${params.toString()}`, { credentials: 'include' });
@@ -194,42 +196,41 @@ export function MilestonesProjections() {
       const result: ProjectionsResult = await res.json();
       setData(result);
 
+      // On first load, pre-fill inputs from savedInflows or calculated defaults
       if (!hasLoadedOnce.current) {
         hasLoadedOnce.current = true;
-        // Use saved value if available, otherwise calculated default
-        if (savedInflow !== null && savedInflow !== undefined) {
-          setInputValue(String(savedInflow));
-          setPendingInflow(savedInflow);
-        } else {
-          setPendingInflow(result.totalMonthlyInflow);
-          setInputValue(String(result.totalMonthlyInflow));
+        const inputs: Record<string, string> = {};
+        for (const acct of result.accounts) {
+          const saved = savedInflows?.[acct.accountId];
+          inputs[acct.accountId] = String(saved !== undefined ? saved : acct.monthlyInflow);
         }
+        setPendingInputs(inputs);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [savedInflow]);
+  }, [savedInflows]);
 
   useEffect(() => {
-    if (savedInflow === undefined) return;
-    fetchProjections(savedInflow);
-  }, [savedInflow, fetchProjections]);
+    if (savedInflows === undefined) return;
+    fetchProjections(savedInflows);
+  }, [savedInflows, fetchProjections]);
 
-  const adjustInflow = (delta: number) => {
-    const current = pendingInflow ?? 0;
+  const adjustInflowForAccount = (accountId: string, delta: number) => {
+    const current = parseFloat(pendingInputs[accountId] ?? '0') || 0;
     const newVal = Math.max(0, Math.round((current + delta) * 100) / 100);
-    setPendingInflow(newVal);
-    setInputValue(String(newVal));
-    setSavedInflow(newVal);
+    setPendingInputs((prev) => ({ ...prev, [accountId]: String(newVal) }));
+    setSavedInflow(accountId, newVal);
   };
 
-  const resetInflowToDefault = () => {
+  const resetInflowForAccount = (accountId: string) => {
     if (!data) return;
-    setSavedInflow(null);
-    setPendingInflow(data.totalMonthlyInflow);
-    setInputValue(String(data.totalMonthlyInflow));
+    const acct = data.accounts.find((a) => a.accountId === accountId);
+    if (!acct) return;
+    setSavedInflow(accountId, null);
+    setPendingInputs((prev) => ({ ...prev, [accountId]: String(acct.monthlyInflow) }));
   };
 
   // Build chart data: either multi-series (all accounts) or single series
@@ -326,7 +327,35 @@ export function MilestonesProjections() {
   }
 
   if (!data || data.accounts.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CollapsibleCardHeader
+          isCollapsed={collapsed}
+          onToggle={setCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary shrink-0" />
+              <span>Milestones &amp; Projections</span>
+            </div>
+          }
+        />
+        {!collapsed && (
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center text-center gap-3 py-4">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">No projections yet</p>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  Link a savings account to one of your goals to see funding timelines, balance projections, and milestone tracking here.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    );
   }
 
   // Collect all goals from chart accounts for the timeline
@@ -370,103 +399,78 @@ export function MilestonesProjections() {
             </div>
           )}
 
-          {/* Monthly Inflow Input */}
-          <div className="bg-muted/20 rounded-lg border border-border/50 p-3">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium text-foreground">Monthly Inflow</span>
-                <button
-                  onClick={resetInflowToDefault}
-                  className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors"
-                  title="Reset to calculated default"
-                >
-                  reset
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => adjustInflow(-500)}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
-                  title="Decrease by $500"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={inputValue}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setInputValue(raw);
-                    const parsed = parseFloat(raw);
-                    if (!isNaN(parsed) && parsed >= 0) {
-                      setPendingInflow(parsed);
-                      if (debounceTimer.current) {
-                        clearTimeout(debounceTimer.current);
-                      }
-                      debounceTimer.current = setTimeout(() => {
-                        setSavedInflow(parsed);
-                      }, 500);
-                    }
-                  }}
-                  className="w-28 px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm font-semibold text-center tabular-nums"
-                />
-                <button
-                  onClick={() => adjustInflow(500)}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
-                  title="Increase by $500"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                  {[500, 1000, 2500, 5000].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => {
-                        setInputValue(String(amount));
-                        setPendingInflow(amount);
-                        setSavedInflow(amount);
-                      }}
-                      className={cn(
-                        'px-2 py-1 rounded-md text-[10px] font-medium transition-all border',
-                        pendingInflow === amount
-                          ? 'bg-primary/10 text-primary border-primary/20'
-                          : 'text-muted-foreground hover:text-foreground border-transparent hover:border-border/50'
-                      )}
-                    >
-                      ${(amount / 1000).toFixed(amount >= 1000 ? 0 : 1)}k
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground font-medium h-8">
-                {loading ? (
-                  <span className="flex items-center gap-1 text-muted-foreground animate-pulse">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Saving...
-                  </span>
-                ) : savedInflow !== null ? (
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
-                    <Check className="w-3.5 h-3.5" />
-                    Auto-saved
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">Using default</span>
-                )}
-              </div>
+          {/* Monthly Inflow — per account */}
+          <div className="bg-muted/20 rounded-lg border border-border/50 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground">Monthly Inflow</span>
+              {loading && (
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Updating...
+                </span>
+              )}
             </div>
-
-            {savedInflow !== null && (
-              <div className="mt-2 text-[10px] text-chart-2 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                Saved inflow: {formatCurrency(savedInflow)}/mo — used across all projections
-              </div>
-            )}
+            {data.accounts.map((acct) => {
+              const acctInputVal = pendingInputs[acct.accountId] ?? String(acct.monthlyInflow);
+              const isSaved = savedInflows?.[acct.accountId] !== undefined;
+              return (
+                <div key={acct.accountId} className="flex flex-row items-center gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-xs text-muted-foreground truncate" title={acct.accountName}>
+                      {acct.accountName}
+                    </span>
+                    <button
+                      onClick={() => resetInflowForAccount(acct.accountId)}
+                      className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors shrink-0"
+                      title="Reset to calculated default"
+                    >
+                      reset
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => adjustInflowForAccount(acct.accountId, -500)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
+                      title="Decrease by $500"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={acctInputVal}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setPendingInputs((prev) => ({ ...prev, [acct.accountId]: raw }));
+                        const parsed = parseFloat(raw);
+                        if (!isNaN(parsed) && parsed >= 0) {
+                          if (debounceTimers.current[acct.accountId]) {
+                            clearTimeout(debounceTimers.current[acct.accountId]);
+                          }
+                          debounceTimers.current[acct.accountId] = setTimeout(() => {
+                            setSavedInflow(acct.accountId, parsed);
+                          }, 500);
+                        }
+                      }}
+                      className="w-28 px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm font-semibold text-center tabular-nums"
+                    />
+                    <button
+                      onClick={() => adjustInflowForAccount(acct.accountId, 500)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
+                      title="Increase by $500"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    {isSaved && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-500 ml-1">
+                        <Check className="w-3 h-3" />
+                        Saved
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Legend */}
