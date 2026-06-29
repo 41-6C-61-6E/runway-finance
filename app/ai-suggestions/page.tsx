@@ -128,7 +128,7 @@ function ProposalCard({
     switch (proposal.type) {
       case 'categorize':
         return (
-          <div className="p-4 bg-card border border-primary/40 rounded-lg">
+          <div className="p-5 bg-muted border border-primary/40 rounded-xl">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
@@ -164,7 +164,7 @@ function ProposalCard({
         break;
       case 'create_rule':
         return (
-          <div className="p-4 bg-card border border-primary/40 rounded-lg">
+          <div className="p-5 bg-muted border border-primary/40 rounded-xl">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
@@ -200,7 +200,7 @@ function ProposalCard({
     }
 
     return (
-      <div className="p-4 bg-card border border-primary/40 rounded-lg">
+      <div className="p-5 bg-muted border border-primary/40 rounded-xl">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
@@ -263,7 +263,7 @@ function ProposalCard({
   }
 
   return (
-    <div className="p-4 bg-card border border-border rounded-lg">
+    <div className="relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
@@ -318,7 +318,7 @@ function ProposalCard({
       </div>
 
       {proposal.type === 'categorize' && proposal.transactionDetails && (
-        <div className="mt-2.5 mb-3 grid grid-cols-2 gap-x-4 gap-y-2 p-3 rounded-lg bg-muted/30 text-[11px] font-mono text-muted-foreground border border-border/40">
+        <div className="mt-2.5 mb-3 grid grid-cols-2 gap-x-4 gap-y-2 p-3 rounded-lg bg-background/50 text-[11px] font-mono text-muted-foreground border border-border/40">
           <div>
             <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Payee</span>
             <span className="text-foreground text-xs">{proposal.transactionDetails.payee || '—'}</span>
@@ -1245,7 +1245,7 @@ export default function AiSuggestionsPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {filterStatus === 'pending' && (
               <div className="flex items-center gap-2 mb-1">
                 <input
@@ -1263,7 +1263,7 @@ export default function AiSuggestionsPage() {
             {proposals.map((proposal) => (
               <div key={proposal.id} className="flex items-start gap-3">
                 {proposal.status === 'pending' && (
-                  <div className="pt-4">
+                  <div className="pt-5">
                     <input
                       type="checkbox"
                       checked={selectedIds.has(proposal.id)}

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoalCard } from './goal-card';
 import { GoalFormDialog } from './goal-form-drawer';
-import { GoalReorder } from './goal-reorder';
-import { formatCurrency, calcGoalProgress } from '@/lib/utils/goals';
+import { formatCurrency } from '@/lib/utils/goals';
 import { useGoalInflow } from './goal-inflow-context';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Goal {
   id: string;
@@ -27,7 +28,6 @@ interface Goal {
 }
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'paused' | 'pending';
-type SortBy = 'sortOrder' | 'targetDate' | 'name' | 'progress';
 
 interface GoalProjection {
   goalId: string;
@@ -50,11 +50,16 @@ export function GoalsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('all');
-  const [sortBy, setSortBy] = useState<SortBy>('sortOrder');
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const [projections, setProjections] = useState<Map<string, GoalProjection>>(new Map());
   const { savedInflow } = useGoalInflow();
+
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [canDrag, setCanDrag] = useState(false);
+  const dragIndexRef = useRef<number | null>(null);
+  dragIndexRef.current = dragIndex;
+
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -129,35 +134,105 @@ export function GoalsList() {
     ? goals
     : goals.filter((g) => g.status === filter);
 
-  // Sort goals
-  const sorter = (a: Goal, b: Goal) => {
-    switch (sortBy) {
-      case 'sortOrder':
-        return a.sortOrder - b.sortOrder;
-      case 'targetDate':
-        if (!a.targetDate && !b.targetDate) return 0;
-        if (!a.targetDate) return 1;
-        if (!b.targetDate) return -1;
-        return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
-      case 'name':
-        return a.name.localeCompare(b.name);
-      case 'progress': {
-        const aProgress = parseFloat(a.targetAmount) > 0
-          ? Math.min((parseFloat(a.currentAmount) / parseFloat(a.targetAmount)) * 100, 100)
-          : 0;
-        const bProgress = parseFloat(b.targetAmount) > 0
-          ? Math.min((parseFloat(b.currentAmount) / parseFloat(b.targetAmount)) * 100, 100)
-          : 0;
-        return bProgress - aProgress;
-      }
-      default:
-        return 0;
-    }
-  };
+  // Sort goals by priority order
+  const sorter = (a: Goal, b: Goal) => a.sortOrder - b.sortOrder;
 
   const sortedGoals = [...filteredGoals].sort(sorter);
   const activeGoals = sortedGoals.filter((g) => g.status !== 'completed').sort(sorter);
   const completedGoals = sortedGoals.filter((g) => g.status === 'completed').sort(sorter);
+
+  // Save order of active goals to backend
+  const saveNewOrder = async (updatedActiveGoals: Goal[]) => {
+    try {
+      const updates = updatedActiveGoals.map((goal, index) => ({
+        id: goal.id,
+        sortOrder: index,
+      }));
+
+      const res = await fetch('/api/goals/bulk-reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update goal order');
+      toast.success('Goal order updated');
+    } catch (err) {
+      toast.error('Failed to save goal order');
+      console.error('Failed to save goal order:', err);
+    }
+  };
+
+  // Reorder active goals locally and trigger save
+  const handleReorderActive = (newActiveGoals: Goal[]) => {
+    setGoals((prev) => {
+      const activeIds = new Set(newActiveGoals.map(g => g.id));
+      const nonActiveGoals = prev.filter(g => !activeIds.has(g.id));
+      
+      const combined = [...newActiveGoals.map((g, idx) => ({ ...g, sortOrder: idx })), ...nonActiveGoals];
+      saveNewOrder(newActiveGoals);
+      return combined;
+    });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+    dragIndexRef.current = index;
+  };
+
+  const handleDragOver = (e: React.DragEvent, newIndex: number) => {
+    e.preventDefault();
+    const currentDragIndex = dragIndexRef.current;
+    if (currentDragIndex === null || currentDragIndex === newIndex) return;
+
+    const activeOrdered = [...goals]
+      .filter((g) => g.status !== 'completed')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    
+    if (currentDragIndex >= activeOrdered.length || newIndex >= activeOrdered.length) return;
+
+    const [draggedItem] = activeOrdered.splice(currentDragIndex, 1);
+    activeOrdered.splice(newIndex, 0, draggedItem);
+
+    const activeIds = new Set(activeOrdered.map(g => g.id));
+    const nonActiveGoals = goals.filter(g => !activeIds.has(g.id));
+    
+    const updatedGoals = [...activeOrdered.map((g, idx) => ({ ...g, sortOrder: idx })), ...nonActiveGoals];
+    setGoals(updatedGoals);
+    
+    dragIndexRef.current = newIndex;
+    setDragIndex(newIndex);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    dragIndexRef.current = null;
+    const activeOrdered = [...goals]
+      .filter((g) => g.status !== 'completed')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    saveNewOrder(activeOrdered);
+  };
+
+  const moveActiveUp = (index: number) => {
+    const activeOrdered = [...goals]
+      .filter((g) => g.status !== 'completed')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (index <= 0 || index >= activeOrdered.length) return;
+    const newActive = [...activeOrdered];
+    [newActive[index - 1], newActive[index]] = [newActive[index], newActive[index - 1]];
+    handleReorderActive(newActive);
+  };
+
+  const moveActiveDown = (index: number) => {
+    const activeOrdered = [...goals]
+      .filter((g) => g.status !== 'completed')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (index < 0 || index >= activeOrdered.length - 1) return;
+    const newActive = [...activeOrdered];
+    [newActive[index], newActive[index + 1]] = [newActive[index + 1], newActive[index]];
+    handleReorderActive(newActive);
+  };
 
   const filters: { key: FilterStatus; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: goals.length },
@@ -240,8 +315,8 @@ export function GoalsList() {
 
   return (
     <div>
-      {/* Filters & Sort */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+      {/* Filters & Actions */}
+      <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-5">
         <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit">
           {filters.map((f) => (
             <button
@@ -261,28 +336,15 @@ export function GoalsList() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-medium"
-          >
-            <option value="sortOrder">Sort: Order</option>
-            <option value="targetDate">Sort: Deadline</option>
-            <option value="name">Sort: Name</option>
-            <option value="progress">Sort: Progress</option>
-          </select>
-
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Goal
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Goal
+        </button>
       </div>
 
       {/* Active Goals Grid */}
@@ -290,16 +352,34 @@ export function GoalsList() {
         <>
           {filter !== 'completed' && (
             <div className="flex flex-col gap-4">
-              {activeGoals.map((goal) => (
-                <GoalCard
+              {activeGoals.map((goal, index) => (
+                <div
                   key={goal.id}
-                  goal={goal}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  percentage={parseFloat(goal.percentage)}
-                  reserve={parseFloat(goal.reserve)}
-                  projection={projections.get(goal.id) || null}
-                />
+                  draggable={canDrag}
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={cn(
+                    "transition-all duration-200 rounded-xl",
+                    dragIndex === index ? 'opacity-40 border border-dashed border-primary/50 bg-primary/5' : 'opacity-100'
+                  )}
+                >
+                  <GoalCard
+                    goal={goal}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    percentage={parseFloat(goal.percentage)}
+                    reserve={parseFloat(goal.reserve)}
+                    projection={projections.get(goal.id) || null}
+                    showReorderControls={true}
+                    isFirst={index === 0}
+                    isLast={index === activeGoals.length - 1}
+                    onMoveUp={() => moveActiveUp(index)}
+                    onMoveDown={() => moveActiveDown(index)}
+                    onDragHandleActive={setCanDrag}
+                    priorityIndex={index + 1}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -354,15 +434,7 @@ export function GoalsList() {
         </div>
       )}
 
-      {/* Goal Reorder - show when there are multiple active goals */}
-      {goals.filter((g) => g.status === 'active').length > 1 && (
-        <div className="mt-4">
-          <GoalReorder
-            goals={goals.filter((g) => g.status === 'active')}
-            onReorder={fetchGoals}
-          />
-        </div>
-      )}
+      {/* Goal Reorder has been consolidated directly into the main list above */}
 
       {/* Form Dialog */}
       <GoalFormDialog
