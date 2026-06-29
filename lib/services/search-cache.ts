@@ -233,12 +233,16 @@ export async function getSearchMatchingTransactionIds(
   const q = query.toLowerCase();
 
   for (const [id, tx] of entry.transactions.entries()) {
+    const amountStr = String(tx.amount || "");
+    const absAmountStr = String(Math.abs(parseFloat(tx.amount) || 0));
     if (
       tx.description.includes(q) ||
       tx.payee.includes(q) ||
       tx.notes.includes(q) ||
       tx.categoryName.includes(q) ||
-      tx.accountName.includes(q)
+      tx.accountName.includes(q) ||
+      amountStr.includes(q) ||
+      absAmountStr.includes(q)
     ) {
       matchingIds.add(id);
     }

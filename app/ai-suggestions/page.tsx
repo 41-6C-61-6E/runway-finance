@@ -811,62 +811,76 @@ export default function AiSuggestionsPage() {
     const isEditing = editingId === id;
     const modifiedPayload = isEditing ? editPayload : undefined;
 
-    confirmAction({
-      title: 'Approve Suggestion',
-      description: isEditing
-        ? 'Are you sure you want to approve this suggestion with your edits? This will apply the change to your financial data.'
-        : 'Are you sure you want to approve this AI suggestion? This will apply the change to your financial data.',
-      actionLabel: 'Approve',
-      onConfirm: async () => {
-        setProcessing(id);
-        try {
-          const body = modifiedPayload ? { payload: modifiedPayload } : {};
-          const res = await fetch(`/api/ai/proposals/${id}/approve`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            showFeedback('error', data.error || 'Failed to approve suggestion');
-          } else {
-            showFeedback('success', 'Approved.');
-          }
-          setEditingId(null);
-          setEditPayload(null);
+    const performApproval = async () => {
+      setProcessing(id);
+      // Optimistic update
+      setProposals((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p))
+      );
+      setPendingProposalsCount((prev) => Math.max(0, prev - 1));
+
+      try {
+        const body = modifiedPayload ? { payload: modifiedPayload } : {};
+        const res = await fetch(`/api/ai/proposals/${id}/approve`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          showFeedback('error', data.error || 'Failed to approve suggestion');
           await fetchProposals();
-        } catch {
-          showFeedback('error', 'Failed to approve.');
-        } finally {
-          setProcessing(null);
+        } else {
+          showFeedback('success', 'Approved.');
+          await fetchProposals();
         }
+        setEditingId(null);
+        setEditPayload(null);
+      } catch {
+        showFeedback('error', 'Failed to approve.');
+        await fetchProposals();
+      } finally {
+        setProcessing(null);
       }
-    });
+    };
+
+    if (isEditing) {
+      confirmAction({
+        title: 'Approve Suggestion',
+        description: 'Are you sure you want to approve this suggestion with your edits? This will apply the change to your financial data.',
+        actionLabel: 'Approve',
+        onConfirm: performApproval,
+      });
+    } else {
+      await performApproval();
+    }
   };
 
   const handleReject = async (id: string) => {
-    confirmAction({
-      title: 'Reject Suggestion',
-      description: 'Are you sure you want to reject this suggestion? It will be hidden and moved to your history.',
-      actionLabel: 'Reject',
-      isDestructive: true,
-      onConfirm: async () => {
-        setProcessing(id);
-        try {
-          const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
-          if (!res.ok) {
-            const data = await res.json();
-            showFeedback('error', data.error || 'Failed to reject suggestion');
-          }
-          await fetchProposals();
-        } catch {
-          showFeedback('error', 'Failed to reject suggestion.');
-        } finally {
-          setProcessing(null);
-        }
+    setProcessing(id);
+    // Optimistic update
+    setProposals((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: 'rejected' } : p))
+    );
+    setPendingProposalsCount((prev) => Math.max(0, prev - 1));
+
+    try {
+      const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const data = await res.json();
+        showFeedback('error', data.error || 'Failed to reject suggestion');
+        await fetchProposals();
+      } else {
+        showFeedback('success', 'Rejected.');
+        await fetchProposals();
       }
-    });
+    } catch {
+      showFeedback('error', 'Failed to reject suggestion.');
+      await fetchProposals();
+    } finally {
+      setProcessing(null);
+    }
   };
 
   const handleClearHistory = async () => {

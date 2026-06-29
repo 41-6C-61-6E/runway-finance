@@ -62,7 +62,12 @@ export function useDateWindow(
     const next = new Date(y, m - 1, 1);
     next.setMonth(next.getMonth() + shift);
     const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-    if (nextStr <= currentMonth) setWindowEnd(nextStr);
+    
+    const mb = MONTHS_BACK[timeframe] ?? 0;
+    const nextStart = new Date(next.getFullYear(), next.getMonth() - mb, 1);
+    const nextStartStr = `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (nextStartStr <= currentMonth) setWindowEnd(nextStr);
   };
 
   const isNextDisabled = useMemo(() => {
