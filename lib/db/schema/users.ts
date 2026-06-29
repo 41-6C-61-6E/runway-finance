@@ -165,6 +165,7 @@ export const userSettings = pgTable('user_settings', {
   notifyGoalMilestones: boolean('notify_goal_milestones').notNull().default(true),
   notifyNetWorthMilestones: boolean('notify_net_worth_milestones').notNull().default(true),
   netWorthMilestoneInterval: integer('net_worth_milestone_interval').notNull().default(100000),
+  notifyDailyNetWorthChange: boolean('notify_daily_net_worth_change').notNull().default(true),
   notifyAiProposals: boolean('notify_ai_proposals').notNull().default(true),
   maxNotificationsPerPeriod: integer('max_notifications_per_period').notNull().default(5),
   notificationLimiterPeriodMinutes: integer('notification_limiter_period_minutes').notNull().default(60),
