@@ -224,11 +224,12 @@ export default function AccountsSidebar() {
     return (
       <>
         <aside 
-          className="fixed top-0 h-screen bg-sidebar border-r border-border flex flex-col p-3 flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
+          className="fixed top-0 h-screen bg-sidebar border-r border-border flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200 z-10 hidden md:flex"
           style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
         >
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground text-center py-8">No accounts</div>
+          {/* Empty State Header */}
+          <div className="px-3 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex items-center justify-between">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Net Worth</div>
             <button
               onClick={toggleAccountsCollapsed}
               className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
@@ -237,9 +238,13 @@ export default function AccountsSidebar() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
+          {/* Empty State Body */}
+          <div className="flex-1 p-3">
+            <div className="text-sm text-muted-foreground text-center py-8">No accounts</div>
+          </div>
         </aside>
         <div
-          className="fixed top-0 z-30 cursor-col-resize hidden md:block"
+          className="fixed top-0 z-30 cursor-col-resize hidden md:block group"
           style={{
             left: `${navCollapsedWidth + accountsWidth}px`,
             width: '6px',
@@ -249,7 +254,7 @@ export default function AccountsSidebar() {
           }}
           onMouseDown={handleResizeDown}
         >
-          <div className="w-1 h-full mx-auto bg-border hover:bg-ring/50 transition-colors" />
+          <div className="w-[2px] h-full mx-auto bg-transparent group-hover:bg-ring/50 transition-colors" />
         </div>
       </>
     );
@@ -262,9 +267,9 @@ export default function AccountsSidebar() {
         style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
       >
         {/* Net Worth Header */}
-        <div className="px-3 py-3 border-b border-border bg-gradient-to-b from-muted/40 to-transparent">
+        <div className="px-3 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex flex-col justify-center">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Net Worth</div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Net Worth</div>
             <button
               onClick={toggleAccountsCollapsed}
               className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
@@ -273,7 +278,7 @@ export default function AccountsSidebar() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
-          <div className={`font-mono text-lg font-bold truncate blur-number ${
+          <div className={`font-mono text-lg font-bold truncate blur-number leading-none ${
             totalNetWorth < 0 ? 'text-destructive' : 'text-foreground'
           }`}>
             {fmt.text}
@@ -330,7 +335,7 @@ export default function AccountsSidebar() {
 
       {/* Resize Handle */}
       <div
-        className="fixed top-0 z-30 cursor-col-resize hidden md:block"
+        className="fixed top-0 z-30 cursor-col-resize hidden md:block group"
         style={{
           left: `${navCollapsedWidth + accountsWidth}px`,
           width: '6px',
@@ -340,7 +345,7 @@ export default function AccountsSidebar() {
         }}
         onMouseDown={handleResizeDown}
       >
-        <div className="w-1 h-full mx-auto bg-border hover:bg-ring/50 transition-colors" />
+        <div className="w-[2px] h-full mx-auto bg-transparent group-hover:bg-ring/50 transition-colors" />
       </div>
 
       {/* Account Detail Drawer */}

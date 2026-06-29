@@ -44,7 +44,11 @@ function formatTimeAgo(dateStr: string) {
   return `${days}d ago`;
 }
 
-export default function NotificationsDropdown() {
+interface NotificationsDropdownProps {
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function NotificationsDropdown({ onOpenChange }: NotificationsDropdownProps = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
@@ -96,6 +100,15 @@ export default function NotificationsDropdown() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
+  }, [open]);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    onOpenChangeRef.current?.(open);
   }, [open]);
 
   // Initial fetch, polling setup, and window focus sync

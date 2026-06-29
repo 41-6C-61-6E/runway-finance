@@ -34,7 +34,11 @@ const statuses = {
   feature: ['requested', 'in work', 'added', 'closed']
 };
 
-export default function BugReportingDropdown() {
+interface BugReportingDropdownProps {
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function BugReportingDropdown({ onOpenChange }: BugReportingDropdownProps = {}) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'report' | 'track'>('report');
@@ -172,6 +176,15 @@ export default function BugReportingDropdown() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
+  }, [open]);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    onOpenChangeRef.current?.(open);
   }, [open]);
 
   // Reset delete confirmation timer

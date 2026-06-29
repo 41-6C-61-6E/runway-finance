@@ -33,7 +33,11 @@ const settingsSections = [
   { id: 'advanced', label: 'Advanced', icon: ShieldAlert },
 ] as const;
 
-export default function SettingsDropdown() {
+interface SettingsDropdownProps {
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -54,6 +58,15 @@ export default function SettingsDropdown() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
+  }, [open]);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    onOpenChangeRef.current?.(open);
   }, [open]);
 
   return (

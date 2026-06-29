@@ -12,6 +12,7 @@ import { ReduceTransparencyProvider } from '@/components/reduce-transparency-pro
 import { UserSettingsProvider } from '@/components/user-settings-provider';
 import { MobileNav } from '@/components/mobile-nav';
 import { SwipeNavProvider } from '@/components/swipe-nav-provider';
+import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -96,7 +97,9 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
         className="transition-all duration-200 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
       >
         <SwipeNavProvider>
-          {children}
+          <PullToRefresh>
+            {children}
+          </PullToRefresh>
         </SwipeNavProvider>
       </div>
     </>
