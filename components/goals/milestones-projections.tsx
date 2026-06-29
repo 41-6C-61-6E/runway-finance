@@ -419,6 +419,9 @@ export function MilestonesProjections() {
                     <span className="text-xs text-muted-foreground truncate" title={acct.accountName}>
                       {acct.accountName}
                     </span>
+                    <span className="text-[10px] text-muted-foreground/60 shrink-0 tabular-nums">
+                      {formatCurrency(acct.accountBalance)}
+                    </span>
                     <button
                       onClick={() => resetInflowForAccount(acct.accountId)}
                       className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors shrink-0"
