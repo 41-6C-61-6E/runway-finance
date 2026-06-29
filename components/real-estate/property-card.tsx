@@ -118,10 +118,7 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-semibold text-foreground">{property.name}</h3>
                 {propertyType && (
-                  <span 
-                    className="goal-pill px-1.5 py-0.5 text-[9px] font-medium rounded uppercase tracking-wider"
-                    style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
-                  >
+                  <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
                     {PROPERTY_TYPE_LABELS[propertyType] || propertyType}
                   </span>
                 )}
