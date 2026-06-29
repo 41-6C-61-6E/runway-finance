@@ -19,6 +19,21 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
+  const [isBugOpen, setIsBugOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUserOpen, setIsUserOpen] = useState(false);
+
+  const isAnyDropdownOpen = isBugOpen || isNotificationsOpen || isSettingsOpen || isUserOpen;
+  const isAnyDropdownOpenRef = useRef(false);
+  
+  useEffect(() => {
+    isAnyDropdownOpenRef.current = isAnyDropdownOpen;
+    if (isAnyDropdownOpen) {
+      setIsVisible(true);
+    }
+  }, [isAnyDropdownOpen]);
+
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -31,7 +46,9 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
       // Hide only if we scroll down and are past a minimum threshold
       if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        setIsVisible(false);
+        if (!isAnyDropdownOpenRef.current) {
+          setIsVisible(false);
+        }
       } else if (currentScrollY < lastScrollY.current) {
         // Show if we scroll up
         setIsVisible(true);
@@ -55,10 +72,10 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
           isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
         }`}
       >
-        <BugReportingDropdown />
-        <NotificationsDropdown />
-        <SettingsDropdown />
-        <UserDropdown />
+        <BugReportingDropdown onOpenChange={setIsBugOpen} />
+        <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
+        <SettingsDropdown onOpenChange={setIsSettingsOpen} />
+        <UserDropdown onOpenChange={setIsUserOpen} />
       </div>
 
       {/* Mobile-only scrolling title & children container */}
@@ -77,7 +94,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
       {/* Desktop-only header bar */}
       <div 
-        className="hidden md:flex relative sticky top-0 z-40 px-6 py-4 border-b border-border/30 bg-background/45 backdrop-blur-xl flex-row items-center justify-between transition-all duration-200 w-full"
+        className="hidden md:flex relative sticky top-0 z-40 px-6 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex-row items-center justify-between transition-all duration-200 w-full"
       >
         <div className="flex items-center gap-3">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />

@@ -12,7 +12,11 @@ import { handleSignOut } from '@/components/server-actions';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
 import { toast } from 'sonner';
 
-export default function UserDropdown() {
+interface UserDropdownProps {
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
@@ -55,6 +59,15 @@ export default function UserDropdown() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
+  }, [open]);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    onOpenChangeRef.current?.(open);
   }, [open]);
 
   const fetchSyncData = async () => {
