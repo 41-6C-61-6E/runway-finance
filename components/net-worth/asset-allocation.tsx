@@ -59,7 +59,7 @@ export function AssetAllocation() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -71,8 +71,8 @@ export function AssetAllocation() {
         }
       />
       {!isCollapsed && (
-        <div className="p-5">
-          <div className="w-full bg-muted rounded-full h-3 overflow-hidden flex">
+        <div className="flex-1 flex flex-col justify-center p-5">
+          <div className="w-full bg-muted rounded-full overflow-hidden flex" style={{ height: '12px' }}>
             <div
               className="bg-chart-1 h-full transition-all"
               style={{ width: `${assetPct}%` }}

@@ -169,7 +169,7 @@ export function DebtToAssetRatio() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm h-full">
+    <div className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -181,30 +181,31 @@ export function DebtToAssetRatio() {
         }
       />
       {!isCollapsed && (
-        <div className="p-3 sm:p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl font-bold text-foreground financial-value">
-              {pct.toFixed(0)}%
-            </span>
-            <span 
-              className="goal-pill inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full"
-              style={{ '--goal-color': rating.colorVar } as React.CSSProperties}
-            >
-              {rating.label}
-            </span>
-          </div>
-
-          <div className="space-y-1.5 mb-3">
-            <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-              <div
-                className={`h-full ${RATING_PROGRESS_COLORS[rating.label]} transition-all duration-500 rounded-full`}
-                style={{ width: `${Math.min(pct, 100)}%` }}
-              />
+        <div className="flex-1 flex flex-col justify-center p-3 sm:p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-4xl font-bold text-foreground financial-value">
+                {pct.toFixed(0)}%
+              </span>
+              <span
+                className="goal-pill inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full"
+                style={{ '--goal-color': rating.colorVar } as React.CSSProperties}
+              >
+                {rating.label}
+              </span>
             </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
+            <div className="flex-1 space-y-1.5">
+              <div className="w-full bg-muted rounded-full overflow-hidden" style={{ height: '12px' }}>
+                <div
+                  className={`h-full ${RATING_PROGRESS_COLORS[rating.label]} transition-all duration-500`}
+                  style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
             </div>
           </div>
 

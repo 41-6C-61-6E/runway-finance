@@ -36,29 +36,8 @@ function NetWorthContent() {
           </div>
         )}
 
-        {showSummary && showRatio && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-            <div className="lg:col-span-2">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <div className="h-full space-y-5">
-                  <NetWorthSummary />
-                  <MathDescription chartId="netWorthSummary" />
-                </div>
-              </Suspense>
-            </div>
-            <div className="h-full">
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <div className="h-full space-y-5">
-                  <DebtToAssetRatio />
-                  <MathDescription chartId="debtToAssetRatio" />
-                </div>
-              </Suspense>
-            </div>
-          </div>
-        )}
-
-        {showSummary && !showRatio && (
-          <Suspense fallback={<div className="text-muted-foreground">Loading summary...</div>}>
+        {showSummary && (
+          <Suspense fallback={<LoadingSpinner category="summary" />}>
             <div className="space-y-5 sm:space-y-6">
               <NetWorthSummary />
               <MathDescription chartId="netWorthSummary" />
@@ -76,7 +55,15 @@ function NetWorthContent() {
         )}
 
         {showSummary && (
-          <div className="mt-5 sm:mt-6">
+          <div className="mt-5 sm:mt-6 grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
+            {showRatio && (
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <div className="h-full space-y-5">
+                  <DebtToAssetRatio />
+                  <MathDescription chartId="debtToAssetRatio" />
+                </div>
+              </Suspense>
+            )}
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <AssetAllocation />
             </Suspense>

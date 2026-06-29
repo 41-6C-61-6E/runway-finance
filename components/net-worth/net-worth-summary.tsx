@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/account-types';
 import { useShowMath } from '@/lib/hooks/use-show-math';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -25,9 +25,26 @@ interface ChartResponse {
   };
 }
 
+interface InvestmentHistoryPoint {
+  date: string;
+  value: number;
+}
+
+interface InvestmentHistoryResponse {
+  data: InvestmentHistoryPoint[];
+  summary: {
+    current: number;
+    previous: number;
+    change: number;
+    percentChange: number;
+  };
+}
+
 export function NetWorthSummary() {
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
+  const [investmentData, setInvestmentData] = useState<InvestmentHistoryPoint[]>([]);
+  const [investmentSummary, setInvestmentSummary] = useState<InvestmentHistoryResponse['summary'] | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
   const { enabled: showMath } = useShowMath();
   const [loading, setLoading] = useState(true);
@@ -40,9 +57,10 @@ export function NetWorthSummary() {
       try {
         setLoading(true);
         setError(null);
-        const [accountsRes, chartRes] = await Promise.all([
+        const [accountsRes, chartRes, investRes] = await Promise.all([
           fetch('/api/accounts'),
           fetch('/api/net-worth/chart?timeframe=1y'),
+          fetch('/api/investments/history?timeframe=1y'),
         ]);
         if (!accountsRes.ok || !chartRes.ok) throw new Error('Failed to fetch data');
         const [accountsData, chartResponse]: [AccountData[], ChartResponse] = await Promise.all([
@@ -52,6 +70,11 @@ export function NetWorthSummary() {
         setAccounts(accountsData);
         setChartData(chartResponse.data || []);
         setHasEstimated((chartResponse.data ?? []).some((d: ChartPoint) => d.isSynthetic));
+        if (investRes.ok) {
+          const investResponse: InvestmentHistoryResponse = await investRes.json();
+          setInvestmentData(investResponse.data || []);
+          setInvestmentSummary(investResponse.summary || null);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -64,6 +87,7 @@ export function NetWorthSummary() {
   const totals = useMemo(() => {
     let totalAssets = 0;
     let totalLiabilities = 0;
+    let totalInvestments = 0;
     const assetByType: Record<string, number> = {};
     const liabilityByType: Record<string, number> = {};
 
@@ -72,6 +96,9 @@ export function NetWorthSummary() {
       if (isAssetAccount(acc.type)) {
         totalAssets += balance;
         assetByType[acc.type] = (assetByType[acc.type] || 0) + balance;
+        if (isInvestmentAccount(acc.type)) {
+          totalInvestments += balance;
+        }
       } else if (isLiabilityAccount(acc.type)) {
         const abs = Math.abs(balance);
         totalLiabilities += abs;
@@ -79,7 +106,7 @@ export function NetWorthSummary() {
       }
     }
 
-    return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities, assetByType, liabilityByType };
+    return { totalAssets, totalLiabilities, totalInvestments, netWorth: totalAssets - totalLiabilities, assetByType, liabilityByType };
   }, [accounts]);
 
   const traces = useMemo(() => showMath ? buildNetWorthTraces(accounts) : [], [accounts, showMath]);
@@ -124,6 +151,7 @@ export function NetWorthSummary() {
   const assetHistory = useMemo(() => processedData.map((d) => d.totalAssets), [processedData]);
   const liabilityHistory = useMemo(() => processedData.map((d) => d.totalLiabilities), [processedData]);
   const netWorthHistory = useMemo(() => processedData.map((d) => d.netWorth), [processedData]);
+  const investmentHistory = useMemo(() => investmentData.map((d) => d.value), [investmentData]);
 
   const assetTrendPositive = useMemo(
     () => assetHistory.length >= 2 && assetHistory[assetHistory.length - 1] >= assetHistory[0],
@@ -136,6 +164,10 @@ export function NetWorthSummary() {
   const netWorthTrendPositive = useMemo(
     () => netWorthHistory.length >= 2 && netWorthHistory[netWorthHistory.length - 1] >= netWorthHistory[0],
     [netWorthHistory]
+  );
+  const investmentTrendPositive = useMemo(
+    () => investmentHistory.length >= 2 && investmentHistory[investmentHistory.length - 1] >= investmentHistory[0],
+    [investmentHistory]
   );
 
   const deltas = useMemo(() => {
@@ -155,21 +187,24 @@ export function NetWorthSummary() {
     };
   }, [processedData]);
 
+  const investmentDelta = investmentSummary?.change ?? 0;
+  const investmentPct = investmentSummary?.percentChange ?? 0;
+
   const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean, trace?: CalculationTrace) => (
-    <div className="p-5">
-      <div className="flex items-center justify-between sm:justify-start gap-0 sm:gap-3 mb-3">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+    <div className="p-4 sm:p-5">
+      <div className="flex items-center justify-between sm:justify-start gap-0 sm:gap-3 mb-2 sm:mb-3">
+        <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</h3>
         <Sparkline data={history} width={80} height={20} isPositive={trendPositive} />
       </div>
-      <div className="flex flex-row sm:flex-col items-start sm:items-stretch justify-between sm:justify-start gap-2 sm:gap-1">
-        <div className="text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
-        <div className="text-right sm:text-left">
-          <div className={`flex items-center gap-1 text-sm font-medium justify-end sm:justify-start ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+      <div className="flex flex-col gap-1">
+        <div className="text-xl sm:text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
+        <div>
+          <div className={`flex items-center gap-1 text-xs font-medium ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
             <span>{delta >= 0 ? '↑' : '↓'}</span>
             <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
-            <span className="text-xs opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
+            <span className="opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
           </div>
-          <div className="text-xs text-muted-foreground mt-1">in the last 1 year</div>
+          <div className="text-xs text-muted-foreground mt-0.5">in the last 1 year</div>
         </div>
       </div>
       {showMath && trace && <CalculationTraceOverlay trace={trace} />}
@@ -191,8 +226,8 @@ export function NetWorthSummary() {
         />
         {!isCollapsed && (
           <div className="animate-pulse">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border h-full">
-              {[1, 2, 3].map((i) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border h-full">
+              {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="p-5 space-y-3">
                   <div className="h-4 bg-muted rounded w-24" />
                   <div className="h-8 bg-muted rounded w-32" />
@@ -241,11 +276,12 @@ export function NetWorthSummary() {
         }
       />
       {!isCollapsed && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-        {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
-        {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, !liabilityTrendPositive, traces[1])}
-        {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
-      </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+          {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
+          {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, !liabilityTrendPositive, traces[1])}
+          {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
+          {section('Investments', totals.totalInvestments, investmentDelta, investmentPct, investmentHistory, investmentTrendPositive, undefined)}
+        </div>
       )}
     </div>
   );
