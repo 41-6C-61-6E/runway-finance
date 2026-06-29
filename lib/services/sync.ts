@@ -85,9 +85,12 @@ export async function createNetWorthSnapshot(userId: string, dek: Uint8Array, sn
     });
 
   // Call milestone checker dynamically to avoid circular imports
-  const { checkNetWorthMilestonesAndNotify } = await import('@/lib/services/notifications');
+  const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
   checkNetWorthMilestonesAndNotify(userId, dek).catch((err) => {
     logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
+  });
+  checkDailyNetWorthChangeAndNotify(userId, dek).catch((err) => {
+    logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
   });
 }
 
