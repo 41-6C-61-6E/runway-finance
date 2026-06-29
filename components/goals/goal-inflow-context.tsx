@@ -3,43 +3,58 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 interface InflowContextValue {
-  savedInflow: number | null | undefined;
-  setSavedInflow: (value: number | null) => void;
+  savedInflows: Record<string, number> | undefined;
+  setSavedInflow: (accountId: string, value: number | null) => void;
 }
 
 const InflowContext = createContext<InflowContextValue>({
-  savedInflow: undefined,
+  savedInflows: undefined,
   setSavedInflow: () => {},
 });
 
-const STORAGE_KEY = 'rf-goal-saved-inflow';
+const STORAGE_KEY = 'rf-goal-saved-inflows-by-account';
 
 export function GoalInflowProvider({ children }: { children: ReactNode }) {
-  const [savedInflow, setSavedInflowState] = useState<number | null | undefined>(undefined);
+  const [savedInflows, setSavedInflowsState] = useState<Record<string, number> | undefined>(undefined);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored !== null) {
-      const parsed = parseFloat(stored);
-      if (!isNaN(parsed) && parsed >= 0) {
-        setSavedInflowState(parsed);
-        return;
+      try {
+        const parsed = JSON.parse(stored);
+        if (typeof parsed === 'object' && parsed !== null) {
+          // Validate values are numbers
+          const cleaned: Record<string, number> = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            if (typeof v === 'number' && !isNaN(v) && v >= 0) {
+              cleaned[k] = v;
+            }
+          }
+          setSavedInflowsState(cleaned);
+          return;
+        }
+      } catch {
+        // ignore parse errors
       }
     }
-    setSavedInflowState(null);
+    setSavedInflowsState({});
   }, []);
 
-  const setSavedInflow = useCallback((value: number | null) => {
-    setSavedInflowState(value);
-    if (value !== null) {
-      localStorage.setItem(STORAGE_KEY, String(value));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+  const setSavedInflow = useCallback((accountId: string, value: number | null) => {
+    setSavedInflowsState((prev) => {
+      const next = { ...(prev || {}) };
+      if (value !== null) {
+        next[accountId] = value;
+      } else {
+        delete next[accountId];
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   return (
-    <InflowContext.Provider value={{ savedInflow, setSavedInflow }}>
+    <InflowContext.Provider value={{ savedInflows, setSavedInflow }}>
       {children}
     </InflowContext.Provider>
   );

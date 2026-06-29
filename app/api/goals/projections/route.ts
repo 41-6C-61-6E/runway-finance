@@ -12,12 +12,14 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const monthlyInflowParam = searchParams.get('monthlyInflow');
+  const accountInflowsParam = searchParams.get('accountInflows');
   const lookbackMonthsParam = searchParams.get('lookbackMonths');
   const projectionMonthsParam = searchParams.get('projectionMonths');
 
   try {
     const overrides: {
       monthlyInflow?: number;
+      accountInflows?: Record<string, number>;
       lookbackMonths?: number;
       projectionMonths?: number;
     } = {};
@@ -26,6 +28,17 @@ export async function GET(req: NextRequest) {
       const parsed = parseFloat(monthlyInflowParam);
       if (!isNaN(parsed) && parsed >= 0) {
         overrides.monthlyInflow = parsed;
+      }
+    }
+
+    if (accountInflowsParam !== null) {
+      try {
+        const parsed = JSON.parse(accountInflowsParam);
+        if (typeof parsed === 'object' && parsed !== null) {
+          overrides.accountInflows = parsed;
+        }
+      } catch {
+        // ignore parsing errors
       }
     }
 

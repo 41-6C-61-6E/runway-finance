@@ -53,7 +53,7 @@ export function GoalsList() {
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const [projections, setProjections] = useState<Map<string, GoalProjection>>(new Map());
-  const { savedInflow } = useGoalInflow();
+  const { savedInflows } = useGoalInflow();
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [canDrag, setCanDrag] = useState(false);
@@ -67,8 +67,8 @@ export function GoalsList() {
       setError(null);
       const projParams = new URLSearchParams();
       projParams.set('projectionMonths', '120');
-      if (savedInflow !== null && savedInflow >= 0) {
-        projParams.set('monthlyInflow', String(savedInflow));
+      if (savedInflows && Object.keys(savedInflows).length > 0) {
+        projParams.set('accountInflows', JSON.stringify(savedInflows));
       }
       const [goalsRes, projRes] = await Promise.all([
         fetch('/api/financial-goals', { credentials: 'include' }),
@@ -93,7 +93,7 @@ export function GoalsList() {
     } finally {
       setLoading(false);
     }
-  }, [savedInflow]);
+  }, [savedInflows]);
 
   useEffect(() => {
     fetchGoals();
