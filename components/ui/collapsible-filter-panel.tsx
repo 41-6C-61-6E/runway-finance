@@ -48,7 +48,7 @@ export function CollapsibleFilterPanel({
 
           {/* Selected Filter/Date Range Feedback (displays only whole indicators that fit) */}
           {feedback && (
-            <div className="text-[11px] font-medium text-muted-foreground flex flex-wrap items-center gap-1.5 overflow-hidden max-h-[26px] py-0.5 min-w-0 flex-1 [&_span]:shrink-0">
+            <div className="text-[11px] font-medium text-muted-foreground flex flex-wrap items-center gap-1.5 overflow-hidden max-h-[20px] py-0 min-w-0 flex-1 [&_span]:shrink-0">
               {feedback}
             </div>
           )}

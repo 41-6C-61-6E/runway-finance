@@ -151,7 +151,13 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       const res = await fetch(`/api/notifications/${id}/read`, {
         method: 'POST',
       });
-      if (!res.ok) {
+      if (res.ok) {
+        try {
+          const bc = new BroadcastChannel('notification-updates');
+          bc.postMessage({ type: 'REFRESH' });
+          bc.close();
+        } catch (_) {}
+      } else {
         throw new Error('Failed to update status on server');
       }
     } catch (err) {
@@ -175,6 +181,11 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       });
       if (res.ok) {
         toast.success('All notifications marked as read.');
+        try {
+          const bc = new BroadcastChannel('notification-updates');
+          bc.postMessage({ type: 'REFRESH' });
+          bc.close();
+        } catch (_) {}
       } else {
         throw new Error('Failed to update status on server');
       }
@@ -197,21 +208,23 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
   const handleClearAll = async () => {
     if (notifications.length === 0) return;
 
-    // Optimistic UI update
-    setNotifications([]);
-
     try {
       const res = await fetch('/api/notifications', {
         method: 'DELETE',
       });
       if (res.ok) {
+        setNotifications([]);
         toast.success('All notifications cleared.');
+        try {
+          const bc = new BroadcastChannel('notification-updates');
+          bc.postMessage({ type: 'REFRESH' });
+          bc.close();
+        } catch (_) {}
       } else {
         throw new Error('Failed to delete on server');
       }
     } catch (err) {
       console.error('Error clearing notifications:', err);
-      fetchNotifications();
     }
   };
 
@@ -223,7 +236,13 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       const res = await fetch(`/api/notifications/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) {
+      if (res.ok) {
+        try {
+          const bc = new BroadcastChannel('notification-updates');
+          bc.postMessage({ type: 'REFRESH' });
+          bc.close();
+        } catch (_) {}
+      } else {
         throw new Error('Failed to delete on server');
       }
     } catch (err) {

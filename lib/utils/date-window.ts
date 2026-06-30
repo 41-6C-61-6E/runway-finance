@@ -31,7 +31,16 @@ export function snapToPeriod(ym: string, timeframe: TimeRange): string {
     case '1y': { sm = 12; break; }
     default: break;
   }
-  if (timeframe !== '1y' && timeframe !== '5y' && (sy > cy || (sy === cy && sm > cm))) return getCurrentMonth();
+  // Ensure the range does not start in the future
+  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
+  const start = new Date(sy, sm - 1 - monthsBack, 1);
+  const startYm = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+  const currentYm = getCurrentMonth();
+
+  if (startYm > currentYm) {
+    return snapToPeriod(currentYm, timeframe);
+  }
+
   return `${sy}-${String(sm).padStart(2, '0')}`;
 }
 
