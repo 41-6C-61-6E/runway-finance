@@ -375,10 +375,9 @@ export function MobileNav() {
       ` }} />
 
       <nav
-        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-2 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-all duration-300 max-w-lg mx-auto"
+        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-2 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-colors duration-300 max-w-lg mx-auto"
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
-          transform: 'translate3d(0, 0, 0)',
         }}
       >
         {activeHomeNavItems.map((item) => {

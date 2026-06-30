@@ -43,10 +43,11 @@ export function useDateWindow(
   };
 
   useEffect(() => {
-    if (controlledTimeframe !== undefined) {
-      setWindowEnd((prev) => snapToPeriod(prev, controlledTimeframe));
+    const snapped = snapToPeriod(windowEnd, timeframe);
+    if (snapped !== windowEnd) {
+      setWindowEnd(snapped);
     }
-  }, [controlledTimeframe, setWindowEnd]);
+  }, [timeframe, windowEnd, setWindowEnd]);
 
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 
