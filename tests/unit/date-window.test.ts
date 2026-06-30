@@ -71,6 +71,14 @@ describe('date-window utilities', () => {
     it('snaps to December for 1y', () => {
       expect(snapToPeriod('2026-05', '1y')).toBe('2026-12');
     });
+
+    it('snaps future 1y to current year December', () => {
+      expect(snapToPeriod('2027-05', '1y')).toBe('2026-12');
+    });
+
+    it('snaps future 1m to current month', () => {
+      expect(snapToPeriod('2026-12', '1m')).toBe('2026-06');
+    });
   });
 
   describe('formatMonth', () => {
