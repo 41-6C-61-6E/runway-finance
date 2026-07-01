@@ -159,7 +159,7 @@ export const userSettings = pgTable('user_settings', {
   notifySyncErrors: boolean('notify_sync_errors').notNull().default(true),
   notifyBudgetAlerts: boolean('notify_budget_alerts').notNull().default(true),
   notifyLargeTransactions: boolean('notify_large_transactions').notNull().default(true),
-  largeTransactionThreshold: integer('large_transaction_threshold').notNull().default(500),
+  largeTransactionThreshold: integer('large_transaction_threshold').notNull().default(100),
   notifyMonthlySummary: boolean('notify_monthly_summary').notNull().default(true),
   budgetAlertThreshold: integer('budget_alert_threshold').notNull().default(80),
   notifyGoalMilestones: boolean('notify_goal_milestones').notNull().default(true),
