@@ -934,19 +934,19 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               logger.error('[sync] Failed to run custom transaction alert checks:', e);
             });
 
-            // Large transaction alert check
+            // Transaction alert check
             if (settings?.notifyLargeTransactions) {
               const absAmount = Math.abs(amountNum);
-              if (absAmount >= (settings.largeTransactionThreshold ?? 500)) {
+              if (absAmount >= (settings.largeTransactionThreshold ?? 100)) {
                 const decDesc = sfTx.description;
                 const { sendPushNotification } = await import('@/lib/services/notifications');
                 sendPushNotification(
                   userId,
-                  `Large Transaction Alert`,
+                  `Transaction Alert`,
                   `New transaction of $${absAmount.toFixed(2)} at ${decDesc}.`,
                   '/transactions'
                 ).catch((e) => {
-                  logger.error('[sync] Failed to send large transaction notification:', e);
+                  logger.error('[sync] Failed to send transaction notification:', e);
                 });
               }
             }

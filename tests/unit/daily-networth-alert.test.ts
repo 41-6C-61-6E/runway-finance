@@ -110,6 +110,7 @@ describe('Daily Net Worth Change Alert', () => {
       currency: 'USD',
       maxNotificationsPerPeriod: 5,
       notificationLimiterPeriodMinutes: 60,
+      dailyNetWorthAlertTime: '00:00',
     };
     mockSnapshotsResponse = [];
     mockSubscriptionsResponse = [{ id: 'sub_1', endpoint: 'https://fcm.googleapis.com/...', keys: { p256dh: 'p256', auth: 'auth' } }];

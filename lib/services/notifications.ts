@@ -318,7 +318,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
       const threshold = settings.budgetAlertThreshold ?? 80;
       const warningThresholdAmount = budget.amount * (threshold / 100);
 
-      if (actualSpent >= budget.amount) {
+      if (actualSpent > budget.amount) {
         const exceededKey = `budget:${currentMonth}:${budgetCatId}:100`;
         const roundedActual = Math.round(actualSpent);
         const roundedBudget = Math.round(budget.amount);
@@ -334,10 +334,11 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
         const warningKey = `budget:${currentMonth}:${budgetCatId}:threshold`;
         const roundedActual = Math.round(actualSpent);
         const roundedBudget = Math.round(budget.amount);
+        const actualPercentage = Math.round((actualSpent / budget.amount) * 100);
         await sendPushNotification(
           userId,
           `Budget Warning: ${budget.categoryName}`,
-          `You've spent $${roundedActual} (${threshold}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
+          `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
           '/budgets',
           'budget_alert',
           warningKey

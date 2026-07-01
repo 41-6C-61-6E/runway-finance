@@ -48,7 +48,7 @@ export default function NotificationsTab() {
   const notifySyncErrors = settings.notifySyncErrors !== false;
   const notifyBudgetAlerts = settings.notifyBudgetAlerts !== false;
   const notifyLargeTransactions = settings.notifyLargeTransactions !== false;
-  const largeTransactionThreshold = settings.largeTransactionThreshold ?? 500;
+  const largeTransactionThreshold = settings.largeTransactionThreshold ?? 100;
   const notifyMonthlySummary = settings.notifyMonthlySummary !== false;
   const budgetAlertThreshold = settings.budgetAlertThreshold ?? 80;
   const notifyGoalMilestones = settings.notifyGoalMilestones !== false;
@@ -422,13 +422,13 @@ export default function NotificationsTab() {
               )}
             </div>
 
-            {/* Large Transactions Toggle & Input */}
+            {/* Transaction Alerts Toggle & Input */}
             <div className="py-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="space-y-1 pr-4">
-                  <Label htmlFor="notify-large" className="font-medium text-sm text-foreground cursor-pointer">Large Transaction Alerts</Label>
+                  <Label htmlFor="notify-large" className="font-medium text-sm text-foreground cursor-pointer">Transaction Alerts</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Receive alerts when a newly imported transaction exceeds a specific currency limit.
+                    Receive alerts when a newly imported transaction exceeds a specific threshold.
                   </p>
                 </div>
                 <Switch
