@@ -420,6 +420,23 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
 
     if (!settings || !settings.notifyDailyNetWorthChange) return;
 
+    // Gate on the user's preferred alert time — skip if current time hasn't reached it yet.
+    // The next sync after the alert time will trigger the notification (dedup key prevents duplicates).
+    const alertTime = settings.dailyNetWorthAlertTime || '18:00';
+    const userTz = settings.timezone || 'America/New_York';
+    const nowInUserTz = new Date(new Date().toLocaleString('en-US', { timeZone: userTz }));
+    const [alertHour, alertMinute] = alertTime.split(':').map(Number);
+    const currentMinutes = nowInUserTz.getHours() * 60 + nowInUserTz.getMinutes();
+    const alertMinutes = alertHour * 60 + alertMinute;
+    if (currentMinutes < alertMinutes) {
+      logger.debug('[notifications-service] Skipping daily net worth change alert: before configured alert time', {
+        userId,
+        alertTime,
+        currentTime: `${nowInUserTz.getHours()}:${String(nowInUserTz.getMinutes()).padStart(2, '0')}`,
+      });
+      return;
+    }
+
     // Fetch the 2 most recent snapshots
     const snapshots = await db
       .select({
@@ -454,10 +471,11 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     if (isNaN(currentNetWorth) || isNaN(previousNetWorth)) return;
 
     const diff = currentNetWorth - previousNetWorth;
-    if (diff === 0) return;
+    // Use a 1-cent threshold to avoid floating-point noise producing "$0.00" alerts
+    if (Math.abs(diff) < 0.01) return;
 
-    const todayStr = snapshots[0].snapshotDate; // e.g. YYYY-MM-DD
-    const key = `daily_net_worth_change:${todayStr}`;
+    const snapshotDateStr = snapshots[0].snapshotDate; // e.g. YYYY-MM-DD
+    const key = `daily_net_worth_change:${snapshotDateStr}`;
 
     const formattedDiff = new Intl.NumberFormat(settings.locale || 'en-US', {
       style: 'currency',
@@ -467,10 +485,13 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     const direction = diff > 0 ? 'increased' : 'decreased';
     const arrow = diff > 0 ? '📈' : '📉';
 
+    const actualToday = new Date().toISOString().split('T')[0];
+    const timePhrase = snapshotDateStr === actualToday ? 'today' : `on ${snapshotDateStr}`;
+
     await sendPushNotification(
       userId,
       `Daily Net Worth Alert ${arrow}`,
-      `Your net worth ${direction} by ${formattedDiff} today.`,
+      `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
       '/net-worth',
       'daily_net_worth_change',
       key

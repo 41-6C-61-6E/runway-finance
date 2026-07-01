@@ -91,12 +91,9 @@ export async function createNetWorthSnapshot(
 
   if (!options?.skipNotifications) {
     // Call milestone checker dynamically to avoid circular imports
-    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
+    const { checkNetWorthMilestonesAndNotify } = await import('@/lib/services/notifications');
     checkNetWorthMilestonesAndNotify(userId, dek).catch((err) => {
       logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
-    });
-    checkDailyNetWorthChangeAndNotify(userId, dek).catch((err) => {
-      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
     });
   }
 }
@@ -1099,7 +1096,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(syncLogs.id, log.id));
 
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true });
+    await createNetWorthSnapshot(dataUserId, dek, today);
     logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
     await createAccountSnapshots(dataUserId, dek, today);
@@ -1152,14 +1149,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       logger.error('[sync] Failed to check cash flow alerts:', e);
     });
 
-    // Trigger net worth milestones and daily change alerts after all history is recalculated
-    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
-    checkNetWorthMilestonesAndNotify(dataUserId, dek).catch((err) => {
-      logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
-    });
-    checkDailyNetWorthChangeAndNotify(dataUserId, dek).catch((err) => {
-      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
-    });
+
 
     const totalDurationMs = Date.now() - startedAt;
     if (transactionsNew > 0 || transactionsUpdated > 0) {

@@ -741,7 +741,7 @@ export async function syncPlaidConnection(
 
     // 6. Recalculate downstream calculations
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true });
+    await createNetWorthSnapshot(dataUserId, dek, today);
     await createAccountSnapshots(dataUserId, dek, today);
 
     // Historical snapshot generation
@@ -785,15 +785,6 @@ export async function syncPlaidConnection(
     const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
-    });
-
-    // Trigger net worth milestones and daily change alerts after all history is recalculated
-    const { checkNetWorthMilestonesAndNotify, checkDailyNetWorthChangeAndNotify } = await import('@/lib/services/notifications');
-    checkNetWorthMilestonesAndNotify(dataUserId, dek).catch((err) => {
-      logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
-    });
-    checkDailyNetWorthChangeAndNotify(dataUserId, dek).catch((err) => {
-      logger.error(`${LOG_TAG} Failed to run daily net worth change check:`, err);
     });
 
     if (transactionsNew > 0 || transactionsUpdated > 0) {

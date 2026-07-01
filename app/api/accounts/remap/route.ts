@@ -231,7 +231,7 @@ export async function POST(request: Request) {
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
       createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today),
+      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
       updateMonthlyCashFlowSummaries(dataUserId, dek),
       updateCategorySpendingSummaries(dataUserId, dek),
       updateCategoryIncomeSummaries(dataUserId, dek),

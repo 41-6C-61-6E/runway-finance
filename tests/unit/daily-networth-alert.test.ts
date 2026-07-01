@@ -161,7 +161,7 @@ describe('Daily Net Worth Change Alert', () => {
     const [sub, payload] = mockSendNotification.mock.calls[0];
     const parsedPayload = JSON.parse(payload);
     expect(parsedPayload.title).toContain('Daily Net Worth Alert 📈');
-    expect(parsedPayload.body).toContain('increased by $5,000.00 today');
+    expect(parsedPayload.body).toContain('increased by $5,000.00');
   });
 
   it('should send a negative notification if net worth decreased', async () => {
@@ -176,7 +176,7 @@ describe('Daily Net Worth Change Alert', () => {
     const [sub, payload] = mockSendNotification.mock.calls[0];
     const parsedPayload = JSON.parse(payload);
     expect(parsedPayload.title).toContain('Daily Net Worth Alert 📉');
-    expect(parsedPayload.body).toContain('decreased by $5,000.00 today');
+    expect(parsedPayload.body).toContain('decreased by $5,000.00');
   });
 
   it('should not notify if snapshots are not consecutive days (e.g. 3 days apart)', async () => {
@@ -202,6 +202,62 @@ describe('Daily Net Worth Change Alert', () => {
     const [sub, payload] = mockSendNotification.mock.calls[0];
     const parsedPayload = JSON.parse(payload);
     expect(parsedPayload.title).toContain('Daily Net Worth Alert 📈');
-    expect(parsedPayload.body).toContain('increased by $5,000.00 today');
+    expect(parsedPayload.body).toContain('increased by $5,000.00');
+  });
+
+  it('should not notify if net worth change is below 1 cent (floating point noise)', async () => {
+    mockSnapshotsResponse = [
+      { netWorth: '100000.000000001', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-27' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('should not notify for negative floating point noise', async () => {
+    mockSnapshotsResponse = [
+      { netWorth: '99999.999999999', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-27' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('should not notify if current time is before the dailyNetWorthAlertTime setting', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-30T16:00:00Z')); // 12:00 PM America/New_York (UTC-4)
+    
+    mockSettingsResponse.timezone = 'America/New_York';
+    mockSettingsResponse.dailyNetWorthAlertTime = '13:00'; // 1:00 PM
+    mockSnapshotsResponse = [
+      { netWorth: '105000', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-27' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('should notify if current time is at or after the dailyNetWorthAlertTime setting', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-30T18:00:00Z')); // 2:00 PM America/New_York (UTC-4)
+    
+    mockSettingsResponse.timezone = 'America/New_York';
+    mockSettingsResponse.dailyNetWorthAlertTime = '13:00'; // 1:00 PM
+    mockSnapshotsResponse = [
+      { netWorth: '105000', snapshotDate: '2026-06-28' },
+      { netWorth: '100000', snapshotDate: '2026-06-27' },
+    ];
+
+    await checkDailyNetWorthChangeAndNotify('user_1', new Uint8Array());
+
+    expect(mockSendNotification).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

@@ -70,6 +70,7 @@ export async function GET() {
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
       notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
+      dailyNetWorthAlertTime: created?.dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -124,6 +125,7 @@ export async function GET() {
     notifyNetWorthMilestones: settings[0].notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
     netWorthMilestoneInterval: settings[0].netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
     notifyDailyNetWorthChange: settings[0].notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
+    dailyNetWorthAlertTime: settings[0].dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -175,6 +177,7 @@ export async function PATCH(request: Request) {
 	const notifyNetWorthMilestones = body.notifyNetWorthMilestones;
 	const netWorthMilestoneInterval = body.netWorthMilestoneInterval;
 	const notifyDailyNetWorthChange = body.notifyDailyNetWorthChange;
+	const dailyNetWorthAlertTime = body.dailyNetWorthAlertTime;
 	const notifyAiProposals = body.notifyAiProposals;
 	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
@@ -348,6 +351,9 @@ export async function PATCH(request: Request) {
 	if (notifyDailyNetWorthChange !== undefined && typeof notifyDailyNetWorthChange !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyDailyNetWorthChange value' }, { status: 400 });
 	}
+	if (dailyNetWorthAlertTime !== undefined && (typeof dailyNetWorthAlertTime !== 'string' || !/^\d{2}:\d{2}$/.test(dailyNetWorthAlertTime))) {
+		return Response.json({ error: 'Invalid dailyNetWorthAlertTime value. Expected HH:MM format.' }, { status: 400 });
+	}
 	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
 	}
@@ -408,6 +414,7 @@ export async function PATCH(request: Request) {
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
       notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
+      dailyNetWorthAlertTime: created?.dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -463,6 +470,7 @@ export async function PATCH(request: Request) {
 	if (notifyNetWorthMilestones !== undefined) updates.notifyNetWorthMilestones = notifyNetWorthMilestones;
 	if (netWorthMilestoneInterval !== undefined) updates.netWorthMilestoneInterval = netWorthMilestoneInterval;
 	if (notifyDailyNetWorthChange !== undefined) updates.notifyDailyNetWorthChange = notifyDailyNetWorthChange;
+	if (dailyNetWorthAlertTime !== undefined) updates.dailyNetWorthAlertTime = dailyNetWorthAlertTime;
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
 	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
 	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
@@ -658,6 +666,7 @@ export async function PATCH(request: Request) {
     notifyNetWorthMilestones: updated.notifyNetWorthMilestones,
     netWorthMilestoneInterval: updated.netWorthMilestoneInterval,
     notifyDailyNetWorthChange: updated.notifyDailyNetWorthChange,
+    dailyNetWorthAlertTime: updated.dailyNetWorthAlertTime,
     notifyAiProposals: updated.notifyAiProposals,
     maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,
