@@ -55,6 +55,7 @@ export default function NotificationsTab() {
   const notifyNetWorthMilestones = settings.notifyNetWorthMilestones !== false;
   const netWorthMilestoneInterval = settings.netWorthMilestoneInterval ?? 100000;
   const notifyDailyNetWorthChange = settings.notifyDailyNetWorthChange !== false;
+  const dailyNetWorthAlertTime = (settings.dailyNetWorthAlertTime as string) || '18:00';
   const notifyAiProposals = settings.notifyAiProposals !== false;
   const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
   const notificationLimiterPeriodMinutes = settings.notificationLimiterPeriodMinutes ?? 60;
@@ -515,6 +516,19 @@ export default function NotificationsTab() {
                 onCheckedChange={(checked) => handleUpdateSetting('notifyDailyNetWorthChange', checked)}
               />
             </div>
+            {notifyDailyNetWorthChange && (
+              <div className="flex items-center gap-3 pl-1 -mt-2 pb-2">
+                <Label htmlFor="daily-networth-time" className="text-xs text-muted-foreground whitespace-nowrap">Alert time</Label>
+                <Input
+                  id="daily-networth-time"
+                  type="time"
+                  value={dailyNetWorthAlertTime}
+                  onChange={(e) => handleUpdateSetting('dailyNetWorthAlertTime', e.target.value)}
+                  className="w-[120px] h-8 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">Sent daily at this time</span>
+              </div>
+            )}
 
             {/* AI Proposals Toggle */}
             <div className="flex items-center justify-between py-4">

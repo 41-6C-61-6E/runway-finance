@@ -2,6 +2,7 @@ import { logger, setDevMode } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 import { paystubAutoGenerateScheduler } from '@/lib/services/paystub-auto-generate-scheduler';
+import { dailyNetWorthScheduler } from '@/lib/services/daily-networth-scheduler';
 
 const LOG_TAG = '[finance-sync]';
 
@@ -44,6 +45,16 @@ export async function registerNodeInstrumentation(): Promise<void> {
     });
   }
 
+  // Initialize daily net worth scheduler
+  try {
+    dailyNetWorthScheduler.init();
+    logger.info(`${LOG_TAG} Daily Net Worth scheduler initialized.`);
+  } catch (err) {
+    logger.error(`${LOG_TAG} Daily Net Worth scheduler initialization failed`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   if (process.env.DEV_MODE === 'true') {
     setDevMode(true);
     logger.info(`${LOG_TAG} Dev mode enabled.`);
@@ -66,6 +77,7 @@ export async function registerNodeInstrumentation(): Promise<void> {
       syncScheduler.shutdown();
       manualAccountScheduler.shutdown();
       paystubAutoGenerateScheduler.shutdown();
+      dailyNetWorthScheduler.shutdown();
       logger.info(`${LOG_TAG} Schedulers stopped.`);
     };
     process.on('SIGTERM', handleShutdown);
