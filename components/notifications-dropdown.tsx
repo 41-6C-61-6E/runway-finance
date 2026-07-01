@@ -60,7 +60,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch('/api/notifications', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const newNotifications = data.notifications || [];
@@ -84,9 +84,18 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      if (target.closest('[role="dialog"]') || target.closest('[data-radix-portal]')) {
+      if (!target) return;
+
+      if (
+        !document.body.contains(target) ||
+        target.closest('[role="dialog"]') ||
+        target.closest('[role="alertdialog"]') ||
+        target.closest('[data-radix-portal]') ||
+        target.closest('[role="tooltip"]')
+      ) {
         return;
       }
+
       if (ref.current && !ref.current.contains(target)) {
         setOpen(false);
       }
@@ -162,6 +171,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       }
     } catch (err) {
       console.error('Error marking notification as read:', err);
+      toast.error('Failed to update notification.');
       // Revert state on error
       fetchNotifications();
     }
@@ -191,6 +201,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       }
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
+      toast.error('Failed to mark all as read.');
       fetchNotifications();
     }
   };
@@ -225,6 +236,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       }
     } catch (err) {
       console.error('Error clearing notifications:', err);
+      toast.error('Failed to clear notifications.');
     }
   };
 
@@ -247,6 +259,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       }
     } catch (err) {
       console.error('Error deleting notification:', err);
+      toast.error('Failed to delete notification.');
       fetchNotifications();
     }
   };
