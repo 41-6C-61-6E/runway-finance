@@ -3,7 +3,7 @@ import { accountSnapshots, transactions, categories, accounts, userSettings } fr
 import { eq, and, or, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
 import { decryptField, decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
-import { isInvestmentAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isInvestmentAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 export interface WealthFlowNode {
   id: string;
@@ -49,8 +49,11 @@ export interface WealthFlowData {
   };
 }
 
-function classifyAccount(type: string): 'cash' | 'retirement' | 'brokerage' | 'realestate' | 'liability' {
+function classifyAccount(type: string): 'cash' | 'retirement' | 'brokerage' | 'realestate' | 'asset' | 'liability' {
   const t = type.toLowerCase();
+  if (isLiabilityAccount(t)) {
+    return 'liability';
+  }
   if (['checking', 'savings', 'hsachecking'].includes(t)) {
     return 'cash';
   }
@@ -63,7 +66,7 @@ function classifyAccount(type: string): 'cash' | 'retirement' | 'brokerage' | 'r
   if (['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate'].includes(t)) {
     return 'realestate';
   }
-  return 'liability';
+  return isAssetAccount(t) ? 'asset' : 'cash';
 }
 
 function getMortgageEndDate(acc: any): string | undefined {
@@ -77,6 +80,24 @@ function getMortgageEndDate(acc: any): string | undefined {
     }
   } catch {}
   return undefined;
+}
+
+function getEffectiveBalance(
+  balances: Record<string, number>,
+  account: any,
+  targetDate: string,
+  baseCurrency: string
+): number {
+  const endEventDate = getMortgageEndDate(account);
+  if (endEventDate && targetDate >= endEventDate) {
+    return 0;
+  }
+
+  return convertCurrency(balances[account.id] ?? 0, account.currency, baseCurrency);
+}
+
+function getSignedNetWorthBalance(balance: number, accountType: string): number {
+  return isLiabilityAccount(accountType) ? -Math.abs(balance) : balance;
 }
 
 async function getBalancesOnDate(
@@ -195,17 +216,6 @@ export async function calculateWealthFlow(
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);
   const endingBalances = await getBalancesOnDate(db, userId, endDateStr, accountIdsToUse, dek);
 
-  // Pre-compute which accounts are past their mortgage end event
-  const accountsPastEndEvent = new Set<string>();
-  for (const id of accountIdsToUse) {
-    const acc = accountsMap.get(id);
-    if (!acc) continue;
-    const endEventDate = getMortgageEndDate(acc);
-    if (endEventDate && endDateStr > endEventDate) {
-      accountsPastEndEvent.add(id);
-    }
-  }
-
   // Calculate beginning and ending net worth
   let beginningNetWorth = 0;
   let endingNetWorth = 0;
@@ -213,22 +223,12 @@ export async function calculateWealthFlow(
   for (const id of accountIdsToUse) {
     const acc = accountsMap.get(id);
     if (!acc) continue;
-    if (accountsPastEndEvent.has(id)) continue;
 
-    const beg = beginningBalances[id] ?? 0;
-    const end = endingBalances[id] ?? 0;
+    const begConverted = getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
+    const endConverted = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
 
-    const begConverted = convertCurrency(beg, acc.currency, baseCurrency);
-    const endConverted = convertCurrency(end, acc.currency, baseCurrency);
-
-    const isLiab = isLiabilityAccount(acc.type);
-    if (isLiab) {
-      beginningNetWorth -= Math.abs(begConverted);
-      endingNetWorth -= Math.abs(endConverted);
-    } else {
-      beginningNetWorth += begConverted;
-      endingNetWorth += endConverted;
-    }
+    beginningNetWorth += getSignedNetWorthBalance(begConverted, acc.type);
+    endingNetWorth += getSignedNetWorthBalance(endConverted, acc.type);
   }
 
   const netWorthChange = endingNetWorth - beginningNetWorth;
@@ -326,6 +326,21 @@ export async function calculateWealthFlow(
     }
   };
 
+  const addFlowAmount = (
+    nodeId: string,
+    label: string,
+    color: string,
+    group: string,
+    amount: number,
+    acc: any
+  ) => {
+    if (Math.abs(amount) <= 0.01) return;
+
+    const node = getOrCreateNode(nodeId, label, color, group);
+    node.value = roundToCents(node.value + amount);
+    addToBreakdown(nodeId, acc.id, acc.name, 0, 0, amount);
+  };
+
   for (const row of txRows) {
     const acc = accountsMap.get(row.accountId);
     if (!acc) continue;
@@ -343,26 +358,49 @@ export async function calculateWealthFlow(
     if (row.categoryType === 'transfer') {
       // Transfers are completely excluded from the direct flow (they cancel out and don't change net worth)
       continue;
-    } else if (row.isIncome) {
+    } else if (row.categoryType === 'compound') {
       const absAmount = Math.abs(amountUSD);
       totalIncome += absAmount;
+      totalExpenses += absAmount;
+
       const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
       const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
       const catColor = row.categoryColor || '#10b981';
-      
-      const node = getOrCreateNode(catId, catName, catColor, 'income');
-      node.value = roundToCents(node.value + absAmount);
-      addToBreakdown(catId, row.accountId, acc.name, 0, 0, absAmount);
+
+      addFlowAmount(catId, catName, catColor, 'income', absAmount, acc);
+      addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', absAmount, acc);
     } else {
       const absAmount = Math.abs(amountUSD);
-      totalExpenses += absAmount;
-      const catId = 'exp_expenses';
-      const catName = 'Expenses';
-      const catColor = '#f43f5e';
-      
-      const node = getOrCreateNode(catId, catName, catColor, 'expense');
-      node.value = roundToCents(node.value + absAmount);
-      addToBreakdown(catId, row.accountId, acc.name, 0, 0, -absAmount);
+
+      if (amountUSD > 0) {
+        if (row.isIncome) {
+          totalIncome += amountUSD;
+          const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
+          const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
+          const catColor = row.categoryColor || '#10b981';
+          addFlowAmount(catId, catName, catColor, 'income', amountUSD, acc);
+        } else {
+          totalExpenses = roundToCents(totalExpenses - amountUSD);
+          addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', -amountUSD, acc);
+        }
+      } else if (amountUSD < 0) {
+        if (row.isIncome) {
+          totalIncome = roundToCents(totalIncome - absAmount);
+          const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
+          const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
+          const catColor = row.categoryColor || '#10b981';
+          addFlowAmount(catId, catName, catColor, 'income', -absAmount, acc);
+        } else {
+          totalExpenses += absAmount;
+          addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', absAmount, acc);
+        }
+      }
+    }
+  }
+
+  for (const [id, node] of Array.from(nodesMap.entries())) {
+    if (node.value <= 0.01) {
+      nodesMap.delete(id);
     }
   }
 
@@ -374,64 +412,66 @@ export async function calculateWealthFlow(
     const acc = accountsMap.get(accId);
     if (!acc) continue;
 
-    const beg = beginningBalances[accId] ?? 0;
-    const end = endingBalances[accId] ?? 0;
-    const begUSD = convertCurrency(beg, acc.currency, baseCurrency);
-    const endUSD = convertCurrency(end, acc.currency, baseCurrency);
+    const begUSD = getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
+    const endUSD = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
 
     const isLiab = isLiabilityAccount(acc.type);
-    const actualDeltaUSD = isLiab ? (begUSD - endUSD) : (endUSD - begUSD);
+    const signedBeg = getSignedNetWorthBalance(begUSD, acc.type);
+    const signedEnd = getSignedNetWorthBalance(endUSD, acc.type);
+    const actualDeltaUSD = signedEnd - signedBeg;
 
     const txSum = txSumByAccount.get(accId) || 0;
-    const effectiveTxSum = isLiab ? -txSum : txSum;
+    const liabilityUsesNegativeBalances = isLiab && (begUSD < 0 || endUSD < 0);
+    const effectiveTxSum = isLiab && !liabilityUsesNegativeBalances ? -txSum : txSum;
 
     const gap = roundToCents(actualDeltaUSD - effectiveTxSum);
 
     if (Math.abs(gap) > 0.01) {
-      const isInvest = classifyAccount(acc.type) === 'brokerage' || classifyAccount(acc.type) === 'realestate' || classifyAccount(acc.type) === 'retirement';
+      const accountClass = classifyAccount(acc.type);
+      const isInvest = accountClass === 'brokerage' || accountClass === 'realestate' || accountClass === 'retirement';
 
       if (gap > 0) {
         if (isInvest) {
           totalMarketGains += gap;
-          if (classifyAccount(acc.type) === 'realestate') {
+          if (accountClass === 'realestate') {
             const nodeId = 'inc_real_estate_appreciation';
             const node = getOrCreateNode(nodeId, 'Real Estate Appreciation', '#8b5cf6', 'market');
             node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, gap);
+            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
           } else {
             const nodeId = 'inc_market_gains';
             const node = getOrCreateNode(nodeId, 'Market Gains', '#10b981', 'market');
             node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, gap);
+            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
           }
         } else {
           // Cash/Liability gap > 0: Balance sheet positive adjustment (untracked inflow)
           const nodeId = 'inc_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + gap);
-          addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, gap);
+          addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
         }
       } else {
         const absGap = Math.abs(gap);
         if (isInvest) {
           totalMarketLosses += absGap;
-          if (classifyAccount(acc.type) === 'realestate') {
+          if (accountClass === 'realestate') {
             const nodeId = 'exp_real_estate_depreciation';
             const node = getOrCreateNode(nodeId, 'Real Estate Depreciation', '#f43f5e', 'market');
             node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, -absGap);
+            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
           } else {
             const nodeId = 'exp_market_losses';
             const node = getOrCreateNode(nodeId, 'Market Losses', '#ef4444', 'market');
             node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, -absGap);
+            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
           }
         } else {
           // Cash/Liability gap < 0: Balance sheet negative adjustment (untracked outflow)
           const nodeId = 'exp_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + absGap);
-          addToBreakdown(nodeId, accId, acc.name, isLiab ? -begUSD : begUSD, isLiab ? -endUSD : endUSD, -absGap);
+          addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
         }
       }
     }
