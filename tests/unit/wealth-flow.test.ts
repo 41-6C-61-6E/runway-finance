@@ -146,10 +146,67 @@ describe('wealth-flow service', () => {
     expect(marketGains).toBeDefined();
     expect(marketGains!.value).toBe(400);
 
-    // Balance Adjustments (checking gap -1000 + mortgage gap -1000 = 2000 negative adjustment)
+    // Balance Adjustments:
+    // Checking ends $1,000 below tracked transaction activity, while mortgage principal paydown
+    // increases net worth by $1,000. These should appear on opposite sides of the flow.
+    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
+    expect(incAdjustments).toBeDefined();
+    expect(incAdjustments!.value).toBe(1000);
+
     const expAdjustments = result.nodes.find(n => n.id === 'exp_balance_adjustments');
     expect(expAdjustments).toBeDefined();
-    expect(expAdjustments!.value).toBe(2000);
+    expect(expAdjustments!.value).toBe(1000);
+  });
+
+  it('treats negative-balance mortgage paydown as positive wealth flow', async () => {
+    mockAccounts = [
+      { id: 'mortgage-1', userId: 'user_1', name: 'Mortgage', type: 'mortgage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+
+    mockSnapshots = [
+      { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
+      { accountId: 'mortgage-1', snapshotDate: '2026-06-30', balance: '-199000.00' },
+    ];
+
+    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+
+    expect(result.summary.beginningNetWorth).toBe(-200000);
+    expect(result.summary.endingNetWorth).toBe(-199000);
+    expect(result.summary.netWorthChange).toBe(1000);
+
+    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
+    expect(incAdjustments).toBeDefined();
+    expect(incAdjustments!.value).toBe(1000);
+    expect(result.nodes.find(n => n.id === 'exp_balance_adjustments')).toBeUndefined();
+  });
+
+  it('keeps a mortgage in beginning net worth when it is paid off during the selected period', async () => {
+    mockAccounts = [
+      {
+        id: 'mortgage-1',
+        userId: 'user_1',
+        name: 'Mortgage',
+        type: 'mortgage',
+        currency: 'USD',
+        isHidden: false,
+        isExcludedFromNetWorth: false,
+        metadata: { mortgageStatus: 'paid_off', payoffDate: '2026-06-15' },
+      },
+    ];
+
+    mockSnapshots = [
+      { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
+    ];
+
+    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+
+    expect(result.summary.beginningNetWorth).toBe(-200000);
+    expect(result.summary.endingNetWorth).toBe(0);
+    expect(result.summary.netWorthChange).toBe(200000);
+
+    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
+    expect(incAdjustments).toBeDefined();
+    expect(incAdjustments!.value).toBe(200000);
   });
 
   it('handles reconciliation gap by routing surplus/deficit', async () => {

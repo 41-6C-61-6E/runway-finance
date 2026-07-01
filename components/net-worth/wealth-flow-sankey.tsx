@@ -495,6 +495,7 @@ export function WealthFlowSankey() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
@@ -522,7 +523,8 @@ export function WealthFlowSankey() {
     fetch('/api/accounts')
       .then((r) => (r.ok ? r.json() : []))
       .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
-      .catch(() => {});
+      .catch(() => setAllAccounts([]))
+      .finally(() => setAccountsLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -566,6 +568,10 @@ export function WealthFlowSankey() {
   };
 
   useEffect(() => {
+    if (!accountsLoaded) return;
+
+    let isCurrent = true;
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -580,18 +586,26 @@ export function WealthFlowSankey() {
           throw new Error(`Failed to load wealth flow data (${res.status})`);
         }
         const data = await res.json();
-        setWealthFlowData(data);
+        if (isCurrent) {
+          setWealthFlowData(data);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (isCurrent) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
-        setLoading(false);
+        if (isCurrent) {
+          setLoading(false);
+        }
       }
     };
 
-    if (allAccounts.length >= 0) {
-      fetchData();
-    }
-  }, [timeframe, windowEnd, excludedAccountIds, allAccounts]);
+    fetchData();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [timeframe, windowEnd, excludedAccountIds, allAccounts, accountsLoaded]);
 
   const getAccountIdsForClass = useCallback((classKey: string) => {
     return allAccounts
