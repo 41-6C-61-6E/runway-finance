@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'react';
 export const HIDDEN_PAGE_KEYS = [
   'netWorth',
   'transactions',
-  'cashFlow',
   'budgets',
   'realEstate',
   'dataExplorer',
@@ -13,6 +12,7 @@ export const HIDDEN_PAGE_KEYS = [
   'spending',
   'financialLogic',
   'investments',
+  'flows',
 ] as const;
 
 // Pages that only appear in the nav when developer mode is enabled
