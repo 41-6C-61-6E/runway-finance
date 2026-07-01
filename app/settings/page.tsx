@@ -1271,7 +1271,7 @@ function SettingsPageBody() {
                   const pageLabel =
                     pageKey === 'netWorth' ? 'Net Worth' :
                     pageKey === 'transactions' ? 'Transactions' :
-                    pageKey === 'cashFlow' ? 'Cash Flow' :
+                    pageKey === 'flows' ? 'Flows' :
                     pageKey === 'budgets' ? 'Budgets' :
                     pageKey === 'realEstate' ? 'Real Estate' :
                     pageKey === 'investments' ? 'Investments' :

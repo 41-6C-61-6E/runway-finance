@@ -7,7 +7,7 @@ interface SwipeNavProviderProps {
   children: ReactNode;
 }
 
-const TABS = ['/', '/accounts', '/transactions', '/cash-flow'];
+const TABS = ['/', '/accounts', '/transactions', '/flows'];
 
 export const SwipeNavContext = createContext<null>(null);
 
@@ -23,7 +23,7 @@ export function SwipeNavProvider({ children }: SwipeNavProviderProps) {
     if (path === '/') return 0;
     if (path.startsWith('/accounts')) return 1;
     if (path.startsWith('/transactions')) return 2;
-    if (path.startsWith('/cash-flow')) return 3;
+    if (path.startsWith('/flows')) return 3;
     return -1;
   };
 

@@ -12,11 +12,10 @@ export const CHARTS = {
       accountValuesChart: 'Account Values Chart',
     },
   },
-  cashFlow: {
-    label: 'Cash Flow',
+  flows: {
+    label: 'Flows',
     charts: {
       cashFlowSummary: 'Summary Cards',
-      incomeExpenseChart: 'Income vs Expense Chart',
       budgetVsActual: 'Budget vs Actual',
       cashFlowSankey: 'Sankey Diagram',
       cashFlowForecast: 'Cash Flow Forecast',
@@ -26,6 +25,7 @@ export const CHARTS = {
     label: 'Spending',
     charts: {
       cashVsCredit: 'Cash vs Credit',
+      incomeExpenseChart: 'Income vs Expense Chart',
       spendingBreakdown: 'Spending Breakdown',
       categorySummaries: 'Category Breakdown',
       categoryIncome: 'Income Section',

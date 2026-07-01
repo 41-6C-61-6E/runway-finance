@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { 
   Landmark, 
   Receipt, 
-  TrendingUp, 
   DollarSign, 
   Menu, 
   X,
@@ -20,6 +19,7 @@ import {
   LayoutDashboard,
   CandlestickChart,
   Minus,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
@@ -36,7 +36,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'net-worth', href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth', category: 'finances' },
   { id: 'accounts', href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'accounts', category: 'finances' },
   { id: 'transactions', href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions', category: 'finances' },
-  { id: 'cash-flow', href: '/cash-flow', label: 'Cash Flow', icon: TrendingUp, pageKey: 'cashFlow', category: 'finances' },
+  { id: 'flows', href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows', category: 'finances' },
   { id: 'spending', href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending', category: 'finances' },
   { id: 'budgets', href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets', category: 'finances' },
   { id: 'real-estate', href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate', category: 'finances' },
