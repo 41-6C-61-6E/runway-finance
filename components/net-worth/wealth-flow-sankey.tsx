@@ -26,6 +26,7 @@ interface AccountData {
 interface AccountBreakdown {
   id: string;
   name: string;
+  type?: string;
   beg?: number;
   end?: number;
   delta: number;
@@ -221,6 +222,149 @@ function routeFlowsThroughAccounts(data: WealthFlowData): WealthFlowData {
   };
 }
 
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  checking: 'Checking',
+  savings: 'Savings',
+  hsachecking: 'HSA Checking',
+  retirement: 'Retirement',
+  rothira: 'Roth IRA',
+  traditionalira: 'Traditional IRA',
+  '401k': '401(k)',
+  '403b': '403(b)',
+  sepira: 'SEP IRA',
+  simpleira: 'Simple IRA',
+  hsa: 'HSA',
+  health: 'Health',
+  '529': '529 Plan',
+  investment: 'Investment',
+  brokerage: 'Brokerage',
+  otherinvestment: 'Other Investment',
+  otherInvestment: 'Other Investment',
+  crypto: 'Crypto',
+  metals: 'Precious Metals',
+  realestate: 'Real Estate',
+  primaryhome: 'Primary Home',
+  secondaryhome: 'Secondary Home',
+  rentalproperty: 'Rental Property',
+  commercial: 'Commercial Real Estate',
+  land: 'Land',
+  otherrealestate: 'Other Real Estate',
+  mortgage: 'Mortgage',
+  credit: 'Credit Card',
+  loan: 'Loan',
+  otherliability: 'Other Liability',
+  otherLiability: 'Other Liability',
+  studentloan: 'Student Loan',
+  autoloan: 'Auto Loan',
+  otherloan: 'Other Loan',
+};
+
+function getAccountTypeLabel(type: string): string {
+  const t = type.trim().toLowerCase();
+  if (ACCOUNT_TYPE_LABELS[t]) return ACCOUNT_TYPE_LABELS[t];
+  if (ACCOUNT_TYPE_LABELS[type]) return ACCOUNT_TYPE_LABELS[type];
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function routeFlowsThroughAccountTypes(data: WealthFlowData): WealthFlowData {
+  const nodesById = new Map<string, SankeyNode>(
+    data.nodes.map((node) => [node.id, { ...node, accounts: node.accounts ? [...node.accounts] : undefined }])
+  );
+  const typeNodes = new Map<string, SankeyNode>();
+  const routedLinks: WealthFlowData['links'] = [];
+
+  const getTypeNode = (side: 'in' | 'out', type: string): SankeyNode => {
+    const cleanType = type || 'other';
+    const id = `type_${side}_${cleanType.toLowerCase()}`;
+    const existing = typeNodes.get(id);
+    if (existing) return existing;
+
+    const node: SankeyNode = {
+      id,
+      label: getAccountTypeLabel(cleanType),
+      color: side === 'in' ? '#2563eb' : '#475569',
+      value: 0,
+      percentage: 0,
+      group: 'account',
+      accounts: [],
+    };
+    typeNodes.set(id, node);
+    return node;
+  };
+
+  const addRoutedLink = (source: string, target: string, value: number) => {
+    const roundedValue = roundFlowValue(value);
+    if (roundedValue <= 0.01) return;
+    const existing = routedLinks.find((link) => link.source === source && link.target === target);
+    if (existing) {
+      existing.value = roundFlowValue(existing.value + roundedValue);
+    } else {
+      routedLinks.push({ source, target, value: roundedValue });
+    }
+  };
+
+  for (const link of data.links) {
+    const sourceNode = nodesById.get(link.source);
+    const targetNode = nodesById.get(link.target);
+
+    if (link.target === 'hub_net_worth_change' && sourceNode) {
+      const accountSplits = splitFlowByAccounts(link.value, sourceNode.accounts);
+      if (accountSplits.length > 0) {
+        for (const account of accountSplits) {
+          const typeNode = getTypeNode('in', account.type || 'other');
+          typeNode.value = roundFlowValue(typeNode.value + account.flowValue);
+          if (typeNode.accounts) {
+            const existingAcc = typeNode.accounts.find(a => a.id === account.id);
+            if (existingAcc) {
+              existingAcc.delta = roundFlowValue(existingAcc.delta + account.delta);
+            } else {
+              typeNode.accounts.push({ ...account });
+            }
+          }
+          addRoutedLink(link.source, typeNode.id, account.flowValue);
+          addRoutedLink(typeNode.id, link.target, account.flowValue);
+        }
+        continue;
+      }
+    }
+
+    if (link.source === 'hub_net_worth_change' && targetNode) {
+      const accountSplits = splitFlowByAccounts(link.value, targetNode.accounts);
+      if (accountSplits.length > 0) {
+        for (const account of accountSplits) {
+          const typeNode = getTypeNode('out', account.type || 'other');
+          typeNode.value = roundFlowValue(typeNode.value + account.flowValue);
+          if (typeNode.accounts) {
+            const existingAcc = typeNode.accounts.find(a => a.id === account.id);
+            if (existingAcc) {
+              existingAcc.delta = roundFlowValue(existingAcc.delta + account.delta);
+            } else {
+              typeNode.accounts.push({ ...account });
+            }
+          }
+          addRoutedLink(link.source, typeNode.id, account.flowValue);
+          addRoutedLink(typeNode.id, link.target, account.flowValue);
+        }
+        continue;
+      }
+    }
+
+    addRoutedLink(link.source, link.target, link.value);
+  }
+
+  const routedNodes = [...data.nodes.map((node) => nodesById.get(node.id)!), ...typeNodes.values()];
+  const maxNodeValue = Math.max(...routedNodes.map((node) => node.value || 0), 1);
+
+  return {
+    ...data,
+    nodes: routedNodes.map((node) => ({
+      ...node,
+      percentage: ((node.value || 0) / maxNodeValue) * 100,
+    })),
+    links: routedLinks,
+  };
+}
+
 const SANITIZED_PROPS = new Set([
   'onMouseEnter', 'onMouseLeave', 'onMouseMove', 'onClick', 'onMouseDown', 'onMouseUp',
   'className', 'style', 'tabIndex', 'role',
@@ -302,18 +446,7 @@ const SankeyCustomNode = ({
       }}
       className="cursor-pointer"
     >
-      {/* Group indicator stripe */}
-      {groupStripeColor && !isBalancing && !isHub && (
-        <rect
-          x={groupLabelSide === 'right' ? x + width : x - 4}
-          y={y}
-          width={4}
-          height={height}
-          fill={groupStripeColor}
-          rx={1}
-          fillOpacity={isDimmed ? 0.2 : 0.7}
-        />
-      )}
+
       <rect
         x={x}
         y={y}
@@ -489,7 +622,7 @@ export function WealthFlowSankey() {
     windowLabel,
     showWindowNav,
     periodOptions,
-  } = useDateWindow('finance:wealth-flow:timeframe', 'finance:wealth-flow:windowEnd', '1m');
+  } = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
 
   const [wealthFlowData, setWealthFlowData] = useState<WealthFlowData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -501,6 +634,22 @@ export function WealthFlowSankey() {
   const [isMobile, setIsMobile] = useState(false);
   const [showPercentages, setShowPercentages] = useState<boolean>(false);
   const [routeThroughAccounts, setRouteThroughAccounts] = useState<boolean>(false);
+  const [routeThroughAccountTypes, setRouteThroughAccountTypes] = useState<boolean>(false);
+
+  const handleRouteThroughAccountsChange = (checked: boolean) => {
+    setRouteThroughAccounts(checked);
+    if (checked) {
+      setRouteThroughAccountTypes(false);
+    }
+  };
+
+  const handleRouteThroughAccountTypesChange = (checked: boolean) => {
+    setRouteThroughAccountTypes(checked);
+    if (checked) {
+      setRouteThroughAccounts(false);
+    }
+  };
+
   const [accountFilterOpen, setAccountFilterOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -652,10 +801,30 @@ export function WealthFlowSankey() {
     [timeframe, windowEnd, router]
   );
 
+  const displayWealthFlowData = useMemo(() => {
+    if (!wealthFlowData) return null;
+    if (routeThroughAccounts) {
+      return routeFlowsThroughAccounts(wealthFlowData);
+    }
+    if (routeThroughAccountTypes) {
+      return routeFlowsThroughAccountTypes(wealthFlowData);
+    }
+    return wealthFlowData;
+  }, [wealthFlowData, routeThroughAccounts, routeThroughAccountTypes]);
+
   const routeFlowElement = useCallback((elementId: string) => {
     if (elementId.startsWith('account_in_') || elementId.startsWith('account_out_')) {
       const accountId = elementId.replace(/^account_(in|out)_/, '');
       navigateToTransactions({ accountIds: accountId });
+      return;
+    }
+
+    if (elementId.startsWith('type_in_') || elementId.startsWith('type_out_')) {
+      const node = displayWealthFlowData?.nodes.find(n => n.id === elementId);
+      if (node && node.accounts && node.accounts.length > 0) {
+        const accountIds = node.accounts.map(a => a.id).join(',');
+        navigateToTransactions({ accountIds });
+      }
       return;
     }
 
@@ -671,7 +840,7 @@ export function WealthFlowSankey() {
     ];
 
     if (snapshotNodeIds.includes(elementId)) {
-      const node = wealthFlowData?.nodes.find(n => n.id === elementId);
+      const node = displayWealthFlowData?.nodes.find(n => n.id === elementId);
       if (node) {
         setSelectedNodeDetails(node);
       }
@@ -698,7 +867,7 @@ export function WealthFlowSankey() {
       }
       return;
     }
-  }, [navigateToTransactions, wealthFlowData]);
+  }, [navigateToTransactions, displayWealthFlowData]);
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
@@ -718,10 +887,7 @@ export function WealthFlowSankey() {
     [routeFlowElement]
   );
 
-  const displayWealthFlowData = useMemo(() => {
-    if (!wealthFlowData) return null;
-    return routeThroughAccounts ? routeFlowsThroughAccounts(wealthFlowData) : wealthFlowData;
-  }, [wealthFlowData, routeThroughAccounts]);
+
 
   const processedData = useMemo(() => {
     if (!displayWealthFlowData || !displayWealthFlowData.nodes) return { nodes: [], links: [] };
@@ -1040,46 +1206,7 @@ export function WealthFlowSankey() {
   const summary = wealthFlowData?.summary;
 
   return (
-    <div className="space-y-6">
-      {/* ── Net Worth Summary Metric Cards ───────────────────────────────────── */}
-      {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Beginning Net Worth
-            </span>
-            <div className="text-2xl font-bold mt-2 font-mono text-foreground select-all">
-              {formatCurrency(summary.beginningNetWorth)}
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Ending Net Worth
-            </span>
-            <div className="text-2xl font-bold mt-2 font-mono text-foreground select-all">
-              {formatCurrency(summary.endingNetWorth)}
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm relative overflow-hidden">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Change in Net Worth
-            </span>
-            <div
-              className={`text-2xl font-bold mt-2 font-mono select-all flex items-baseline gap-2 ${
-                summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
-              }`}
-            >
-              {summary.netWorthChange >= 0 ? '+' : ''}
-              {formatCurrency(summary.netWorthChange)}
-              <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded text-muted-foreground font-sans">
-                {summary.percentChange >= 0 ? '+' : ''}
-                {summary.percentChange.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <>
       {/* ── Main Sankey Card ─────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
@@ -1109,6 +1236,11 @@ export function WealthFlowSankey() {
                   {routeThroughAccounts && (
                     <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                       ACCOUNT ROUTING
+                    </span>
+                  )}
+                  {routeThroughAccountTypes && (
+                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                      TYPE ROUTING
                     </span>
                   )}
                   {excludedAccountIds.size > 0 && (
@@ -1150,7 +1282,7 @@ export function WealthFlowSankey() {
                         { label: '6M', value: '6m' },
                         { label: '1Y', value: '1y' },
                         { label: 'YTD', value: 'ytd' },
-                        { label: 'ALL', value: 'all' },
+                        { label: 'All', value: 'all' },
                       ]}
                       onChange={setTimeframe}
                     />
@@ -1172,7 +1304,7 @@ export function WealthFlowSankey() {
                   <div className="flex items-center gap-2 border-l border-border/30 pl-4">
                     <Switch
                       checked={routeThroughAccounts}
-                      onCheckedChange={setRouteThroughAccounts}
+                      onCheckedChange={handleRouteThroughAccountsChange}
                       id="wealth-flow-account-routing"
                     />
                     <label
@@ -1180,6 +1312,20 @@ export function WealthFlowSankey() {
                       className="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer"
                     >
                       Route through accounts
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+                    <Switch
+                      checked={routeThroughAccountTypes}
+                      onCheckedChange={handleRouteThroughAccountTypesChange}
+                      id="wealth-flow-type-routing"
+                    />
+                    <label
+                      htmlFor="wealth-flow-type-routing"
+                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer"
+                    >
+                      Route through account types
                     </label>
                   </div>
                 </div>
@@ -1265,17 +1411,44 @@ export function WealthFlowSankey() {
             </CollapsibleFilterPanel>
 
             <div className="p-4 md:p-6 pt-0">
-
-              {/* Group Legend */}
-              <div className="flex flex-wrap gap-3 mb-4 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Groups:</span>
-                {Object.entries(GROUP_COLORS).map(([key, color]) => (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-                    <span>{GROUP_LABELS[key]}</span>
+              {/* ── Net Worth Summary Metric Cards ───────────────────────────────────── */}
+              {summary && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Beginning Net Worth
+                    </span>
+                    <div className="text-xl font-bold mt-1.5 font-mono text-foreground select-all">
+                      {formatCurrency(summary.beginningNetWorth)}
+                    </div>
                   </div>
-                ))}
-              </div>
+                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Ending Net Worth
+                    </span>
+                    <div className="text-xl font-bold mt-1.5 font-mono text-foreground select-all">
+                      {formatCurrency(summary.endingNetWorth)}
+                    </div>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm relative overflow-hidden">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Change in Net Worth
+                    </span>
+                    <div
+                      className={`text-xl font-bold mt-1.5 font-mono select-all flex items-baseline gap-2 ${
+                        summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                      }`}
+                    >
+                      {summary.netWorthChange >= 0 ? '+' : ''}
+                      {formatCurrency(summary.netWorthChange)}
+                      <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded text-muted-foreground font-sans">
+                        {summary.percentChange >= 0 ? '+' : ''}
+                        {summary.percentChange.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {allAccountsExcluded ? (
                 <div className="h-[400px] flex items-center justify-center">
@@ -1434,7 +1607,7 @@ export function WealthFlowSankey() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

@@ -201,8 +201,8 @@ body,
 /* ── Light theme: swap page bg and nav bar colors ──────────────────────────── */
 [data-theme="light"] {
   --background: oklch(1.0 0 0);
-  --sidebar: oklch(0.96 0.01 25);
-  --card: oklch(0.96 0.01 25);
+  --sidebar: oklch(0.98 0.003 260);
+  --card: oklch(0.98 0.003 260);
 }
 
 /* ── Privacy Mode ─────────────────────────────────────────────────────────── */

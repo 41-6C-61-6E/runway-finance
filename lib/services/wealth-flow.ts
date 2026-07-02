@@ -13,7 +13,7 @@ export interface WealthFlowNode {
   percentage: number;
   group?: string;
   isBalancingNode?: boolean;
-  accounts?: Array<{ id: string; name: string; delta: number }>;
+  accounts?: Array<{ id: string; name: string; type?: string; delta: number }>;
   netWorthChange?: number;
   contributions?: number;
   marketGrowth?: number;
@@ -313,8 +313,8 @@ export async function calculateWealthFlow(
   const txSumByAccount = new Map<string, number>();
   
   // We will keep account breakdowns for each node
-  const accountBreakdowns: Record<string, Array<{ id: string; name: string; beg: number; end: number; delta: number }>> = {};
-  const addToBreakdown = (nodeId: string, accId: string, accName: string, beg: number, end: number, delta: number) => {
+  const accountBreakdowns: Record<string, Array<{ id: string; name: string; type: string; beg: number; end: number; delta: number }>> = {};
+  const addToBreakdown = (nodeId: string, accId: string, accName: string, accType: string, beg: number, end: number, delta: number) => {
     if (!accountBreakdowns[nodeId]) accountBreakdowns[nodeId] = [];
     const existing = accountBreakdowns[nodeId].find(a => a.id === accId);
     if (existing) {
@@ -322,7 +322,7 @@ export async function calculateWealthFlow(
       existing.end = roundToCents(existing.end + end);
       existing.delta = roundToCents(existing.delta + delta);
     } else {
-      accountBreakdowns[nodeId].push({ id: accId, name: accName, beg: roundToCents(beg), end: roundToCents(end), delta: roundToCents(delta) });
+      accountBreakdowns[nodeId].push({ id: accId, name: accName, type: accType, beg: roundToCents(beg), end: roundToCents(end), delta: roundToCents(delta) });
     }
   };
 
@@ -338,7 +338,7 @@ export async function calculateWealthFlow(
 
     const node = getOrCreateNode(nodeId, label, color, group);
     node.value = roundToCents(node.value + amount);
-    addToBreakdown(nodeId, acc.id, acc.name, 0, 0, amount);
+    addToBreakdown(nodeId, acc.id, acc.name, acc.type, 0, 0, amount);
   };
 
   for (const row of txRows) {
@@ -437,19 +437,19 @@ export async function calculateWealthFlow(
             const nodeId = 'inc_real_estate_appreciation';
             const node = getOrCreateNode(nodeId, 'Real Estate Appreciation', '#8b5cf6', 'market');
             node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
+            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
           } else {
             const nodeId = 'inc_market_gains';
             const node = getOrCreateNode(nodeId, 'Market Gains', '#10b981', 'market');
             node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
+            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
           }
         } else {
           // Cash/Liability gap > 0: Balance sheet positive adjustment (untracked inflow)
           const nodeId = 'inc_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + gap);
-          addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, gap);
+          addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
         }
       } else {
         const absGap = Math.abs(gap);
@@ -459,19 +459,19 @@ export async function calculateWealthFlow(
             const nodeId = 'exp_real_estate_depreciation';
             const node = getOrCreateNode(nodeId, 'Real Estate Depreciation', '#f43f5e', 'market');
             node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
+            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
           } else {
             const nodeId = 'exp_market_losses';
             const node = getOrCreateNode(nodeId, 'Market Losses', '#ef4444', 'market');
             node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
+            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
           }
         } else {
           // Cash/Liability gap < 0: Balance sheet negative adjustment (untracked outflow)
           const nodeId = 'exp_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + absGap);
-          addToBreakdown(nodeId, accId, acc.name, signedBeg, signedEnd, -absGap);
+          addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
         }
       }
     }
