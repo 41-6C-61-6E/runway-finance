@@ -615,13 +615,13 @@ export function WealthFlowSankey() {
     setTimeframe,
     windowEnd,
     setWindowEnd,
-    monthRange,
     nextWindow,
     prevWindow,
     isNextDisabled,
     windowLabel,
     showWindowNav,
     periodOptions,
+    dateRange,
   } = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
 
   const [wealthFlowData, setWealthFlowData] = useState<WealthFlowData | null>(null);
@@ -726,9 +726,8 @@ export function WealthFlowSankey() {
         setLoading(true);
         setError(null);
 
-        const range = getMonthRange(timeframe, windowEnd);
         const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
-        const url = `/api/wealth-flow?startMonth=${range.start}&endMonth=${range.end}${acctParam}`;
+        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`;
 
         const res = await fetch(url);
         if (!res.ok) {
@@ -784,12 +783,9 @@ export function WealthFlowSankey() {
 
   const navigateToTransactions = useCallback(
     (filters: { categoryId?: string; categoryIds?: string; type?: string; accountIds?: string }) => {
-      const range = getMonthRange(timeframe, windowEnd);
       const params = new URLSearchParams();
-      params.set('startDate', `${range.start}-01`);
-      const [year, month] = range.end.split('-');
-      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      params.set('endDate', `${range.end}-${lastDay}`);
+      params.set('startDate', dateRange.start);
+      params.set('endDate', dateRange.end);
 
       if (filters.categoryId) params.set('categoryId', filters.categoryId);
       if (filters.categoryIds) params.set('categoryIds', filters.categoryIds);
@@ -1271,19 +1267,8 @@ export function WealthFlowSankey() {
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">
-                      Timeframe
-                    </span>
                     <TimeRangeFilter
                       value={timeframe}
-                      presets={[
-                        { label: '1M', value: '1m' },
-                        { label: '3M', value: '3m' },
-                        { label: '6M', value: '6m' },
-                        { label: '1Y', value: '1y' },
-                        { label: 'YTD', value: 'ytd' },
-                        { label: 'All', value: 'all' },
-                      ]}
                       onChange={setTimeframe}
                     />
                   </div>

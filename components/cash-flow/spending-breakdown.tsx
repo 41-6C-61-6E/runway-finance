@@ -8,6 +8,7 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { getMonthRange } from '@/lib/utils/date-window';
@@ -98,6 +99,7 @@ export function SpendingBreakdown() {
     windowLabel,
     periodOptions,
     showWindowNav,
+    dateRange,
   } = useDateWindow('finance:spending-breakdown:timeframe', 'finance:spending-breakdown:windowEnd', '1m');
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:spending-breakdown:chartType', 'pie');
   const [excludedCategoryIds, setExcludedCategoryIds] = usePersistentState<Set<string>>(
@@ -112,12 +114,12 @@ export function SpendingBreakdown() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const queryParams = useMemo(() => {
-    const range = getMonthRange(timeframe, windowEnd);
-    if (timeframe === '1m') {
-      return `month=${range.start}`;
-    }
-    return `startMonth=${range.start}&endMonth=${range.end}`;
-  }, [timeframe, windowEnd]);
+    return `startDate=${dateRange.start}&endDate=${dateRange.end}`;
+  }, [dateRange.start, dateRange.end]);
+
+  const dateRangeStr = useMemo(() => {
+    return formatChartDateRange(dateRange.start, dateRange.end);
+  }, [dateRange.start, dateRange.end]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -319,8 +321,7 @@ export function SpendingBreakdown() {
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
               <div className="flex items-center gap-1.5">
@@ -343,6 +344,13 @@ export function SpendingBreakdown() {
               />
             ) : (
               <div className="h-full w-full relative touch-pan-y">
+                {dateRangeStr && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {dateRangeStr}
+                    </span>
+                  </div>
+                )}
                 {chartType === 'bar' ? (() => {
                   const maxLabelLen = pieData.length > 0
                     ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))

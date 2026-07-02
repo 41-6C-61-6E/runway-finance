@@ -636,6 +636,7 @@ export function CashFlowSankey() {
     windowLabel,
     periodOptions,
     showWindowNav,
+    dateRange,
   } = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -717,24 +718,17 @@ export function CashFlowSankey() {
         setLoading(true);
         setError(null);
 
-        const range = getMonthRange(timeframe, windowEnd);
         const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
 
         let categories: CategoryData[];
         let totalIncome = 0;
         let totalExpenses = 0;
 
-        if (timeframe === '1m') {
-          const categoriesRes = await fetch(
-            `/api/cash-flow/categories?month=${range.start}${acctParam}`
-          );
-          if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
-          categories = await categoriesRes.json();
-        } else {
-          const res = await fetch(`/api/cash-flow/categories?startMonth=${range.start}&endMonth=${range.end}${acctParam}`);
-          if (!res.ok) throw new Error('Failed to fetch sankey data');
-          categories = await res.json();
-        }
+        const categoriesRes = await fetch(
+          `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`
+        );
+        if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
+        categories = await categoriesRes.json();
 
         totalIncome = categories
           .filter((c) => c.isIncome && c.amount > 0)
@@ -1091,17 +1085,8 @@ export function CashFlowSankey() {
               {/* Row 1: Time Range */}
               <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
                   <TimeRangeFilter
                     value={timeframe}
-                    presets={[
-                      { label: '1M', value: '1m' },
-                      { label: '3M', value: '3m' },
-                      { label: '6M', value: '6m' },
-                      { label: '1Y', value: '1y' },
-                      { label: 'YTD', value: 'ytd' },
-                      { label: 'All', value: 'all' },
-                    ]}
                     onChange={setTimeframe}
                   />
                 </div>

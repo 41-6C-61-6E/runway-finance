@@ -54,7 +54,8 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
 import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
-import { getMonthRange } from '@/lib/utils/date-window';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
+import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     windowLabel,
     periodOptions,
     showWindowNav,
-    monthRange: txMonthRange,
+    dateRange: txDateRange,
   } = useDateWindow(
     null,
     `finance:account-tx:${accountId}:windowEnd`,
@@ -245,14 +246,13 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
 
   const queryStartDate = useMemo(() => {
     if (timeframe === 'all') return undefined;
-    return txMonthRange.start + '-01';
-  }, [timeframe, txMonthRange.start]);
+    return txDateRange.start;
+  }, [timeframe, txDateRange.start]);
 
   const queryEndDate = useMemo(() => {
     if (timeframe === 'all') return undefined;
-    const [ey, em] = txMonthRange.end.split('-').map(Number);
-    return txMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
-  }, [timeframe, txMonthRange.end]);
+    return txDateRange.end;
+  }, [timeframe, txDateRange.end]);
 
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId, queryStartDate, queryEndDate],
@@ -297,24 +297,25 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
   const visibleMiniData = useMemo(() => {
     if (accountHistory.length === 0) return [];
     if (timeframe === 'all') return accountHistory;
-    const [ey, em] = txMonthRange.end.split('-').map(Number);
-    const endDateStr = txMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
-    const startIdx = accountHistory.findIndex((d: any) => d.date >= txMonthRange.start + '-01');
+    const endDateStr = txDateRange.end;
+    const startIdx = accountHistory.findIndex((d: any) => d.date >= txDateRange.start);
     if (startIdx === -1) return [];
     let endIdx = accountHistory.length - 1;
     for (let i = accountHistory.length - 1; i >= 0; i--) {
-      if (accountHistory[i].date <= endDateStr) { endIdx = i; break; }
+      if (accountHistory[i].date <= endDateStr) {
+        endIdx = i;
+        break;
+      }
     }
     return accountHistory.slice(startIdx, endIdx + 1);
-  }, [accountHistory, timeframe, txMonthRange.start, txMonthRange.end]);
+  }, [accountHistory, timeframe, txDateRange.start, txDateRange.end]);
 
   const visibleMiniDateRange = useMemo(() => {
     if (visibleMiniData.length === 0) return null;
     const first = String(visibleMiniData[0].date);
     const last = String(visibleMiniData[visibleMiniData.length - 1].date);
     if (first === last) return null;
-    const fmt = (d: string) => formatSafeUTCDate(d, { month: 'short', year: 'numeric' });
-    return `${fmt(first)} – ${fmt(last)}`;
+    return formatChartDateRange(first, last);
   }, [visibleMiniData]);
 
   const { minVal, maxVal } = useMemo(() => {
@@ -416,7 +417,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
                         return `$${absV.toFixed(0)}`;
                       }}
                     />
-                    <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} />
+                    <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
                     <Area
                       type="monotone"
                       dataKey="balance"
@@ -557,7 +558,7 @@ export default function AccountsPage() {
     windowLabel,
     periodOptions,
     showWindowNav,
-    monthRange: windowMonthRange,
+    dateRange: windowDateRange,
   } = useDateWindow('finance:accounts:timeframe', 'finance:accounts:windowEnd', '1m');
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:accounts:chartType', 'line');
@@ -567,6 +568,14 @@ export default function AccountsPage() {
   const [hierarchyCollapsed, setHierarchyCollapsed] = useCardCollapsed('accountsHierarchy');
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ── Chart pan/zoom viewport state ────────────────────────────────────────────
   const [viewStart, setViewStart] = useState<number | null>(null);
@@ -1091,10 +1100,9 @@ export default function AccountsPage() {
   const [defaultStart, defaultEnd] = useMemo(() => {
     if (rechartsData.length === 0) return [0, 0];
     if (timeframe === 'all') return [0, rechartsData.length - 1];
-    // Find indices corresponding to the month range window
-    const startStr = windowMonthRange.start + '-01';
-    const [ey, em] = windowMonthRange.end.split('-').map(Number);
-    const endStr = windowMonthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+    // Find indices corresponding to the date range window
+    const startStr = windowDateRange.start;
+    const endStr = windowDateRange.end;
     const sIdx = rechartsData.findIndex((d: any) => d.date >= startStr);
     if (sIdx === -1) return [0, -1];
     let eIdx = rechartsData.length - 1;
@@ -1102,7 +1110,7 @@ export default function AccountsPage() {
       if (rechartsData[i].date <= endStr) { eIdx = i; break; }
     }
     return [sIdx, eIdx];
-  }, [rechartsData, timeframe, windowMonthRange.start, windowMonthRange.end]);
+  }, [rechartsData, timeframe, windowDateRange.start, windowDateRange.end]);
 
   const currentViewStart = viewStart ?? defaultStart;
   const currentViewEnd = viewEnd ?? defaultEnd;
@@ -1235,8 +1243,15 @@ export default function AccountsPage() {
   }, [minVal, maxVal]);
 
   const xAxisTicks = useMemo(() => {
-    return getChartXTicks(visibleData, timeframe, 'date');
-  }, [visibleData, timeframe]);
+    return getChartXTicksUnified(visibleData, timeframe, isMobile, 'date');
+  }, [visibleData, timeframe, isMobile]);
+
+  const dateRangeStr = useMemo(() => {
+    if (visibleData.length === 0) return null;
+    const first = String(visibleData[0].date);
+    const last = String(visibleData[visibleData.length - 1].date);
+    return formatChartDateRange(first, last);
+  }, [visibleData]);
 
   // ── Pan handlers ─────────────────────────────────────────────────────────────
   const handleChartMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1290,10 +1305,13 @@ export default function AccountsPage() {
     const zoomMap: Record<TimeRange, TimeRange> = {
       all: '5y',
       '5y': '1y',
+      '365d': '6m',
       '1y': '6m',
       '6m': '3m',
       '3m': '1m',
-      '1m': '1m',
+      '1m': '30d',
+      '30d': '7d',
+      '7d': '7d',
       ytd: '3m',
     };
     const nextTimeframe = zoomMap[timeframe];
@@ -1348,15 +1366,14 @@ export default function AccountsPage() {
     const firstAcc = accs[0];
     const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
 
-    // Use month-aligned date range instead of rolling date range
-    const range = getMonthRange(hierarchyTimeframe);
+    // Use precise date range to support rolling timeframes correctly
+    const range = getPreciseDateRange(hierarchyTimeframe);
     let startIdx = 0;
     let endIdx = historyData.length - 1;
 
     if (hierarchyTimeframe !== 'all') {
-      const startStr = range.start + '-01';
-      const [ey, em] = range.end.split('-').map(Number);
-      const endStr = range.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+      const startStr = range.start;
+      const endStr = range.end;
 
       const foundStart = historyData.findIndex((d) => d.date >= startStr);
       if (foundStart !== -1) startIdx = foundStart;
@@ -2103,6 +2120,13 @@ export default function AccountsPage() {
                             onMouseLeave={handleChartMouseUp}
                             onDoubleClick={handleChartDoubleClick}
                           >
+                            {dateRangeStr && (
+                              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-10">
+                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                                  {dateRangeStr}
+                                </span>
+                              </div>
+                            )}
                             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                               {chartType === 'bar' ? (
                                 <BarChart
@@ -2118,16 +2142,8 @@ export default function AccountsPage() {
                                     axisLine={{ stroke: 'var(--color-border)' }}
                                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                                     ticks={xAxisTicks}
-                                    tickFormatter={(d) => {
-                                      if (!d) return '';
-                                      if (timeframe === '1m') {
-                                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                                      } else if (timeframe === '5y' || timeframe === 'all') {
-                                        return formatSafeUTCDate(d, { year: 'numeric' });
-                                      } else {
-                                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                                      }
-                                    }}
+                                    tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
+                                    minTickGap={30}
                                   />
                                   <YAxis
                                     tickLine={false}
@@ -2141,17 +2157,10 @@ export default function AccountsPage() {
                                       const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
                                       return withZero;
                                     })()}
-                                    tickFormatter={(v: number) => {
-                                      const absV = Math.abs(v);
-                                      const sign = v < 0 ? '-' : '';
-                                      if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                                      if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                                      if (absV === 0) return '$0';
-                                      return `${sign}$${absV.toFixed(0)}`;
-                                    }}
+                                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
                                   />
                                   <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                                  <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                                  <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} wrapperStyle={{ zIndex: 50 }} />
                                   
                                   {/* Render assets bars (positive stack) */}
                                   {activeAssets.map((key) => {
@@ -2209,16 +2218,8 @@ export default function AccountsPage() {
                                     axisLine={{ stroke: 'var(--color-border)' }}
                                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                                     ticks={xAxisTicks}
-                                    tickFormatter={(d) => {
-                                      if (!d) return '';
-                                      if (timeframe === '1m') {
-                                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                                      } else if (timeframe === '5y' || timeframe === 'all') {
-                                        return formatSafeUTCDate(d, { year: 'numeric' });
-                                      } else {
-                                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                                      }
-                                    }}
+                                    tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
+                                    minTickGap={30}
                                   />
                                   <YAxis
                                     tickLine={false}
@@ -2232,14 +2233,7 @@ export default function AccountsPage() {
                                       const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
                                       return withZero;
                                     })()}
-                                    tickFormatter={(v: number) => {
-                                      const absV = Math.abs(v);
-                                      const sign = v < 0 ? '-' : '';
-                                      if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-                                      if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-                                      if (absV === 0) return '$0';
-                                      return `${sign}$${absV.toFixed(0)}`;
-                                    }}
+                                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
                                   />
                                   <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                                   <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />

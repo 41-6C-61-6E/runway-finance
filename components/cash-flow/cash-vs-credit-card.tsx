@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -107,13 +108,23 @@ export function CashVsCreditCard() {
     windowLabel,
     periodOptions,
     showWindowNav,
-    monthRange,
+    dateRange,
   } = useDateWindow('finance:cash-vs-credit:timeframe', 'finance:cash-vs-credit:windowEnd', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashVsCredit');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const dateRangeStr = useMemo(() => {
+    return formatChartDateRange(dateRange.start, dateRange.end);
+  }, [dateRange.start, dateRange.end]);
   const [includeSavings, setIncludeSavings] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('finance:cash-vs-credit:include-savings');
@@ -139,10 +150,9 @@ export function CashVsCreditCard() {
   }, [showNetPosition]);
 
   const queryParams = useMemo(() => {
-    const range = getMonthRange(timeframe, windowEnd);
-    const base = timeframe === 'all' ? 'timeframe=all' : `startMonth=${range.start}&endMonth=${range.end}`;
+    const base = timeframe === 'all' ? 'timeframe=all' : `startDate=${dateRange.start}&endDate=${dateRange.end}`;
     return `${base}&includeSavings=${includeSavings}`;
-  }, [timeframe, windowEnd, includeSavings]);
+  }, [timeframe, dateRange.start, dateRange.end, includeSavings]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -223,33 +233,16 @@ export function CashVsCreditCard() {
   const yDomain: [number, number] = [minVal * 1.15, maxVal * 1.15];
 
   const formatTick = useCallback((v: number) => {
-    const absV = Math.abs(v);
-    if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
-    if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
-    return `$${absV}`;
-  }, []);
+    return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
+  }, [yDomain]);
 
   const formatXTick = useCallback((d: string) => {
-    if (!d) return '';
-    if (timeframe === '1m') {
-      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-    }
-    if (timeframe === '5y' || timeframe === 'all') {
-      return formatSafeUTCDate(d, { year: 'numeric' });
-    }
-    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+    return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
   }, [timeframe]);
 
   const xTicks = useMemo(() => {
-    if (chartData.length <= 6) return chartData.map((d) => d.date);
-    const ticks: string[] = [];
-    const step = (chartData.length - 1) / 5;
-    for (let i = 0; i < 6; i++) {
-      const idx = Math.round(step * i);
-      if (idx < chartData.length) ticks.push(chartData[idx].date);
-    }
-    return ticks;
-  }, [chartData]);
+    return getChartXTicksUnified(chartData, timeframe, isMobile, 'date');
+  }, [chartData, timeframe, isMobile]);
 
   const CustomTooltip = useCallback(({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -372,8 +365,7 @@ export function CashVsCreditCard() {
             }
           >
             <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
               <div className="flex items-center gap-2">
@@ -446,7 +438,14 @@ export function CashVsCreditCard() {
             ) : (
               <div className="h-[260px]">
                 <div className="h-full w-full overflow-x-auto overflow-y-hidden">
-                  <div className="min-w-max h-full px-2 pb-2">
+                   <div className="min-w-max h-full px-2 pb-2 relative">
+                    {dateRangeStr && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                          {dateRangeStr}
+                        </span>
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                       <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                         <defs>
@@ -467,6 +466,7 @@ export function CashVsCreditCard() {
                           tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                           ticks={xTicks}
                           tickFormatter={formatXTick}
+                          minTickGap={30}
                         />
                         <YAxis
                           tickLine={false}

@@ -7,6 +7,22 @@ export const authConfig = {
     error: "/signin",
   },
   trustHost: true,
+  ...(process.env.NODE_ENV !== "production" ? {
+    cookies: {
+      sessionToken: {
+        name: "authjs.session-token",
+        options: { httpOnly: true, sameSite: "none", path: "/", secure: true }
+      },
+      csrfToken: {
+        name: "authjs.csrf-token",
+        options: { httpOnly: true, sameSite: "none", path: "/", secure: true }
+      },
+      callbackUrl: {
+        name: "authjs.callback-url",
+        options: { sameSite: "none", path: "/", secure: true }
+      }
+    }
+  } : {}),
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
