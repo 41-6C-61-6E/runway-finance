@@ -18,7 +18,8 @@ import {
   Legend,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatSafeUTCDate, getChartXTicks } from '@/lib/utils/date';
+import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -51,6 +52,7 @@ type DisplayMode = 'dollar' | 'percent';
 async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
   try {
     const rangeMap: Record<TimeRange, string> = {
+      '7d': '5d', '30d': '1mo', '365d': '1y',
       '1m': '1mo', '3m': '3mo', '6m': '6mo', '1y': '1y',
       '5y': '5y', 'ytd': 'ytd', 'all': '10y',
     };
@@ -76,6 +78,14 @@ export function PerformanceChart() {
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -153,24 +163,23 @@ export function PerformanceChart() {
     return [lowerBound, rawMax + pad];
   }, [mergedData, displayMode, showBenchmark]);
 
-  const xTicks = useMemo(() => getChartXTicks(mergedData, timeframe), [mergedData, timeframe]);
+  const xTicks = useMemo(() => getChartXTicksUnified(mergedData, timeframe, isMobile, 'date'), [mergedData, timeframe, isMobile]);
 
   const formatXTick = useCallback((d: string) => {
-    if (!d) return '';
-    if (timeframe === '1m') return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-    if (timeframe === '5y' || timeframe === 'all') return formatSafeUTCDate(d, { year: 'numeric' });
-    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+    return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
   }, [timeframe]);
+
+  const dateRangeStr = useMemo(() => {
+    if (mergedData.length === 0) return null;
+    const first = String(mergedData[0].date);
+    const last = String(mergedData[mergedData.length - 1].date);
+    return formatChartDateRange(first, last);
+  }, [mergedData]);
 
   const formatYTick = useCallback((v: number) => {
     if (displayMode === 'percent') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-    const absV = Math.abs(v);
-    const sign = v < 0 ? '-' : '';
-    if (absV >= 1_000_000) return `${sign}$${(absV / 1_000_000).toFixed(1)}M`;
-    if (absV >= 1_000) return `${sign}$${(absV / 1_000).toFixed(0)}K`;
-    if (absV === 0) return '$0';
-    return `${sign}$${absV.toFixed(0)}`;
-  }, [displayMode]);
+    return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
+  }, [displayMode, yDomain]);
 
   const CustomTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -266,8 +275,7 @@ export function PerformanceChart() {
           >
             <div className="flex flex-wrap items-center gap-4">
               {/* Timeframe */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
 
@@ -316,6 +324,13 @@ export function PerformanceChart() {
             {/* Chart Area */}
             <div className="flex-1 min-w-0 p-3 sm:p-5">
               <div className="h-[190px] sm:h-[280px] w-full relative">
+                {dateRangeStr && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {dateRangeStr}
+                    </span>
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Portfolio History Area Chart" data={mergedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
@@ -336,6 +351,7 @@ export function PerformanceChart() {
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       ticks={xTicks}
                       tickFormatter={formatXTick}
+                      minTickGap={30}
                     />
                     <YAxis
                       tickLine={false}

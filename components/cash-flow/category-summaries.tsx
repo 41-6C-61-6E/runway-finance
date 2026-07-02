@@ -77,17 +77,14 @@ export function CategorySummaries() {
     windowLabel,
     periodOptions,
     showWindowNav,
+    dateRange,
   } = useDateWindow('finance:category-summaries:timeframe', 'finance:category-summaries:windowEnd', '1m');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('categorySummaries');
   const [showFilters, setShowFilters] = useState(false);
 
   const queryParams = useMemo(() => {
-    const range = getMonthRange(timeframe, windowEnd);
-    if (timeframe === '1m') {
-      return `month=${range.start}`;
-    }
-    return `startMonth=${range.start}&endMonth=${range.end}`;
-  }, [timeframe, windowEnd]);
+    return `startDate=${dateRange.start}&endDate=${dateRange.end}`;
+  }, [dateRange.start, dateRange.end]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -341,8 +338,7 @@ export function CategorySummaries() {
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
             </div>

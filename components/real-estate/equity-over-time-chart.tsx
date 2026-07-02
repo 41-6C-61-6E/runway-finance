@@ -11,7 +11,8 @@ import {
   Tooltip as RechartsTooltip,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
+import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -71,10 +72,18 @@ export function EquityOverTimeChart() {
     windowLabel,
     periodOptions,
     showWindowNav,
-    monthRange,
+    dateRange,
   } = useDateWindow('finance:real-estate:timeframe', 'finance:real-estate:windowEnd', 'all');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetch('/api/real-estate?months=600', { credentials: 'include' })
@@ -315,12 +324,11 @@ export function EquityOverTimeChart() {
 
     if (timeframe === 'all') return synthFiltered;
 
-    const startStr = `${monthRange.start}-01`;
-    const [ey, em] = monthRange.end.split('-').map(Number);
-    const endStr = `${ey}-${String(em).padStart(2, '0')}-${new Date(ey, em, 0).getDate()}`;
+    const startStr = dateRange.start;
+    const endStr = dateRange.end;
 
     return synthFiltered.filter((pt) => pt.date >= startStr && pt.date <= endStr);
-  }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeframe, monthRange.start, monthRange.end]);
+  }, [selectedPropertyId, propTimelines, combinedTimeline, showSynth, timeframe, dateRange.start, dateRange.end]);
 
   // Downsample the timeline to at most `maxPoints` evenly-spaced entries so
   // the basis spline has room to curve smoothly on dense "all" timelines.
@@ -336,8 +344,15 @@ export function EquityOverTimeChart() {
   }, [activeTimeline]);
 
   const xAxisTicks = useMemo(() => {
-    return getChartXTicks(displayTimeline, timeframe, 'date');
-  }, [displayTimeline, timeframe]);
+    return getChartXTicksUnified(displayTimeline, timeframe, isMobile, 'date');
+  }, [displayTimeline, timeframe, isMobile]);
+
+  const dateRangeStr = useMemo(() => {
+    if (displayTimeline.length === 0) return null;
+    const first = String(displayTimeline[0].date);
+    const last = String(displayTimeline[displayTimeline.length - 1].date);
+    return formatChartDateRange(first, last);
+  }, [displayTimeline]);
 
   // Map mortgage account IDs to their readable names
   const mortgageNamesMap = useMemo(() => {
@@ -575,14 +590,20 @@ export function EquityOverTimeChart() {
                   </select>
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
             </div>
           </CollapsibleFilterPanel>
           <div className="h-[300px] px-2 pb-2">
-            <div className="h-full">
+            <div className="h-full relative">
+              {dateRangeStr && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                    {dateRangeStr}
+                  </span>
+                </div>
+              )}
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <ComposedChart
                   role="img"
@@ -616,28 +637,15 @@ export function EquityOverTimeChart() {
                     axisLine={{ stroke: 'var(--color-border)' }}
                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                     ticks={xAxisTicks}
-                    tickFormatter={(d) => {
-                      if (!d) return '';
-                      if (timeframe === '1m') {
-                        return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-                      } else if (timeframe === '5y' || timeframe === 'all') {
-                        return formatSafeUTCDate(d, { year: 'numeric' });
-                      } else {
-                        return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-                      }
-                    }}
+                    tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
+                    minTickGap={30}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={{ stroke: 'var(--color-border)' }}
                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                     domain={[0, maxVal * 1.05]}
-                    tickFormatter={(v: number) => {
-                      if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                      if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                      if (v === 0) return '$0';
-                      return `$${v.toFixed(0)}`;
-                    }}
+                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, 0, maxVal * 1.05)}
                   />
                   <RechartsTooltip
                     content={<CustomTooltip />}

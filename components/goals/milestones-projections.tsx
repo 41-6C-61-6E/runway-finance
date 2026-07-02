@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, PiggyBank, Loader2, Check } from 'lucide-react';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils/format';
 import { useGoalInflow } from './goal-inflow-context';
@@ -65,8 +66,7 @@ interface ProjectionsResult {
 }
 
 function formatDateLabel(dateStr: string): string {
-  const d = new Date(dateStr + '-01');
-  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  return formatChartXAxisDate(dateStr + '-01', 'all', { isMonthly: true });
 }
 
 function formatMonthYear(dateStr: string): string {
@@ -169,6 +169,14 @@ export function MilestonesProjections() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   // Per-account pending inflow inputs: accountId -> string (raw input)
   const [pendingInputs, setPendingInputs] = useState<Record<string, string>>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const { savedInflows, setSavedInflow } = useGoalInflow();
   const hasLoadedOnce = useRef(false);
   const debounceTimers = useRef<Record<string, any>>({});
@@ -299,6 +307,24 @@ export function MilestonesProjections() {
       chartAccounts: [{ ...account, dataKey: `acct_${account.accountId}` } as any],
     };
   }, [data, selectedAccountId]);
+
+  const xAxisTicks = useMemo(() => {
+    if (!chartData || chartData.length === 0) return [];
+    return getChartXTicksUnified(chartData, 'all', isMobile, 'date');
+  }, [chartData, isMobile]);
+
+  const yDomainMax = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 0;
+    let max = 0;
+    for (const row of chartData) {
+      for (const key of Object.keys(row)) {
+        if (key.startsWith('acct_') && typeof row[key] === 'number') {
+          max = Math.max(max, row[key]);
+        }
+      }
+    }
+    return max;
+  }, [chartData]);
 
   if (loading && !data) {
     return (
@@ -509,8 +535,9 @@ export function MilestonesProjections() {
                     tickLine={false}
                     axisLine={{ stroke: 'var(--color-border)' }}
                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-                    interval={Math.max(1, Math.floor(chartData.length / 8))}
+                    ticks={xAxisTicks}
                     tickFormatter={formatDateLabel}
+                    minTickGap={30}
                   />
 
                   <YAxis
@@ -518,11 +545,7 @@ export function MilestonesProjections() {
                     axisLine={false}
                     tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                     width={55}
-                    tickFormatter={(v: number) => {
-                      if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                      if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                      return `$${v}`;
-                    }}
+                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, 0, yDomainMax)}
                   />
 
                   <RechartsTooltip content={<ProjectionChartTooltip goals={allGoals} />} cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.4 }} />

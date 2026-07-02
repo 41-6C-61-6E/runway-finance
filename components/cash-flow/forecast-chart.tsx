@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
 interface ChartSeries {
@@ -55,12 +56,34 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const xInterval = useMemo(() => {
-    if (isMobile) {
-      return Math.max(0, Math.ceil(chartData.length / 6) - 1);
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicksUnified(chartData, 'all', isMobile, 'x');
+  }, [chartData, isMobile]);
+
+  const yDomain = useMemo(() => {
+    if (chartData.length === 0) return [0, 0];
+    let min = Infinity;
+    let max = -Infinity;
+    for (const d of chartData) {
+      for (const key of Object.keys(d)) {
+        if (key !== 'x' && typeof d[key] === 'number') {
+          min = Math.min(min, d[key]);
+          max = Math.max(max, d[key]);
+        }
+      }
     }
-    return Math.max(0, Math.ceil(chartData.length / 12) - 1);
-  }, [chartData.length, isMobile]);
+    if (min === Infinity) min = 0;
+    if (max === -Infinity) max = 0;
+    return [min, max];
+  }, [chartData]);
+
+  const formatXTick = useCallback((v: string) => {
+    return formatChartXAxisDate(v + '-01', 'all', { isMonthly: true });
+  }, []);
+
+  const formatYTick = useCallback((v: number) => {
+    return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
+  }, [yDomain]);
 
   const srSummary = useMemo(() => {
     if (chartData.length === 0) return '';
@@ -92,26 +115,21 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
               tickLine={false}
               axisLine={{ stroke: 'var(--color-border)' }}
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-              interval={xInterval}
-              tickFormatter={(v: string) => {
-                return formatSafeUTCDate(v + '-01', { month: 'short', year: '2-digit' });
-              }}
+              ticks={xAxisTicks}
+              tickFormatter={formatXTick}
+              minTickGap={30}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
               width={60}
-              tickFormatter={(v: number) => {
-                if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                return `$${v}`;
-              }}
+              tickFormatter={formatYTick}
             />
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                const xFormatted = formatSafeUTCDate(label + '-01', { month: 'short', year: '2-digit' });
+                const xFormatted = formatChartXAxisDate(label + '-01', 'all', { isMonthly: true });
                 return (
                   <ChartTooltip>
                     <TooltipHeader>{xFormatted}</TooltipHeader>

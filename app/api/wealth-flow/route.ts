@@ -31,23 +31,31 @@ export async function GET(request: Request) {
   const month = searchParams.get('month');
   let startMonth = searchParams.get('startMonth');
   let endMonth = searchParams.get('endMonth');
+  let startDate = searchParams.get('startDate');
+  let endDate = searchParams.get('endDate');
   const accountIdsParam = searchParams.get('accountIds') || '';
   const accountIds = accountIdsParam ? accountIdsParam.split(',').filter(Boolean) : [];
 
-  if (month) {
-    startMonth = month;
-    endMonth = month;
-  }
+  if (!startDate || !endDate) {
+    if (month) {
+      startMonth = month;
+      endMonth = month;
+    }
 
-  if (!startMonth || !endMonth) {
-    const now = new Date();
-    const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    startMonth = currentYm;
-    endMonth = currentYm;
+    if (!startMonth || !endMonth) {
+      const now = new Date();
+      const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      startMonth = currentYm;
+      endMonth = currentYm;
+    }
+
+    startDate = `${startMonth}-01`;
+    const [ey, em] = endMonth.split('-').map(Number);
+    endDate = `${endMonth}-${String(new Date(ey, em, 0).getDate()).padStart(2, '0')}`;
   }
 
   try {
-    const data = await calculateWealthFlow(dataUserId, startMonth, endMonth, dek, accountIds);
+    const data = await calculateWealthFlow(dataUserId, startDate, endDate, dek, accountIds);
     return NextResponse.json(data);
   } catch (error) {
     logger.error('[api-wealth-flow] Error calculating wealth flow', {

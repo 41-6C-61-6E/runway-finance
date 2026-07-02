@@ -17,12 +17,31 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month');
-  const startMonth = searchParams.get('startMonth');
-  const endMonth = searchParams.get('endMonth');
+  let startMonth = searchParams.get('startMonth');
+  let endMonth = searchParams.get('endMonth');
+  let startDate = searchParams.get('startDate');
+  let endDate = searchParams.get('endDate');
   const accountIdsParam = searchParams.get('accountIds') || '';
   const accountIdList = accountIdsParam ? accountIdsParam.split(',').filter(Boolean) : [];
 
-  const isRange = startMonth && endMonth;
+  if (!startDate || !endDate) {
+    if (month) {
+      startMonth = month;
+      endMonth = month;
+    }
+
+    if (!startMonth || !endMonth) {
+      const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      startMonth = currentYm;
+      endMonth = currentYm;
+    }
+
+    startDate = `${startMonth}-01`;
+    const [ey, em] = endMonth.split('-').map(Number);
+    endDate = `${endMonth}-${String(new Date(ey, em, 0).getDate()).padStart(2, '0')}`;
+  }
+
+  const isRange = startDate !== endDate;
 
   const db = getDb();
 
@@ -109,8 +128,8 @@ export async function GET(request: Request) {
     async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
     const conditions = [
       eq(transactions.userId, dataUserId),
-      gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
-      lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
+      gte(transactions.date, start),
+      lte(transactions.date, end),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
       eq(transactions.deleted, false),
@@ -220,8 +239,8 @@ export async function GET(request: Request) {
   }> {
     const conditions = [
       eq(transactions.userId, dataUserId),
-      gte(sql`to_char(${transactions.date}, 'YYYY-MM')`, start),
-      lte(sql`to_char(${transactions.date}, 'YYYY-MM')`, end),
+      gte(transactions.date, start),
+      lte(transactions.date, end),
       isNull(transactions.categoryId),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
@@ -270,9 +289,10 @@ export async function GET(request: Request) {
       let incomeRows: any[];
 
       if (!isImportTransactionsEnabled) {
-        const [spending, income] = await Promise.all([
-          fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, false),
-          fetchTransactionsAggregated(startMonth!, endMonth!, accountIdList, true),
+        const [spending, income, { spendingTotal, spendingCount, incomeTotal, incomeCount }] = await Promise.all([
+          fetchTransactionsAggregated(startDate!, endDate!, accountIdList, false),
+          fetchTransactionsAggregated(startDate!, endDate!, accountIdList, true),
+          fetchUncategorizedTotals(startDate!, endDate!, accountIdList),
         ]);
         rows = spending;
         incomeRows = income;
@@ -280,8 +300,8 @@ export async function GET(request: Request) {
         // Use summary tables (pre-computed, but encrypted)
         const spendingConditions = [
           eq(categorySpendingSummary.userId, dataUserId),
-          gte(categorySpendingSummary.yearMonth, startMonth!),
-          lte(categorySpendingSummary.yearMonth, endMonth!),
+          gte(categorySpendingSummary.yearMonth, startDate!),
+          lte(categorySpendingSummary.yearMonth, endDate!),
           eq(categories.excludeFromReports, false),
           // Also exclude children whose parent has excludeFromReports=true
           or(
@@ -292,8 +312,8 @@ export async function GET(request: Request) {
 
         const incomeConditions = [
           eq(categoryIncomeSummary.userId, dataUserId),
-          gte(categoryIncomeSummary.yearMonth, startMonth!),
-          lte(categoryIncomeSummary.yearMonth, endMonth!),
+          gte(categoryIncomeSummary.yearMonth, startDate!),
+          lte(categoryIncomeSummary.yearMonth, endDate!),
           eq(categories.excludeFromReports, false),
           // Also exclude children whose parent has excludeFromReports=true
           or(
@@ -339,7 +359,7 @@ export async function GET(request: Request) {
           .where(and(...incomeConditions));
       }
 
-      const { spendingTotal, spendingCount, incomeTotal, incomeCount } = await fetchUncategorizedTotals(startMonth!, endMonth!, accountIdList);
+      const { spendingTotal, spendingCount, incomeTotal, incomeCount } = await fetchUncategorizedTotals(startDate!, endDate!, accountIdList);
 
       // Decrypt and aggregate by categoryId
       const categoryMap = new Map<string, any>();

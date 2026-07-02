@@ -152,8 +152,8 @@ async function getBalancesOnDate(
 
 export async function calculateWealthFlow(
   userId: string,
-  startMonth: string,
-  endMonth: string,
+  startDateStr: string,
+  endDateStr: string,
   dek: Uint8Array,
   filterAccountIds?: string[]
 ): Promise<WealthFlowData> {
@@ -202,15 +202,9 @@ export async function calculateWealthFlow(
   );
 
   // 2. Resolve dates
-  const [startYear, startMonthNum] = startMonth.split('-').map(Number);
-  const dayBeforeDate = new Date(startYear, startMonthNum - 1, 0);
+  const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');
+  dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
   const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
-
-  const [endYear, endMonthNum] = endMonth.split('-').map(Number);
-  const lastDayDate = new Date(endYear, endMonthNum, 0);
-  const endDateStr = lastDayDate.toISOString().split('T')[0];
-
-  const startDateStr = `${startMonth}-01`;
 
   // 3. Fetch beginning and ending balances
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);

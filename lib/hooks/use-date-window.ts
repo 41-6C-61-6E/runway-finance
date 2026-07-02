@@ -3,7 +3,7 @@
 import { useMemo, useEffect } from 'react';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
-import { getCurrentMonth, getMonthRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
+import { getCurrentMonth, getMonthRange, getPreciseDateRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
 
 const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, 'ytd': 12, '5y': 60 };
 const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 };
@@ -18,6 +18,7 @@ export interface DateWindowState {
   isNextDisabled: boolean;
   windowLabel: string;
   monthRange: { start: string; end: string };
+  dateRange: { start: string; end: string };
   periodOptions: { label: string; value: string }[];
   showWindowNav: boolean;
 }
@@ -72,7 +73,7 @@ export function useDateWindow(
   };
 
   const isNextDisabled = useMemo(() => {
-    if (timeframe === 'all') return true;
+    if (timeframe === 'all' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return true;
     const [y, m] = windowEnd.split('-').map(Number);
     const nextEnd = new Date(y, m - 1, 1);
     nextEnd.setMonth(nextEnd.getMonth() + shift);
@@ -81,14 +82,15 @@ export function useDateWindow(
     return `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}` > currentMonth;
   }, [timeframe, windowEnd, shift, currentMonth]);
 
-  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd';
+  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd' && timeframe !== '7d' && timeframe !== '30d' && timeframe !== '365d';
 
   const windowLabel = useMemo(() => getPeriodLabel(windowEnd, timeframe), [windowEnd, timeframe]);
 
   const monthRange = useMemo(() => getMonthRange(timeframe, windowEnd), [timeframe, windowEnd]);
+  const dateRange = useMemo(() => getPreciseDateRange(timeframe, windowEnd), [timeframe, windowEnd]);
 
   const periodOptions = useMemo(() => {
-    if (timeframe === 'all') return [];
+    if (timeframe === 'all' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return [];
     const options: { label: string; value: string }[] = [];
     const count = timeframe === '1m' ? 24 : 12;
     const cursor = new Date();
@@ -115,6 +117,7 @@ export function useDateWindow(
     isNextDisabled,
     windowLabel,
     monthRange,
+    dateRange,
     periodOptions,
     showWindowNav,
   };

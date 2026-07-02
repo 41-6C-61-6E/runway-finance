@@ -76,6 +76,8 @@ export async function GET(request: Request) {
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
   const startMonth = searchParams.get('startMonth');
   const endMonth = searchParams.get('endMonth');
+  let startDateParam = searchParams.get('startDate');
+  let endDateParam = searchParams.get('endDate');
   const includeSavings = searchParams.get('includeSavings') !== 'false';
 
   const userSettingsList = await getDb()
@@ -86,20 +88,24 @@ export async function GET(request: Request) {
 
   const userTz = userSettingsList[0]?.timezone || 'America/New_York';
 
-  let startDate: Date;
-  let endDate: Date;
+  let earliestSnap: any[] | undefined = undefined;
 
-  if (startMonth && endMonth) {
-    const [sy, sm] = startMonth.split('-').map(Number);
-    startDate = new Date(Date.UTC(sy, sm - 1, 1));
+  let startStr = '';
+  let endStr = '';
+
+  if (startDateParam && endDateParam) {
+    startStr = startDateParam;
+    endStr = endDateParam;
+  } else if (startMonth && endMonth) {
+    startStr = `${startMonth}-01`;
     const [ey, em] = endMonth.split('-').map(Number);
-    endDate = new Date(Date.UTC(ey, em, 0)); // last day of the month
+    endStr = `${ey}-${String(em).padStart(2, '0')}-${String(new Date(ey, em, 0).getDate()).padStart(2, '0')}`;
   } else {
     const [s, e] = getDateRange(timeframe);
-    startDate = s;
-    endDate = e;
+    let startDate = s;
+    let endDate = e;
     if (timeframe === 'all') {
-      const earliestSnap = await getDb()
+      earliestSnap = await getDb()
         .select({ snapshotDate: accountSnapshots.snapshotDate })
         .from(accountSnapshots)
         .where(eq(accountSnapshots.userId, dataUserId))
@@ -112,11 +118,11 @@ export async function GET(request: Request) {
         startDate.setFullYear(startDate.getFullYear() - 1);
       }
     }
+    startStr = timeframe === 'all' && earliestSnap && earliestSnap.length > 0 && earliestSnap[0].snapshotDate
+      ? earliestSnap[0].snapshotDate
+      : formatInTimezone(startDate, userTz);
+    endStr = formatInTimezone(endDate, userTz);
   }
-  const startStr = timeframe === 'all' && earliestSnap && earliestSnap.length > 0 && earliestSnap[0].snapshotDate
-    ? earliestSnap[0].snapshotDate
-    : formatInTimezone(startDate, userTz);
-  const endStr = formatInTimezone(endDate, userTz);
 
   try {
     const userAccounts = await getDb()

@@ -9,13 +9,19 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
 
-type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
+type TimeFrame = '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all';
 
 function getDateRange(timeframe: TimeFrame): [Date, Date] {
   const endDate = new Date();
   const startDate = new Date();
 
   switch (timeframe) {
+    case '7d':
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case '30d':
+      startDate.setDate(startDate.getDate() - 30);
+      break;
     case '1m':
       startDate.setMonth(startDate.getMonth() - 1);
       break;
@@ -27,6 +33,9 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
       break;
     case '1y':
       startDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+    case '365d':
+      startDate.setDate(startDate.getDate() - 365);
       break;
     case '5y':
       startDate.setFullYear(startDate.getFullYear() - 5);
@@ -82,8 +91,9 @@ export async function GET(request: Request) {
   const userTz = userSettingsList[0]?.timezone || 'America/New_York';
 
   let [startDate, endDate] = getDateRange(timeframe);
+  let earliestSnap: any[] | undefined = undefined;
   if (timeframe === 'all') {
-    const earliestSnap = await getDb()
+    earliestSnap = await getDb()
       .select({ snapshotDate: accountSnapshots.snapshotDate })
       .from(accountSnapshots)
       .where(eq(accountSnapshots.userId, dataUserId))

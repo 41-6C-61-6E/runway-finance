@@ -19,6 +19,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
@@ -39,6 +40,7 @@ interface MonthlyData {
 }
 
 const MONTH_MAP: Record<TimeRange, number> = {
+  '7d': 1, '30d': 1, '365d': 12,
   '1m': 1, '3m': 3, '6m': 6, '1y': 12, '5y': 60, 'ytd': 12, 'all': 120,
 };
 
@@ -69,6 +71,7 @@ export function IncomeExpenseChart() {
     windowLabel,
     periodOptions,
     showWindowNav,
+    dateRange,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
@@ -81,7 +84,9 @@ export function IncomeExpenseChart() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
+  const dateRangeStr = useMemo(() => {
+    return formatChartDateRange(dateRange.start, dateRange.end);
+  }, [dateRange.start, dateRange.end]);
   const numMonths = MONTH_MAP[timeframe] || 12;
   const effectiveEndIdx = useMemo(() => {
     if (timeframe === 'all') return allData.length;
@@ -103,20 +108,18 @@ export function IncomeExpenseChart() {
     expenses: -Math.abs(d.expenses),
   })), [data]);
 
-  const xInterval = useMemo(() => {
-    if (isMobile) {
-      return Math.max(0, Math.ceil(data.length / 6) - 1);
-    }
-    return Math.max(0, Math.ceil(data.length / 12) - 1);
-  }, [data.length, isMobile]);
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicksUnified(data, timeframe, isMobile, 'yearMonth');
+  }, [data, timeframe, isMobile]);
 
   const srSummary = useMemo(() => {
     if (chartData.length === 0) return '';
     const lastPoint = chartData[chartData.length - 1];
     const totalIncome = chartData.reduce((sum, d) => sum + d.income, 0);
     const totalExpenses = chartData.reduce((sum, d) => sum + Math.abs(d.expenses), 0);
-    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${lastPoint.month}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}.`;
-  }, [chartData]);
+    const formattedLastPointMonth = formatChartXAxisDate(lastPoint.yearMonth + '-01', timeframe, { isMonthly: true });
+    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${formattedLastPointMonth}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}.`;
+  }, [chartData, timeframe]);
 
   const allValues = chartData.flatMap((d) => [d.income, d.expenses, d.net]);
   const minVal = Math.min(...allValues, 0);
@@ -130,43 +133,47 @@ export function IncomeExpenseChart() {
     router.push(`/transactions?startDate=${startDate}&endDate=${endDate}`);
   };
 
-  const formatTick = (v: number) => {
-    const absV = Math.abs(v);
-    if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
-    if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
-    return `$${absV}`;
-  };
+  const formatXTick = useCallback((d: string) => {
+    return formatChartXAxisDate(d + '-01', timeframe, { isMonthly: true });
+  }, [timeframe]);
+
+  const formatYTick = useCallback((v: number) => {
+    return formatChartYAxisCurrency(v, minVal * 1.15, maxVal * 1.15);
+  }, [minVal, maxVal]);
 
   const CustomTooltip = useCallback(({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     const point = payload[0]?.payload;
     if (!point) return null;
+    const headerDate = formatChartXAxisDate(point.yearMonth + '-01', timeframe, { isMonthly: true });
     return (
       <ChartTooltip>
-        <TooltipHeader>{label}</TooltipHeader>
+        <TooltipHeader>{headerDate}</TooltipHeader>
         <TooltipRow label="Income" value={formatCurrency(point.income)} color="var(--color-chart-1)" />
         <TooltipRow label="Expenses" value={formatCurrency(Math.abs(point.expenses))} color="var(--color-destructive)" />
         <TooltipRow label="Net Income" value={formatCurrency(point.net)} color="var(--color-primary)" />
       </ChartTooltip>
     );
-  }, []);
+  }, [timeframe]);
 
   const sharedAxes = (
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
       <XAxis
-        dataKey="month"
+        dataKey="yearMonth"
         tickLine={false}
         axisLine={{ stroke: 'var(--color-border)' }}
         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-        interval={xInterval}
+        ticks={xAxisTicks}
+        tickFormatter={formatXTick}
+        minTickGap={30}
       />
       <YAxis
         tickLine={false}
         axisLine={{ stroke: 'var(--color-border)' }}
         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
         domain={[minVal * 1.15, maxVal * 1.15]}
-        tickFormatter={formatTick}
+        tickFormatter={formatYTick}
       />
       <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
       <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
@@ -291,8 +298,7 @@ export function IncomeExpenseChart() {
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
+              <div className="flex items-center">
                 <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
               </div>
               <div className="flex items-center gap-1.5">
@@ -303,7 +309,14 @@ export function IncomeExpenseChart() {
           </CollapsibleFilterPanel>
           <div className="h-[320px] touch-pan-y">
             <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
-              <div className="min-w-max h-full px-2 pb-2">
+              <div className="min-w-max h-full px-2 pb-2 relative">
+                {dateRangeStr && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {dateRangeStr}
+                    </span>
+                  </div>
+                )}
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               {chartType === 'bar' ? (
                <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
