@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots } from '@/lib/db/schema';
+import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, gte, lte, lt, desc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -46,6 +46,20 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
   return [startDate, endDate];
 }
 
+function formatInTimezone(date: Date, tz: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -63,6 +77,14 @@ export async function GET(request: Request) {
   const startMonth = searchParams.get('startMonth');
   const endMonth = searchParams.get('endMonth');
   const includeSavings = searchParams.get('includeSavings') !== 'false';
+
+  const userSettingsList = await getDb()
+    .select({ timezone: userSettings.timezone })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  const userTz = userSettingsList[0]?.timezone || 'America/New_York';
 
   let startDate: Date;
   let endDate: Date;
@@ -91,8 +113,10 @@ export async function GET(request: Request) {
       }
     }
   }
-  const startStr = startDate.toISOString().split('T')[0];
-  const endStr = endDate.toISOString().split('T')[0];
+  const startStr = timeframe === 'all' && earliestSnap && earliestSnap.length > 0 && earliestSnap[0].snapshotDate
+    ? earliestSnap[0].snapshotDate
+    : formatInTimezone(startDate, userTz);
+  const endStr = formatInTimezone(endDate, userTz);
 
   try {
     const userAccounts = await getDb()
@@ -212,7 +236,7 @@ export async function GET(request: Request) {
 
     const datesInRange: string[] = [];
     const curr = new Date(startStr + 'T00:00:00Z');
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatInTimezone(new Date(), userTz);
     const actualEndStr = endStr < todayStr ? endStr : todayStr;
     const stop = new Date(actualEndStr + 'T00:00:00Z');
     while (curr <= stop) {
