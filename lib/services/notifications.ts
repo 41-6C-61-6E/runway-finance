@@ -400,7 +400,7 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
         userId,
         `Net Worth Milestone Reached!`,
         `Congratulations, your net worth has crossed ${formattedAmount}!`,
-        '/net-worth',
+        '/',
         'net_worth_milestone',
         key
       );
@@ -493,7 +493,7 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
       userId,
       `Daily Net Worth Alert ${arrow}`,
       `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
-      '/net-worth',
+      '/',
       'daily_net_worth_change',
       key
     );
@@ -1235,7 +1235,7 @@ export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
           userId,
           `Cash Flow Alert: ${rule.name}`,
           notificationBody,
-          '/dashboard',
+          '/flows',
           'custom_cash_flow_alert',
           key
         );

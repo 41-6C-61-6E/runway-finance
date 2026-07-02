@@ -44,6 +44,20 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
   return [startDate, endDate];
 }
 
+function formatInTimezone(date: Date, tz: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -58,6 +72,14 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
+
+  const userSettingsList = await getDb()
+    .select({ timezone: userSettings.timezone })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  const userTz = userSettingsList[0]?.timezone || 'America/New_York';
 
   let [startDate, endDate] = getDateRange(timeframe);
   if (timeframe === 'all') {
@@ -74,8 +96,11 @@ export async function GET(request: Request) {
       startDate.setFullYear(startDate.getFullYear() - 1);
     }
   }
-  const startStr = startDate.toISOString().split('T')[0];
-  const endStr = endDate.toISOString().split('T')[0];
+  
+  const startStr = timeframe === 'all' && earliestSnap && earliestSnap.length > 0 && earliestSnap[0].snapshotDate
+    ? earliestSnap[0].snapshotDate
+    : formatInTimezone(startDate, userTz);
+  const endStr = formatInTimezone(endDate, userTz);
 
   try {
     // 1. Get all user accounts with balance data
@@ -312,7 +337,7 @@ export async function GET(request: Request) {
     // Generate full list of dates in the range
     const datesInRange: string[] = [];
     const curr = new Date(startStr + 'T00:00:00Z');
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatInTimezone(new Date(), userTz);
     const actualEndStr = endStr < todayStr ? endStr : todayStr;
     const stop = new Date(actualEndStr + 'T00:00:00Z');
     while (curr <= stop) {
