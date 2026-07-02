@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatChartYAxisCurrency, formatChartXAxisDate } from '@/lib/utils/chart-format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import {
@@ -32,10 +33,7 @@ interface IncomeDividendsPanelProps {
 }
 
 function formatMonth(ym: string): string {
-  // "2024-03" → "Mar"
-  const [year, month] = ym.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  return formatChartXAxisDate(ym + '-01', 'all', { isMonthly: true });
 }
 
 export function IncomeDividendsPanel({
@@ -65,6 +63,10 @@ export function IncomeDividendsPanel({
     : 0;
 
   const maxBar = chartData.length > 0 ? Math.max(...chartData.map((d) => d.total)) : 0;
+
+  const formatYTick = useCallback((v: number) => {
+    return formatChartYAxisCurrency(v, 0, maxBar * 1.1);
+  }, [maxBar]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -132,12 +134,13 @@ export function IncomeDividendsPanel({
                         axisLine={false}
                         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                         interval={isMobile ? 1 : 0}
+                        minTickGap={30}
                       />
                       <YAxis
                         tickLine={false}
                         axisLine={false}
                         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-                        tickFormatter={(v) => v === 0 ? '$0' : `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v.toFixed(0)}`}
+                        tickFormatter={formatYTick}
                       />
                       <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-muted-foreground)', opacity: 0.08 }} />
                       <Bar dataKey="total" radius={[3, 3, 0, 0]}>

@@ -9,7 +9,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isInvestmentAccount } from '@/lib/utils/account-scope';
 
-type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
+type TimeFrame = '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all';
 
 const LOG_TAG = '[api-investments-history]';
 
@@ -18,6 +18,12 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
   const startDate = new Date();
 
   switch (timeframe) {
+    case '7d':
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case '30d':
+      startDate.setDate(startDate.getDate() - 30);
+      break;
     case '1m':
       startDate.setMonth(startDate.getMonth() - 1);
       break;
@@ -29,6 +35,9 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
       break;
     case '1y':
       startDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+    case '365d':
+      startDate.setDate(startDate.getDate() - 365);
       break;
     case '5y':
       startDate.setFullYear(startDate.getFullYear() - 5);
@@ -109,8 +118,9 @@ export async function GET(request: Request) {
 
     // 2. Establish start and end date boundaries
     let [startDate, endDate] = getDateRange(timeframe);
+    let earliestSnap: any[] | undefined = undefined;
     if (timeframe === 'all') {
-      const earliestSnap = await getDb()
+      earliestSnap = await getDb()
         .select({ snapshotDate: accountSnapshots.snapshotDate })
         .from(accountSnapshots)
         .where(

@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import {
@@ -47,6 +48,14 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
   const [lumpSumDate, setLumpSumDate] = useState('');
   const [biweekly, setBiweekly] = useState(false);
   const [showProjection, setShowProjection] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const termMonths = mortgage.termMonths ?? 360;
   const monthlyPayment = mortgage.monthlyPayment;
@@ -146,11 +155,13 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
 
   const hasExtraPayments = showProjection && (parseFloat(extraMonthly) > 0 || parseFloat(lumpSum) > 0 || biweekly);
 
-  const formatXAxis = (tickStr: string) => {
-    return formatSafeUTCDate(tickStr, { month: 'short', year: 'numeric' });
-  };
+  const formatXAxis = useCallback((tickStr: string) => {
+    return formatChartXAxisDate(tickStr, 'all', { isMonthly: true });
+  }, []);
 
-  const xInterval = Math.max(1, Math.floor(chartDataPoints.length / 6));
+  const xAxisTicks = useMemo(() => {
+    return getChartXTicksUnified(chartDataPoints, 'all', isMobile, 'date');
+  }, [chartDataPoints, isMobile]);
 
   return (
     <div className={inline ? "" : "bg-card border border-border rounded-xl p-5"}>
@@ -339,19 +350,16 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                 tickLine={false}
                 axisLine={{ stroke: 'var(--color-border)' }}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                interval={xInterval}
+                ticks={xAxisTicks}
                 tickFormatter={formatXAxis}
+                minTickGap={30}
               />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                 width={75}
-                tickFormatter={(v: number) => {
-                  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-                  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-                  return `$${v}`;
-                }}
+                tickFormatter={(v: number) => formatChartYAxisCurrency(v, 0, Math.ceil(maxBalance * 1.1))}
                 domain={[0, Math.ceil(maxBalance * 1.1)]}
               />
               <Tooltip

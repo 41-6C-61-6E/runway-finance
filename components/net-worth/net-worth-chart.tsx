@@ -16,7 +16,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatSafeUTCDate, getChartXTicks } from '@/lib/utils/date';
+import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import {
   computeMovingAverage,
   computeMedianFilter,
@@ -67,21 +68,28 @@ export function NetWorthChart() {
     windowLabel,
     periodOptions,
     showWindowNav,
-    monthRange,
+    dateRange,
   } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const startDate = monthRange.start + '-01';
-        const [ey, em] = monthRange.end.split('-').map(Number);
-        const endDate = monthRange.end + '-' + String(new Date(ey, em, 0).getDate()).padStart(2, '0');
+        const startDate = dateRange.start;
+        const endDate = dateRange.end;
         const res = await fetch(`/api/net-worth/chart?timeframe=${timeframe}&startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch net worth history data');
         const json: ChartResponse = await res.json();
@@ -93,7 +101,7 @@ export function NetWorthChart() {
       }
     };
     fetchData();
-  }, [timeframe, monthRange.start, monthRange.end]);
+  }, [timeframe, dateRange.start, dateRange.end]);
 
   const processedData = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -227,57 +235,33 @@ export function NetWorthChart() {
     );
   }, []);
 
-  const areaTicks = useMemo(() => getChartXTicks(processedData, timeframe), [processedData, timeframe]);
+  const areaTicks = useMemo(() => getChartXTicksUnified(processedData, timeframe, isMobile), [processedData, timeframe, isMobile]);
 
-  const barTicks = useMemo(() => {
-    if (barData.length <= 6) return barData.map((d) => d.date);
-    const ticks: string[] = [];
-    const step = (barData.length - 1) / 5;
-    for (let i = 0; i < 6; i++) {
-      const idx = Math.round(step * i);
-      if (idx < barData.length) ticks.push(barData[idx].date);
-    }
-    return ticks;
-  }, [barData]);
+  const barTicks = useMemo(() => getChartXTicksUnified(barData, timeframe, isMobile), [barData, timeframe, isMobile]);
+
+  const dateRangeStr = useMemo(() => {
+    if (processedData.length === 0) return null;
+    const first = String(processedData[0].date);
+    const last = String(processedData[processedData.length - 1].date);
+    return formatChartDateRange(first, last);
+  }, [processedData]);
 
   const formatAreaXTick = useCallback((d: string) => {
-    if (!d) return '';
-    if (timeframe === '1m') {
-      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-    }
-    if (timeframe === '5y' || timeframe === 'all') {
-      return formatSafeUTCDate(d, { year: 'numeric' });
-    }
-    return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
+    return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
   }, [timeframe]);
 
   const formatBarXTick = useCallback((d: string) => {
-    if (!d) return '';
-    if (bucketSize === 'daily' || bucketSize === 'weekly' || bucketSize === 'biweekly') {
-      return formatSafeUTCDate(d, { month: 'short', day: 'numeric' });
-    }
-    if (bucketSize === 'monthly') {
-      return formatSafeUTCDate(d, { month: 'short', year: '2-digit' });
-    }
-    if (bucketSize === 'quarterly') {
-      const month = parseInt(d.slice(5, 7), 10);
-      const q = Math.ceil(month / 3);
-      return `Q${q} ${d.slice(2, 4)}`;
-    }
-    if (bucketSize === 'yearly') {
-      return d.slice(0, 4);
-    }
-    return d;
-  }, [bucketSize]);
+    const isMonthly = bucketSize === 'monthly' || bucketSize === 'quarterly' || bucketSize === 'yearly';
+    return formatChartXAxisDate(d, timeframe, { isMonthly: isMonthly || timeframe !== '1m' });
+  }, [bucketSize, timeframe]);
 
-  const formatYTick = useCallback((v: number) => {
-    const absV = Math.abs(v);
-    const sign = v < 0 ? '-' : '';
-    if (absV >= 1000000) return `${sign}$${(absV / 1000000).toFixed(1)}M`;
-    if (absV >= 1000) return `${sign}$${(absV / 1000).toFixed(0)}K`;
-    if (absV === 0) return '$0';
-    return `${sign}$${absV.toFixed(0)}`;
-  }, []);
+  const formatAreaYTick = useCallback((v: number) => {
+    return formatChartYAxisCurrency(v, areaYDomain[0], areaYDomain[1]);
+  }, [areaYDomain]);
+
+  const formatBarYTick = useCallback((v: number) => {
+    return formatChartYAxisCurrency(v, barYDomain[0], barYDomain[1]);
+  }, [barYDomain]);
 
   const AreaTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -426,8 +410,7 @@ export function NetWorthChart() {
               )
             }
           >
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timeframe</span>
+            <div className="flex items-center">
               <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
             </div>
           </CollapsibleFilterPanel>
@@ -438,6 +421,13 @@ export function NetWorthChart() {
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Net Worth</span>
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
+                {dateRangeStr && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {dateRangeStr}
+                    </span>
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Net Worth Over Time Area Chart" data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
@@ -483,13 +473,14 @@ export function NetWorthChart() {
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       ticks={areaTicks}
                       tickFormatter={formatAreaXTick}
+                      minTickGap={30}
                     />
                     <YAxis
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       domain={areaYDomain}
-                      tickFormatter={formatYTick}
+                      tickFormatter={formatAreaYTick}
                     />
                     <RechartsTooltip
                       content={<AreaTooltip />}
@@ -515,6 +506,13 @@ export function NetWorthChart() {
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
+                {dateRangeStr && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
+                      {dateRangeStr}
+                    </span>
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
                     role="img"
@@ -531,13 +529,14 @@ export function NetWorthChart() {
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       ticks={barTicks}
                       tickFormatter={formatBarXTick}
+                      minTickGap={30}
                     />
                     <YAxis
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       domain={barYDomain}
-                      tickFormatter={formatYTick}
+                      tickFormatter={formatBarYTick}
                     />
                     <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                     <RechartsTooltip
