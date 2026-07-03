@@ -152,9 +152,17 @@ export async function fetchRentcastValue(
   
   let selectedValue: number | undefined;
   if (params.valuationMethod === 'conservative') {
-    selectedValue = data.priceRangeLow ?? data.price;
+    if (data.priceRangeLow !== undefined && data.priceRangeLow !== null && data.price !== undefined && data.price !== null) {
+      selectedValue = (data.priceRangeLow + data.price) / 2;
+    } else {
+      selectedValue = data.priceRangeLow ?? data.price;
+    }
   } else if (params.valuationMethod === 'optimistic') {
-    selectedValue = data.priceRangeHigh ?? data.price;
+    if (data.priceRangeHigh !== undefined && data.priceRangeHigh !== null && data.price !== undefined && data.price !== null) {
+      selectedValue = (data.priceRangeHigh + data.price) / 2;
+    } else {
+      selectedValue = data.priceRangeHigh ?? data.price;
+    }
   } else {
     selectedValue = data.price;
   }

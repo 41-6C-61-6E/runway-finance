@@ -86,7 +86,7 @@ describe('RentCast fetchRentcastValue', () => {
       apiConfig
     );
 
-    expect(price).toBe(320000);
+    expect(price).toBe(335000);
   });
 
   it('correctly uses the priceRangeHigh field for optimistic valuationMethod', async () => {
@@ -106,7 +106,7 @@ describe('RentCast fetchRentcastValue', () => {
       apiConfig
     );
 
-    expect(price).toBe(380000);
+    expect(price).toBe(365000);
   });
 
   it('falls back to price if priceRangeLow is missing for conservative method', async () => {
