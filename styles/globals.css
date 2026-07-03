@@ -119,16 +119,10 @@ body,
   box-shadow: none !important;
 }
 
-/* Card borders transparent on light, subtle on dark themes */
+/* Card borders transparent on light, dark, and moonlight themes */
 .bg-card.border-border,
 [class*="bg-card/"].border-border {
   border-color: transparent !important;
-}
-[data-theme=dark] .bg-card.border-border,
-[data-theme=dark] [class*="bg-card/"].border-border,
-[data-theme=moonlight] .bg-card.border-border,
-[data-theme=moonlight] [class*="bg-card/"].border-border {
-  border-color: color-mix(in srgb, var(--border) 40%, transparent) !important;
 }
 
 /* Card border-radius removed */

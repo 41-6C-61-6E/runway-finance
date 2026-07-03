@@ -1246,12 +1246,6 @@ export default function AccountsPage() {
     return getChartXTicksUnified(visibleData, timeframe, isMobile, 'date');
   }, [visibleData, timeframe, isMobile]);
 
-  const dateRangeStr = useMemo(() => {
-    if (visibleData.length === 0) return null;
-    const first = String(visibleData[0].date);
-    const last = String(visibleData[visibleData.length - 1].date);
-    return formatChartDateRange(first, last);
-  }, [visibleData]);
 
   // ── Pan handlers ─────────────────────────────────────────────────────────────
   const handleChartMouseDown = useCallback((e: React.MouseEvent) => {
@@ -2120,13 +2114,6 @@ export default function AccountsPage() {
                             onMouseLeave={handleChartMouseUp}
                             onDoubleClick={handleChartDoubleClick}
                           >
-                            {dateRangeStr && (
-                              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-10">
-                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                                  {dateRangeStr}
-                                </span>
-                              </div>
-                            )}
                             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                               {chartType === 'bar' ? (
                                 <BarChart

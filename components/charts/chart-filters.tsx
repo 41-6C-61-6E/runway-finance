@@ -42,7 +42,7 @@ export function TimeRangeFilter({ value, presets = TIME_RANGE_PRESETS, onChange 
                 <button
                   key={opt.value}
                   onClick={() => onChange(opt.value)}
-                  className={`px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium leading-none transition-all ${
                     value === opt.value
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-muted/80 hover:text-accent-foreground'
@@ -64,7 +64,7 @@ export function TimeRangeFilter({ value, presets = TIME_RANGE_PRESETS, onChange 
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium transition-all ${
+          className={`px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium leading-none transition-all ${
             value === opt.value
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'

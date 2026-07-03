@@ -169,12 +169,7 @@ export function PerformanceChart() {
     return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
   }, [timeframe]);
 
-  const dateRangeStr = useMemo(() => {
-    if (mergedData.length === 0) return null;
-    const first = String(mergedData[0].date);
-    const last = String(mergedData[mergedData.length - 1].date);
-    return formatChartDateRange(first, last);
-  }, [mergedData]);
+
 
   const formatYTick = useCallback((v: number) => {
     if (displayMode === 'percent') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
@@ -324,13 +319,6 @@ export function PerformanceChart() {
             {/* Chart Area */}
             <div className="flex-1 min-w-0 p-3 sm:p-5">
               <div className="h-[190px] sm:h-[280px] w-full relative">
-                {dateRangeStr && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                      {dateRangeStr}
-                    </span>
-                  </div>
-                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Portfolio History Area Chart" data={mergedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>

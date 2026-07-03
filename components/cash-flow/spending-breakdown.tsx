@@ -117,9 +117,7 @@ export function SpendingBreakdown() {
     return `startDate=${dateRange.start}&endDate=${dateRange.end}`;
   }, [dateRange.start, dateRange.end]);
 
-  const dateRangeStr = useMemo(() => {
-    return formatChartDateRange(dateRange.start, dateRange.end);
-  }, [dateRange.start, dateRange.end]);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -344,13 +342,6 @@ export function SpendingBreakdown() {
               />
             ) : (
               <div className="h-full w-full relative touch-pan-y">
-                {dateRangeStr && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                      {dateRangeStr}
-                    </span>
-                  </div>
-                )}
                 {chartType === 'bar' ? (() => {
                   const maxLabelLen = pieData.length > 0
                     ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
