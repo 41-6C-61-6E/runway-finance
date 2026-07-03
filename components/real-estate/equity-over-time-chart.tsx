@@ -347,12 +347,7 @@ export function EquityOverTimeChart() {
     return getChartXTicksUnified(displayTimeline, timeframe, isMobile, 'date');
   }, [displayTimeline, timeframe, isMobile]);
 
-  const dateRangeStr = useMemo(() => {
-    if (displayTimeline.length === 0) return null;
-    const first = String(displayTimeline[0].date);
-    const last = String(displayTimeline[displayTimeline.length - 1].date);
-    return formatChartDateRange(first, last);
-  }, [displayTimeline]);
+
 
   // Map mortgage account IDs to their readable names
   const mortgageNamesMap = useMemo(() => {
@@ -597,13 +592,6 @@ export function EquityOverTimeChart() {
           </CollapsibleFilterPanel>
           <div className="h-[300px] px-2 pb-2">
             <div className="h-full relative">
-              {dateRangeStr && (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                    {dateRangeStr}
-                  </span>
-                </div>
-              )}
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <ComposedChart
                   role="img"

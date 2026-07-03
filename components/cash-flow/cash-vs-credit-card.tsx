@@ -122,9 +122,7 @@ export function CashVsCreditCard() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const dateRangeStr = useMemo(() => {
-    return formatChartDateRange(dateRange.start, dateRange.end);
-  }, [dateRange.start, dateRange.end]);
+
   const [includeSavings, setIncludeSavings] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('finance:cash-vs-credit:include-savings');
@@ -439,13 +437,6 @@ export function CashVsCreditCard() {
               <div className="h-[260px]">
                 <div className="h-full w-full overflow-x-auto overflow-y-hidden">
                    <div className="min-w-max h-full px-2 pb-2 relative">
-                    {dateRangeStr && (
-                      <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                          {dateRangeStr}
-                        </span>
-                      </div>
-                    )}
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                       <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
                         <defs>

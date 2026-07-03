@@ -17,7 +17,7 @@ export function ChartTypeSelector({ value, options, onChange }: ChartTypeSelecto
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
+          className={`px-2.5 py-1 rounded-md text-[10px] font-medium leading-none transition-all ${
             value === opt.value
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
