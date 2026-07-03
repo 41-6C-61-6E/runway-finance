@@ -71,7 +71,6 @@ export function IncomeExpenseChart() {
     windowLabel,
     periodOptions,
     showWindowNav,
-    dateRange,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
@@ -84,9 +83,7 @@ export function IncomeExpenseChart() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const dateRangeStr = useMemo(() => {
-    return formatChartDateRange(dateRange.start, dateRange.end);
-  }, [dateRange.start, dateRange.end]);
+
   const numMonths = MONTH_MAP[timeframe] || 12;
   const effectiveEndIdx = useMemo(() => {
     if (timeframe === 'all') return allData.length;
@@ -310,13 +307,6 @@ export function IncomeExpenseChart() {
           <div className="h-[320px] touch-pan-y">
             <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
               <div className="min-w-max h-full px-2 pb-2 relative">
-                {dateRangeStr && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                      {dateRangeStr}
-                    </span>
-                  </div>
-                )}
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
               {chartType === 'bar' ? (
                <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>

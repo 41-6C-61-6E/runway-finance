@@ -239,12 +239,7 @@ export function NetWorthChart() {
 
   const barTicks = useMemo(() => getChartXTicksUnified(barData, timeframe, isMobile), [barData, timeframe, isMobile]);
 
-  const dateRangeStr = useMemo(() => {
-    if (processedData.length === 0) return null;
-    const first = String(processedData[0].date);
-    const last = String(processedData[processedData.length - 1].date);
-    return formatChartDateRange(first, last);
-  }, [processedData]);
+
 
   const formatAreaXTick = useCallback((d: string) => {
     return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
@@ -421,13 +416,6 @@ export function NetWorthChart() {
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Net Worth</span>
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
-                {dateRangeStr && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                      {dateRangeStr}
-                    </span>
-                  </div>
-                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <AreaChart role="img" aria-label="Net Worth Over Time Area Chart" data={processedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
@@ -506,13 +494,6 @@ export function NetWorthChart() {
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
-                {dateRangeStr && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/80 border border-border/40 text-muted-foreground backdrop-blur-sm">
-                      {dateRangeStr}
-                    </span>
-                  </div>
-                )}
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
                     role="img"
