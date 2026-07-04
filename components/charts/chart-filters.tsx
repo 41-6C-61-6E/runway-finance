@@ -1,8 +1,9 @@
 'use client';
 
-export type TimeRange = '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all';
+export type TimeRange = '1d' | '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all';
 
 export const TIME_RANGE_PRESETS: { label: string; value: TimeRange; group?: string }[] = [
+  { label: '1D', value: '1d', group: 'Rolling' },
   { label: '7D', value: '7d', group: 'Rolling' },
   { label: '30D', value: '30d', group: 'Rolling' },
   { label: '365D', value: '365d', group: 'Rolling' },

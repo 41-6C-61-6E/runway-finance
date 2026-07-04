@@ -604,6 +604,7 @@ export async function syncPlaidConnection(
           payee: pt.merchant_name || null,
           memo: pt.payment_meta?.reference_number || null,
           amount: appAmount,
+          date: pt.date,
         }).catch((e) => {
           logger.error('[plaid-sync] Failed to run custom transaction alert checks:', e);
         });
