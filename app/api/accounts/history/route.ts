@@ -358,6 +358,7 @@ export async function GET(request: Request) {
     // 5. Build daily forward-filled points
     const formattedData: AggregatablePoint[] = [];
     for (const dateStr of datesInRange) {
+      const isToday = dateStr === todayStr;
       const daySnaps = snapshotsByDate.get(dateStr);
       if (daySnaps) {
         for (const snap of daySnaps) {
@@ -368,6 +369,12 @@ export async function GET(request: Request) {
       const point: AggregatablePoint = { date: dateStr };
       let netWorth = 0;
       for (const account of filteredAccounts) {
+        if (isToday) {
+          const currentBal = parseFloat(account.balance);
+          if (!isNaN(currentBal)) {
+            latestByAccount.set(account.id, currentBal);
+          }
+        }
         if (!latestByAccount.has(account.id)) {
           continue;
         }

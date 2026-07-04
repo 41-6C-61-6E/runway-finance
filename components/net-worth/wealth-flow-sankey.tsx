@@ -35,6 +35,7 @@ interface AccountBreakdown {
 interface SankeyNode {
   id: string;
   label: string;
+  name?: string;
   color: string;
   value: number;
   percentage: number;
@@ -63,6 +64,8 @@ interface WealthFlowSummary {
   totalExpenses: number;
   totalMarketGains: number;
   totalMarketLosses: number;
+  totalAdjustmentsIn?: number;
+  totalAdjustmentsOut?: number;
   totalSavings: number;
   totalDrawdowns: number;
 }
@@ -808,42 +811,47 @@ export function WealthFlowSankey() {
     return wealthFlowData;
   }, [wealthFlowData, routeThroughAccounts, routeThroughAccountTypes]);
 
-  const routeFlowElement = useCallback((elementId: string) => {
-    if (elementId.startsWith('account_in_') || elementId.startsWith('account_out_')) {
-      const accountId = elementId.replace(/^account_(in|out)_/, '');
-      navigateToTransactions({ accountIds: accountId });
-      return;
-    }
+  const nodeSupportsTransactions = useCallback((node: SankeyNode): boolean => {
+    const id = node.id;
+    if (id.startsWith('account_in_') || id.startsWith('account_out_')) return true;
+    if (id.startsWith('type_in_') || id.startsWith('type_out_')) return true;
 
-    if (elementId.startsWith('type_in_') || elementId.startsWith('type_out_')) {
-      const node = displayWealthFlowData?.nodes.find(n => n.id === elementId);
-      if (node && node.accounts && node.accounts.length > 0) {
-        const accountIds = node.accounts.map(a => a.id).join(',');
-        navigateToTransactions({ accountIds });
-      }
-      return;
-    }
-
-    // 1. Snapshot-based nodes open detail modal
-    const snapshotNodeIds = [
+    const nonTxIds = [
       'inc_market_gains',
       'exp_market_losses',
       'inc_real_estate_appreciation',
       'exp_real_estate_depreciation',
       'inc_balance_adjustments',
       'exp_balance_adjustments',
+      'inc_new_accounts',
+      'exp_new_accounts',
+      'inc_mortgage_reduction',
+      'exp_mortgage_payment',
       'hub_net_worth_change'
     ];
+    if (nonTxIds.includes(id)) return false;
 
-    if (snapshotNodeIds.includes(elementId)) {
-      const node = displayWealthFlowData?.nodes.find(n => n.id === elementId);
-      if (node) {
-        setSelectedNodeDetails(node);
+    return id.startsWith('inc_') || id.startsWith('exp_');
+  }, []);
+
+  const handleViewTransactions = useCallback((node: SankeyNode) => {
+    const elementId = node.id;
+    if (elementId.startsWith('account_in_') || elementId.startsWith('account_out_')) {
+      const accountId = elementId.replace(/^account_(in|out)_/, '');
+      navigateToTransactions({ accountIds: accountId });
+      setSelectedNodeDetails(null);
+      return;
+    }
+
+    if (elementId.startsWith('type_in_') || elementId.startsWith('type_out_')) {
+      if (node.accounts && node.accounts.length > 0) {
+        const accountIds = node.accounts.map(a => a.id).join(',');
+        navigateToTransactions({ accountIds });
+        setSelectedNodeDetails(null);
       }
       return;
     }
 
-    // 2. Transaction-based nodes navigate to /transactions
     if (elementId.startsWith('inc_')) {
       const catId = elementId.substring(4);
       if (catId === 'uncategorized_tx') {
@@ -851,6 +859,7 @@ export function WealthFlowSankey() {
       } else {
         navigateToTransactions({ categoryId: catId });
       }
+      setSelectedNodeDetails(null);
       return;
     }
 
@@ -861,9 +870,17 @@ export function WealthFlowSankey() {
       } else {
         navigateToTransactions({ categoryId: catId });
       }
+      setSelectedNodeDetails(null);
       return;
     }
-  }, [navigateToTransactions, displayWealthFlowData]);
+  }, [navigateToTransactions]);
+
+  const routeFlowElement = useCallback((elementId: string) => {
+    const node = displayWealthFlowData?.nodes.find(n => n.id === elementId);
+    if (node) {
+      setSelectedNodeDetails(node);
+    }
+  }, [displayWealthFlowData]);
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
@@ -1473,41 +1490,69 @@ export function WealthFlowSankey() {
               {/* ── Net Worth Drivers Table ────────────────────────────────────── */}
               {summary && processedData.nodes.length > 0 && (
                 <div className="mt-6 bg-card border border-border/50 rounded-xl p-5">
-                  <h4 className="text-sm font-semibold text-foreground mb-3">
-                    Net Worth Drivers <span className="font-normal text-muted-foreground">for {windowLabel}</span>
+                  <h4 className="text-sm font-semibold text-foreground mb-4">
+                    Net Worth Drivers & Reconciliation <span className="font-normal text-muted-foreground">for {windowLabel}</span>
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <DriverRow label="Income & Dividends" value={summary.totalIncome} positive />
-                      <DriverRow label="Expenses" value={summary.totalExpenses} negative />
-                      <DriverRow label="Income Surplus" value={summary.totalIncome - summary.totalExpenses}
-                        positive={summary.totalIncome >= summary.totalExpenses} />
+                  <div className="max-w-xl mx-auto space-y-2.5">
+                    <div className="flex justify-between items-center text-sm font-medium border-b border-border/40 pb-2">
+                      <span className="text-muted-foreground">Beginning Net Worth</span>
+                      <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
                     </div>
-                    <div className="space-y-2">
-                      <DriverRow label="Market Gains" value={summary.totalMarketGains} positive />
-                      <DriverRow label="Market Losses" value={summary.totalMarketLosses} negative />
-                      <DriverRow label="Net Market"
-                        value={summary.totalMarketGains - summary.totalMarketLosses}
-                        positive={summary.totalMarketGains >= summary.totalMarketLosses} />
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-500 font-bold">+</span> Inflows & Income
+                      </span>
+                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalIncome)}</span>
                     </div>
-                    <div className="space-y-2">
-                      <DriverRow label="Account Savings" value={summary.totalSavings} positive />
-                      <DriverRow label="Account Drawdowns" value={summary.totalDrawdowns} negative />
-                      <div className="pt-1 border-t border-border/40 mt-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-semibold text-foreground">Net Worth Change</span>
-                          <span
-                            className={`text-sm font-bold font-mono ${
-                              summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
-                            }`}
-                          >
-                            {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)}
-                            <span className="text-[10px] ml-1 opacity-70">
-                              ({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
-                            </span>
-                          </span>
-                        </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-rose-500 font-bold">-</span> Expenses & Outflows
+                      </span>
+                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalExpenses)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-500 font-bold">+</span> Market Gains & Appreciation
+                      </span>
+                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalMarketGains)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-rose-500 font-bold">-</span> Market Losses & Depreciation
+                      </span>
+                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalMarketLosses)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-500 font-bold">+</span> Capital Inflows & Adjustments
+                      </span>
+                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalAdjustmentsIn || 0)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="text-rose-500 font-bold">-</span> Capital Outflows & Adjustments
+                      </span>
+                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalAdjustmentsOut || 0)}</span>
+                    </div>
+
+                    <div className="border-t-2 border-double border-border/80 pt-2.5 mt-2">
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <span className="text-foreground">Ending Net Worth</span>
+                        <span className="font-mono">{formatCurrency(summary.endingNetWorth)}</span>
                       </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] text-muted-foreground pt-1">
+                      <span>Total Net Worth Change</span>
+                      <span className={`font-semibold font-mono ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)} ({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1519,9 +1564,8 @@ export function WealthFlowSankey() {
 
       {selectedNodeDetails && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setSelectedNodeDetails(null)}
-          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
         >
           <div
             className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto"
@@ -1541,6 +1585,59 @@ export function WealthFlowSankey() {
             </div>
 
             <div className="p-5 space-y-4 bg-background">
+              {/* Explanation Paragraph */}
+              <p className="text-xs text-muted-foreground leading-relaxed bg-muted/30 border border-border/20 rounded-xl p-3">
+                {(() => {
+                  const id = selectedNodeDetails.id;
+                  if (id === 'inc_market_gains') {
+                    return "Market Gains represent the growth of your investment and retirement assets during this period that is not accounted for by manual transactions. This is calculated as the increase in asset balances minus any net contributions or deposits.";
+                  }
+                  if (id === 'exp_market_losses') {
+                    return "Market Losses represent the decline of your investment, retirement, or real estate assets during this period that is not accounted for by manual transactions. This is calculated as the decrease in asset balances minus any net drawdowns or withdrawals.";
+                  }
+                  if (id === 'inc_real_estate_appreciation') {
+                    return "Real Estate Appreciation represents the estimated increase in your property values during this period. This is based on market valuation updates and manual real estate asset adjustments.";
+                  }
+                  if (id === 'exp_real_estate_depreciation') {
+                    return "Real Estate Depreciation represents the estimated decrease in your property values during this period. This is based on market valuation updates and manual real estate asset adjustments.";
+                  }
+                  if (id === 'inc_balance_adjustments') {
+                    return "Positive Balance Adjustments represent positive changes in your cash accounts or manual liabilities that cannot be fully reconciled with recorded transactions (e.g. missing transaction logs, manual balance updates, or rounding errors).";
+                  }
+                  if (id === 'exp_balance_adjustments') {
+                    return "Negative Balance Adjustments represent negative changes in your cash accounts or manual liabilities that cannot be fully reconciled with recorded transactions (e.g. missing transaction logs, manual balance updates, or rounding errors).";
+                  }
+                  if (id === 'inc_mortgage_reduction') {
+                    return "Mortgage Liability Reduction represents the decrease in your mortgage debt during this period. This is the portion of your mortgage payments that went directly toward reducing your principal loan balance.";
+                  }
+                  if (id === 'exp_mortgage_payment') {
+                    return "Mortgage Payment represents the total amount paid toward your mortgage principal during this period, matched with your mortgage liability reduction.";
+                  }
+                  if (id === 'inc_new_accounts') {
+                    return "New Assets represent the initial balances of asset accounts that were added to the system during this period. They are treated as capital inflows to prevent their initial balances from counting as market gains.";
+                  }
+                  if (id === 'exp_new_accounts') {
+                    return "New Liabilities represent the initial balances of liability accounts (such as loans or credit cards) that were added to the system during this period. They are treated as capital outflows to prevent their initial balances from counting as market losses.";
+                  }
+                  if (id === 'hub_net_worth_change') {
+                    return "The Net Worth Change Hub represents the total change in your wealth over this period. It reconciles all sources of wealth (income, market gains, adjustments) against all uses of wealth (expenses, market losses, adjustments), leaving the net surplus or deficit as your net worth change.";
+                  }
+                  if (id.startsWith('account_')) {
+                    return "This node represents the flow of funds through your individual account. The net change in balance over this period is reconciled with transactions and market movements.";
+                  }
+                  if (id === 'exp_expenses') {
+                    return "This node represents your total expenses during this period, aggregated across all categories.";
+                  }
+                  if (id.startsWith('inc_')) {
+                    return "This node shows the total amount of income recorded under this category during the selected period. Click 'View Transactions' below to see the full list of matching transactions.";
+                  }
+                  if (id.startsWith('exp_')) {
+                    return "This node shows the total amount of expenses recorded under this category during the selected period. Click 'View Transactions' below to see the full list of matching transactions.";
+                  }
+                  return "This node represents a flow in your wealth distribution during the selected period.";
+                })()}
+              </p>
+
               <div className="flex justify-between items-center bg-muted/20 border border-border/40 rounded-xl p-4">
                 <span className="text-sm text-muted-foreground font-semibold">Total Change</span>
                 <span
@@ -1556,37 +1653,89 @@ export function WealthFlowSankey() {
               </div>
 
               {selectedNodeDetails.accounts && selectedNodeDetails.accounts.length > 0 ? (
-                <div className="border border-border/40 rounded-xl overflow-hidden">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider text-[10px] font-semibold border-b border-border/40">
-                      <tr>
-                        <th className="p-3">Account</th>
-                        <th className="p-3 text-right">Start Balance</th>
-                        <th className="p-3 text-right">End Balance</th>
-                        <th className="p-3 text-right">Net Change</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {selectedNodeDetails.accounts.map((acc: any) => {
-                        const showSign = acc.delta >= 0 ? '+' : '';
-                        return (
-                          <tr key={acc.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="p-3 font-medium text-foreground">{acc.name}</td>
-                            <td className="p-3 text-right font-mono text-muted-foreground">{formatCurrency(acc.beg)}</td>
-                            <td className="p-3 text-right font-mono text-muted-foreground">{formatCurrency(acc.end)}</td>
-                            <td className={`p-3 text-right font-mono font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {showSign}{formatCurrency(acc.delta)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                (() => {
+                  const hasBalances = selectedNodeDetails.accounts.some((a: any) => (a.beg !== 0 || a.end !== 0));
+                  if (hasBalances) {
+                    return (
+                      <div className="border border-border/40 rounded-xl overflow-hidden">
+                        <table className="w-full text-[11px] text-left border-collapse">
+                          <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider text-[9px] font-semibold border-b border-border/40">
+                            <tr>
+                              <th className="p-2.5">Account</th>
+                              <th className="p-2.5 text-right">Start Balance</th>
+                              <th className="p-2.5 text-right">End Balance</th>
+                              <th className="p-2.5 text-right">Net Transactions</th>
+                              <th className="p-2.5 text-right">Allocated Flow</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/30">
+                            {selectedNodeDetails.accounts.map((acc: any) => {
+                              const showSign = acc.delta >= 0 ? '+' : '';
+                              const netTx = roundFlowValue((acc.end || 0) - (acc.beg || 0) - (acc.delta || 0));
+                              const showNetTxSign = netTx >= 0 ? '+' : '';
+                              return (
+                                <tr key={acc.id} className="hover:bg-muted/10 transition-colors">
+                                  <td className="p-2.5 font-medium text-foreground">{acc.name}</td>
+                                  <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(acc.beg)}</td>
+                                  <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(acc.end)}</td>
+                                  <td className="p-2.5 text-right font-mono text-muted-foreground">
+                                    {showNetTxSign}{formatCurrency(netTx)}
+                                  </td>
+                                  <td className={`p-2.5 text-right font-mono font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {showSign}{formatCurrency(acc.delta)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="border border-border/40 rounded-xl overflow-hidden">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider text-[10px] font-semibold border-b border-border/40">
+                            <tr>
+                              <th className="p-3">Account</th>
+                              <th className="p-3 text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/30">
+                            {selectedNodeDetails.accounts.map((acc: any) => {
+                              const showSign = acc.delta >= 0 ? '+' : '';
+                              return (
+                                <tr key={acc.id} className="hover:bg-muted/10 transition-colors">
+                                  <td className="p-3 font-medium text-foreground">{acc.name}</td>
+                                  <td className={`p-3 text-right font-mono font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {showSign}{formatCurrency(acc.delta)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+                })()
               ) : (
                 <p className="text-xs text-muted-foreground text-center py-4">
                   No account breakdown available for this node.
                 </p>
+              )}
+
+              {/* View Transactions Link */}
+              {nodeSupportsTransactions(selectedNodeDetails) && (
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => handleViewTransactions(selectedNodeDetails)}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline bg-primary/10 hover:bg-primary/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    View Matching Transactions
+                  </button>
+                </div>
               )}
             </div>
           </div>

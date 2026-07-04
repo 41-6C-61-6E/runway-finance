@@ -75,6 +75,15 @@ const nextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/net-worth',
+        destination: '/flows',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

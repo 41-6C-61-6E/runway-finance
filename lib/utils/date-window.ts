@@ -68,9 +68,10 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
 }
 
 export function getPreciseDateRange(timeframe: TimeRange, windowEnd?: string): { start: string; end: string } {
-  if (timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
+  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
     const end = new Date();
     const start = new Date();
+    if (timeframe === '1d') start.setDate(start.getDate() - 1);
     if (timeframe === '7d') start.setDate(start.getDate() - 7);
     if (timeframe === '30d') start.setDate(start.getDate() - 30);
     if (timeframe === '365d') start.setDate(start.getDate() - 365);

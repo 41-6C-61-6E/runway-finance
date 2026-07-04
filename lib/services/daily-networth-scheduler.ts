@@ -46,8 +46,16 @@ class DailyNetWorthScheduler {
           const alertTime = settings.dailyNetWorthAlertTime || '18:00';
           const [alertHour, alertMinute] = alertTime.split(':').map(Number);
 
-          const nowInUserTz = new Date(new Date().toLocaleString('en-US', { timeZone: userTz }));
-          const currentMinutes = nowInUserTz.getHours() * 60 + nowInUserTz.getMinutes();
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: userTz,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          const parts = formatter.formatToParts(new Date());
+          const hourStr = parts.find(p => p.type === 'hour')?.value || '0';
+          const minStr = parts.find(p => p.type === 'minute')?.value || '0';
+          const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
           const alertMinutes = alertHour * 60 + alertMinute;
 
           // If current time has reached or passed the alert time, run the alert check.

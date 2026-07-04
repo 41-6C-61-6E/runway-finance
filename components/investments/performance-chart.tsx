@@ -20,6 +20,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
+import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -52,7 +53,7 @@ type DisplayMode = 'dollar' | 'percent';
 async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
   try {
     const rangeMap: Record<TimeRange, string> = {
-      '7d': '5d', '30d': '1mo', '365d': '1y',
+      '1d': '1d', '7d': '5d', '30d': '1mo', '365d': '1y',
       '1m': '1mo', '3m': '3mo', '6m': '6mo', '1y': '1y',
       '5y': '5y', 'ytd': 'ytd', 'all': '10y',
     };
@@ -114,11 +115,68 @@ export function PerformanceChart() {
     }
   }, [showBenchmark, timeframe]);
 
-  // Build merged chart data with optional % normalization and benchmark
-  const mergedData = useMemo((): HistoryPoint[] => {
+  const smoothedChartData = useMemo(() => {
     if (chartData.length === 0) return [];
 
-    const baseValue = chartData[0]?.value ?? 0;
+    const getMaxSpikeDuration = (range: TimeRange): number => {
+      switch (range) {
+        case '1m': return 1;
+        case '3m': return 1.5;
+        case '6m': return 3;
+        case '1y': return 4;
+        case 'ytd': return 4;
+        case '5y': return 7;
+        case 'all': return 14;
+        default: return 3;
+      }
+    };
+
+    const getMaxSmaDuration = (range: TimeRange): number => {
+      switch (range) {
+        case '1m': return 0;
+        case '3m': return 0;
+        case '6m': return 4;
+        case '1y': return 7;
+        case 'ytd': return 7;
+        case '5y': return 30;
+        case 'all': return 45;
+        default: return 7;
+      }
+    };
+
+    const first = new Date(chartData[0].date + 'T00:00:00Z').getTime();
+    const last = new Date(chartData[chartData.length - 1].date + 'T00:00:00Z').getTime();
+    const totalDays = (last - first) / (1000 * 60 * 60 * 24);
+    const gap = chartData.length > 1 ? totalDays / (chartData.length - 1) : 1;
+
+    const targetSpikeDays = getMaxSpikeDuration(timeframe);
+    const targetPoints = Math.ceil(targetSpikeDays / (gap || 1));
+    const windowSize = 2 * targetPoints + 1;
+
+    const maxAllowed = Math.floor(chartData.length * 0.15);
+    const finalWindow = Math.min(windowSize, maxAllowed % 2 === 0 ? maxAllowed + 1 : maxAllowed);
+    const medianWindow = Math.max(1, finalWindow % 2 === 0 ? finalWindow - 1 : finalWindow);
+
+    const targetSmaDays = getMaxSmaDuration(timeframe);
+    const smaTargetPoints = Math.round(targetSmaDays / (gap || 1));
+    const maxSmaAllowed = Math.floor(chartData.length * 0.15);
+    const finalSmaWindow = Math.min(smaTargetPoints, maxSmaAllowed);
+    const smaWindow = Math.max(1, finalSmaWindow);
+
+    const fields: ('value')[] = ['value'];
+    const medianFiltered = computeMedianFilter(chartData, fields, medianWindow);
+
+    if (smaWindow > 1) {
+      return computeMovingAverage(medianFiltered, fields, smaWindow);
+    }
+    return medianFiltered;
+  }, [chartData, timeframe]);
+
+  // Build merged chart data with optional % normalization and benchmark
+  const mergedData = useMemo((): HistoryPoint[] => {
+    if (smoothedChartData.length === 0) return [];
+
+    const baseValue = smoothedChartData[0]?.value ?? 0;
 
     // Build a date-indexed map for benchmark
     const benchMap = new Map<string, number>();
@@ -129,7 +187,7 @@ export function PerformanceChart() {
       }
     }
 
-    return chartData.map((d) => {
+    return smoothedChartData.map((d) => {
       const portfolioPct = baseValue > 0 ? ((d.value - baseValue) / baseValue) * 100 : 0;
       const benchmark = benchMap.get(d.date);
       return {
@@ -139,7 +197,7 @@ export function PerformanceChart() {
         ...(benchmark !== undefined ? { benchmark } : {}),
       };
     });
-  }, [chartData, benchmarkData]);
+  }, [smoothedChartData, benchmarkData]);
 
   const yDomain = useMemo((): [number, number] => {
     if (mergedData.length === 0) return [0, 1000];

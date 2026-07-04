@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
 import { getCurrentMonth, getMonthRange, getPreciseDateRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
@@ -30,6 +31,7 @@ export function useDateWindow(
   controlledTimeframe?: TimeRange,
 ): DateWindowState {
   const currentMonth = getCurrentMonth();
+  const searchParams = useSearchParams();
 
   const [timeframeState, _setTimeframe] = usePersistentState<TimeRange>(timeframeKey || '', defaultTimeframe);
   const [windowEnd, setWindowEnd] = usePersistentState<string>(windowEndKey, currentMonth);
@@ -42,6 +44,18 @@ export function useDateWindow(
     }
     setWindowEnd(snapToPeriod(windowEnd, tf));
   };
+
+  useEffect(() => {
+    if (searchParams) {
+      const paramTf = searchParams.get('timeframe') as TimeRange | null;
+      const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all'];
+      if (paramTf && validTfs.includes(paramTf)) {
+        if (timeframe !== paramTf) {
+          setTimeframe(paramTf);
+        }
+      }
+    }
+  }, [searchParams, timeframe]);
 
   useEffect(() => {
     const snapped = snapToPeriod(windowEnd, timeframe);

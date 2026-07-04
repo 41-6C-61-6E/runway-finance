@@ -425,15 +425,23 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     // The next sync after the alert time will trigger the notification (dedup key prevents duplicates).
     const alertTime = settings.dailyNetWorthAlertTime || '18:00';
     const userTz = settings.timezone || 'America/New_York';
-    const nowInUserTz = new Date(new Date().toLocaleString('en-US', { timeZone: userTz }));
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hourStr = parts.find(p => p.type === 'hour')?.value || '0';
+    const minStr = parts.find(p => p.type === 'minute')?.value || '0';
+    const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
     const [alertHour, alertMinute] = alertTime.split(':').map(Number);
-    const currentMinutes = nowInUserTz.getHours() * 60 + nowInUserTz.getMinutes();
     const alertMinutes = alertHour * 60 + alertMinute;
     if (currentMinutes < alertMinutes) {
       logger.debug('[notifications-service] Skipping daily net worth change alert: before configured alert time', {
         userId,
         alertTime,
-        currentTime: `${nowInUserTz.getHours()}:${String(nowInUserTz.getMinutes()).padStart(2, '0')}`,
+        currentTime: `${hourStr}:${minStr}`,
       });
       return;
     }
@@ -493,7 +501,7 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
       userId,
       `Daily Net Worth Alert ${arrow}`,
       `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
-      '/',
+      '/flows?timeframe=1d',
       'daily_net_worth_change',
       key
     );
@@ -741,7 +749,7 @@ function buildCashFlowNotificationBody(
 
 export async function checkTransactionAlerts(
   userId: string,
-  tx: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string }
+  tx: { externalId: string; accountId: string; description: string; payee: string | null; memo: string | null; amount: string; date?: string }
 ) {
   try {
     const db = getDb();
@@ -804,11 +812,15 @@ export async function checkTransactionAlerts(
       if (matched) {
         const key = `custom_tx_alert:${rule.id}:${tx.externalId}`;
         const amountStr = txAmount.toFixed(2);
+        const encodedDesc = encodeURIComponent(tx.description || '');
+        const linkUrl = tx.date
+          ? `/transactions?search=${encodedDesc}&startDate=${tx.date}&endDate=${tx.date}`
+          : `/transactions?search=${encodedDesc}`;
         await sendPushNotification(
           userId,
           `Transaction Alert: ${rule.name}`,
           `New transaction of $${amountStr} at ${tx.description} matched your alert criteria.`,
-          '/transactions',
+          linkUrl,
           'custom_transaction_alert',
           key
         );

@@ -930,6 +930,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               payee: sfTx.payee ?? null,
               memo: sfTx.memo ?? null,
               amount: String(amountNum),
+              date: txDate,
             }).catch((e) => {
               logger.error('[sync] Failed to run custom transaction alert checks:', e);
             });
@@ -939,12 +940,16 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               const absAmount = Math.abs(amountNum);
               if (absAmount >= (settings.largeTransactionThreshold ?? 100)) {
                 const decDesc = sfTx.description;
+                const encodedDesc = encodeURIComponent(decDesc || '');
+                const linkUrl = `/transactions?search=${encodedDesc}&startDate=${txDate}&endDate=${txDate}`;
                 const { sendPushNotification } = await import('@/lib/services/notifications');
                 sendPushNotification(
                   userId,
                   `Transaction Alert`,
                   `New transaction of $${absAmount.toFixed(2)} at ${decDesc}.`,
-                  '/transactions'
+                  linkUrl,
+                  'large_transaction',
+                  `large_tx:${sfTx.id}`
                 ).catch((e) => {
                   logger.error('[sync] Failed to send transaction notification:', e);
                 });

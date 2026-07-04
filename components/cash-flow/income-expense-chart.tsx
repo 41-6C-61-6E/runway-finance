@@ -40,7 +40,7 @@ interface MonthlyData {
 }
 
 const MONTH_MAP: Record<TimeRange, number> = {
-  '7d': 1, '30d': 1, '365d': 12,
+  '1d': 1, '7d': 1, '30d': 1, '365d': 12,
   '1m': 1, '3m': 3, '6m': 6, '1y': 12, '5y': 60, 'ytd': 12, 'all': 120,
 };
 

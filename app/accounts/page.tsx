@@ -1295,7 +1295,6 @@ export default function AccountsPage() {
     const idx = Math.round(fraction * (visibleData.length - 1));
     const clickedDate = String(visibleData[idx]?.date ?? '');
 
-    // Determine the next drill-down timeframe
     const zoomMap: Record<TimeRange, TimeRange> = {
       all: '5y',
       '5y': '1y',
@@ -1306,6 +1305,7 @@ export default function AccountsPage() {
       '1m': '30d',
       '30d': '7d',
       '7d': '7d',
+      '1d': '1d',
       ytd: '3m',
     };
     const nextTimeframe = zoomMap[timeframe];
