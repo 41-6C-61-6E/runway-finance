@@ -54,6 +54,7 @@ interface SankeyNode {
   value?: number;
   percentage?: number;
   netChange?: number;
+  visualImbalance?: number;
   isHub?: boolean;
 }
 
@@ -309,10 +310,11 @@ function buildSankeyData(
     nodes.push({
       id: hubId,
       label,
-      color: hubColor,
+      color: '#0ea5e9',
       value: Math.max(totalIncome, totalExpenses),
       percentage: 100,
       netChange,
+      visualImbalance: netChange,
       isHub: true,
     });
   }
@@ -473,8 +475,26 @@ const SankeyCustomNode = ({
   const nodeIdx = nodes.findIndex((n: any) => n.id === payload.id);
   const colIndex = columnMetrics?.columns[nodeIdx] ?? -1;
   const offset = colIndex >= 0 ? (columnOffsets[colIndex] ?? 0) : 0;
-  
+
   const shiftedY = y + offset;
+
+  // Compute hub delta ratio & height based on visual imbalance
+  const isHub = payload.isHub;
+  const netChange = payload.netChange || 0;
+  const isNetSurplus = netChange >= 0;
+  const visualImbalance = Math.abs(netChange);
+  const maxFlow = payload.value || 0;
+
+  const hubDeltaRatio = isHub && maxFlow > 0
+    ? Math.min(1, visualImbalance / maxFlow)
+    : 0;
+  const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
+  const hubDeltaY = isNetSurplus
+    ? shiftedY + height - hubDeltaHeight
+    : shiftedY;
+
+  const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
+  const hubLabelCenterY = hubDeltaCenterY;
 
   // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
@@ -516,34 +536,94 @@ const SankeyCustomNode = ({
         fillOpacity={isDimmed ? 0.3 : 0.95}
         stroke="none"
       />
-      {/* Name label */}
-      <text
-        x={isRightSide ? x - 8 : x + width + 8}
-        y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
-        textAnchor={isRightSide ? 'end' : 'start'}
-        dominantBaseline="central"
-        fontSize={isMobileSize ? 8 : 10}
-        fontWeight={600}
-        fill="currentColor"
-        className="fill-foreground select-none"
-        style={{ opacity: isDimmed ? 0.3 : 1 }}
-      >
-        {label}
-      </text>
-      {/* Value / percentage sub-label */}
-      {valueLabel && (
-        <text
-          x={isRightSide ? x - 8 : x + width + 8}
-          y={shiftedY + height / 2 + 5}
-          textAnchor={isRightSide ? 'end' : 'start'}
-          dominantBaseline="central"
-          fontSize={isMobileSize ? 7 : 9}
-          fill="currentColor"
-          className="fill-muted-foreground select-none blur-number"
-          style={{ opacity: isDimmed ? 0.3 : 0.75 }}
-        >
-          {valueLabel}
-        </text>
+      {isHub ? (
+        <>
+          {hubDeltaHeight > 0 && (
+            <rect
+              x={x}
+              y={hubDeltaY}
+              width={width}
+              height={hubDeltaHeight}
+              fill={isNetSurplus ? '#10b981' : '#ef4444'}
+              rx={4}
+              fillOpacity={isDimmed ? 0.2 : 0.95}
+            />
+          )}
+          {/* Background box for readability */}
+          <rect
+            x={x + width + 4}
+            y={hubLabelCenterY - 20}
+            width={isMobileSize ? 120 : 180}
+            height={40}
+            fill="var(--background)"
+            stroke="var(--border)"
+            strokeWidth={1}
+            rx={6}
+            fillOpacity={0.85}
+            pointerEvents="none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          />
+          <text
+            x={x + width + 12}
+            y={hubLabelCenterY - 9}
+            textAnchor="start"
+            dominantBaseline="central"
+            fontSize={isMobileSize ? 8 : 10}
+            fontWeight={600}
+            fill="currentColor"
+            pointerEvents="none"
+            className="fill-foreground select-none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          >
+            {payload.label}
+          </text>
+          <text
+            x={x + width + 12}
+            y={hubLabelCenterY + 9}
+            textAnchor="start"
+            dominantBaseline="central"
+            fontSize={isMobileSize ? 13 : 17}
+            fontWeight={800}
+            fill={isNetSurplus ? '#10b981' : '#ef4444'}
+            pointerEvents="none"
+            className="select-none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          >
+            {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
+          </text>
+        </>
+      ) : (
+        <>
+          {/* Name label */}
+          <text
+            x={isRightSide ? x - 8 : x + width + 8}
+            y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
+            textAnchor={isRightSide ? 'end' : 'start'}
+            dominantBaseline="central"
+            fontSize={isMobileSize ? 8 : 10}
+            fontWeight={600}
+            fill="currentColor"
+            className="fill-foreground select-none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          >
+            {label}
+          </text>
+          {/* Value / percentage sub-label */}
+          {valueLabel && (
+            <text
+              x={isRightSide ? x - 8 : x + width + 8}
+              y={shiftedY + height / 2 + 5}
+              textAnchor={isRightSide ? 'end' : 'start'}
+              dominantBaseline="central"
+              fontSize={isMobileSize ? 7 : 9}
+              fill="currentColor"
+              className="fill-muted-foreground select-none blur-number"
+              style={{ opacity: isDimmed ? 0.3 : 0.75 }}
+            >
+              {valueLabel}
+            </text>
+          )}
+        </>
       )}
     </g>
   );
@@ -986,6 +1066,9 @@ export function CashFlowSankey() {
             </ChartTooltip>
           );
         } else {
+          const rawData = payload[0].payload;
+          const data = processedData.nodes.find((n: any) => n.name === rawData.name) || rawData;
+
           if (data.isHub) {
             return (
               <ChartTooltip x={x} y={y}>
@@ -1010,7 +1093,7 @@ export function CashFlowSankey() {
         }
       }}
     />
-  ), [showPercentages, themeVersion]);
+  ), [showPercentages, themeVersion, sankeyData, processedData]);
 
   // ── Loading / error / empty states ─────────────────────────────────────────
   if (loading) {

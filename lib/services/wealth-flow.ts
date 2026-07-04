@@ -15,6 +15,7 @@ export interface WealthFlowNode {
   isBalancingNode?: boolean;
   accounts?: Array<{ id: string; name: string; type?: string; delta: number }>;
   netWorthChange?: number;
+  visualImbalance?: number;
   contributions?: number;
   marketGrowth?: number;
 }
@@ -613,6 +614,7 @@ export async function calculateWealthFlow(
   const totalInflowsSum = roundToCents(inflowNodes.reduce((s, n) => s + n.value, 0));
   const totalOutflowsSum = roundToCents(outflowNodes.reduce((s, n) => s + n.value, 0));
   hubNode.value = roundToCents(Math.max(totalInflowsSum, totalOutflowsSum)) || 0.01;
+  hubNode.visualImbalance = roundToCents(totalInflowsSum - totalOutflowsSum);
 
   // Set node percentages based on maximum value in the chart
   const maxNodeValue = Math.max(...Array.from(nodesMap.values()).map(n => n.value)) || 1;
