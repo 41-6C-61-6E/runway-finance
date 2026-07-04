@@ -37,6 +37,8 @@ export interface WealthFlowData {
     totalExpenses: number;
     totalMarketGains: number;
     totalMarketLosses: number;
+    totalAdjustmentsIn?: number;
+    totalAdjustmentsOut?: number;
     totalSavings: number;
     totalDrawdowns: number;
   };
@@ -89,8 +91,11 @@ function getEffectiveBalance(
   baseCurrency: string
 ): number {
   const endEventDate = getMortgageEndDate(account);
-  if (endEventDate && targetDate >= endEventDate) {
-    return 0;
+  if (endEventDate) {
+    const compTarget = targetDate.length === 7 ? `${targetDate}-31` : targetDate;
+    if (compTarget >= endEventDate) {
+      return 0;
+    }
   }
 
   return convertCurrency(balances[account.id] ?? 0, account.currency, baseCurrency);
@@ -206,6 +211,57 @@ export async function calculateWealthFlow(
   dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
   const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
 
+  const newAccountIds = reportableAccounts.filter((acc: any) => {
+    if (!acc.createdAt) return false;
+    const createdDate = new Date(acc.createdAt);
+    if (isNaN(createdDate.getTime())) return false;
+    const createdStr = createdDate.toISOString().split('T')[0];
+    return createdStr >= startDateStr;
+  }).map((acc: any) => acc.id);
+
+  const newAccountInitBals = new Map<string, number>();
+  if (newAccountIds.length > 0) {
+    const earliestSnapshots = await db
+      .select({
+        accountId: accountSnapshots.accountId,
+        minDate: sql<string>`min(${accountSnapshots.snapshotDate})`,
+      })
+      .from(accountSnapshots)
+      .where(and(
+        eq(accountSnapshots.userId, userId),
+        inArray(accountSnapshots.accountId, newAccountIds)
+      ))
+      .groupBy(accountSnapshots.accountId);
+
+    const earliestDatesMap = new Map<string, string>();
+    for (const s of earliestSnapshots) {
+      if (s.minDate) {
+        earliestDatesMap.set(s.accountId, s.minDate);
+      }
+    }
+
+    const conditions = newAccountIds.map(id =>
+      and(
+        eq(accountSnapshots.accountId, id),
+        eq(accountSnapshots.snapshotDate, earliestDatesMap.get(id) || startDateStr)
+      )
+    );
+    const initSnaps = await db
+      .select({
+        accountId: accountSnapshots.accountId,
+        balance: accountSnapshots.balance,
+      })
+      .from(accountSnapshots)
+      .where(and(
+        eq(accountSnapshots.userId, userId),
+        or(...conditions)
+      ));
+    for (const s of initSnaps) {
+      const decrypted = await decryptField(s.balance, dek);
+      newAccountInitBals.set(s.accountId, parseFloat(decrypted) || 0);
+    }
+  }
+
   // 3. Fetch beginning and ending balances
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);
   const endingBalances = await getBalancesOnDate(db, userId, endDateStr, accountIdsToUse, dek);
@@ -218,7 +274,8 @@ export async function calculateWealthFlow(
     const acc = accountsMap.get(id);
     if (!acc) continue;
 
-    const begConverted = getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
+    const isNewAccount = newAccountIds.includes(id);
+    const begConverted = isNewAccount ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
     const endConverted = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
 
     beginningNetWorth += getSignedNetWorthBalance(begConverted, acc.type);
@@ -401,12 +458,18 @@ export async function calculateWealthFlow(
   // 2. Process Snapshots & Gaps
   let totalMarketGains = 0;
   let totalMarketLosses = 0;
+  let totalMortgageReduction = 0;
 
   for (const accId of accountIdsToUse) {
     const acc = accountsMap.get(accId);
     if (!acc) continue;
 
-    const begUSD = getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
+    const isNewAccount = newAccountIds.includes(accId);
+    const initValRaw = newAccountInitBals.get(accId) || 0;
+    const initValUSD = convertCurrency(initValRaw, acc.currency, baseCurrency);
+    const signedInitVal = getSignedNetWorthBalance(initValUSD, acc.type);
+
+    const begUSD = isNewAccount ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
     const endUSD = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
 
     const isLiab = isLiabilityAccount(acc.type);
@@ -418,9 +481,36 @@ export async function calculateWealthFlow(
     const liabilityUsesNegativeBalances = isLiab && (begUSD < 0 || endUSD < 0);
     const effectiveTxSum = isLiab && !liabilityUsesNegativeBalances ? -txSum : txSum;
 
-    const gap = roundToCents(actualDeltaUSD - effectiveTxSum);
+    const gap = roundToCents(actualDeltaUSD - effectiveTxSum - (isNewAccount ? signedInitVal : 0));
 
-    if (Math.abs(gap) > 0.01) {
+    if (isNewAccount) {
+      if (!isLiab) {
+        const nodeId = 'inc_new_accounts';
+        const node = getOrCreateNode(nodeId, 'New Assets', '#10b981', 'new_accounts');
+        node.value = roundToCents(node.value + signedInitVal);
+        addToBreakdown(nodeId, accId, acc.name, acc.type, 0, signedEnd, signedInitVal);
+      } else {
+        const absVal = Math.abs(signedInitVal);
+        const nodeId = 'exp_new_accounts';
+        const node = getOrCreateNode(nodeId, 'New Liabilities', '#ef4444', 'new_accounts');
+        node.value = roundToCents(node.value + absVal);
+        addToBreakdown(nodeId, accId, acc.name, acc.type, 0, signedEnd, -absVal);
+      }
+    }
+
+    if (acc.type.toLowerCase() === 'mortgage' && gap > 0) {
+      totalMortgageReduction += gap;
+
+      const incNodeId = 'inc_mortgage_reduction';
+      const incNode = getOrCreateNode(incNodeId, 'Mortgage Liability Reduction', '#10b981', 'mortgage');
+      incNode.value = roundToCents(incNode.value + gap);
+      addToBreakdown(incNodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
+
+      const expNodeId = 'exp_mortgage_payment';
+      const expNode = getOrCreateNode(expNodeId, 'Mortgage Payment', '#f43f5e', 'mortgage');
+      expNode.value = roundToCents(expNode.value + gap);
+      addToBreakdown(expNodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
+    } else if (Math.abs(gap) > 0.01) {
       const accountClass = classifyAccount(acc.type);
       const isInvest = accountClass === 'brokerage' || accountClass === 'realestate' || accountClass === 'retirement';
 
@@ -439,7 +529,6 @@ export async function calculateWealthFlow(
             addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
           }
         } else {
-          // Cash/Liability gap > 0: Balance sheet positive adjustment (untracked inflow)
           const nodeId = 'inc_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + gap);
@@ -461,13 +550,39 @@ export async function calculateWealthFlow(
             addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
           }
         } else {
-          // Cash/Liability gap < 0: Balance sheet negative adjustment (untracked outflow)
           const nodeId = 'exp_balance_adjustments';
           const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
           node.value = roundToCents(node.value + absGap);
           addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
         }
       }
+    }
+  }
+
+  // Deduct mortgage principal payments from Category Expenses to avoid double counting
+  let mortgageDeductionRemaining = totalMortgageReduction;
+  if (mortgageDeductionRemaining > 0) {
+    const expensesNode = nodesMap.get('exp_expenses');
+    if (expensesNode) {
+      const deduct = Math.min(expensesNode.value, mortgageDeductionRemaining);
+      expensesNode.value = roundToCents(expensesNode.value - deduct);
+      totalExpenses = roundToCents(totalExpenses - deduct);
+      mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+    }
+    if (mortgageDeductionRemaining > 0) {
+      const adjNode = nodesMap.get('exp_balance_adjustments');
+      if (adjNode) {
+        const deduct = Math.min(adjNode.value, mortgageDeductionRemaining);
+        adjNode.value = roundToCents(adjNode.value - deduct);
+        mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+      }
+    }
+  }
+
+  // Clean up any nodes with value <= 0.01 after deductions
+  for (const [id, node] of Array.from(nodesMap.entries())) {
+    if (node.value <= 0.01) {
+      nodesMap.delete(id);
     }
   }
 
@@ -514,6 +629,21 @@ export async function calculateWealthFlow(
   const finalNodes = [...sources, ...hub, ...destinations];
   const roundedNetWorthChange = roundToCents(netWorthChange);
 
+  // Calculate detailed adjustments sums for the Net Worth Drivers section
+  let totalAdjustmentsIn = 0;
+  let totalAdjustmentsOut = 0;
+  for (const node of Array.from(nodesMap.values())) {
+    if (node.id.startsWith('inc_')) {
+      if (node.group === 'unaccounted' || node.group === 'new_accounts' || node.group === 'mortgage') {
+        totalAdjustmentsIn += node.value;
+      }
+    } else if (node.id.startsWith('exp_')) {
+      if (node.group === 'unaccounted' || node.group === 'new_accounts' || node.group === 'mortgage') {
+        totalAdjustmentsOut += node.value;
+      }
+    }
+  }
+
   return {
     nodes: finalNodes,
     links,
@@ -528,6 +658,8 @@ export async function calculateWealthFlow(
       totalExpenses: roundToCents(totalExpenses),
       totalMarketGains: roundToCents(totalMarketGains),
       totalMarketLosses: roundToCents(totalMarketLosses),
+      totalAdjustmentsIn: roundToCents(totalAdjustmentsIn),
+      totalAdjustmentsOut: roundToCents(totalAdjustmentsOut),
       totalSavings: roundedNetWorthChange > 0 ? roundedNetWorthChange : 0,
       totalDrawdowns: roundedNetWorthChange < 0 ? Math.abs(roundedNetWorthChange) : 0,
     }

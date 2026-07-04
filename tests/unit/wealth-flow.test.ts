@@ -125,10 +125,15 @@ describe('wealth-flow service', () => {
     expect(incInterest).toBeDefined();
     expect(incInterest!.value).toBe(100);
 
-    // Expenses
+    // Expenses: Original $2,000, but mortgage liability reduction is $1,000,
+    // so $1,000 is deducted from category expenses to avoid double counting.
     const expExpenses = result.nodes.find(n => n.id === 'exp_expenses');
     expect(expExpenses).toBeDefined();
-    expect(expExpenses!.value).toBe(2000);
+    expect(expExpenses!.value).toBe(1000);
+
+    const expMortgagePayment = result.nodes.find(n => n.id === 'exp_mortgage_payment');
+    expect(expMortgagePayment).toBeDefined();
+    expect(expMortgagePayment!.value).toBe(1000);
 
     // Net worth change is represented as the central hub imbalance, not as a flow node.
     const nwIncrease = result.nodes.find(n => n.id === 'use_net_wealth_generated');
@@ -146,12 +151,10 @@ describe('wealth-flow service', () => {
     expect(marketGains).toBeDefined();
     expect(marketGains!.value).toBe(400);
 
-    // Balance Adjustments:
-    // Checking ends $1,000 below tracked transaction activity, while mortgage principal paydown
-    // increases net worth by $1,000. These should appear on opposite sides of the flow.
-    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
-    expect(incAdjustments).toBeDefined();
-    expect(incAdjustments!.value).toBe(1000);
+    // Mortgage Reduction (originally classified under Cash & Liability Adjustments):
+    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
+    expect(incMortgageReduction).toBeDefined();
+    expect(incMortgageReduction!.value).toBe(1000);
 
     const expAdjustments = result.nodes.find(n => n.id === 'exp_balance_adjustments');
     expect(expAdjustments).toBeDefined();
@@ -174,9 +177,9 @@ describe('wealth-flow service', () => {
     expect(result.summary.endingNetWorth).toBe(-199000);
     expect(result.summary.netWorthChange).toBe(1000);
 
-    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
-    expect(incAdjustments).toBeDefined();
-    expect(incAdjustments!.value).toBe(1000);
+    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
+    expect(incMortgageReduction).toBeDefined();
+    expect(incMortgageReduction!.value).toBe(1000);
     expect(result.nodes.find(n => n.id === 'exp_balance_adjustments')).toBeUndefined();
   });
 
@@ -204,9 +207,9 @@ describe('wealth-flow service', () => {
     expect(result.summary.endingNetWorth).toBe(0);
     expect(result.summary.netWorthChange).toBe(200000);
 
-    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
-    expect(incAdjustments).toBeDefined();
-    expect(incAdjustments!.value).toBe(200000);
+    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
+    expect(incMortgageReduction).toBeDefined();
+    expect(incMortgageReduction!.value).toBe(200000);
   });
 
   it('handles reconciliation gap by routing surplus/deficit', async () => {

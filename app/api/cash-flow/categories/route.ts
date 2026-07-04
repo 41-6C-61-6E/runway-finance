@@ -298,10 +298,13 @@ export async function GET(request: Request) {
         incomeRows = income;
       } else {
         // Use summary tables (pre-computed, but encrypted)
+        const startYm = startDate!.substring(0, 7);
+        const endYm = endDate!.substring(0, 7);
+
         const spendingConditions = [
           eq(categorySpendingSummary.userId, dataUserId),
-          gte(categorySpendingSummary.yearMonth, startDate!),
-          lte(categorySpendingSummary.yearMonth, endDate!),
+          gte(categorySpendingSummary.yearMonth, startYm),
+          lte(categorySpendingSummary.yearMonth, endYm),
           eq(categories.excludeFromReports, false),
           // Also exclude children whose parent has excludeFromReports=true
           or(
@@ -312,8 +315,8 @@ export async function GET(request: Request) {
 
         const incomeConditions = [
           eq(categoryIncomeSummary.userId, dataUserId),
-          gte(categoryIncomeSummary.yearMonth, startDate!),
-          lte(categoryIncomeSummary.yearMonth, endDate!),
+          gte(categoryIncomeSummary.yearMonth, startYm),
+          lte(categoryIncomeSummary.yearMonth, endYm),
           eq(categories.excludeFromReports, false),
           // Also exclude children whose parent has excludeFromReports=true
           or(

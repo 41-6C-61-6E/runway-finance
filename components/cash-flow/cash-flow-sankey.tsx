@@ -53,6 +53,8 @@ interface SankeyNode {
   sourceCategoryId?: string;
   value?: number;
   percentage?: number;
+  netChange?: number;
+  isHub?: boolean;
 }
 
 interface SankeyLink {
@@ -300,8 +302,19 @@ function buildSankeyData(
 
   // Hub node
   if (incomeCategories.length > 0 || expenseCategories.length > 0 || totalIncome > 0 || totalExpenses > 0) {
-    const hubColor = totalIncome >= totalExpenses ? VIBRANT_COLORS[1] : VIBRANT_COLORS[3];
-    nodes.push({ id: hubId, label: 'Cash Flow', color: hubColor, value: totalIncome, percentage: 100 });
+    const isSurplus = totalIncome >= totalExpenses;
+    const hubColor = isSurplus ? '#10b981' : '#ef4444';
+    const label = isSurplus ? 'Cash Surplus' : 'Cash Deficit';
+    const netChange = totalIncome - totalExpenses;
+    nodes.push({
+      id: hubId,
+      label,
+      color: hubColor,
+      value: Math.max(totalIncome, totalExpenses),
+      percentage: 100,
+      netChange,
+      isHub: true,
+    });
   }
 
   // ── Expense side ─────────────────────────────────────────────────────────
@@ -448,11 +461,13 @@ const SankeyCustomNode = ({
   const maxLabelLen = isMobileSize ? 8 : 22;
   let label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
 
-  const valueLabel = showPercentages && payload.percentage !== undefined
-    ? `${payload.percentage.toFixed(1)}%`
-    : payload.value !== undefined
-      ? formatCurrency(payload.value)
-      : '';
+  const valueLabel = payload.isHub
+    ? formatCurrency(payload.netChange)
+    : showPercentages && payload.percentage !== undefined
+      ? `${payload.percentage.toFixed(1)}%`
+      : payload.value !== undefined
+        ? formatCurrency(payload.value)
+        : '';
 
   // Get vertical offset to center this node's column
   const nodeIdx = nodes.findIndex((n: any) => n.id === payload.id);
@@ -971,6 +986,15 @@ export function CashFlowSankey() {
             </ChartTooltip>
           );
         } else {
+          if (data.isHub) {
+            return (
+              <ChartTooltip x={x} y={y}>
+                <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
+                <TooltipRow label="Net Change" value={formatCurrency(data.netChange)} color={data.netChange >= 0 ? '#10b981' : '#ef4444'} />
+                <TooltipRow label="Total Flow" value={formatCurrency(data.value)} />
+              </ChartTooltip>
+            );
+          }
           const displayValue = showPercentages && data.percentage !== undefined
             ? `${data.percentage.toFixed(1)}%`
             : formatCurrency(data.value);

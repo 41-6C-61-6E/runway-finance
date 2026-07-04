@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, netWorthSnapshots } from '@/lib/db/schema';
+import { accounts, netWorthSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
@@ -10,6 +10,20 @@ import { decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
+
+function formatInTimezone(date: Date, tz: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
 
 const assetCategoryMap: Record<string, string> = {
   checking: 'Cash & Checking',
@@ -99,6 +113,13 @@ export async function GET(request: Request) {
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
   const explicitStart = searchParams.get('startDate');
   const explicitEnd = searchParams.get('endDate');
+
+  const userSettingsList = await getDb()
+    .select({ timezone: userSettings.timezone })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const userTz = userSettingsList[0]?.timezone || 'America/New_York';
 
   let [startDate, endDate] = getDateRange(timeframe);
   if (explicitStart && explicitEnd) {
@@ -208,6 +229,45 @@ export async function GET(request: Request) {
       isSynthetic: false,
       isImported: false,
     }));
+
+    // Fetch live accounts to get today's balance
+    const userAccounts = await getDb()
+      .select()
+      .from(accounts)
+      .where(eq(accounts.userId, dataUserId));
+
+    const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
+    const reportableAccounts = filterReportableAccounts(decryptedAccounts);
+
+    let liveAssets = 0;
+    let liveLiabilities = 0;
+    for (const acc of reportableAccounts) {
+      const balance = parseFloat(acc.balance) || 0;
+      const accountType = acc.type.toLowerCase();
+      if (isAssetAccount(accountType)) {
+        liveAssets += balance;
+      } else if (isLiabilityAccount(accountType)) {
+        liveLiabilities += Math.abs(balance);
+      }
+    }
+    const liveNetWorth = liveAssets - liveLiabilities;
+    const todayStr = formatInTimezone(new Date(), userTz);
+
+    const lastPoint = formattedData[formattedData.length - 1];
+    if (lastPoint && lastPoint.date === todayStr) {
+      lastPoint.netWorth = liveNetWorth;
+      lastPoint.totalAssets = liveAssets;
+      lastPoint.totalLiabilities = liveLiabilities;
+    } else if (!lastPoint || lastPoint.date < todayStr) {
+      formattedData.push({
+        date: todayStr,
+        netWorth: liveNetWorth,
+        totalAssets: liveAssets,
+        totalLiabilities: liveLiabilities,
+        isSynthetic: false,
+        isImported: false,
+      });
+    }
 
     // Calculate summary stats from aggregated data
     const current = formattedData[formattedData.length - 1];

@@ -50,7 +50,7 @@ export interface ProjectionsResult {
 }
 
 /**
- * Calculate average monthly net inflow for an account over the last ~90 days.
+ * Calculate average monthly net inflow for an account over the last ~60 days.
  * Uses account snapshots first, falls back to goal allocation history, then current balance.
  */
 export async function calculateMonthlyInflow(
@@ -59,10 +59,10 @@ export async function calculateMonthlyInflow(
 ): Promise<number> {
   const dek = await getSessionDEK();
   const now = new Date();
-  const cutoff90d = new Date(now);
-  cutoff90d.setDate(cutoff90d.getDate() - 90);
+  const cutoff60d = new Date(now);
+  cutoff60d.setDate(cutoff60d.getDate() - 60);
 
-  const cutoffStr = cutoff90d.toISOString().split('T')[0];
+  const cutoffStr = cutoff60d.toISOString().split('T')[0];
 
   // Try accountSnapshots first (most accurate)
   const snapshots = await getDb()
@@ -379,7 +379,7 @@ export async function computeGoalProjections(
   return {
     accounts: accountProjections,
     totalMonthlyInflow,
-    lookbackMonths: 3,
+    lookbackMonths: 2,
     projectionMonths,
   };
 }
