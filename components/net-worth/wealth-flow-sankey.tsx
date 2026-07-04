@@ -608,6 +608,116 @@ const SankeyCustomLink = ({
   );
 };
 
+interface DriverBreakdownItem {
+  label: string;
+  value: number;
+  accounts?: Array<{
+    id: string;
+    name: string;
+    beg?: number;
+    end?: number;
+    delta: number;
+  }>;
+}
+
+function ExpandableDriverRow({
+  label,
+  value,
+  sign,
+  colorClass,
+  items,
+  isBalanceSheet
+}: {
+  label: string;
+  value: number;
+  sign: '+' | '-';
+  colorClass: string;
+  items: DriverBreakdownItem[];
+  isBalanceSheet?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="space-y-1.5 py-1">
+      <div
+        className="flex justify-between items-center text-xs cursor-pointer hover:bg-muted/10 p-1.5 -mx-1.5 rounded-lg transition-colors group select-none"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+          <span className="transition-transform duration-200">
+            {isOpen ? '▼' : '▶'}
+          </span>
+          <span className={`${colorClass} font-bold`}>{sign}</span> {label}
+        </span>
+        <span className={`font-mono font-semibold ${colorClass}`}>
+          {sign}{formatCurrency(value)}
+        </span>
+      </div>
+
+      {isOpen && (
+        <div className="pl-4 border-l border-border/40 ml-1.5 space-y-2 pb-2 mt-1">
+          {items.length === 0 ? (
+            <div className="text-[10px] text-muted-foreground italic py-1 pl-1">
+              No entries in this period.
+            </div>
+          ) : (
+            items.map((item, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex justify-between items-center text-[11px] font-medium text-foreground pl-1">
+                  <span>{item.label}</span>
+                  <span className="font-mono text-muted-foreground">{formatCurrency(item.value)}</span>
+                </div>
+                {item.accounts && item.accounts.length > 0 && (
+                  <div className="pl-2 space-y-1">
+                    {isBalanceSheet ? (
+                      <table className="w-full text-[9px] text-left text-muted-foreground border-collapse font-mono">
+                        <thead>
+                          <tr className="border-b border-border/20 text-[8px] uppercase tracking-wider text-muted-foreground/60">
+                            <th className="py-0.5 font-semibold">Account</th>
+                            <th className="py-0.5 text-right font-semibold">Start</th>
+                            <th className="py-0.5 text-right font-semibold">End</th>
+                            <th className="py-0.5 text-right font-semibold">Net Tx</th>
+                            <th className="py-0.5 text-right font-semibold">Flow</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {item.accounts.map((acc) => {
+                            const netTx = roundFlowValue((acc.end || 0) - (acc.beg || 0) - (acc.delta || 0));
+                            return (
+                              <tr key={acc.id} className="hover:bg-muted/5">
+                                <td className="py-0.5 truncate max-w-[100px] font-sans text-muted-foreground/80">{acc.name}</td>
+                                <td className="py-0.5 text-right">{formatCurrency(acc.beg || 0)}</td>
+                                <td className="py-0.5 text-right">{formatCurrency(acc.end || 0)}</td>
+                                <td className="py-0.5 text-right">{formatCurrency(netTx)}</td>
+                                <td className={`py-0.5 text-right font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                  {acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {item.accounts.map((acc) => (
+                          <div key={acc.id} className="flex justify-between items-center text-[10px] text-muted-foreground font-mono pl-1">
+                            <span className="truncate max-w-[180px] font-sans">{acc.name}</span>
+                            <span>{acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WealthFlowSankey() {
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('networth-flow-sankey-collapsed');
@@ -810,6 +920,72 @@ export function WealthFlowSankey() {
     }
     return wealthFlowData;
   }, [wealthFlowData, routeThroughAccounts, routeThroughAccountTypes]);
+
+  const driverInflows = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => n.id.startsWith('inc_') && n.group === 'income' && !['inc_market_gains', 'inc_real_estate_appreciation', 'inc_balance_adjustments', 'inc_new_accounts', 'inc_mortgage_reduction'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
+
+  const driverOutflows = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => n.id.startsWith('exp_') && n.group === 'expense' && !['exp_expenses', 'exp_balance_adjustments', 'exp_new_accounts', 'exp_mortgage_payment'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
+
+  const driverMarketGains = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => ['inc_market_gains', 'inc_real_estate_appreciation'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
+
+  const driverMarketLosses = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => ['exp_market_losses', 'exp_real_estate_depreciation'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
+
+  const driverAdjustmentsIn = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => ['inc_balance_adjustments', 'inc_new_accounts', 'inc_mortgage_reduction'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
+
+  const driverAdjustmentsOut = useMemo(() => {
+    if (!displayWealthFlowData) return [];
+    return displayWealthFlowData.nodes
+      .filter(n => ['exp_balance_adjustments', 'exp_new_accounts', 'exp_mortgage_payment'].includes(n.id))
+      .map(n => ({
+        label: n.label ?? n.name ?? '',
+        value: n.value,
+        accounts: n.accounts
+      }));
+  }, [displayWealthFlowData]);
 
   const nodeSupportsTransactions = useCallback((node: SankeyNode): boolean => {
     const id = node.id;
@@ -1499,47 +1675,57 @@ export function WealthFlowSankey() {
                       <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-emerald-500 font-bold">+</span> Inflows & Income
-                      </span>
-                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalIncome)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Inflows & Income"
+                      value={summary.totalIncome}
+                      sign="+"
+                      colorClass="text-emerald-500"
+                      items={driverInflows}
+                    />
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-rose-500 font-bold">-</span> Expenses & Outflows
-                      </span>
-                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalExpenses)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Expenses & Outflows"
+                      value={summary.totalExpenses}
+                      sign="-"
+                      colorClass="text-rose-500"
+                      items={driverOutflows}
+                    />
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-emerald-500 font-bold">+</span> Market Gains & Appreciation
-                      </span>
-                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalMarketGains)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Market Gains & Appreciation"
+                      value={summary.totalMarketGains}
+                      sign="+"
+                      colorClass="text-emerald-500"
+                      items={driverMarketGains}
+                      isBalanceSheet
+                    />
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-rose-500 font-bold">-</span> Market Losses & Depreciation
-                      </span>
-                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalMarketLosses)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Market Losses & Depreciation"
+                      value={summary.totalMarketLosses}
+                      sign="-"
+                      colorClass="text-rose-500"
+                      items={driverMarketLosses}
+                      isBalanceSheet
+                    />
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-emerald-500 font-bold">+</span> Capital Inflows & Adjustments
-                      </span>
-                      <span className="font-mono text-emerald-500">+{formatCurrency(summary.totalAdjustmentsIn || 0)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Capital Inflows & Adjustments"
+                      value={summary.totalAdjustmentsIn || 0}
+                      sign="+"
+                      colorClass="text-emerald-500"
+                      items={driverAdjustmentsIn}
+                      isBalanceSheet
+                    />
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <span className="text-rose-500 font-bold">-</span> Capital Outflows & Adjustments
-                      </span>
-                      <span className="font-mono text-rose-500">-{formatCurrency(summary.totalAdjustmentsOut || 0)}</span>
-                    </div>
+                    <ExpandableDriverRow
+                      label="Capital Outflows & Adjustments"
+                      value={summary.totalAdjustmentsOut || 0}
+                      sign="-"
+                      colorClass="text-rose-500"
+                      items={driverAdjustmentsOut}
+                      isBalanceSheet
+                    />
 
                     <div className="border-t-2 border-double border-border/80 pt-2.5 mt-2">
                       <div className="flex justify-between items-center text-sm font-bold">
