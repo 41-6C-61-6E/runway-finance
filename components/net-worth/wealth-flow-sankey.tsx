@@ -43,6 +43,7 @@ interface SankeyNode {
   isBalancingNode?: boolean;
   accounts?: AccountBreakdown[];
   netWorthChange?: number;
+  visualImbalance?: number;
   contributions?: number;
   marketGrowth?: number;
 }
@@ -417,15 +418,20 @@ const SankeyCustomNode = ({
   const group = payload.group as string | undefined;
   const isHub = group === 'hub';
   const hubNetWorthChange = payload.netWorthChange as number | undefined;
-  const hubDeltaRatio = isHub && hubNetWorthChange !== undefined && payload.value > 0
-    ? Math.min(1, Math.abs(hubNetWorthChange) / payload.value)
+
+  const isNetSurplus = (payload.visualImbalance || 0) >= 0;
+  const visualImbalance = Math.abs(payload.visualImbalance || 0);
+  const maxFlow = payload.value || 0;
+
+  const hubDeltaRatio = isHub && maxFlow > 0
+    ? Math.min(1, visualImbalance / maxFlow)
     : 0;
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
-  const hubDeltaY = hubNetWorthChange !== undefined && hubNetWorthChange < 0
-    ? y
-    : y + height - hubDeltaHeight;
+  const hubDeltaY = isNetSurplus
+    ? y + height - hubDeltaHeight
+    : y;
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
-  const hubLabelCenterY = hubDeltaHeight >= 18 ? hubDeltaCenterY : y + height / 2;
+  const hubLabelCenterY = hubDeltaCenterY;
   const isBalancing = payload.isBalancingNode;
   const groupStripeColor = group ? GROUP_COLORS[group] : undefined;
 
@@ -475,14 +481,29 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 0.95}
             />
           )}
+          {/* Background box for readability */}
+          <rect
+            x={x + width + 4}
+            y={hubLabelCenterY - 20}
+            width={isMobileSize ? 120 : 180}
+            height={40}
+            fill="var(--background)"
+            stroke="var(--border)"
+            strokeWidth={1}
+            rx={6}
+            fillOpacity={0.85}
+            pointerEvents="none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          />
           <text
-            x={x + width + 8}
+            x={x + width + 12}
             y={hubNetWorthChange !== undefined ? hubLabelCenterY - 9 : y + height / 2}
             textAnchor="start"
             dominantBaseline="central"
             fontSize={isMobileSize ? 8 : 10}
             fontWeight={600}
             fill="currentColor"
+            pointerEvents="none"
             className="fill-foreground select-none"
             style={{ opacity: isDimmed ? 0.3 : 1 }}
           >
@@ -490,31 +511,20 @@ const SankeyCustomNode = ({
           </text>
           {hubNetWorthChange !== undefined && (
             <text
-              x={x + width + 8}
+              x={x + width + 12}
               y={hubLabelCenterY + 8}
               textAnchor="start"
               dominantBaseline="central"
               fontSize={isMobileSize ? 13 : 17}
               fontWeight={800}
               fill={hubNetWorthChange >= 0 ? '#10b981' : '#ef4444'}
+              pointerEvents="none"
               className="select-none"
               style={{ opacity: isDimmed ? 0.3 : 1 }}
             >
               {hubNetWorthChange >= 0 ? '+' : ''}{formatCurrency(hubNetWorthChange)}
             </text>
           )}
-          <text
-            x={x + width + 8}
-            y={y + height + 12}
-            textAnchor="start"
-            dominantBaseline="central"
-            fontSize={isMobileSize ? 7 : 9}
-            fill="currentColor"
-            className="fill-muted-foreground select-none"
-            style={{ opacity: isDimmed ? 0.3 : 0.75 }}
-          >
-            Middle Bar: {formatCurrency(payload.value)}
-          </text>
         </>
       ) : (
         <>
@@ -1264,6 +1274,9 @@ export function WealthFlowSankey() {
               </ChartTooltip>
             );
           } else {
+            const rawData = payload[0].payload;
+            const data = processedData.nodes.find((n) => n.name === rawData.name) || rawData;
+
             const displayValue =
               showPercentages && data.percentage !== undefined
                 ? `${data.percentage.toFixed(1)}%`
@@ -1272,7 +1285,6 @@ export function WealthFlowSankey() {
             const accounts = data.accounts as any[] | undefined;
             const group = data.group as string | undefined;
             const groupLabel = group ? GROUP_LABELS[group] : undefined;
-            const hubNetWorthChange = data.netWorthChange as number | undefined;
 
             return (
               <ChartTooltip x={x} y={y}>
@@ -1282,13 +1294,14 @@ export function WealthFlowSankey() {
                 {groupLabel && (
                   <TooltipRow label="Category" value={groupLabel} />
                 )}
-                {hubNetWorthChange !== undefined ? (
+                {data.id === 'hub_net_worth_change' ? (
                   <>
                     <TooltipRow
-                      label={hubNetWorthChange >= 0 ? 'Net Worth Increase' : 'Net Worth Decrease'}
-                      value={`${hubNetWorthChange >= 0 ? '+' : ''}${formatCurrency(hubNetWorthChange)}`}
+                      label="Net Change"
+                      value={`${(data.netWorthChange || 0) >= 0 ? '+' : ''}${formatCurrency(data.netWorthChange || 0)}`}
+                      color={(data.netWorthChange || 0) >= 0 ? '#10b981' : '#ef4444'}
                     />
-                    <TooltipRow label="Middle Bar" value={formatCurrency(data.value)} />
+                    <TooltipRow label="Total Flow" value={formatCurrency(data.value)} />
                   </>
                 ) : data.contributions !== undefined && data.marketGrowth !== undefined ? (
                   <>
@@ -1331,7 +1344,7 @@ export function WealthFlowSankey() {
         }}
       />
     ),
-    [showPercentages, themeVersion, wealthFlowData]
+    [showPercentages, themeVersion, wealthFlowData, processedData]
   );
 
   const toggleAccount = (id: string) => {
