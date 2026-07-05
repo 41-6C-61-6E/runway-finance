@@ -489,9 +489,7 @@ const SankeyCustomNode = ({
     ? Math.min(1, visualImbalance / maxFlow)
     : 0;
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
-  const hubDeltaY = isNetSurplus
-    ? shiftedY + height - hubDeltaHeight
-    : shiftedY;
+  const hubDeltaY = shiftedY + height - hubDeltaHeight;
 
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
   const hubLabelCenterY = hubDeltaCenterY;
@@ -550,47 +548,39 @@ const SankeyCustomNode = ({
             />
           )}
           {/* Background box for readability */}
-          <rect
+          <foreignObject
             x={x + width + 4}
-            y={hubLabelCenterY - 20}
-            width={isMobileSize ? 120 : 180}
-            height={40}
-            fill="var(--background)"
-            stroke="var(--border)"
-            strokeWidth={1}
-            rx={6}
-            fillOpacity={0.85}
+            y={hubLabelCenterY - 24}
+            width={400}
+            height={50}
             pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          />
-          <text
-            x={x + width + 12}
-            y={hubLabelCenterY - 9}
-            textAnchor="start"
-            dominantBaseline="central"
-            fontSize={isMobileSize ? 8 : 10}
-            fontWeight={600}
-            fill="currentColor"
-            pointerEvents="none"
-            className="fill-foreground select-none"
             style={{ opacity: isDimmed ? 0.3 : 1 }}
           >
-            {payload.label}
-          </text>
-          <text
-            x={x + width + 12}
-            y={hubLabelCenterY + 9}
-            textAnchor="start"
-            dominantBaseline="central"
-            fontSize={isMobileSize ? 13 : 17}
-            fontWeight={800}
-            fill={isNetSurplus ? '#10b981' : '#ef4444'}
-            pointerEvents="none"
-            className="select-none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
-          </text>
+            <div style={{
+              display: 'inline-block',
+              width: 'fit-content',
+              background: 'var(--background)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              padding: '4px 10px',
+            }}>
+              <div style={{
+                fontSize: isMobileSize ? 8 : 10,
+                fontWeight: 600,
+                lineHeight: 1.4,
+              }}>
+                {payload.label}
+              </div>
+              <div style={{
+                fontSize: isMobileSize ? 13 : 17,
+                fontWeight: 800,
+                color: isNetSurplus ? '#10b981' : '#ef4444',
+                lineHeight: 1.3,
+              }}>
+                {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
+              </div>
+            </div>
+          </foreignObject>
         </>
       ) : (
         <>

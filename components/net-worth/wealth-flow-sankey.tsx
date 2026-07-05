@@ -30,6 +30,7 @@ interface AccountBreakdown {
   beg?: number;
   end?: number;
   delta: number;
+  adjustedDelta?: number;
 }
 
 interface SankeyNode {
@@ -126,6 +127,14 @@ function splitFlowByAccounts(
   totalValue: number,
   accounts: AccountBreakdown[] | undefined
 ): Array<AccountBreakdown & { flowValue: number }> {
+  const hasAdjusted = accounts?.some(a => a.adjustedDelta !== undefined);
+  if (hasAdjusted) {
+    const valid = (accounts || [])
+      .map(a => ({ ...a, absAdjusted: Math.abs(a.adjustedDelta!) }))
+      .filter(a => a.absAdjusted > 0.01);
+    return valid.map(a => ({ ...a, flowValue: a.absAdjusted }));
+  }
+
   const validAccounts = (accounts || [])
     .map((account) => ({ ...account, absDelta: Math.abs(account.delta || 0) }))
     .filter((account) => account.absDelta > 0.01);
@@ -211,6 +220,33 @@ function routeFlowsThroughAccounts(data: WealthFlowData): WealthFlowData {
     }
 
     addRoutedLink(link.source, link.target, link.value);
+  }
+
+  // Update category node values to match routed link sums
+  const updatedNodeValues = new Map<string, number>();
+  for (const link of routedLinks) {
+    if (typeof link.source === 'string' && link.source.startsWith('inc_')) {
+      updatedNodeValues.set(link.source, (updatedNodeValues.get(link.source) || 0) + link.value);
+    }
+    if (typeof link.target === 'string' && link.target.startsWith('exp_') && link.target !== 'hub_net_worth_change') {
+      updatedNodeValues.set(link.target, (updatedNodeValues.get(link.target) || 0) + link.value);
+    }
+  }
+
+  for (const [nodeId, newValue] of updatedNodeValues) {
+    const node = nodesById.get(nodeId);
+    if (node) node.value = roundFlowValue(newValue);
+  }
+
+  // Recompute hub in routed view
+  const hubNode = nodesById.get('hub_net_worth_change');
+  if (hubNode) {
+    const routedInflowNodes = [...nodesById.values()].filter(n => n.id.startsWith('inc_') && n.id !== 'hub_net_worth_change');
+    const routedOutflowNodes = [...nodesById.values()].filter(n => n.id.startsWith('exp_') && n.id !== 'hub_net_worth_change');
+    const totalInflow = routedInflowNodes.reduce((s, n) => s + n.value, 0);
+    const totalOutflow = routedOutflowNodes.reduce((s, n) => s + n.value, 0);
+    hubNode.value = roundFlowValue(Math.max(totalInflow, totalOutflow, Math.abs(hubNode.netWorthChange || 0))) || 0.01;
+    hubNode.visualImbalance = roundFlowValue(totalInflow - totalOutflow);
   }
 
   const routedNodes = [...data.nodes.map((node) => nodesById.get(node.id)!), ...accountNodes.values()];
@@ -354,6 +390,33 @@ function routeFlowsThroughAccountTypes(data: WealthFlowData): WealthFlowData {
     }
 
     addRoutedLink(link.source, link.target, link.value);
+  }
+
+  // Update category node values to match routed link sums
+  const updatedNodeValues = new Map<string, number>();
+  for (const link of routedLinks) {
+    if (typeof link.source === 'string' && link.source.startsWith('inc_')) {
+      updatedNodeValues.set(link.source, (updatedNodeValues.get(link.source) || 0) + link.value);
+    }
+    if (typeof link.target === 'string' && link.target.startsWith('exp_') && link.target !== 'hub_net_worth_change') {
+      updatedNodeValues.set(link.target, (updatedNodeValues.get(link.target) || 0) + link.value);
+    }
+  }
+
+  for (const [nodeId, newValue] of updatedNodeValues) {
+    const node = nodesById.get(nodeId);
+    if (node) node.value = roundFlowValue(newValue);
+  }
+
+  // Recompute hub in routed view
+  const hubNode = nodesById.get('hub_net_worth_change');
+  if (hubNode) {
+    const routedInflowNodes = [...nodesById.values()].filter(n => n.id.startsWith('inc_') && n.id !== 'hub_net_worth_change');
+    const routedOutflowNodes = [...nodesById.values()].filter(n => n.id.startsWith('exp_') && n.id !== 'hub_net_worth_change');
+    const totalInflow = routedInflowNodes.reduce((s, n) => s + n.value, 0);
+    const totalOutflow = routedOutflowNodes.reduce((s, n) => s + n.value, 0);
+    hubNode.value = roundFlowValue(Math.max(totalInflow, totalOutflow, Math.abs(hubNode.netWorthChange || 0))) || 0.01;
+    hubNode.visualImbalance = roundFlowValue(totalInflow - totalOutflow);
   }
 
   const routedNodes = [...data.nodes.map((node) => nodesById.get(node.id)!), ...typeNodes.values()];

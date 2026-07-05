@@ -383,7 +383,7 @@ export async function calculateWealthFlow(
   const txSumByAccount = new Map<string, number>();
   
   // We will keep account breakdowns for each node
-  const accountBreakdowns: Record<string, Array<{ id: string; name: string; type: string; beg: number; end: number; delta: number }>> = {};
+  const accountBreakdowns: Record<string, Array<{ id: string; name: string; type: string; beg: number; end: number; delta: number; adjustedDelta?: number }>> = {};
   const addToBreakdown = (nodeId: string, accId: string, accName: string, accType: string, beg: number, end: number, delta: number) => {
     if (!accountBreakdowns[nodeId]) accountBreakdowns[nodeId] = [];
     const existing = accountBreakdowns[nodeId].find(a => a.id === accId);
@@ -615,6 +615,32 @@ export async function calculateWealthFlow(
   for (const [id, node] of Array.from(nodesMap.entries())) {
     if (node.value <= 0.01) {
       nodesMap.delete(id);
+    }
+  }
+
+  // Compute per-account adjusted breakdowns for balance-change-proportional routing
+  // First pass: sum |delta| per account across all breakdowns
+  const accountAbsDeltaSum = new Map<string, number>();
+  for (const breakdowns of Object.values(accountBreakdowns)) {
+    for (const b of breakdowns) {
+      accountAbsDeltaSum.set(b.id, (accountAbsDeltaSum.get(b.id) || 0) + Math.abs(b.delta));
+    }
+  }
+
+  // Second pass: compute scaling factor per account and apply adjustedDelta
+  for (const breakdowns of Object.values(accountBreakdowns)) {
+    for (const b of breakdowns) {
+      const acc = accountsMap.get(b.id);
+      if (!acc) continue;
+      const isNewAcct = newAccountIds.includes(b.id);
+      const bBegUSD = isNewAcct ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
+      const bEndUSD = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
+      const bSignedBeg = getSignedNetWorthBalance(bBegUSD, acc.type);
+      const bSignedEnd = getSignedNetWorthBalance(bEndUSD, acc.type);
+      const absBalChange = Math.abs(bSignedEnd - bSignedBeg);
+      const sumAbs = accountAbsDeltaSum.get(b.id) || 0;
+      const scale = sumAbs > 0.01 ? Math.min(1, absBalChange / sumAbs) : 1;
+      b.adjustedDelta = roundToCents(b.delta * scale);
     }
   }
 
