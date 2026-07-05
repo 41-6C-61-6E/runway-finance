@@ -1408,35 +1408,33 @@ export function WealthFlowSankey() {
             <CollapsibleFilterPanel
               isOpen={showFilters}
               onToggle={() => setShowFilters(!showFilters)}
-              feedback={
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    {timeframe.toUpperCase()}
+              feedbackItems={[
+                <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {timeframe.toUpperCase()}
+                </span>,
+                <span key="unit" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {showPercentages ? '%' : '$'}
+                </span>,
+                ...(routeThroughAccounts ? [
+                  <span key="account-routing" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    ACCOUNT ROUTING
                   </span>
-                  <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    {showPercentages ? '%' : '$'}
+                ] : []),
+                ...(routeThroughAccountTypes ? [
+                  <span key="type-routing" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    TYPE ROUTING
                   </span>
-                  {routeThroughAccounts && (
-                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                      ACCOUNT ROUTING
-                    </span>
-                  )}
-                  {routeThroughAccountTypes && (
-                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                      TYPE ROUTING
-                    </span>
-                  )}
-                  {excludedAccountIds.size > 0 && (
-                    <span
-                      className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
-                    >
-                      {allAccounts.length - excludedAccountIds.size} ACCOUNTS
-                    </span>
-                  )}
-
-                </div>
-              }
+                ] : []),
+                ...(excludedAccountIds.size > 0 ? [
+                  <span
+                    key="accounts"
+                    className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
+                  >
+                    {allAccounts.length - excludedAccountIds.size} ACCOUNTS
+                  </span>
+                ] : []),
+              ]}
               rightActions={
                 showWindowNav && (
                   <DateWindowNav
