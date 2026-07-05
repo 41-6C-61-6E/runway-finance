@@ -85,6 +85,12 @@ function getMortgageEndDate(acc: any): string | undefined {
   return undefined;
 }
 
+function getLastDayOfMonth(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+}
+
 function getEffectiveBalance(
   balances: Record<string, number>,
   account: any,
@@ -93,7 +99,7 @@ function getEffectiveBalance(
 ): number {
   const endEventDate = getMortgageEndDate(account);
   if (endEventDate) {
-    const compTarget = targetDate.length === 7 ? `${targetDate}-31` : targetDate;
+    const compTarget = targetDate.length === 7 ? getLastDayOfMonth(targetDate) : targetDate;
     if (compTarget >= endEventDate) {
       return 0;
     }
@@ -413,8 +419,11 @@ export async function calculateWealthFlow(
     const amountVal = parseFloat(plainAmountStr) || 0;
     const amountUSD = convertCurrency(amountVal, acc.currency, baseCurrency);
 
-    // Group transactions by account
-    txSumByAccount.set(row.accountId, (txSumByAccount.get(row.accountId) || 0) + amountUSD);
+    // Group transactions by account (skip compounds — they're self-contained via inc/exp nodes)
+    const isCompound = row.categoryType === 'compound';
+    if (!isCompound) {
+      txSumByAccount.set(row.accountId, (txSumByAccount.get(row.accountId) || 0) + amountUSD);
+    }
 
     const isExcluded = row.excludeFromReports === true;
     if (isExcluded) continue;
@@ -422,7 +431,7 @@ export async function calculateWealthFlow(
     if (row.categoryType === 'transfer') {
       // Transfers are completely excluded from the direct flow (they cancel out and don't change net worth)
       continue;
-    } else if (row.categoryType === 'compound') {
+    } else if (isCompound) {
       const absAmount = Math.abs(amountUSD);
       totalIncome += absAmount;
       totalExpenses += absAmount;
@@ -519,10 +528,10 @@ export async function calculateWealthFlow(
       incNode.value = roundToCents(incNode.value + gap);
       addToBreakdown(incNodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
 
-      const expNodeId = 'exp_mortgage_payment';
-      const expNode = getOrCreateNode(expNodeId, 'Mortgage Payment', '#f43f5e', 'mortgage');
-      expNode.value = roundToCents(expNode.value + gap);
-      addToBreakdown(expNodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
+      // exp_mortgage_payment is created during the deduction phase below
+      // at only the amount that can be matched by reducing existing expense nodes,
+      // preventing the outflow side from being inflated beyond what was actually
+      // spent on mortgage payments in the transaction record.
     } else if (Math.abs(gap) > 0.01) {
       const accountClass = classifyAccount(acc.type);
       const isInvest = accountClass === 'brokerage' || accountClass === 'realestate' || accountClass === 'retirement';
@@ -572,22 +581,32 @@ export async function calculateWealthFlow(
     }
   }
 
-  // Deduct mortgage principal payments from Category Expenses to avoid double counting
+  // Deduct mortgage principal payments from Category Expenses to avoid double counting.
+  // exp_mortgage_payment is created at only the amount actually deducted, so the
+  // outflow side is not inflated beyond what the transaction record supports.
   let mortgageDeductionRemaining = totalMortgageReduction;
   if (mortgageDeductionRemaining > 0) {
     const expensesNode = nodesMap.get('exp_expenses');
     if (expensesNode) {
       const deduct = Math.min(expensesNode.value, mortgageDeductionRemaining);
-      expensesNode.value = roundToCents(expensesNode.value - deduct);
-      totalExpenses = roundToCents(totalExpenses - deduct);
-      mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+      if (deduct > 0.01) {
+        expensesNode.value = roundToCents(expensesNode.value - deduct);
+        totalExpenses = roundToCents(totalExpenses - deduct);
+        const expNode = getOrCreateNode('exp_mortgage_payment', 'Mortgage Payment', '#f43f5e', 'mortgage');
+        expNode.value = roundToCents(expNode.value + deduct);
+        mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+      }
     }
     if (mortgageDeductionRemaining > 0) {
       const adjNode = nodesMap.get('exp_balance_adjustments');
       if (adjNode) {
         const deduct = Math.min(adjNode.value, mortgageDeductionRemaining);
-        adjNode.value = roundToCents(adjNode.value - deduct);
-        mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+        if (deduct > 0.01) {
+          adjNode.value = roundToCents(adjNode.value - deduct);
+          const expNode = getOrCreateNode('exp_mortgage_payment', 'Mortgage Payment', '#f43f5e', 'mortgage');
+          expNode.value = roundToCents(expNode.value + deduct);
+          mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
+        }
       }
     }
   }
@@ -622,10 +641,11 @@ export async function calculateWealthFlow(
     addLink(hubId, node.id, node.value);
   }
 
-  // Define Hub value as the max of total inflows or outflows
+  // Define Hub value as the max of total inflows, outflows, or the absolute net worth change.
+  // This guarantees the colored delta bar always fits within the hub node.
   const totalInflowsSum = roundToCents(inflowNodes.reduce((s, n) => s + n.value, 0));
   const totalOutflowsSum = roundToCents(outflowNodes.reduce((s, n) => s + n.value, 0));
-  hubNode.value = roundToCents(Math.max(totalInflowsSum, totalOutflowsSum)) || 0.01;
+  hubNode.value = roundToCents(Math.max(totalInflowsSum, totalOutflowsSum, Math.abs(netWorthChange))) || 0.01;
   hubNode.visualImbalance = roundToCents(totalInflowsSum - totalOutflowsSum);
 
   // Set node percentages based on maximum value in the chart
