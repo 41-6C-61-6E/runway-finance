@@ -87,7 +87,7 @@ export function useDateWindow(
   };
 
   const isNextDisabled = useMemo(() => {
-    if (timeframe === 'all' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return true;
+    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return true;
     const [y, m] = windowEnd.split('-').map(Number);
     const nextEnd = new Date(y, m - 1, 1);
     nextEnd.setMonth(nextEnd.getMonth() + shift);
@@ -96,7 +96,7 @@ export function useDateWindow(
     return `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}` > currentMonth;
   }, [timeframe, windowEnd, shift, currentMonth]);
 
-  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd' && timeframe !== '7d' && timeframe !== '30d' && timeframe !== '365d';
+  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd' && timeframe !== '1d' && timeframe !== '7d' && timeframe !== '30d' && timeframe !== '365d';
 
   const windowLabel = useMemo(() => getPeriodLabel(windowEnd, timeframe), [windowEnd, timeframe]);
 
