@@ -417,14 +417,14 @@ const SankeyCustomNode = ({
 
   const group = payload.group as string | undefined;
   const isHub = group === 'hub';
-  const hubNetWorthChange = payload.netWorthChange as number | undefined;
+  const hubVisualImbalance = payload.visualImbalance as number | undefined;
 
-  const isNetSurplus = (payload.visualImbalance || 0) >= 0;
-  const visualImbalance = Math.abs(payload.visualImbalance || 0);
+  const isNetSurplus = (hubVisualImbalance || 0) >= 0;
+  const imbalance = Math.abs(hubVisualImbalance || 0);
   const maxFlow = payload.value || 0;
 
   const hubDeltaRatio = isHub && maxFlow > 0
-    ? Math.min(1, visualImbalance / maxFlow)
+    ? Math.min(1, imbalance / maxFlow)
     : 0;
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
   const hubDeltaY = isNetSurplus
@@ -470,61 +470,53 @@ const SankeyCustomNode = ({
       />
       {isHub ? (
         <>
-          {hubNetWorthChange !== undefined && hubDeltaHeight > 0 && (
+          {hubVisualImbalance !== undefined && hubDeltaHeight > 0 && (
             <rect
               x={x}
               y={hubDeltaY}
               width={width}
               height={hubDeltaHeight}
-              fill={hubNetWorthChange >= 0 ? '#10b981' : '#ef4444'}
+              fill={hubVisualImbalance >= 0 ? '#10b981' : '#ef4444'}
               rx={4}
               fillOpacity={isDimmed ? 0.2 : 0.95}
             />
           )}
           {/* Background box for readability */}
-          <rect
+          <foreignObject
             x={x + width + 4}
-            y={hubLabelCenterY - 20}
-            width={isMobileSize ? 120 : 180}
-            height={40}
-            fill="var(--background)"
-            stroke="var(--border)"
-            strokeWidth={1}
-            rx={6}
-            fillOpacity={0.85}
+            y={hubLabelCenterY - 24}
+            width={400}
+            height={50}
             pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          />
-          <text
-            x={x + width + 12}
-            y={hubNetWorthChange !== undefined ? hubLabelCenterY - 9 : y + height / 2}
-            textAnchor="start"
-            dominantBaseline="central"
-            fontSize={isMobileSize ? 8 : 10}
-            fontWeight={600}
-            fill="currentColor"
-            pointerEvents="none"
-            className="fill-foreground select-none"
             style={{ opacity: isDimmed ? 0.3 : 1 }}
           >
-            {payload.label}
-          </text>
-          {hubNetWorthChange !== undefined && (
-            <text
-              x={x + width + 12}
-              y={hubLabelCenterY + 8}
-              textAnchor="start"
-              dominantBaseline="central"
-              fontSize={isMobileSize ? 13 : 17}
-              fontWeight={800}
-              fill={hubNetWorthChange >= 0 ? '#10b981' : '#ef4444'}
-              pointerEvents="none"
-              className="select-none"
-              style={{ opacity: isDimmed ? 0.3 : 1 }}
-            >
-              {hubNetWorthChange >= 0 ? '+' : ''}{formatCurrency(hubNetWorthChange)}
-            </text>
-          )}
+            <div style={{
+              display: 'inline-block',
+              width: 'fit-content',
+              background: 'var(--background)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              padding: '4px 10px',
+            }}>
+              <div style={{
+                fontSize: isMobileSize ? 8 : 10,
+                fontWeight: 600,
+                lineHeight: 1.4,
+              }}>
+                {payload.label}
+              </div>
+              {hubVisualImbalance !== undefined && (
+                <div style={{
+                  fontSize: isMobileSize ? 13 : 17,
+                  fontWeight: 800,
+                  color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
+                  lineHeight: 1.3,
+                }}>
+                  {hubVisualImbalance >= 0 ? '+' : ''}{formatCurrency(hubVisualImbalance)}
+                </div>
+              )}
+            </div>
+          </foreignObject>
         </>
       ) : (
         <>
@@ -630,7 +622,7 @@ interface DriverBreakdownItem {
   }>;
 }
 
-function ExpandableDriverRow({
+function DriverLedgerSection({
   label,
   value,
   sign,
@@ -645,85 +637,74 @@ function ExpandableDriverRow({
   items: DriverBreakdownItem[];
   isBalanceSheet?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
     <div className="space-y-1.5 py-1">
-      <div
-        className="flex justify-between items-center text-xs cursor-pointer hover:bg-muted/10 p-1.5 -mx-1.5 rounded-lg transition-colors group select-none"
-        onClick={() => setIsOpen(!isOpen)}
-      >
+      <div className="flex justify-between items-center text-xs p-1.5 -mx-1.5 rounded-lg">
         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-          <span className="transition-transform duration-200">
-            {isOpen ? '▼' : '▶'}
-          </span>
           <span className={`${colorClass} font-bold`}>{sign}</span> {label}
         </span>
         <span className={`font-mono font-semibold ${colorClass}`}>
           {sign}{formatCurrency(value)}
         </span>
       </div>
-
-      {isOpen && (
-        <div className="pl-4 border-l border-border/40 ml-1.5 space-y-2 pb-2 mt-1">
-          {items.length === 0 ? (
-            <div className="text-[10px] text-muted-foreground italic py-1 pl-1">
-              No entries in this period.
-            </div>
-          ) : (
-            items.map((item, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between items-center text-[11px] font-medium text-foreground pl-1">
-                  <span>{item.label}</span>
-                  <span className="font-mono text-muted-foreground">{formatCurrency(item.value)}</span>
-                </div>
-                {item.accounts && item.accounts.length > 0 && (
-                  <div className="pl-2 space-y-1">
-                    {isBalanceSheet ? (
-                      <table className="w-full text-[9px] text-left text-muted-foreground border-collapse font-mono">
-                        <thead>
-                          <tr className="border-b border-border/20 text-[8px] uppercase tracking-wider text-muted-foreground/60">
-                            <th className="py-0.5 font-semibold">Account</th>
-                            <th className="py-0.5 text-right font-semibold">Start</th>
-                            <th className="py-0.5 text-right font-semibold">End</th>
-                            <th className="py-0.5 text-right font-semibold">Net Tx</th>
-                            <th className="py-0.5 text-right font-semibold">Flow</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {item.accounts.map((acc) => {
-                            const netTx = roundFlowValue((acc.end || 0) - (acc.beg || 0) - (acc.delta || 0));
-                            return (
-                              <tr key={acc.id} className="hover:bg-muted/5">
-                                <td className="py-0.5 truncate max-w-[100px] font-sans text-muted-foreground/80">{acc.name}</td>
-                                <td className="py-0.5 text-right">{formatCurrency(acc.beg || 0)}</td>
-                                <td className="py-0.5 text-right">{formatCurrency(acc.end || 0)}</td>
-                                <td className="py-0.5 text-right">{formatCurrency(netTx)}</td>
-                                <td className={`py-0.5 text-right font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                  {acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {item.accounts.map((acc) => (
-                          <div key={acc.id} className="flex justify-between items-center text-[10px] text-muted-foreground font-mono pl-1">
-                            <span className="truncate max-w-[180px] font-sans">{acc.name}</span>
-                            <span>{acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+      <div className="pl-4 border-l border-border/40 ml-1.5 space-y-2 pb-2 mt-1">
+        {items.length === 0 ? (
+          <div className="text-[10px] text-muted-foreground italic py-1 pl-1">
+            No entries in this period.
+          </div>
+        ) : (
+          items.map((item, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="flex justify-between items-center text-[11px] font-medium text-foreground pl-1">
+                <span>{item.label}</span>
+                <span className="font-mono text-muted-foreground">{formatCurrency(item.value)}</span>
               </div>
-            ))
-          )}
-        </div>
-      )}
+              {item.accounts && item.accounts.length > 0 && (
+                <div className="pl-2 space-y-1">
+                  {isBalanceSheet ? (
+                    <table className="w-full text-[9px] text-left text-muted-foreground border-collapse font-mono">
+                      <thead>
+                        <tr className="border-b border-border/20 text-[8px] uppercase tracking-wider text-muted-foreground/60">
+                          <th className="py-0.5 font-semibold">Account</th>
+                          <th className="py-0.5 text-right font-semibold">Start</th>
+                          <th className="py-0.5 text-right font-semibold">End</th>
+                          <th className="py-0.5 text-right font-semibold">Net Tx</th>
+                          <th className="py-0.5 text-right font-semibold">Flow</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {item.accounts.map((acc) => {
+                          const netTx = roundFlowValue((acc.end || 0) - (acc.beg || 0) - (acc.delta || 0));
+                          return (
+                            <tr key={acc.id} className="hover:bg-muted/5">
+                              <td className="py-0.5 truncate max-w-[100px] font-sans text-muted-foreground/80">{acc.name}</td>
+                              <td className="py-0.5 text-right">{formatCurrency(acc.beg || 0)}</td>
+                              <td className="py-0.5 text-right">{formatCurrency(acc.end || 0)}</td>
+                              <td className="py-0.5 text-right">{formatCurrency(netTx)}</td>
+                              <td className={`py-0.5 text-right font-semibold ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {item.accounts.map((acc) => (
+                        <div key={acc.id} className="flex justify-between items-center text-[10px] text-muted-foreground font-mono pl-1">
+                          <span className="truncate max-w-[180px] font-sans">{acc.name}</span>
+                          <span>{acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -945,7 +926,7 @@ export function WealthFlowSankey() {
   const driverOutflows = useMemo(() => {
     if (!displayWealthFlowData) return [];
     return displayWealthFlowData.nodes
-      .filter(n => n.id.startsWith('exp_') && n.group === 'expense' && !['exp_expenses', 'exp_balance_adjustments', 'exp_new_accounts', 'exp_mortgage_payment'].includes(n.id))
+      .filter(n => n.id.startsWith('exp_') && n.group === 'expense' && !['exp_balance_adjustments', 'exp_new_accounts', 'exp_mortgage_payment'].includes(n.id))
       .map(n => ({
         label: n.label ?? n.name ?? '',
         value: n.value,
@@ -1602,44 +1583,6 @@ export function WealthFlowSankey() {
             </CollapsibleFilterPanel>
 
             <div className="p-4 md:p-6 pt-0">
-              {/* ── Net Worth Summary Metric Cards ───────────────────────────────────── */}
-              {summary && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Beginning Net Worth
-                    </span>
-                    <div className="text-xl font-bold mt-1.5 font-mono text-foreground select-all">
-                      {formatCurrency(summary.beginningNetWorth)}
-                    </div>
-                  </div>
-                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Ending Net Worth
-                    </span>
-                    <div className="text-xl font-bold mt-1.5 font-mono text-foreground select-all">
-                      {formatCurrency(summary.endingNetWorth)}
-                    </div>
-                  </div>
-                  <div className="bg-card border border-border rounded-xl p-4 shadow-sm relative overflow-hidden">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Change in Net Worth
-                    </span>
-                    <div
-                      className={`text-xl font-bold mt-1.5 font-mono select-all flex items-baseline gap-2 ${
-                        summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
-                      }`}
-                    >
-                      {summary.netWorthChange >= 0 ? '+' : ''}
-                      {formatCurrency(summary.netWorthChange)}
-                      <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded text-muted-foreground font-sans">
-                        {summary.percentChange >= 0 ? '+' : ''}
-                        {summary.percentChange.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {allAccountsExcluded ? (
                 <div className="h-[400px] flex items-center justify-center">
@@ -1680,7 +1623,7 @@ export function WealthFlowSankey() {
               {summary && processedData.nodes.length > 0 && (
                 <div className="mt-6 bg-card border border-border/50 rounded-xl p-5">
                   <h4 className="text-sm font-semibold text-foreground mb-4">
-                    Net Worth Drivers & Reconciliation <span className="font-normal text-muted-foreground">for {windowLabel}</span>
+                    Net Worth Drivers <span className="font-normal text-muted-foreground">for {windowLabel}</span>
                   </h4>
                   <div className="max-w-xl mx-auto space-y-2.5">
                     <div className="flex justify-between items-center text-sm font-medium border-b border-border/40 pb-2">
@@ -1688,7 +1631,7 @@ export function WealthFlowSankey() {
                       <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
                     </div>
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Inflows & Income"
                       value={summary.totalIncome}
                       sign="+"
@@ -1696,7 +1639,7 @@ export function WealthFlowSankey() {
                       items={driverInflows}
                     />
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Expenses & Outflows"
                       value={summary.totalExpenses}
                       sign="-"
@@ -1704,7 +1647,7 @@ export function WealthFlowSankey() {
                       items={driverOutflows}
                     />
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Market Gains & Appreciation"
                       value={summary.totalMarketGains}
                       sign="+"
@@ -1713,7 +1656,7 @@ export function WealthFlowSankey() {
                       isBalanceSheet
                     />
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Market Losses & Depreciation"
                       value={summary.totalMarketLosses}
                       sign="-"
@@ -1722,7 +1665,7 @@ export function WealthFlowSankey() {
                       isBalanceSheet
                     />
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Capital Inflows & Adjustments"
                       value={summary.totalAdjustmentsIn || 0}
                       sign="+"
@@ -1731,7 +1674,7 @@ export function WealthFlowSankey() {
                       isBalanceSheet
                     />
 
-                    <ExpandableDriverRow
+                    <DriverLedgerSection
                       label="Capital Outflows & Adjustments"
                       value={summary.totalAdjustmentsOut || 0}
                       sign="-"
