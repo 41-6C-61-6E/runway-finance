@@ -3,11 +3,13 @@
 import * as React from 'react';
 import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { OverflowAware } from '@/components/ui/overflow-aware';
 
 interface CollapsibleFilterPanelProps {
   isOpen: boolean;
   onToggle: () => void;
-  feedback: React.ReactNode;
+  feedback?: React.ReactNode;
+  feedbackItems?: React.ReactNode[];
   children: React.ReactNode;
   className?: string;
   actions?: React.ReactNode;
@@ -18,6 +20,7 @@ export function CollapsibleFilterPanel({
   isOpen,
   onToggle,
   feedback,
+  feedbackItems,
   children,
   className,
   actions,
@@ -47,7 +50,11 @@ export function CollapsibleFilterPanel({
           {actions}
 
           {/* Selected Filter/Date Range Feedback (displays only whole indicators that fit) */}
-          {feedback && (
+          {feedbackItems && feedbackItems.length > 0 ? (
+            <OverflowAware className="text-[11px] font-medium text-muted-foreground py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
+              {feedbackItems}
+            </OverflowAware>
+          ) : feedback && (
             <div className="text-[11px] font-medium text-muted-foreground flex flex-wrap items-center gap-1.5 overflow-hidden max-h-[24px] py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
               {feedback}
             </div>

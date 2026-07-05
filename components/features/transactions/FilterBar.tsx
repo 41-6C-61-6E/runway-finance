@@ -489,18 +489,14 @@ export default function FilterBar({
       <CollapsibleFilterPanel
         isOpen={isOpen}
         onToggle={() => setIsOpen(!isOpen)}
-        feedback={
-          <div className="flex flex-wrap items-center gap-1.5">
-            {activePills.map((pill) => (
-              <span
-                key={pill}
-                className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider animate-in fade-in duration-150"
-              >
-                {pill}
-              </span>
-            ))}
-          </div>
-        }
+        feedbackItems={activePills.map((pill) => (
+          <span
+            key={pill}
+            className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider animate-in fade-in duration-150"
+          >
+            {pill}
+          </span>
+        ))}
         className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
         actions={
           pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && (

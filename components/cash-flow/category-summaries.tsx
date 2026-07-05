@@ -317,11 +317,9 @@ export function CategorySummaries() {
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {timeframe.toUpperCase()}
-                </span>
-              </div>
+              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                {timeframe.toUpperCase()}
+              </span>
             }
             rightActions={
               showWindowNav && (
