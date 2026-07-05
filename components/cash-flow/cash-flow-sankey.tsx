@@ -1151,29 +1151,28 @@ export function CashFlowSankey() {
           <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
-            feedback={
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {timeframe.toUpperCase()}
+            feedbackItems={[
+              <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                {timeframe.toUpperCase()}
+              </span>,
+              <span key="unit" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                {showPercentages ? '%' : '$'}
+              </span>,
+              ...(actualHideParents ? [
+                <span key="groups-hidden" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  GROUPS HIDDEN
                 </span>
-                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {showPercentages ? '%' : '$'}
-                </span>
-                {actualHideParents && (
-                  <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    GROUPS HIDDEN
-                  </span>
-                )}
-                {excludedAccountIds.size > 0 && (
-                  <span 
-                    className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+              ] : []),
+              ...(excludedAccountIds.size > 0 ? [
+                <span 
+                  key="accounts"
+                  className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
                     style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
                   >
                     {allAccounts.length - excludedAccountIds.size} ACCOUNTS
                   </span>
-                )}
-              </div>
-            }
+              ] : []),
+            ]}
             rightActions={
               showWindowNav && (
                 <DateWindowNav
