@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
@@ -60,6 +61,7 @@ interface ChartResponse {
 }
 
 export function NetWorthChart() {
+  const router = useRouter();
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const {
     timeframe, setTimeframe,
@@ -75,6 +77,10 @@ export function NetWorthChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  const handleNavigateToFlows = useCallback(() => {
+    router.push(`/flows?timeframe=${timeframe}`);
+  }, [timeframe, router]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -227,13 +233,15 @@ export function NetWorthChart() {
       <circle
         cx={cx}
         cy={cy}
-        r={4}
+        r={5}
         fill={color}
-        stroke={color}
-        strokeWidth={1}
+        stroke="var(--color-background)"
+        strokeWidth={2}
+        onClick={handleNavigateToFlows}
+        style={{ cursor: 'pointer' }}
       />
     );
-  }, []);
+  }, [handleNavigateToFlows]);
 
   const areaTicks = useMemo(() => getChartXTicksUnified(processedData, timeframe, isMobile), [processedData, timeframe, isMobile]);
 
@@ -529,6 +537,8 @@ export function NetWorthChart() {
                         <Cell
                           key={index}
                           fill={entry.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                          onClick={handleNavigateToFlows}
+                          style={{ cursor: 'pointer' }}
                         />
                       ))}
                     </Bar>
