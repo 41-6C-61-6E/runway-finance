@@ -14,6 +14,7 @@ class MockDbQueryBuilder {
   private _groupBy = false;
   private _isJoin = false;
   static callCount = 0;
+  static groupByCallCount = 0;
 
   select(...args: any[]) { return this; }
   from(table: any) { this._table = table; return this; }
@@ -30,17 +31,37 @@ class MockDbQueryBuilder {
       result = mockAccounts;
     } else if (this._table === accountSnapshots) {
       MockDbQueryBuilder.callCount++;
-      const targetDate = (MockDbQueryBuilder.callCount === 1 || MockDbQueryBuilder.callCount === 2) ? '2026-05-31' : '2026-06-30';
-      
+
       if (isGroupBy) {
-        const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
-        result = uniqueAccts.map(accId => {
-          const acctSnaps = mockSnapshots.filter(s => s.accountId === accId && s.snapshotDate <= targetDate);
-          if (acctSnaps.length === 0) return null;
-          const maxDate = acctSnaps.reduce((max, s) => s.snapshotDate > max ? s.snapshotDate : max, '');
-          return { accountId: accId, maxDate };
-        }).filter(Boolean);
+        MockDbQueryBuilder.groupByCallCount++;
+        const gbCount = MockDbQueryBuilder.groupByCallCount;
+
+        if (gbCount === 1) {
+          // First groupBy = allEarliestSnapshots (returns minDate per account, across ALL snapshots)
+          const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
+          result = uniqueAccts.map(accId => {
+            const acctSnaps = mockSnapshots.filter(s => s.accountId === accId);
+            if (acctSnaps.length === 0) return null;
+            const minDate = acctSnaps.reduce((min, s) => s.snapshotDate < min ? s.snapshotDate : min, acctSnaps[0].snapshotDate);
+            return { accountId: accId, minDate };
+          }).filter(Boolean);
+        } else {
+          // Subsequent groupBys = getBalancesOnDate (maxDate per account, up to a target date)
+          // gbCount 2 = beginning (dayBefore = 2026-05-31), gbCount 3 = ending (2026-06-30)
+          const targetDate = gbCount === 2 ? '2026-05-31' : '2026-06-30';
+          const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
+          result = uniqueAccts.map(accId => {
+            const acctSnaps = mockSnapshots.filter(s => s.accountId === accId && s.snapshotDate <= targetDate);
+            if (acctSnaps.length === 0) return null;
+            const maxDate = acctSnaps.reduce((max, s) => s.snapshotDate > max ? s.snapshotDate : max, '');
+            return { accountId: accId, maxDate };
+          }).filter(Boolean);
+        }
       } else {
+        // Non-groupBy snapshot fetch: second pass of getBalancesOnDate to get the actual balances
+        // or newAccountInitBals fetch. Use callCount to sequence: 2=beg, 3=end.
+        const nonGbCount = MockDbQueryBuilder.callCount - MockDbQueryBuilder.groupByCallCount;
+        const targetDate = nonGbCount <= 1 ? '2026-05-31' : '2026-06-30';
         const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
         result = uniqueAccts.map(accId => {
           const acctSnaps = mockSnapshots.filter(s => s.accountId === accId && s.snapshotDate <= targetDate);
@@ -49,7 +70,7 @@ class MockDbQueryBuilder {
           return acctSnaps.find(s => s.snapshotDate === maxDate);
         }).filter(Boolean);
       }
-      console.log('Query for ', targetDate, 'groupBy=', this._groupBy, 'returned', JSON.stringify(result));
+      console.log('Query for ', MockDbQueryBuilder.callCount, 'groupBy=', isGroupBy, 'returned', JSON.stringify(result));
     } else if (this._table === transactions || this._isJoin) {
       result = mockTransactions;
     } else if (this._table === userSettings) {
@@ -82,6 +103,7 @@ describe('wealth-flow service', () => {
     mockTransactions = [];
     mockUserSettings = [{ showImportedData: { global: true, cashFlowProjections: true }, paystubEnabled: true, currency: 'USD' }];
     MockDbQueryBuilder.callCount = 0;
+    MockDbQueryBuilder.groupByCallCount = 0;
   });
 
   it('correctly calculates positive net worth change with balanced reconciliation', async () => {

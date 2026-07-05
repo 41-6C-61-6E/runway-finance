@@ -212,58 +212,68 @@ export async function calculateWealthFlow(
   dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
   const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
 
-  const newAccountIds = reportableAccounts.filter((acc: any) => {
-    if (!acc.createdAt) return false;
-    const createdDate = new Date(acc.createdAt);
-    if (isNaN(createdDate.getTime())) return false;
-    const createdStr = createdDate.toISOString().split('T')[0];
-    return createdStr >= startDateStr;
-  }).map((acc: any) => acc.id);
+  // Determine each account's earliest snapshot date across ALL time (not just the period).
+  // An account is "new" within this period only if its earliest-ever snapshot falls within
+  // the period. If it has any snapshot before the period start, its historical balance
+  // already existed — we should use that as the true beginning balance rather than 0.
+  const allEarliestSnapshots = await db
+    .select({
+      accountId: accountSnapshots.accountId,
+      minDate: sql<string>`min(${accountSnapshots.snapshotDate})`,
+    })
+    .from(accountSnapshots)
+    .where(and(
+      eq(accountSnapshots.userId, userId),
+      inArray(accountSnapshots.accountId, accountIdsToUse)
+    ))
+    .groupBy(accountSnapshots.accountId);
 
+  const earliestSnapshotDateMap = new Map<string, string>();
+  for (const s of allEarliestSnapshots) {
+    if (s.minDate) earliestSnapshotDateMap.set(s.accountId, s.minDate);
+  }
+
+  // "New" = earliest snapshot is within the period (account had no prior history)
+  const newAccountIds = accountIdsToUse.filter(id => {
+    const earliest = earliestSnapshotDateMap.get(id);
+    return !earliest || earliest >= startDateStr;
+  });
+
+  // For new accounts, fetch the balance at their earliest snapshot (their "opening" balance).
+  // This is what gets routed to New Assets / New Liabilities in the Sankey.
   const newAccountInitBals = new Map<string, number>();
   if (newAccountIds.length > 0) {
-    const earliestSnapshots = await db
-      .select({
-        accountId: accountSnapshots.accountId,
-        minDate: sql<string>`min(${accountSnapshots.snapshotDate})`,
-      })
-      .from(accountSnapshots)
-      .where(and(
-        eq(accountSnapshots.userId, userId),
-        inArray(accountSnapshots.accountId, newAccountIds)
-      ))
-      .groupBy(accountSnapshots.accountId);
+    const conditions = newAccountIds
+      .filter(id => earliestSnapshotDateMap.has(id))
+      .map(id =>
+        and(
+          eq(accountSnapshots.accountId, id),
+          eq(accountSnapshots.snapshotDate, earliestSnapshotDateMap.get(id)!)
+        )
+      );
 
-    const earliestDatesMap = new Map<string, string>();
-    for (const s of earliestSnapshots) {
-      if (s.minDate) {
-        earliestDatesMap.set(s.accountId, s.minDate);
+    if (conditions.length > 0) {
+      const initSnaps = await db
+        .select({
+          accountId: accountSnapshots.accountId,
+          balance: accountSnapshots.balance,
+        })
+        .from(accountSnapshots)
+        .where(and(
+          eq(accountSnapshots.userId, userId),
+          or(...conditions)
+        ));
+      for (const s of initSnaps) {
+        const decrypted = await decryptField(s.balance, dek);
+        newAccountInitBals.set(s.accountId, parseFloat(decrypted) || 0);
       }
-    }
-
-    const conditions = newAccountIds.map(id =>
-      and(
-        eq(accountSnapshots.accountId, id),
-        eq(accountSnapshots.snapshotDate, earliestDatesMap.get(id) || startDateStr)
-      )
-    );
-    const initSnaps = await db
-      .select({
-        accountId: accountSnapshots.accountId,
-        balance: accountSnapshots.balance,
-      })
-      .from(accountSnapshots)
-      .where(and(
-        eq(accountSnapshots.userId, userId),
-        or(...conditions)
-      ));
-    for (const s of initSnaps) {
-      const decrypted = await decryptField(s.balance, dek);
-      newAccountInitBals.set(s.accountId, parseFloat(decrypted) || 0);
     }
   }
 
   // 3. Fetch beginning and ending balances
+  // For accounts with history before the period, getBalancesOnDate will find their
+  // last snapshot <= dayBeforeStr as the true beginning. For genuinely new accounts
+  // (no prior snapshot), it returns nothing and we use 0.
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);
   const endingBalances = await getBalancesOnDate(db, userId, endDateStr, accountIdsToUse, dek);
 
@@ -275,6 +285,8 @@ export async function calculateWealthFlow(
     const acc = accountsMap.get(id);
     if (!acc) continue;
 
+    // For new accounts (no pre-period snapshot), beginning = 0.
+    // For all others, use the actual last snapshot before the period start.
     const isNewAccount = newAccountIds.includes(id);
     const begConverted = isNewAccount ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
     const endConverted = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);

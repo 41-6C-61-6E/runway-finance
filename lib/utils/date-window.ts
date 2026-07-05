@@ -68,15 +68,20 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
 }
 
 export function getPreciseDateRange(timeframe: TimeRange, windowEnd?: string): { start: string; end: string } {
-  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
+  const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  if (timeframe === '1d') {
+    // start = end = today → wealth-flow computes dayBefore = yesterday's snapshot
+    const today = formatDate(new Date());
+    return { start: today, end: today };
+  }
+
+  if (timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
     const end = new Date();
     const start = new Date();
-    if (timeframe === '1d') start.setDate(start.getDate() - 1);
     if (timeframe === '7d') start.setDate(start.getDate() - 7);
     if (timeframe === '30d') start.setDate(start.getDate() - 30);
     if (timeframe === '365d') start.setDate(start.getDate() - 365);
-    
-    const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     return { start: formatDate(start), end: formatDate(end) };
   }
   
@@ -94,6 +99,10 @@ export function formatMonth(ym: string): string {
 
 export function getPeriodLabel(ym: string, timeframe: TimeRange): string {
   if (timeframe === 'all') return 'All time';
+  if (timeframe === '1d') {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
   const [y, m] = ym.split('-').map(Number);
   switch (timeframe) {
     case '7d': return 'Last 7 Days';
