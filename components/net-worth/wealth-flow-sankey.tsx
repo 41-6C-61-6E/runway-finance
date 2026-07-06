@@ -800,36 +800,6 @@ export function WealthFlowSankey() {
     };
   }, [displayWealthFlowData]);
 
-  if (loading) {
-    return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title="Wealth Building Flow"
-        />
-        {!isCollapsed && <LoadingSpinner category="sankey" className="h-[450px]" />}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title="Wealth Building Flow"
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="error" error={error} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const allAccountsExcluded = allAccounts.length > 0 && excludedAccountIds.size >= allAccounts.length;
   const filteredAccountsList = allAccounts.filter((a) =>
     a.name.toLowerCase().includes(accountSearch.toLowerCase())
@@ -1002,7 +972,13 @@ export function WealthFlowSankey() {
             </CollapsibleFilterPanel>
 
             <div className="p-4 md:p-6 pt-0">
-              {allAccountsExcluded ? (
+              {loading ? (
+                <LoadingSpinner category="sankey" className="h-[400px]" />
+              ) : error ? (
+                <div className="h-[400px] flex items-center justify-center">
+                  <ChartEmptyState variant="error" error={error} />
+                </div>
+              ) : allAccountsExcluded ? (
                 <div className="h-[400px] flex items-center justify-center">
                   <ChartEmptyState variant="empty" description="All accounts are excluded. Adjust your filters." />
                 </div>

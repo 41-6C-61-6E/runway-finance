@@ -1088,37 +1088,6 @@ export function CashFlowSankey() {
     />
   ), [showPercentages, themeVersion, sankeyData, processedData]);
 
-  // ── Loading / error / empty states ─────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title="Cash Flow Sankey"
-        />
-        {!isCollapsed && <LoadingSpinner category="sankey" className="h-[450px]" />}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title="Cash Flow Sankey"
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="error" error={error} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const allAccountsExcluded = allAccounts.length > 0 && excludedAccountIds.size >= allAccounts.length;
 
   const filteredAccounts = allAccounts.filter(
@@ -1300,11 +1269,17 @@ export function CashFlowSankey() {
             </div>
           </CollapsibleFilterPanel>
 
-          {/* Chart */}
+          {/* Content: loading / error / empty / chart */}
           <div style={{ height: chartHeight }} className="w-full touch-pan-y">
             <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
               <div className="min-w-max h-full px-2 pb-2">
-                {processedData.nodes.length > 0 && processedData.links.length > 0 ? (
+                {loading ? (
+                  <LoadingSpinner category="sankey" className="h-[400px]" />
+                ) : error ? (
+                  <div className="h-[400px] flex items-center justify-center">
+                    <ChartEmptyState variant="error" error={error} />
+                  </div>
+                ) : processedData.nodes.length > 0 && processedData.links.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                     <Sankey
                       data={processedData}
