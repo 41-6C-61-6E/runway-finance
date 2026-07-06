@@ -33,6 +33,7 @@ jobs:
           BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
           echo "BUILD_TIME=${BUILD_TIME}" >> $GITHUB_ENV
+          BUILD_NUMBER="${BUILD_NUMBER}" node scripts/generate-sw.mjs
 
       - name: Build and push
         uses: docker/build-push-action@v6
