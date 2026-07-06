@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "delete_pending_older_than_30_days" boolean DEFAULT false NOT NULL;

@@ -26,7 +26,8 @@ import {
   createNetWorthSnapshot,
   updateCategoryIncomeSummaries,
   updateCategorySpendingSummaries,
-  updateMonthlyCashFlowSummaries
+  updateMonthlyCashFlowSummaries,
+  deleteOldPendingTransactions
 } from '@/lib/services/sync';
 
 const LOG_TAG = '[plaid-sync]';
@@ -777,6 +778,11 @@ export async function syncPlaidConnection(
       await recalculateNetWorthSnapshots(dataUserId, dek);
       logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new Plaid accounts`, { userId });
     }
+
+    // Automatically delete pending transactions older than 30 days if enabled
+    await deleteOldPendingTransactions(userId).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to delete old pending transactions (non-fatal):`, err);
+    });
 
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);

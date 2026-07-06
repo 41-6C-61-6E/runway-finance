@@ -35,6 +35,7 @@ import {
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
@@ -172,6 +173,25 @@ function SettingsPageBody() {
   const [accentColor, setAccentColor] = useState('violet');
   const [accentColorLoading, setAccentColorLoading] = useState(false);
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
+
+  const settingsContext = useUserSettings();
+  const settings = settingsContext?.settings || {};
+  const updateSetting = settingsContext?.updateSetting;
+  const deletePendingOlderThan30Days = settings.deletePendingOlderThan30Days ?? false;
+  const [savingDeletePending, setSavingDeletePending] = useState(false);
+
+  const handleToggleDeletePending = useCallback(async (checked: boolean) => {
+    setSavingDeletePending(true);
+    try {
+      if (updateSetting) {
+        await updateSetting('deletePendingOlderThan30Days', checked);
+      }
+    } catch (e) {
+      console.error('Failed to toggle deletePendingOlderThan30Days', e);
+    } finally {
+      setSavingDeletePending(false);
+    }
+  }, [updateSetting]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -1532,6 +1552,32 @@ function SettingsPageBody() {
                 })()}
             </div>
           )}
+
+          {/* Transaction Settings Section */}
+          <div className="mt-8 pt-6 border-t border-border/60">
+            <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
+            <p className="text-xs text-muted-foreground mb-4 font-normal">
+              Configure cleanup policies and rules for your bank-synced transactions.
+            </p>
+            
+            <div className="p-4 bg-muted/30 border border-border rounded-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-foreground">Automatically Delete Old Pending Transactions</h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Automatically delete pending bank transactions older than 30 days during account synchronization. 
+                    Sometimes financial institutions fail to clear pending transactions, causing duplicate or outdated entries to linger indefinitely.
+                  </p>
+                </div>
+                <Switch
+                  checked={deletePendingOlderThan30Days}
+                  onCheckedChange={handleToggleDeletePending}
+                  disabled={savingDeletePending}
+                  id="toggle-delete-pending-old-tx"
+                />
+              </div>
+            </div>
+          </div>
         </>
         )}
 
