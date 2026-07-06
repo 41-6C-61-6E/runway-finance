@@ -113,6 +113,7 @@ vi.mock('@/lib/services/sync', () => ({
   updateMonthlyCashFlowSummaries: vi.fn(),
   updateCategorySpendingSummaries: vi.fn(),
   updateCategoryIncomeSummaries: vi.fn(),
+  deleteOldPendingTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock account history
