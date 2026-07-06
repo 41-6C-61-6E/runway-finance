@@ -272,14 +272,14 @@ function routeFlowsThroughAccounts(data: WealthFlowData): WealthFlowData {
     } else if (linkFromHub && targetNode?.accounts && targetNode.accounts.length > 0) {
       for (const acc of targetNode.accounts) {
         const nodeId = `account_out_${acc.id}`;
-        const flowValue = acc.signedNWDelta;
+        const flowValue = Math.abs(acc.signedNWDelta);
         if (flowValue <= 0.01) continue;
 
         if (!accountNodes.has(nodeId)) {
           accountNodes.set(nodeId, {
             id: nodeId, label: acc.name, color: targetNode.color,
             value: 0, percentage: 0, type: 'decrease',
-            accounts: [{ ...acc, signedNWDelta: -flowValue }],
+            accounts: [{ ...acc, signedNWDelta: flowValue }],
           });
         }
         const n = accountNodes.get(nodeId)!;
@@ -586,6 +586,13 @@ export function WealthFlowSankey() {
     if (!displayWealthFlowData || !displayWealthFlowData.nodes) return { nodes: [], links: [] };
 
     const nodes = displayWealthFlowData.nodes.map((n) => ({ ...n, name: n.label || n.id }));
+
+    const hubIdx = nodes.findIndex((n) => n.id === 'hub_net_worth_change');
+    if (hubIdx !== -1) {
+      const [hub] = nodes.splice(hubIdx, 1);
+      nodes.push(hub);
+    }
+
     const links = displayWealthFlowData.links
       .map((l) => {
         const sourceIndex = nodes.findIndex((n) => n.id === l.source);

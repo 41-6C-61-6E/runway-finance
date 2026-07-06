@@ -51,3 +51,51 @@ export async function getBalancesOnDate(
   }
   return result;
 }
+
+export async function getEarliestBalances(
+  db: any,
+  userId: string,
+  accountIds: string[],
+  dek: Uint8Array
+): Promise<Record<string, number>> {
+  if (accountIds.length === 0) return {};
+
+  const earliestDates = await db
+    .select({
+      accountId: accountSnapshots.accountId,
+      minDate: sql<string>`min(${accountSnapshots.snapshotDate})`,
+    })
+    .from(accountSnapshots)
+    .where(and(
+      eq(accountSnapshots.userId, userId),
+      inArray(accountSnapshots.accountId, accountIds)
+    ))
+    .groupBy(accountSnapshots.accountId);
+
+  if (earliestDates.length === 0) return {};
+
+  const conditions = earliestDates.map((ed: any) =>
+    and(
+      eq(accountSnapshots.accountId, ed.accountId),
+      eq(accountSnapshots.snapshotDate, ed.minDate)
+    )
+  );
+
+  const snaps = await db
+    .select({
+      accountId: accountSnapshots.accountId,
+      balance: accountSnapshots.balance,
+    })
+    .from(accountSnapshots)
+    .where(and(
+      eq(accountSnapshots.userId, userId),
+      or(...conditions)
+    ));
+
+  const result: Record<string, number> = {};
+  for (const s of snaps) {
+    const decrypted = await decryptField(s.balance, dek);
+    result[s.accountId] = parseFloat(decrypted) || 0;
+  }
+  return result;
+}

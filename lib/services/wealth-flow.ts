@@ -3,7 +3,7 @@ import { accounts, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
-import { getBalancesOnDate } from '@/lib/services/snapshot-balances';
+import { getBalancesOnDate, getEarliestBalances } from '@/lib/services/snapshot-balances';
 import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
@@ -150,6 +150,11 @@ export async function calculateWealthFlow(
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, beginningAccountIds, dek);
   const endingBalances = await getBalancesOnDate(db, userId, endDateStr, endingAccountIds, dek);
 
+  const accountIdsWithEndButNoBeg = Object.keys(endingBalances).filter(id => !(id in beginningBalances));
+  const earliestBalances = accountIdsWithEndButNoBeg.length > 0
+    ? await getEarliestBalances(db, userId, accountIdsWithEndButNoBeg, dek)
+    : {};
+
   let beginningNetWorth = 0;
   let endingNetWorth = 0;
 
@@ -164,7 +169,11 @@ export async function calculateWealthFlow(
 
     if (!hasBeg && !hasEnd) continue;
 
-    const beg = hasBeg ? convertCurrency(beginningBalances[id], acc.currency, baseCurrency) : 0;
+    const beg = hasBeg
+      ? convertCurrency(beginningBalances[id], acc.currency, baseCurrency)
+      : id in earliestBalances
+        ? convertCurrency(earliestBalances[id], acc.currency, baseCurrency)
+        : 0;
     const end = hasEnd ? convertCurrency(endingBalances[id], acc.currency, baseCurrency) : 0;
 
     const rawDelta = end - beg;

@@ -31,6 +31,27 @@ vi.mock('@/lib/services/snapshot-balances', () => ({
     }
     return result;
   },
+  getEarliestBalances: async (
+    _db: any,
+    _userId: string,
+    accountIds: string[],
+    _dek: Uint8Array,
+  ) => {
+    const result: Record<string, number> = {};
+    if (accountIds.length === 0) return result;
+    for (const accId of accountIds) {
+      const snaps = mockState.mockAccountSnapshots.filter(
+        (s) => s.accountId === accId
+      );
+      if (snaps.length === 0) continue;
+      const minDate = snaps.reduce((min, s) => s.snapshotDate < min ? s.snapshotDate : min, snaps[0].snapshotDate);
+      const match = snaps.find((s) => s.snapshotDate === minDate);
+      if (match) {
+        result[accId] = parseFloat(match.balance) || 0;
+      }
+    }
+    return result;
+  },
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -233,7 +254,7 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(decCash!.accounts![0].id).toBe('checking-2');
   });
 
-  it('treats new accounts (no beginning snapshot) as starting at 0', async () => {
+  it('uses earliest snapshot as beginning balance for new accounts', async () => {
     mockState.mockAccounts = [
       { id: 'new-checking', userId: 'user_1', name: 'New Account', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
@@ -246,11 +267,11 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(result.summary.beginningNetWorth).toBe(0);
     expect(result.summary.endingNetWorth).toBe(5000);
     expect(result.summary.netWorthChange).toBe(5000);
-    expect(result.summary.totalIncreases).toBe(5000);
+    expect(result.summary.totalIncreases).toBe(0);
+    expect(result.summary.totalDecreases).toBe(0);
 
     const incCash = result.nodes.find(n => n.id === 'inc_cash');
-    expect(incCash).toBeDefined();
-    expect(incCash!.value).toBe(5000);
+    expect(incCash).toBeUndefined();
   });
 
   it('skips accounts with neither beginning nor ending snapshot', async () => {
