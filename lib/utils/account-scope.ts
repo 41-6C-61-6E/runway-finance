@@ -74,3 +74,29 @@ export function filterReportableAccounts<T extends {
 }>(accounts: T[]): T[] {
   return accounts.filter(isReportableAccount);
 }
+
+export function isAccountActiveOnDate(
+  account: { type: string; metadata?: string | any | null },
+  dateStr: string
+): boolean {
+  const accountType = account.type.toLowerCase();
+  let endEventDateStr: string | undefined = undefined;
+  if (accountType === 'mortgage' && account.metadata) {
+    try {
+      const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+      if (meta) {
+        const status = meta.mortgageStatus as string | undefined;
+        endEventDateStr = status === 'paid_off' 
+          ? (meta.payoffDate as string | undefined) 
+          : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
+      }
+    } catch (err) {
+      // Ignore parse errors
+    }
+  }
+
+  if (endEventDateStr && dateStr > endEventDateStr) {
+    return false;
+  }
+  return true;
+}

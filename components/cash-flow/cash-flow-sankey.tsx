@@ -812,7 +812,10 @@ export function CashFlowSankey() {
         const categoriesRes = await fetch(
           `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`
         );
-        if (!categoriesRes.ok) throw new Error('Failed to fetch sankey data');
+        if (!categoriesRes.ok) {
+          const body = await categoriesRes.text().catch(() => '');
+          throw new Error(`Failed to fetch sankey data (${categoriesRes.status}): ${body}`);
+        }
         categories = await categoriesRes.json();
 
         totalIncome = categories

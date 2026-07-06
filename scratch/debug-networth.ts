@@ -1,5 +1,5 @@
-import { getDb } from '../lib/db';
-import { user as userTable, netWorthSnapshots, accountSnapshots, accounts } from '../lib/db/schema';
+import { getDb, getPool } from '../lib/db';
+import { users as userTable, netWorthSnapshots, accountSnapshots, accounts } from '../lib/db/schema';
 import { getServerDEK } from '../lib/crypto-context';
 import { decryptField } from '../lib/crypto';
 import { eq, and, gte, lte, sql, inArray, or } from 'drizzle-orm';
@@ -13,10 +13,11 @@ async function run() {
   const userList = await db.select().from(userTable).limit(1);
   if (userList.length === 0) {
     console.log("No users found in database.");
+    await getPool().end();
     return;
   }
   const user = userList[0];
-  const userId = user.id;
+  const userId = user.username;
   console.log(`User ID: ${userId}, Email: ${user.email}`);
 
   // 2. Get server DEK
@@ -153,6 +154,7 @@ async function run() {
   }
   console.log(`Computed Ending Net Worth: ${endNetWorth}`);
   console.log(`Wealth Flow Net Worth Change: ${endNetWorth - begNetWorth}`);
+  await getPool().end();
 }
 
 run().catch(console.error);
