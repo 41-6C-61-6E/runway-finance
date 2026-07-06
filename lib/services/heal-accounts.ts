@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db';
-import { plaidConnections, simplifinConnections, accounts } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { plaidConnections, simplifinConnections, accounts, accountSnapshots } from '@/lib/db/schema';
+import { eq, and, gt, lt } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getServerDEK } from '@/lib/crypto-context';
 import { syncPlaidConnection } from '@/lib/services/plaid-sync';
@@ -50,6 +50,28 @@ export async function healProductionAccounts(): Promise<void> {
             
             conn.disabledAccounts = updatedDisabled;
             connectionsToSync.add(conn.id);
+
+            // Delete carry-over flat snapshots between the last actual update and today
+            if (acc.balanceDate) {
+              const lastUpdateStr = acc.balanceDate.toISOString().split('T')[0];
+              const todayStr = new Date().toISOString().split('T')[0];
+              
+              await db
+                .delete(accountSnapshots)
+                .where(
+                  and(
+                    eq(accountSnapshots.accountId, acc.id),
+                    eq(accountSnapshots.userId, acc.userId),
+                    eq(accountSnapshots.isSynthetic, false),
+                    gt(accountSnapshots.snapshotDate, lastUpdateStr),
+                    lt(accountSnapshots.snapshotDate, todayStr)
+                  )
+                );
+              logger.info('[startup-healing] Cleared carry-over snapshots for re-enabled account', { 
+                accountId: acc.id, 
+                after: lastUpdateStr 
+              });
+            }
           }
         }
       }
@@ -112,6 +134,28 @@ export async function healProductionAccounts(): Promise<void> {
 
         conn.disabledAccounts = updatedDisabled;
         connectionsToSync.add(conn.id);
+
+        // Delete carry-over flat snapshots between the last actual update and today
+        if (mismatchedAcc.balanceDate) {
+          const lastUpdateStr = mismatchedAcc.balanceDate.toISOString().split('T')[0];
+          const todayStr = new Date().toISOString().split('T')[0];
+          
+          await db
+            .delete(accountSnapshots)
+            .where(
+              and(
+                eq(accountSnapshots.accountId, mismatchedAcc.id),
+                eq(accountSnapshots.userId, mismatchedAcc.userId),
+                eq(accountSnapshots.isSynthetic, false),
+                gt(accountSnapshots.snapshotDate, lastUpdateStr),
+                lt(accountSnapshots.snapshotDate, todayStr)
+              )
+            );
+          logger.info('[startup-healing] Cleared carry-over snapshots for repaired account', { 
+            accountId: mismatchedAcc.id, 
+            after: lastUpdateStr 
+          });
+        }
       }
     }
 
