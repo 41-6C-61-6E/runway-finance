@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
 import { getBalancesOnDate } from '@/lib/services/snapshot-balances';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
 interface AccountGroupConfig {
@@ -138,8 +138,17 @@ export async function calculateWealthFlow(
   dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
   const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
 
-  const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);
-  const endingBalances = await getBalancesOnDate(db, userId, endDateStr, accountIdsToUse, dek);
+  const beginningAccountIds = accountIdsToUse.filter((id) => {
+    const acc = accountsMap.get(id);
+    return acc ? isAccountActiveOnDate(acc, dayBeforeStr) : false;
+  });
+  const endingAccountIds = accountIdsToUse.filter((id) => {
+    const acc = accountsMap.get(id);
+    return acc ? isAccountActiveOnDate(acc, endDateStr) : false;
+  });
+
+  const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, beginningAccountIds, dek);
+  const endingBalances = await getBalancesOnDate(db, userId, endDateStr, endingAccountIds, dek);
 
   let beginningNetWorth = 0;
   let endingNetWorth = 0;

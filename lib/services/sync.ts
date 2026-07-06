@@ -1,6 +1,6 @@
 import { getDb, getPool } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories, transactionTags } from '@/lib/db/schema';
-import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, convertCurrency } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
@@ -11,7 +11,7 @@ import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from 
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 import { resolveDataUserId } from '@/lib/sharing';
@@ -28,7 +28,16 @@ export async function createNetWorthSnapshot(
   snapshotDate: string,
   options?: { skipNotifications?: boolean }
 ) {
-  const userAccounts = await getDb()
+  const db = getDb();
+  
+  const [settings] = await db
+    .select({ currency: userSettings.currency })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const baseCurrency = settings?.currency || 'USD';
+
+  const userAccounts = await db
     .select()
     .from(accounts)
     .where(and(
@@ -44,27 +53,39 @@ export async function createNetWorthSnapshot(
   const breakdown: Record<string, { count: number; value: number }> = {};
 
   for (const acc of decrypted) {
-    if (acc.isExcludedFromNetWorth) {
+    if (acc.isExcludedFromNetWorth || acc.isHidden) {
+      continue;
+    }
+
+    if (!isAccountActiveOnDate(acc, snapshotDate)) {
       continue;
     }
 
     const balance = acc.balance ? parseFloat(acc.balance) : 0;
+    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
     const accountType = acc.type.toLowerCase();
 
     if (isAssetAccount(accountType)) {
-      totalAssets += balance;
+      totalAssets += convertedBal;
     } else if (isLiabilityAccount(accountType)) {
-      totalLiabilities += Math.abs(balance);
+      totalLiabilities += Math.abs(convertedBal);
     }
 
     if (!breakdown[accountType]) {
       breakdown[accountType] = { count: 0, value: 0 };
     }
     breakdown[accountType].count++;
-    breakdown[accountType].value += balance;
+    breakdown[accountType].value += convertedBal;
   }
 
-  const netWorth = totalAssets - totalLiabilities;
+  const roundToCents = (val: number) => Math.round(val * 100) / 100;
+  totalAssets = roundToCents(totalAssets);
+  totalLiabilities = roundToCents(totalLiabilities);
+  const netWorth = roundToCents(totalAssets - totalLiabilities);
+
+  for (const key of Object.keys(breakdown)) {
+    breakdown[key].value = roundToCents(breakdown[key].value);
+  }
 
   const nwValues = {
     userId,
