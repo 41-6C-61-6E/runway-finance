@@ -60,6 +60,16 @@ export async function registerNodeInstrumentation(): Promise<void> {
     logger.info(`${LOG_TAG} Dev mode enabled.`);
   }
 
+  // Run production account self-healing logic (incorrectly disabled or mismatched accounts from remap bug)
+  try {
+    const { healProductionAccounts } = await import('@/lib/services/heal-accounts');
+    healProductionAccounts().catch((err: unknown) => {
+      logger.error('[startup] Production accounts self-healing run failed', { error: String(err) });
+    });
+  } catch (err) {
+    logger.error('[startup] Failed to initialize production accounts self-healing service', { error: String(err) });
+  }
+
   // Recalculate all synthetic snapshots and summaries on startup so that
   // any code changes that affect snapshot or summary logic take effect immediately
   try {
