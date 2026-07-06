@@ -544,7 +544,7 @@ const SankeyCustomNode = ({
               height={hubDeltaHeight}
               fill={isNetSurplus ? '#10b981' : '#ef4444'}
               rx={0}
-              fillOpacity={isDimmed ? 0.2 : 0.95}
+              fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
           {/* Background box for readability */}
