@@ -98,14 +98,8 @@ export async function POST(request: Request) {
       if (sourceAccount.connectionId && sourceAccount.externalId) {
         sfToDisable.push({ connectionId: sourceAccount.connectionId, externalId: sourceAccount.externalId });
       }
-      if (targetAccount.connectionId && targetAccount.externalId && targetAccount.connectionId !== sourceAccount.connectionId) {
-        sfToDisable.push({ connectionId: targetAccount.connectionId, externalId: targetAccount.externalId });
-      }
       if (sourceAccount.plaidConnectionId && sourceAccount.externalId) {
         plaidToDisable.push({ connectionId: sourceAccount.plaidConnectionId, externalId: sourceAccount.externalId });
-      }
-      if (targetAccount.plaidConnectionId && targetAccount.externalId && targetAccount.plaidConnectionId !== sourceAccount.plaidConnectionId) {
-        plaidToDisable.push({ connectionId: targetAccount.plaidConnectionId, externalId: targetAccount.externalId });
       }
 
       for (const { connectionId, externalId } of sfToDisable) {
