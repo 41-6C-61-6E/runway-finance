@@ -20,6 +20,7 @@ import {
   desc,
   asc,
   inArray,
+  notInArray,
   isNull,
 } from "drizzle-orm";
 import {
@@ -59,6 +60,7 @@ function parseCommaSeparatedIds(value?: string) {
 function buildCategoryConditions(
   categoryId?: string,
   categoryIds?: string,
+  excludeCategoryIds?: string,
 ) {
   if (categoryIds) {
     const ids = parseCommaSeparatedIds(categoryIds);
@@ -101,6 +103,19 @@ function buildCategoryConditions(
     return [sql`false`];
   }
 
+  if (excludeCategoryIds) {
+    const ids = parseCommaSeparatedIds(excludeCategoryIds);
+    const validIds = ids.filter((id) => UUID_PATTERN.test(id));
+    if (validIds.length > 0) {
+      return [
+        or(
+          isNull(transactions.categoryId),
+          notInArray(transactions.categoryId, validIds),
+        ),
+      ];
+    }
+  }
+
   return [];
 }
 
@@ -129,6 +144,7 @@ export async function GET(request: Request) {
     endDate: searchParams.get("endDate") ?? undefined,
     categoryId: searchParams.get("categoryId") ?? undefined,
     categoryIds: searchParams.get("categoryIds") ?? undefined,
+    excludeCategoryIds: searchParams.get("excludeCategoryIds") ?? undefined,
     tagId: searchParams.get("tagId") ?? undefined,
     tagIds: searchParams.get("tagIds") ?? undefined,
     accountTagIds: searchParams.get("accountTagIds") ?? undefined,
@@ -321,7 +337,7 @@ export async function GET(request: Request) {
 
   // Handle category filter
   whereConditions.push(
-    ...buildCategoryConditions(filters.categoryId, filters.categoryIds),
+    ...buildCategoryConditions(filters.categoryId, filters.categoryIds, filters.excludeCategoryIds),
   );
 
   if (filters.idsOnly) {
@@ -1007,7 +1023,7 @@ export async function PATCH(request: Request) {
     }
 
     whereConditions.push(
-      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds),
+      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds, filterFields.excludeCategoryIds),
     );
 
     const hasEncryptedFilters = !!(
@@ -1387,7 +1403,7 @@ export async function DELETE(request: Request) {
     }
 
     whereConditions.push(
-      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds),
+      ...buildCategoryConditions(filterFields.categoryId, filterFields.categoryIds, filterFields.excludeCategoryIds),
     );
 
     const hasEncryptedFilters = !!(

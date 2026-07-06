@@ -14,6 +14,7 @@ export const TransactionFilterSchema = z.object({
     ])
     .optional(),
   categoryIds: z.string().optional(),
+  excludeCategoryIds: z.string().optional(),
   search: z.string().max(200).optional(),
   type: z.enum(["income", "expense"]).optional(),
   pending: z.preprocess(
@@ -107,6 +108,7 @@ export const BulkPatchTransactionSchema = z.object({
   accountTypes: z.string().optional(),
   categoryId: z.string().optional(),
   categoryIds: z.string().optional(),
+  excludeCategoryIds: z.string().optional(),
   tagId: z.string().optional(),
   tagIds: z.string().optional(),
   accountTagIds: z.string().optional(),
@@ -129,6 +131,7 @@ export const BulkDeleteTransactionSchema = z.object({
   accountTypes: z.string().optional(),
   categoryId: z.string().optional(),
   categoryIds: z.string().optional(),
+  excludeCategoryIds: z.string().optional(),
   tagId: z.string().optional(),
   tagIds: z.string().optional(),
   accountTagIds: z.string().optional(),
