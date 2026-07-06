@@ -1,92 +1,45 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
-import { accounts, accountSnapshots, transactions, userSettings } from '@/lib/db/schema';
 
-let mockAccounts: any[] = [];
-let mockSnapshots: any[] = [];
-let mockTransactions: any[] = [];
-let mockUserSettings: any[] = [];
+const mockState = vi.hoisted(() => {
+  let mockAccounts: any[] = [];
+  let mockUserSettings: any[] = [];
+  const mockAccountSnapshots: Array<{ accountId: string; snapshotDate: string; balance: string }> = [];
+  return { mockAccounts, mockUserSettings, mockAccountSnapshots };
+});
 
-
-
-class MockDbQueryBuilder {
-  private _table: any;
-  private _groupBy = false;
-  private _isJoin = false;
-  static callCount = 0;
-  static groupByCallCount = 0;
-
-  select(...args: any[]) { return this; }
-  from(table: any) { this._table = table; return this; }
-  innerJoin(...args: any[]) { this._isJoin = true; return this; }
-  leftJoin(...args: any[]) { this._isJoin = true; return this; }
-  where(...args: any[]) { return this; }
-  inArray(...args: any[]) { return this; }
-  groupBy(...args: any[]) { this._groupBy = true; return this; }
-  limit(...args: any[]) { return this; }
-
-  async then(onfulfilled?: (value: any) => any) {
-    let result: any = []; const isGroupBy = this._groupBy; this._groupBy = false;
-    if (this._table === accounts) {
-      result = mockAccounts;
-    } else if (this._table === accountSnapshots) {
-      MockDbQueryBuilder.callCount++;
-
-      if (isGroupBy) {
-        MockDbQueryBuilder.groupByCallCount++;
-        const gbCount = MockDbQueryBuilder.groupByCallCount;
-
-        if (gbCount === 1) {
-          // First groupBy = allEarliestSnapshots (returns minDate per account, across ALL snapshots)
-          const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
-          result = uniqueAccts.map(accId => {
-            const acctSnaps = mockSnapshots.filter(s => s.accountId === accId);
-            if (acctSnaps.length === 0) return null;
-            const minDate = acctSnaps.reduce((min, s) => s.snapshotDate < min ? s.snapshotDate : min, acctSnaps[0].snapshotDate);
-            return { accountId: accId, minDate };
-          }).filter(Boolean);
-        } else {
-          // Subsequent groupBys = getBalancesOnDate (maxDate per account, up to a target date)
-          // gbCount 2 = beginning (dayBefore = 2026-05-31), gbCount 3 = ending (2026-06-30)
-          const targetDate = gbCount === 2 ? '2026-05-31' : '2026-06-30';
-          const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
-          result = uniqueAccts.map(accId => {
-            const acctSnaps = mockSnapshots.filter(s => s.accountId === accId && s.snapshotDate <= targetDate);
-            if (acctSnaps.length === 0) return null;
-            const maxDate = acctSnaps.reduce((max, s) => s.snapshotDate > max ? s.snapshotDate : max, '');
-            return { accountId: accId, maxDate };
-          }).filter(Boolean);
-        }
-      } else {
-        // Non-groupBy snapshot fetch: second pass of getBalancesOnDate to get the actual balances
-        // or newAccountInitBals fetch. Use callCount to sequence: 2=beg, 3=end.
-        const nonGbCount = MockDbQueryBuilder.callCount - MockDbQueryBuilder.groupByCallCount;
-        const targetDate = nonGbCount <= 1 ? '2026-05-31' : '2026-06-30';
-        const uniqueAccts = Array.from(new Set(mockSnapshots.map(s => s.accountId)));
-        result = uniqueAccts.map(accId => {
-          const acctSnaps = mockSnapshots.filter(s => s.accountId === accId && s.snapshotDate <= targetDate);
-          if (acctSnaps.length === 0) return null;
-          const maxDate = acctSnaps.reduce((max, s) => s.snapshotDate > max ? s.snapshotDate : max, '');
-          return acctSnaps.find(s => s.snapshotDate === maxDate);
-        }).filter(Boolean);
+vi.mock('@/lib/services/snapshot-balances', () => ({
+  getBalancesOnDate: async (
+    _db: any,
+    _userId: string,
+    targetDate: string,
+    accountIds: string[],
+    _dek: Uint8Array,
+  ) => {
+    const result: Record<string, number> = {};
+    if (accountIds.length === 0) return result;
+    for (const accId of accountIds) {
+      const snaps = mockState.mockAccountSnapshots.filter(
+        (s) => s.accountId === accId && s.snapshotDate <= targetDate
+      );
+      if (snaps.length === 0) continue;
+      const maxDate = snaps.reduce((max, s) => s.snapshotDate > max ? s.snapshotDate : max, '');
+      const match = snaps.find((s) => s.snapshotDate === maxDate);
+      if (match) {
+        result[accId] = parseFloat(match.balance) || 0;
       }
-      console.log('Query for ', MockDbQueryBuilder.callCount, 'groupBy=', isGroupBy, 'returned', JSON.stringify(result));
-    } else if (this._table === transactions || this._isJoin) {
-      result = mockTransactions;
-    } else if (this._table === userSettings) {
-      result = mockUserSettings;
     }
-    return Promise.resolve(result).then(onfulfilled);
-  }
-}
+    return result;
+  },
+}));
 
 vi.mock('@/lib/db', () => ({
-  getDb: () => new MockDbQueryBuilder(),
+  getDb: vi.fn(),
 }));
 
 vi.mock('@/lib/crypto', () => ({
   decryptField: async (val: string) => val,
-  decryptRows: async (table: string, rows: any[]) => rows,
+  decryptRows: async (_table: string, rows: any[]) => rows,
 }));
 
 vi.mock('@/lib/services/account-history', () => ({
@@ -94,196 +47,312 @@ vi.mock('@/lib/services/account-history', () => ({
   roundToCents: (val: number) => Math.round(val * 100) / 100,
 }));
 
-describe('wealth-flow service', () => {
+vi.mock('@/lib/db/schema', () => ({
+  accounts: 'accounts',
+  userSettings: 'userSettings',
+  accountSnapshots: 'accountSnapshots',
+}));
+
+describe('wealth-flow service (snapshot-only)', () => {
   const mockDek = new Uint8Array(32);
 
   beforeEach(() => {
-    mockAccounts = [];
-    mockSnapshots = [];
-    mockTransactions = [];
-    mockUserSettings = [{ showImportedData: { global: true, cashFlowProjections: true }, paystubEnabled: true, currency: 'USD' }];
-    MockDbQueryBuilder.callCount = 0;
-    MockDbQueryBuilder.groupByCallCount = 0;
+    mockState.mockAccounts = [];
+    mockState.mockUserSettings = [{ currency: 'USD', showImportedData: { global: true, cashFlowProjections: true }, paystubEnabled: true }];
+    mockState.mockAccountSnapshots.length = 0;
   });
 
-  it('correctly calculates positive net worth change with balanced reconciliation', async () => {
-    mockAccounts = [
+  async function runWealthFlow(
+    startDate: string,
+    endDate: string,
+    filterAccountIds?: string[],
+  ) {
+    const dbMock = {
+      select: vi.fn(() => ({
+        from: vi.fn((table: any) => ({
+          where: vi.fn(() => {
+            const makeThenable = () => ({
+              then: (onfulfilled: any) => {
+                let result: any[] = [];
+                if (table === 'userSettings') result = mockState.mockUserSettings;
+                else if (table === 'accounts') result = mockState.mockAccounts;
+                return Promise.resolve(result).then(onfulfilled);
+              },
+            });
+            const thenable: any = makeThenable();
+            thenable.limit = vi.fn(() => makeThenable());
+            return thenable;
+          }),
+        })),
+      })),
+    };
+
+    const dbModule = await import('@/lib/db');
+    (dbModule.getDb as any).mockReturnValue(dbMock);
+
+    return calculateWealthFlow('user_1', startDate, endDate, mockDek, filterAccountIds);
+  }
+
+  it('calculates positive net worth change from asset growth', async () => {
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'savings-1', userId: 'user_1', name: 'Savings', type: 'savings', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '1000.00' },
+      { accountId: 'savings-1', snapshotDate: '2026-05-31', balance: '5000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '3000.00' },
+      { accountId: 'savings-1', snapshotDate: '2026-06-30', balance: '5500.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(6000);
+    expect(result.summary.endingNetWorth).toBe(8500);
+    expect(result.summary.netWorthChange).toBe(2500);
+    expect(result.summary.totalIncreases).toBe(2500);
+    expect(result.summary.totalDecreases).toBe(0);
+
+    const incCash = result.nodes.find(n => n.id === 'inc_cash');
+    expect(incCash).toBeDefined();
+    expect(incCash!.value).toBe(2500);
+    expect(incCash!.type).toBe('increase');
+    expect(incCash!.accounts).toHaveLength(2);
+
+    const hub = result.nodes.find(n => n.id === 'hub_net_worth_change');
+    expect(hub).toBeDefined();
+    expect(hub!.netWorthChange).toBe(2500);
+    expect(hub!.label).toBe('Net Worth Increase');
+    expect(hub!.visualImbalance).toBe(2500);
+
+    expect(result.links.some(l => l.source === 'inc_cash' && l.target === 'hub_net_worth_change')).toBe(true);
+  });
+
+  it('calculates negative net worth change from asset decline', async () => {
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '5000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '2000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(5000);
+    expect(result.summary.endingNetWorth).toBe(2000);
+    expect(result.summary.netWorthChange).toBe(-3000);
+    expect(result.summary.totalIncreases).toBe(0);
+    expect(result.summary.totalDecreases).toBe(3000);
+
+    const decCash = result.nodes.find(n => n.id === 'dec_cash');
+    expect(decCash).toBeDefined();
+    expect(decCash!.value).toBe(3000);
+    expect(decCash!.type).toBe('decrease');
+
+    const hub = result.nodes.find(n => n.id === 'hub_net_worth_change');
+    expect(hub).toBeDefined();
+    expect(hub!.netWorthChange).toBe(-3000);
+    expect(hub!.label).toBe('Net Worth Decrease');
+    expect(hub!.visualImbalance).toBe(-3000);
+  });
+
+  it('handles mixed asset and liability accounts', async () => {
+    mockState.mockAccounts = [
       { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
       { id: 'brokerage-1', userId: 'user_1', name: 'Brokerage', type: 'brokerage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
       { id: 'mortgage-1', userId: 'user_1', name: 'Mortgage', type: 'mortgage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'credit-1', userId: 'user_1', name: 'Credit Card', type: 'credit', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
-
-    mockSnapshots = [
+    mockState.mockAccountSnapshots.push(
       { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '1000.00' },
-      { accountId: 'brokerage-1', snapshotDate: '2026-05-31', balance: '5000.00' },
+      { accountId: 'brokerage-1', snapshotDate: '2026-05-31', balance: '10000.00' },
       { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
-      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '2000.00' },
-      { accountId: 'brokerage-1', snapshotDate: '2026-06-30', balance: '6500.00' },
+      { accountId: 'credit-1', snapshotDate: '2026-05-31', balance: '-500.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '4000.00' },
+      { accountId: 'brokerage-1', snapshotDate: '2026-06-30', balance: '10500.00' },
       { accountId: 'mortgage-1', snapshotDate: '2026-06-30', balance: '-199000.00' },
-    ];
+      { accountId: 'credit-1', snapshotDate: '2026-06-30', balance: '-300.00' },
+    );
 
-    mockTransactions = [
-      { id: 't1', accountId: 'checking-1', amount: '5000.00', date: '2026-06-05', categoryId: 'c-income', categoryName: 'Salary', categoryType: 'standard', isIncome: true, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'Employer' },
-      { id: 't2', accountId: 'checking-1', amount: '-2000.00', date: '2026-06-10', categoryId: 'c-expense', categoryName: 'Rent', categoryType: 'standard', isIncome: false, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'Landlord' },
-      { id: 't3', accountId: 'checking-1', amount: '-1000.00', date: '2026-06-15', categoryId: 'c-transfer', categoryName: 'Transfer', categoryType: 'transfer', isIncome: false, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'Transfer Out' },
-      { id: 't3b', accountId: 'brokerage-1', amount: '1000.00', date: '2026-06-15', categoryId: 'c-transfer', categoryName: 'Transfer', categoryType: 'transfer', isIncome: true, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'Transfer In' },
-      { id: 't4', accountId: 'brokerage-1', amount: '100.00', date: '2026-06-25', categoryId: 'c-interest', categoryName: 'Interest & Dividends', categoryType: 'standard', isIncome: true, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'Dividend' },
-    ];
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
 
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+    expect(result.summary.beginningNetWorth).toBe(-189500);
+    expect(result.summary.endingNetWorth).toBe(-184800);
+    expect(result.summary.netWorthChange).toBe(4700);
 
-    // Net worth calculations
-    expect(result.summary.beginningNetWorth).toBe(-194000);
-    expect(result.summary.endingNetWorth).toBe(-190500);
-    expect(result.summary.netWorthChange).toBe(3500);
+    const incCash = result.nodes.find(n => n.id === 'inc_cash');
+    expect(incCash).toBeDefined();
+    expect(incCash!.value).toBe(3000);
 
-    // Income
-    const incIncome = result.nodes.find(n => n.id === 'inc_c-income');
-    expect(incIncome).toBeDefined();
-    expect(incIncome!.value).toBe(5000);
+    const incInvestments = result.nodes.find(n => n.id === 'inc_investments');
+    expect(incInvestments).toBeDefined();
+    expect(incInvestments!.value).toBe(500);
 
-    // Interest & Dividends
-    const incInterest = result.nodes.find(n => n.id === 'inc_c-interest');
-    expect(incInterest).toBeDefined();
-    expect(incInterest!.value).toBe(100);
+    const incMortgage = result.nodes.find(n => n.id === 'inc_mortgage');
+    expect(incMortgage).toBeDefined();
+    expect(incMortgage!.value).toBe(1000);
 
-    // Expenses: Original $2,000, but mortgage liability reduction is $1,000,
-    // so $1,000 is deducted from category expenses to avoid double counting.
-    const expExpenses = result.nodes.find(n => n.id === 'exp_expenses');
-    expect(expExpenses).toBeDefined();
-    expect(expExpenses!.value).toBe(1000);
+    const incCreditLoans = result.nodes.find(n => n.id === 'inc_credit_loans');
+    expect(incCreditLoans).toBeDefined();
+    expect(incCreditLoans!.value).toBe(200);
 
-    const expMortgagePayment = result.nodes.find(n => n.id === 'exp_mortgage_payment');
-    expect(expMortgagePayment).toBeDefined();
-    expect(expMortgagePayment!.value).toBe(1000);
-
-    // Net worth change is represented as the central hub imbalance, not as a flow node.
-    const nwIncrease = result.nodes.find(n => n.id === 'use_net_wealth_generated');
-    expect(nwIncrease).toBeUndefined();
-    const hub = result.nodes.find(n => n.id === 'hub_net_worth_change');
-    expect(hub).toBeDefined();
-    expect(hub!.label).toBe('Net Worth Increase');
-    expect(hub!.netWorthChange).toBe(3500);
-    expect(result.links.some(l => l.source === 'hub_net_worth_change' && l.target === 'use_net_wealth_generated')).toBe(false);
-
-    // Market Gains
-    // Brokerage: Beg 5000, End 6500. Delta = 1500. Tx = 1000 (transfer) + 100 (interest) = 1100.
-    // Gap (Growth) = 400.
-    const marketGains = result.nodes.find(n => n.id === 'inc_market_gains');
-    expect(marketGains).toBeDefined();
-    expect(marketGains!.value).toBe(400);
-
-    // Mortgage Reduction (originally classified under Cash & Liability Adjustments):
-    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
-    expect(incMortgageReduction).toBeDefined();
-    expect(incMortgageReduction!.value).toBe(1000);
-
-    const expAdjustments = result.nodes.find(n => n.id === 'exp_balance_adjustments');
-    expect(expAdjustments).toBeDefined();
-    expect(expAdjustments!.value).toBe(1000);
+    expect(result.nodes.filter(n => n.type === 'decrease')).toHaveLength(0);
+    expect(result.summary.totalIncreases).toBe(4700);
+    expect(result.summary.totalDecreases).toBe(0);
   });
 
-  it('treats negative-balance mortgage paydown as positive wealth flow', async () => {
-    mockAccounts = [
-      { id: 'mortgage-1', userId: 'user_1', name: 'Mortgage', type: 'mortgage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+  it('handles mixed signs within the same account group', async () => {
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking A', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'checking-2', userId: 'user_1', name: 'Checking B', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '1000.00' },
+      { accountId: 'checking-2', snapshotDate: '2026-05-31', balance: '2000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '4000.00' },
+      { accountId: 'checking-2', snapshotDate: '2026-06-30', balance: '1500.00' },
+    );
 
-    mockSnapshots = [
-      { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
-      { accountId: 'mortgage-1', snapshotDate: '2026-06-30', balance: '-199000.00' },
-    ];
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
 
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+    expect(result.summary.netWorthChange).toBe(2500);
+    expect(result.summary.totalIncreases).toBe(3000);
+    expect(result.summary.totalDecreases).toBe(500);
 
-    expect(result.summary.beginningNetWorth).toBe(-200000);
-    expect(result.summary.endingNetWorth).toBe(-199000);
-    expect(result.summary.netWorthChange).toBe(1000);
+    const incCash = result.nodes.find(n => n.id === 'inc_cash');
+    expect(incCash).toBeDefined();
+    expect(incCash!.value).toBe(3000);
+    expect(incCash!.accounts).toHaveLength(1);
+    expect(incCash!.accounts![0].id).toBe('checking-1');
 
-    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
-    expect(incMortgageReduction).toBeDefined();
-    expect(incMortgageReduction!.value).toBe(1000);
-    expect(result.nodes.find(n => n.id === 'exp_balance_adjustments')).toBeUndefined();
+    const decCash = result.nodes.find(n => n.id === 'dec_cash');
+    expect(decCash).toBeDefined();
+    expect(decCash!.value).toBe(500);
+    expect(decCash!.accounts).toHaveLength(1);
+    expect(decCash!.accounts![0].id).toBe('checking-2');
   });
 
-  it('keeps a mortgage in beginning net worth when it is paid off during the selected period', async () => {
-    mockAccounts = [
-      {
-        id: 'mortgage-1',
-        userId: 'user_1',
-        name: 'Mortgage',
-        type: 'mortgage',
-        currency: 'USD',
-        isHidden: false,
-        isExcludedFromNetWorth: false,
-        metadata: { mortgageStatus: 'paid_off', payoffDate: '2026-06-15' },
-      },
+  it('treats new accounts (no beginning snapshot) as starting at 0', async () => {
+    mockState.mockAccounts = [
+      { id: 'new-checking', userId: 'user_1', name: 'New Account', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'new-checking', snapshotDate: '2026-06-15', balance: '5000.00' },
+    );
 
-    mockSnapshots = [
-      { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(0);
+    expect(result.summary.endingNetWorth).toBe(5000);
+    expect(result.summary.netWorthChange).toBe(5000);
+    expect(result.summary.totalIncreases).toBe(5000);
+
+    const incCash = result.nodes.find(n => n.id === 'inc_cash');
+    expect(incCash).toBeDefined();
+    expect(incCash!.value).toBe(5000);
+  });
+
+  it('skips accounts with neither beginning nor ending snapshot', async () => {
+    mockState.mockAccounts = [
+      { id: 'orphan', userId: 'user_1', name: 'Orphan', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
+    mockState.mockAccountSnapshots.length = 0;
 
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
 
-    expect(result.summary.beginningNetWorth).toBe(-200000);
+    expect(result.nodes.filter(n => n.type !== 'hub')).toHaveLength(0);
+    expect(result.summary.beginningNetWorth).toBe(0);
     expect(result.summary.endingNetWorth).toBe(0);
-    expect(result.summary.netWorthChange).toBe(200000);
-
-    const incMortgageReduction = result.nodes.find(n => n.id === 'inc_mortgage_reduction');
-    expect(incMortgageReduction).toBeDefined();
-    expect(incMortgageReduction!.value).toBe(200000);
+    expect(result.summary.netWorthChange).toBe(0);
   });
 
-  it('handles reconciliation gap by routing surplus/deficit', async () => {
-    mockAccounts = [{ id: 'checking-1', userId: 'u1', name: 'C', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false }];
-    mockSnapshots = [
-      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '1000.00' },
-      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '2000.00' }, // Delta = 1000
+  it('returns empty result when no reportable accounts match filter', async () => {
+    mockState.mockAccounts = [
+      { id: 'hidden-1', userId: 'user_1', name: 'Hidden', type: 'checking', currency: 'USD', isHidden: true, isExcludedFromNetWorth: false },
     ];
-    mockTransactions = []; // No transactions = 1000 Balance Adjustment
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
-    const incAdjustments = result.nodes.find(n => n.id === 'inc_balance_adjustments');
-    expect(incAdjustments).toBeDefined();
-    expect(incAdjustments!.value).toBe(1000);
-    const nwIncrease = result.nodes.find(n => n.id === 'use_net_wealth_generated');
-    expect(nwIncrease).toBeUndefined();
-    const hub = result.nodes.find(n => n.id === 'hub_net_worth_change');
-    expect(hub).toBeDefined();
-    expect(hub!.netWorthChange).toBe(1000);
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.nodes).toHaveLength(0);
+    expect(result.links).toHaveLength(0);
+    expect(result.summary.beginningNetWorth).toBe(0);
+    expect(result.summary.endingNetWorth).toBe(0);
   });
 
-  it('classifies nodes with correct groups for net worth decrease scenario', async () => {
-    mockAccounts = [{ id: 'checking-1', userId: 'u1', name: 'C', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false }];
-    mockSnapshots = [
-      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '3000.00' },
-      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '1000.00' }, // Delta = -2000
+  it('respects account filtering', async () => {
+    mockState.mockAccounts = [
+      { id: 'acc-1', userId: 'user_1', name: 'Account 1', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'acc-2', userId: 'user_1', name: 'Account 2', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
-    mockTransactions = [
-      { id: 't1', accountId: 'checking-1', amount: '-2000.00', date: '2026-06-15', categoryId: 'c-exp', categoryName: 'Exp', categoryType: 'standard', isIncome: false, excludeFromReports: false, parentId: null, categoryColor: '#000', payee: 'X' },
-    ];
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
-    
-    // NW decrease is represented as the central hub imbalance, not as a flow node.
-    const nwDecrease = result.nodes.find(n => n.id === 'inc_net_wealth_lost');
-    expect(nwDecrease).toBeUndefined();
-    const hub = result.nodes.find(n => n.id === 'hub_net_worth_change');
-    expect(hub).toBeDefined();
-    expect(hub!.label).toBe('Net Worth Decrease');
-    expect(hub!.netWorthChange).toBe(-2000);
-    expect(result.links.some(l => l.source === 'inc_net_wealth_lost' && l.target === 'hub_net_worth_change')).toBe(false);
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'acc-1', snapshotDate: '2026-05-31', balance: '100.00' },
+      { accountId: 'acc-2', snapshotDate: '2026-05-31', balance: '200.00' },
+      { accountId: 'acc-1', snapshotDate: '2026-06-30', balance: '300.00' },
+      { accountId: 'acc-2', snapshotDate: '2026-06-30', balance: '800.00' },
+    );
+
+    const resultFull = await runWealthFlow('2026-06-01', '2026-06-30');
+    expect(resultFull.summary.netWorthChange).toBe(800);
+
+    const resultFiltered = await runWealthFlow('2026-06-01', '2026-06-30', ['acc-1']);
+    expect(resultFiltered.summary.netWorthChange).toBe(200);
+    expect(resultFiltered.summary.totalIncreases).toBe(200);
   });
 
   it('uses base currency from user settings', async () => {
-    mockUserSettings = [{ currency: 'EUR' }];
-    mockAccounts = [
-      { id: 'acc-1', userId: 'user_1', name: 'Euro Checking', type: 'checking', currency: 'EUR', isHidden: false, isExcludedFromNetWorth: false },
+    mockState.mockUserSettings = [{ currency: 'EUR' }];
+    mockState.mockAccounts = [
+      { id: 'acc-1', userId: 'user_1', name: 'Euro Account', type: 'checking', currency: 'EUR', isHidden: false, isExcludedFromNetWorth: false },
     ];
-    mockSnapshots = [
+    mockState.mockAccountSnapshots.push(
       { accountId: 'acc-1', snapshotDate: '2026-05-31', balance: '100.00' },
-      { accountId: 'acc-1', snapshotDate: '2026-06-30', balance: '200.00' },
-    ];
-    const result = await calculateWealthFlow('user_1', '2026-06', '2026-06', mockDek);
+      { accountId: 'acc-1', snapshotDate: '2026-06-30', balance: '300.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
     expect(result.summary.baseCurrency).toBe('EUR');
-    expect(result.summary.netWorthChange).toBe(100);
+    expect(result.summary.netWorthChange).toBe(200);
+  });
+
+  it('correctly handles liability decrease as net worth increase', async () => {
+    mockState.mockAccounts = [
+      { id: 'mortgage-1', userId: 'user_1', name: 'Mortgage', type: 'mortgage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'mortgage-1', snapshotDate: '2026-05-31', balance: '-200000.00' },
+      { accountId: 'mortgage-1', snapshotDate: '2026-06-30', balance: '-198000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(-200000);
+    expect(result.summary.endingNetWorth).toBe(-198000);
+    expect(result.summary.netWorthChange).toBe(2000);
+
+    const incMortgage = result.nodes.find(n => n.id === 'inc_mortgage');
+    expect(incMortgage).toBeDefined();
+    expect(incMortgage!.value).toBe(2000);
+    expect(incMortgage!.accounts![0].signedNWDelta).toBe(2000);
+  });
+
+  it('correctly handles liability increase as net worth decrease', async () => {
+    mockState.mockAccounts = [
+      { id: 'credit-1', userId: 'user_1', name: 'Credit Card', type: 'credit', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'credit-1', snapshotDate: '2026-05-31', balance: '-500.00' },
+      { accountId: 'credit-1', snapshotDate: '2026-06-30', balance: '-1200.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(-500);
+    expect(result.summary.endingNetWorth).toBe(-1200);
+    expect(result.summary.netWorthChange).toBe(-700);
+
+    const decCreditLoans = result.nodes.find(n => n.id === 'dec_credit_loans');
+    expect(decCreditLoans).toBeDefined();
+    expect(decCreditLoans!.value).toBe(700);
   });
 });

@@ -42,3 +42,49 @@ export interface CalculationTrace {
   format: TraceFormat;
   children?: CalculationTrace[];
 }
+
+export interface WealthFlowAccountDetail {
+  id: string;
+  name: string;
+  type: string;
+  beginningBalance: number;
+  endingBalance: number;
+  delta: number;
+  signedNWDelta: number;
+}
+
+export interface WealthFlowNode {
+  id: string;
+  label: string;
+  color: string;
+  value: number;
+  percentage: number;
+  type: 'increase' | 'decrease' | 'hub';
+  accountGroup?: string;
+  accounts?: WealthFlowAccountDetail[];
+  netWorthChange?: number;
+  visualImbalance?: number;
+  description?: string;
+}
+
+export interface WealthFlowLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface WealthFlowSummary {
+  beginningNetWorth: number;
+  endingNetWorth: number;
+  netWorthChange: number;
+  percentChange: number;
+  baseCurrency: string;
+  totalIncreases: number;
+  totalDecreases: number;
+}
+
+export interface WealthFlowData {
+  nodes: WealthFlowNode[];
+  links: WealthFlowLink[];
+  summary: WealthFlowSummary;
+}
