@@ -19,6 +19,7 @@ const CreateCategorySchema = z.object({
   color: z.string().max(7).default('#6366f1'),
   isIncome: z.boolean().default(false),
   excludeFromReports: z.boolean().default(false),
+  hideFromTransactions: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
   categoryType: z.enum(['standard', 'compound', 'transfer']).default('standard'),
   expenseParentId: z.string().uuid().nullable().optional(),
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, parentId, color, isIncome, excludeFromReports, displayOrder, categoryType, expenseParentId } = parsed.data;
+  const { name, parentId, color, isIncome, excludeFromReports, hideFromTransactions, displayOrder, categoryType, expenseParentId } = parsed.data;
 
   await mergeDuplicateCategories(dataUserId, dek);
 
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     isIncome,
     isSystem: false,
     excludeFromReports,
+    hideFromTransactions,
     displayOrder,
     categoryType,
     expenseParentId: expenseParentId ?? null,

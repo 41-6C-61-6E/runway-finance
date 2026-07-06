@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CATEGORY_COLORS } from '@/lib/colors/palette';
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -22,6 +22,7 @@ type Category = {
   isSystem: boolean;
   createdByAi: boolean;
   excludeFromReports: boolean;
+  hideFromTransactions: boolean;
   displayOrder: number;
   transactionCount: number;
 };
@@ -53,6 +54,7 @@ export default function CategoriesTab() {
   const [formCategoryType, setFormCategoryType] = useState<FormCategoryType>('expense');
   const [formExpenseParentId, setFormExpenseParentId] = useState<string | null>(null);
   const [formOrder, setFormOrder] = useState(0);
+  const [formHideFromTransactions, setFormHideFromTransactions] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = useCallback(async () => {
@@ -222,6 +224,7 @@ export default function CategoriesTab() {
     setFormCategoryType('expense');
     setFormExpenseParentId(null);
     setFormOrder(categories.length);
+    setFormHideFromTransactions(false);
   };
 
   const openEdit = (cat: Category) => {
@@ -234,6 +237,7 @@ export default function CategoriesTab() {
     setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder);
+    setFormHideFromTransactions(cat.hideFromTransactions ?? false);
   };
 
   const openClone = (cat: Category) => {
@@ -246,6 +250,7 @@ export default function CategoriesTab() {
     setFormCategoryType(cat.categoryType === 'compound' ? 'compound' : cat.categoryType === 'transfer' ? 'transfer' : cat.isIncome ? 'income' : 'expense');
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder + 1);
+    setFormHideFromTransactions(cat.hideFromTransactions ?? false);
   };
 
   const handleClose = () => {
@@ -271,6 +276,7 @@ export default function CategoriesTab() {
         categoryType: isCompound ? 'compound' : isTransfer ? 'transfer' : 'standard',
         expenseParentId: resolvedExpenseParentId,
         displayOrder: formOrder,
+        hideFromTransactions: formHideFromTransactions,
       };
 
       if (editing) {
@@ -521,6 +527,11 @@ export default function CategoriesTab() {
                   {parent.createdByAi && (
                     <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
                   )}
+                  {parent.hideFromTransactions && (
+                    <span title="Hidden from transactions page">
+                      <EyeOff className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
+                    </span>
+                  )}
                 </div>
               </div>
               {parent.categoryType === 'compound' && (parent.parentId || parent.expenseParentId) && (
@@ -579,6 +590,11 @@ export default function CategoriesTab() {
                               )}
                               {child.createdByAi && (
                                 <Sparkles className="h-3 w-3 opacity-60 flex-shrink-0" />
+                              )}
+                              {child.hideFromTransactions && (
+                                <span title="Hidden from transactions page">
+                                  <EyeOff className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
+                                </span>
                               )}
                             </div>
                           </div>
@@ -709,6 +725,26 @@ export default function CategoriesTab() {
                 onChange={(e) => setFormOrder(parseInt(e.target.value) || 0)}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <label className="block text-sm font-medium text-foreground">Hide from transactions</label>
+                <p className="text-xs text-muted-foreground">Transactions in this category are hidden by default on the transactions page</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formHideFromTransactions}
+                onClick={() => setFormHideFromTransactions(!formHideFromTransactions)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                  formHideFromTransactions ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform ${
+                  formHideFromTransactions ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
             </div>
           </div>
 
