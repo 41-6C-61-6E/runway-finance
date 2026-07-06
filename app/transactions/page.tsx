@@ -18,6 +18,7 @@ export type FilterState = {
   accountTypes: string | null;
   categoryId: string | null;
   categoryIds: string | null;
+  excludeCategoryIds: string | null;
   tagId: string | null;
   tagIds: string | null;
   accountTagIds: string | null;
@@ -53,6 +54,7 @@ function TransactionsContent() {
     accountTypes: searchParams.get('accountTypes') ?? null,
     categoryId: searchParams.get('categoryId') ?? null,
     categoryIds: searchParams.get('categoryIds') ?? null,
+    excludeCategoryIds: searchParams.get('excludeCategoryIds') ?? null,
     tagId: searchParams.get('tagId') ?? null,
     tagIds: searchParams.get('tagIds') ?? null,
     accountTagIds: searchParams.get('accountTagIds') ?? null,
@@ -90,6 +92,7 @@ function TransactionsContent() {
       accountTypes: preset.filters.accountTypes ?? null,
       categoryId: preset.filters.categoryId ?? null,
       categoryIds: preset.filters.categoryIds ?? null,
+      excludeCategoryIds: preset.filters.excludeCategoryIds ?? null,
       tagId: preset.filters.tagId ?? null,
       tagIds: preset.filters.tagIds ?? null,
       accountTagIds: preset.filters.accountTagIds ?? null,
@@ -165,6 +168,7 @@ function TransactionsContent() {
     if (filters.accountTypes) params.set('accountTypes', filters.accountTypes);
     if (filters.categoryId) params.set('categoryId', filters.categoryId);
     if (filters.categoryIds) params.set('categoryIds', filters.categoryIds);
+    if (filters.excludeCategoryIds) params.set('excludeCategoryIds', filters.excludeCategoryIds);
     if (filters.tagId) params.set('tagId', filters.tagId);
     if (filters.tagIds) params.set('tagIds', filters.tagIds);
     if (filters.accountTagIds) params.set('accountTagIds', filters.accountTagIds);
@@ -192,11 +196,34 @@ function TransactionsContent() {
     setSelectedIds(new Set());
   }, [filters]);
 
+  // Fetch categories hidden from transactions and auto-apply exclude filter
+  useEffect(() => {
+    // Only auto-apply if no explicit category filter is set
+    if (filters.categoryId || filters.categoryIds) return;
+
+    fetch('/api/categories', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((cats: any[]) => {
+        const hiddenIds = cats
+          .filter((c) => c.hideFromTransactions)
+          .map((c) => c.id);
+        if (hiddenIds.length > 0) {
+          const hiddenStr = hiddenIds.join(',');
+          setFilters((prev) => {
+            if (prev.excludeCategoryIds === hiddenStr) return prev;
+            return { ...prev, excludeCategoryIds: hiddenStr };
+          });
+        }
+      })
+      .catch(() => {});
+  }, []); // only on mount
+
   const spAccountId = searchParams.get('accountId');
   const spAccountIds = searchParams.get('accountIds');
   const spAccountTypes = searchParams.get('accountTypes');
   const spCategoryId = searchParams.get('categoryId');
   const spCategoryIds = searchParams.get('categoryIds');
+  const spExcludeCategoryIds = searchParams.get('excludeCategoryIds');
   const spTagId = searchParams.get('tagId');
   const spTagIds = searchParams.get('tagIds');
   const spAccountTagIds = searchParams.get('accountTagIds');
@@ -219,6 +246,7 @@ function TransactionsContent() {
       const accountTypes = spAccountTypes ?? null;
       const categoryId = spCategoryId ?? null;
       const categoryIds = spCategoryIds ?? null;
+      const excludeCategoryIds = spExcludeCategoryIds ?? null;
       const tagId = spTagId ?? null;
       const tagIds = spTagIds ?? null;
       const accountTagIds = spAccountTagIds ?? null;
@@ -239,6 +267,7 @@ function TransactionsContent() {
         prev.accountTypes === accountTypes &&
         prev.categoryId === categoryId &&
         prev.categoryIds === categoryIds &&
+        prev.excludeCategoryIds === excludeCategoryIds &&
         prev.tagId === tagId &&
         prev.tagIds === tagIds &&
         prev.accountTagIds === accountTagIds &&
@@ -256,9 +285,9 @@ function TransactionsContent() {
       ) {
         return prev;
       }
-      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, tagId, tagIds, accountTagIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
+      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, excludeCategoryIds, tagId, tagIds, accountTagIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
     });
-    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spTagId, spTagIds, spAccountTagIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
+    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spExcludeCategoryIds, spTagId, spTagIds, spAccountTagIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
 
   const updateFilter = useCallback((key: keyof FilterState, value: string | null) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -271,6 +300,7 @@ function TransactionsContent() {
       accountTypes: null,
       categoryId: null,
       categoryIds: null,
+      excludeCategoryIds: null,
       tagId: null,
       tagIds: null,
       accountTagIds: null,
