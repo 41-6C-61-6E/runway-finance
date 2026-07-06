@@ -1,165 +1,85 @@
 import { getDb } from '@/lib/db';
-import { accountSnapshots, transactions, categories, accounts, userSettings } from '@/lib/db/schema';
-import { eq, and, or, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { decryptField, decryptRows } from '@/lib/crypto';
+import { accounts, userSettings } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
-import { isAssetAccount, isInvestmentAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { getBalancesOnDate } from '@/lib/services/snapshot-balances';
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
-export interface WealthFlowNode {
-  id: string;
+interface AccountGroupConfig {
   label: string;
-  color: string;
-  value: number;
-  percentage: number;
-  group?: string;
-  isBalancingNode?: boolean;
-  accounts?: Array<{ id: string; name: string; type?: string; delta: number }>;
-  netWorthChange?: number;
-  visualImbalance?: number;
-  contributions?: number;
-  marketGrowth?: number;
+  incLabel: string;
+  decLabel: string;
+  incColor: string;
+  decColor: string;
+  description: string;
 }
 
-export interface WealthFlowData {
-  nodes: WealthFlowNode[];
-  links: Array<{
-    source: string;
-    target: string;
-    value: number;
-  }>;
-  summary: {
-    beginningNetWorth: number;
-    endingNetWorth: number;
-    netWorthChange: number;
-    percentChange: number;
-    reconciliationError: number;
-    baseCurrency?: string;
-    totalIncome: number;
-    totalExpenses: number;
-    totalMarketGains: number;
-    totalMarketLosses: number;
-    totalAdjustmentsIn?: number;
-    totalAdjustmentsOut?: number;
-    totalSavings: number;
-    totalDrawdowns: number;
-  };
-  reconciliationDetails?: {
-    leftSum: number;
-    rightSum: number;
-    gap: number;
-    sources: Array<{ id: string; label: string; value: number; group: string }>;
-    uses: Array<{ id: string; label: string; value: number; group: string }>;
-  };
-}
+const GROUP_CONFIG: Record<string, AccountGroupConfig> = {
+  cash: {
+    label: 'Bank & Cash',
+    incLabel: 'Cash Accumulated',
+    decLabel: 'Cash Spent',
+    incColor: '#10b981',
+    decColor: '#ef4444',
+    description: 'Net change in your checking, savings, and cash account balances. This could include income, transfers, interest, spending, and fees.',
+  },
+  investments: {
+    label: 'Investments',
+    incLabel: 'Portfolio Growth',
+    decLabel: 'Portfolio Decline',
+    incColor: '#8b5cf6',
+    decColor: '#f59e0b',
+    description: 'Net change in your investment, brokerage, and retirement account balances. This could include contributions, market gains, dividends, withdrawals, and losses.',
+  },
+  real_estate: {
+    label: 'Real Estate',
+    incLabel: 'Property Appreciation',
+    decLabel: 'Property Depreciation',
+    incColor: '#3b82f6',
+    decColor: '#f97316',
+    description: 'Net change in your real estate property values based on recorded snapshots.',
+  },
+  mortgage: {
+    label: 'Mortgage',
+    incLabel: 'Principal Paydown',
+    decLabel: 'Mortgage Increase',
+    incColor: '#06b6d4',
+    decColor: '#ec4899',
+    description: 'Net change in your mortgage balance. A decrease means you owe less. An increase could mean new borrowing or interest accrual.',
+  },
+  credit_loans: {
+    label: 'Credit & Loans',
+    incLabel: 'Debt Repayment',
+    decLabel: 'New Borrowing',
+    incColor: '#14b8a6',
+    decColor: '#e11d48',
+    description: 'Net change in your credit card and loan balances. A decrease means you paid down debt. An increase means new charges or loans.',
+  },
+  other_assets: {
+    label: 'Other Assets',
+    incLabel: 'Other Asset Growth',
+    decLabel: 'Other Asset Decline',
+    incColor: '#6366f1',
+    decColor: '#a855f7',
+    description: 'Net change in other asset values such as vehicles, personal property, and other tracked assets.',
+  },
+};
 
-function classifyAccount(type: string): 'cash' | 'retirement' | 'brokerage' | 'realestate' | 'asset' | 'liability' {
+function getAccountGroup(type: string): string {
   const t = type.toLowerCase();
-  if (isLiabilityAccount(t)) {
-    return 'liability';
-  }
-  if (['checking', 'savings', 'hsachecking'].includes(t)) {
-    return 'cash';
-  }
-  if (['retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', 'hsa', 'health', '529'].includes(t)) {
-    return 'retirement';
-  }
-  if (['investment', 'brokerage', 'otherinvestment', 'otherInvestment', 'crypto', 'metals'].includes(t)) {
-    return 'brokerage';
-  }
-  if (['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate'].includes(t)) {
-    return 'realestate';
-  }
-  return isAssetAccount(t) ? 'asset' : 'cash';
-}
-
-function getMortgageEndDate(acc: any): string | undefined {
-  if (!acc.metadata) return undefined;
-  try {
-    const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
-    if (meta) {
-      const status = meta.mortgageStatus as string | undefined;
-      if (status === 'paid_off') return meta.payoffDate as string | undefined;
-      if (status === 'refinanced') return meta.refinanceDate as string | undefined;
-    }
-  } catch {}
-  return undefined;
-}
-
-function getLastDayOfMonth(yearMonth: string): string {
-  const [y, m] = yearMonth.split('-').map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  return `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
-}
-
-function getEffectiveBalance(
-  balances: Record<string, number>,
-  account: any,
-  targetDate: string,
-  baseCurrency: string
-): number {
-  const endEventDate = getMortgageEndDate(account);
-  if (endEventDate) {
-    const compTarget = targetDate.length === 7 ? getLastDayOfMonth(targetDate) : targetDate;
-    if (compTarget >= endEventDate) {
-      return 0;
-    }
-  }
-
-  return convertCurrency(balances[account.id] ?? 0, account.currency, baseCurrency);
+  if (['checking', 'savings', 'cash', 'hsachecking'].includes(t)) return 'cash';
+  if (['investment', 'brokerage', 'retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', 'hsa', 'health', '529', 'crypto', 'metals', 'otherinvestment', 'otherInvestment'].includes(t)) return 'investments';
+  if (['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'single-family', 'condo', 'townhouse', 'multi-family'].includes(t)) return 'real_estate';
+  if (t === 'mortgage') return 'mortgage';
+  if (['credit', 'loan', 'studentloan', 'autoloan', 'otherloan', 'otherliability', 'otherLiability', 'personal_loan', 'heloc'].includes(t)) return 'credit_loans';
+  if (['vehicle', 'other', 'otherasset', 'otherAsset'].includes(t) && isAssetAccount(t)) return 'other_assets';
+  return isAssetAccount(t) ? 'other_assets' : 'credit_loans';
 }
 
 function getSignedNetWorthBalance(balance: number, accountType: string): number {
   return isLiabilityAccount(accountType) ? -Math.abs(balance) : balance;
-}
-
-async function getBalancesOnDate(
-  db: any,
-  userId: string,
-  targetDate: string,
-  accountIds: string[],
-  dek: Uint8Array
-): Promise<Record<string, number>> {
-  if (accountIds.length === 0) return {};
-
-  const latestDates = await db
-    .select({
-      accountId: accountSnapshots.accountId,
-      maxDate: sql<string>`max(${accountSnapshots.snapshotDate})`,
-    })
-    .from(accountSnapshots)
-    .where(and(
-      eq(accountSnapshots.userId, userId),
-      lte(accountSnapshots.snapshotDate, targetDate),
-      inArray(accountSnapshots.accountId, accountIds)
-    ))
-    .groupBy(accountSnapshots.accountId);
-
-  if (latestDates.length === 0) return {};
-
-  const conditions = latestDates.map((ld: any) =>
-    and(
-      eq(accountSnapshots.accountId, ld.accountId),
-      eq(accountSnapshots.snapshotDate, ld.maxDate)
-    )
-  );
-
-  const snaps = await db
-    .select({
-      accountId: accountSnapshots.accountId,
-      balance: accountSnapshots.balance,
-    })
-    .from(accountSnapshots)
-    .where(and(
-      eq(accountSnapshots.userId, userId),
-      or(...conditions)
-    ));
-
-  const result: Record<string, number> = {};
-  for (const s of snaps) {
-    const decrypted = await decryptField(s.balance, dek);
-    result[s.accountId] = parseFloat(decrypted) || 0;
-  }
-  return result;
 }
 
 export async function calculateWealthFlow(
@@ -171,7 +91,6 @@ export async function calculateWealthFlow(
 ): Promise<WealthFlowData> {
   const db = getDb();
 
-  // 0. Fetch user settings for base currency and data toggles
   const userSettingsList = await db
     .select()
     .from(userSettings)
@@ -180,7 +99,6 @@ export async function calculateWealthFlow(
   const userSetting = userSettingsList[0];
   const baseCurrency = userSetting?.currency || 'USD';
 
-  // 1. Load active, reportable accounts
   const allAccounts = await db
     .select()
     .from(accounts)
@@ -201,11 +119,14 @@ export async function calculateWealthFlow(
       nodes: [],
       links: [],
       summary: {
-        beginningNetWorth: 0, endingNetWorth: 0, netWorthChange: 0, percentChange: 0,
-        reconciliationError: 0, baseCurrency,
-        totalIncome: 0, totalExpenses: 0, totalMarketGains: 0, totalMarketLosses: 0,
-        totalSavings: 0, totalDrawdowns: 0,
-      }
+        beginningNetWorth: 0,
+        endingNetWorth: 0,
+        netWorthChange: 0,
+        percentChange: 0,
+        baseCurrency,
+        totalIncreases: 0,
+        totalDecreases: 0,
+      },
     };
   }
 
@@ -213,515 +134,160 @@ export async function calculateWealthFlow(
     reportableAccounts.map((a: any) => [a.id, a])
   );
 
-  // 2. Resolve dates
   const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');
   dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
   const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
 
-  // Determine each account's earliest snapshot date across ALL time (not just the period).
-  // An account is "new" within this period only if its earliest-ever snapshot falls within
-  // the period. If it has any snapshot before the period start, its historical balance
-  // already existed — we should use that as the true beginning balance rather than 0.
-  const allEarliestSnapshots = await db
-    .select({
-      accountId: accountSnapshots.accountId,
-      minDate: sql<string>`min(${accountSnapshots.snapshotDate})`,
-    })
-    .from(accountSnapshots)
-    .where(and(
-      eq(accountSnapshots.userId, userId),
-      inArray(accountSnapshots.accountId, accountIdsToUse)
-    ))
-    .groupBy(accountSnapshots.accountId);
-
-  const earliestSnapshotDateMap = new Map<string, string>();
-  for (const s of allEarliestSnapshots) {
-    if (s.minDate) earliestSnapshotDateMap.set(s.accountId, s.minDate);
-  }
-
-  // "New" = earliest snapshot is within the period (account had no prior history)
-  const newAccountIds = accountIdsToUse.filter(id => {
-    const earliest = earliestSnapshotDateMap.get(id);
-    return !earliest || earliest >= startDateStr;
-  });
-
-  // For new accounts, fetch the balance at their earliest snapshot (their "opening" balance).
-  // This is what gets routed to New Assets / New Liabilities in the Sankey.
-  const newAccountInitBals = new Map<string, number>();
-  if (newAccountIds.length > 0) {
-    const conditions = newAccountIds
-      .filter(id => earliestSnapshotDateMap.has(id))
-      .map(id =>
-        and(
-          eq(accountSnapshots.accountId, id),
-          eq(accountSnapshots.snapshotDate, earliestSnapshotDateMap.get(id)!)
-        )
-      );
-
-    if (conditions.length > 0) {
-      const initSnaps = await db
-        .select({
-          accountId: accountSnapshots.accountId,
-          balance: accountSnapshots.balance,
-        })
-        .from(accountSnapshots)
-        .where(and(
-          eq(accountSnapshots.userId, userId),
-          or(...conditions)
-        ));
-      for (const s of initSnaps) {
-        const decrypted = await decryptField(s.balance, dek);
-        newAccountInitBals.set(s.accountId, parseFloat(decrypted) || 0);
-      }
-    }
-  }
-
-  // 3. Fetch beginning and ending balances
-  // For accounts with history before the period, getBalancesOnDate will find their
-  // last snapshot <= dayBeforeStr as the true beginning. For genuinely new accounts
-  // (no prior snapshot), it returns nothing and we use 0.
   const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, accountIdsToUse, dek);
   const endingBalances = await getBalancesOnDate(db, userId, endDateStr, accountIdsToUse, dek);
 
-  // Calculate beginning and ending net worth
   let beginningNetWorth = 0;
   let endingNetWorth = 0;
+
+  const accountDetails: WealthFlowAccountDetail[] = [];
 
   for (const id of accountIdsToUse) {
     const acc = accountsMap.get(id);
     if (!acc) continue;
 
-    // For new accounts (no pre-period snapshot), beginning = 0.
-    // For all others, use the actual last snapshot before the period start.
-    const isNewAccount = newAccountIds.includes(id);
-    const begConverted = isNewAccount ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
-    const endConverted = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
+    const hasBeg = id in beginningBalances;
+    const hasEnd = id in endingBalances;
 
-    beginningNetWorth += getSignedNetWorthBalance(begConverted, acc.type);
-    endingNetWorth += getSignedNetWorthBalance(endConverted, acc.type);
+    if (!hasBeg && !hasEnd) continue;
+
+    const beg = hasBeg ? convertCurrency(beginningBalances[id], acc.currency, baseCurrency) : 0;
+    const end = hasEnd ? convertCurrency(endingBalances[id], acc.currency, baseCurrency) : 0;
+
+    const rawDelta = end - beg;
+    const signedBeg = getSignedNetWorthBalance(beg, acc.type);
+    const signedEnd = getSignedNetWorthBalance(end, acc.type);
+    const signedNWDelta = signedEnd - signedBeg;
+
+    if (hasBeg) {
+      beginningNetWorth += getSignedNetWorthBalance(beg, acc.type);
+    }
+    if (hasEnd) {
+      endingNetWorth += getSignedNetWorthBalance(end, acc.type);
+    }
+
+    accountDetails.push({
+      id,
+      name: acc.name,
+      type: acc.type,
+      beginningBalance: roundToCents(beg),
+      endingBalance: roundToCents(end),
+      delta: roundToCents(rawDelta),
+      signedNWDelta: roundToCents(signedNWDelta),
+    });
   }
 
-  const netWorthChange = endingNetWorth - beginningNetWorth;
-  const percentChange = beginningNetWorth !== 0 ? (netWorthChange / Math.abs(beginningNetWorth)) * 100 : 0;
+  const netWorthChange = roundToCents(endingNetWorth - beginningNetWorth);
+  const percentChange = beginningNetWorth !== 0
+    ? (netWorthChange / Math.abs(beginningNetWorth)) * 100
+    : 0;
 
-  // 4. Data toggles from settings
-  const rawShowImported = userSetting?.showImportedData;
-  const importSettings = {
-    global: true,
-    cashFlowProjections: true,
-    ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
-  } as Record<string, boolean>;
+  const groupPositives = new Map<string, number>();
+  const groupNegatives = new Map<string, number>();
+  const groupAccountsPos = new Map<string, WealthFlowAccountDetail[]>();
+  const groupAccountsNeg = new Map<string, WealthFlowAccountDetail[]>();
 
-  const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
-  const isPaystubEnabled = userSetting?.paystubEnabled ?? false;
+  for (const detail of accountDetails) {
+    const group = getAccountGroup(detail.type);
 
-  // 5. Query transactions in the range
-  const conditions = [
-    eq(transactions.userId, userId),
-    gte(transactions.date, startDateStr),
-    lte(transactions.date, endDateStr),
-    eq(transactions.pending, false),
-    eq(transactions.ignored, false),
-    eq(transactions.deleted, false),
-    eq(accounts.isHidden, false),
-    eq(accounts.isExcludedFromNetWorth, false),
-  ];
-  if (!isImportTransactionsEnabled) {
-    conditions.push(eq(transactions.isImported, false));
-  }
-  if (!isPaystubEnabled) {
-    conditions.push(ne(transactions.source, 'paystub'));
-  }
-  let whereClause = and(...conditions);
-  if (accountIdsToUse.length > 0) {
-    whereClause = and(whereClause, inArray(transactions.accountId, accountIdsToUse));
+    if (detail.signedNWDelta > 0.01) {
+      groupPositives.set(group, (groupPositives.get(group) || 0) + detail.signedNWDelta);
+      if (!groupAccountsPos.has(group)) groupAccountsPos.set(group, []);
+      groupAccountsPos.get(group)!.push(detail);
+    } else if (detail.signedNWDelta < -0.01) {
+      const absVal = Math.abs(detail.signedNWDelta);
+      groupNegatives.set(group, (groupNegatives.get(group) || 0) + absVal);
+      if (!groupAccountsNeg.has(group)) groupAccountsNeg.set(group, []);
+      groupAccountsNeg.get(group)!.push(detail);
+    }
   }
 
-  const txRows = await db
-    .select({
-      id: transactions.id,
-      accountId: transactions.accountId,
-      amount: transactions.amount,
-      date: transactions.date,
-      categoryId: transactions.categoryId,
-      categoryName: categories.name,
-      categoryColor: categories.color,
-      categoryType: categories.categoryType,
-      isIncome: categories.isIncome,
-      excludeFromReports: categories.excludeFromReports,
-      parentId: categories.parentId,
-      payee: transactions.payee,
-    })
-    .from(transactions)
-    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(whereClause);
-
+  const nodes: WealthFlowNode[] = [];
   const links: Array<{ source: string; target: string; value: number }> = [];
-  const nodesMap = new Map<string, WealthFlowNode>();
 
-  const addLink = (source: string, target: string, value: number) => {
-    if (value <= 0.01) return;
-    const existing = links.find(l => l.source === source && l.target === target);
-    if (existing) {
-      existing.value += value;
-    } else {
-      links.push({ source, target, value });
-    }
+  const totalIncreases = Array.from(groupPositives.values()).reduce((s, v) => s + v, 0);
+  const totalDecreases = Array.from(groupNegatives.values()).reduce((s, v) => s + v, 0);
+
+  for (const [group, value] of groupPositives) {
+    const config = GROUP_CONFIG[group] || GROUP_CONFIG.other_assets;
+    const incValue = roundToCents(value);
+    if (incValue <= 0.01) continue;
+
+    const incAccounts = groupAccountsPos.get(group) || [];
+    const node: WealthFlowNode = {
+      id: `inc_${group}`,
+      label: config.incLabel,
+      color: config.incColor,
+      value: incValue,
+      percentage: 0,
+      type: 'increase',
+      accountGroup: group,
+      accounts: incAccounts,
+      description: config.description,
+    };
+    nodes.push(node);
+    links.push({ source: node.id, target: 'hub_net_worth_change', value: incValue });
+  }
+
+  for (const [group, value] of groupNegatives) {
+    const config = GROUP_CONFIG[group] || GROUP_CONFIG.other_assets;
+    const decValue = roundToCents(value);
+    if (decValue <= 0.01) continue;
+
+    const decAccounts = groupAccountsNeg.get(group) || [];
+    const node: WealthFlowNode = {
+      id: `dec_${group}`,
+      label: config.decLabel,
+      color: config.decColor,
+      value: decValue,
+      percentage: 0,
+      type: 'decrease',
+      accountGroup: group,
+      accounts: decAccounts,
+      description: config.description,
+    };
+    nodes.push(node);
+    links.push({ source: 'hub_net_worth_change', target: node.id, value: decValue });
+  }
+
+  const hubValue = Math.max(totalIncreases, totalDecreases, Math.abs(netWorthChange)) || 0.01;
+  const hubNode: WealthFlowNode = {
+    id: 'hub_net_worth_change',
+    label: netWorthChange >= 0 ? 'Net Worth Increase' : 'Net Worth Decrease',
+    color: '#0ea5e9',
+    value: roundToCents(hubValue),
+    percentage: 100,
+    type: 'hub',
+    netWorthChange: roundToCents(netWorthChange),
+    visualImbalance: roundToCents(totalIncreases - totalDecreases),
+    description: 'The center of your wealth flow. All increases in net worth flow in from the left, and all decreases flow out to the right. The colored bar shows whether you built wealth (green, surplus) or drew it down (red, deficit).',
   };
+  nodes.push(hubNode);
 
-  const getOrCreateNode = (id: string, label: string, color: string, group: string) => {
-    if (!nodesMap.has(id)) {
-      nodesMap.set(id, { id, label, color, value: 0, percentage: 0, group });
-    }
-    return nodesMap.get(id)!;
-  };
-
-  // 1. Process Transactions directly to Category Nodes
-  let totalIncome = 0;
-  let totalExpenses = 0;
-  const txSumByAccount = new Map<string, number>();
-  
-  // We will keep account breakdowns for each node
-  const accountBreakdowns: Record<string, Array<{ id: string; name: string; type: string; beg: number; end: number; delta: number; adjustedDelta?: number }>> = {};
-  const addToBreakdown = (nodeId: string, accId: string, accName: string, accType: string, beg: number, end: number, delta: number) => {
-    if (!accountBreakdowns[nodeId]) accountBreakdowns[nodeId] = [];
-    const existing = accountBreakdowns[nodeId].find(a => a.id === accId);
-    if (existing) {
-      existing.beg = roundToCents(existing.beg + beg);
-      existing.end = roundToCents(existing.end + end);
-      existing.delta = roundToCents(existing.delta + delta);
-    } else {
-      accountBreakdowns[nodeId].push({ id: accId, name: accName, type: accType, beg: roundToCents(beg), end: roundToCents(end), delta: roundToCents(delta) });
-    }
-  };
-
-  const addFlowAmount = (
-    nodeId: string,
-    label: string,
-    color: string,
-    group: string,
-    amount: number,
-    acc: any
-  ) => {
-    if (Math.abs(amount) <= 0.01) return;
-
-    const node = getOrCreateNode(nodeId, label, color, group);
-    node.value = roundToCents(node.value + amount);
-    addToBreakdown(nodeId, acc.id, acc.name, acc.type, 0, 0, amount);
-  };
-
-  for (const row of txRows) {
-    const acc = accountsMap.get(row.accountId);
-    if (!acc) continue;
-
-    const plainAmountStr = await decryptField(row.amount, dek);
-    const amountVal = parseFloat(plainAmountStr) || 0;
-    const amountUSD = convertCurrency(amountVal, acc.currency, baseCurrency);
-
-    // Group transactions by account (skip compounds — they're self-contained via inc/exp nodes)
-    const isCompound = row.categoryType === 'compound';
-    if (!isCompound) {
-      txSumByAccount.set(row.accountId, (txSumByAccount.get(row.accountId) || 0) + amountUSD);
-    }
-
-    const isExcluded = row.excludeFromReports === true;
-    if (isExcluded) continue;
-
-    if (row.categoryType === 'transfer') {
-      // Transfers are completely excluded from the direct flow (they cancel out and don't change net worth)
-      continue;
-    } else if (isCompound) {
-      const absAmount = Math.abs(amountUSD);
-      totalIncome += absAmount;
-      totalExpenses += absAmount;
-
-      const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
-      const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
-      const catColor = row.categoryColor || '#10b981';
-
-      addFlowAmount(catId, catName, catColor, 'income', absAmount, acc);
-      addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', absAmount, acc);
-    } else {
-      const absAmount = Math.abs(amountUSD);
-
-      if (amountUSD > 0) {
-        if (row.isIncome) {
-          totalIncome += amountUSD;
-          const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
-          const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
-          const catColor = row.categoryColor || '#10b981';
-          addFlowAmount(catId, catName, catColor, 'income', amountUSD, acc);
-        } else {
-          totalExpenses = roundToCents(totalExpenses - amountUSD);
-          addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', -amountUSD, acc);
-        }
-      } else if (amountUSD < 0) {
-        if (row.isIncome) {
-          totalIncome = roundToCents(totalIncome - absAmount);
-          const catId = row.categoryId ? `inc_${row.categoryId}` : 'inc_uncategorized_tx';
-          const catName = row.categoryId ? (row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized Income') : 'Uncategorized Income';
-          const catColor = row.categoryColor || '#10b981';
-          addFlowAmount(catId, catName, catColor, 'income', -absAmount, acc);
-        } else {
-          totalExpenses += absAmount;
-          addFlowAmount('exp_expenses', 'Expenses', '#f43f5e', 'expense', absAmount, acc);
-        }
-      }
-    }
-  }
-
-  for (const [id, node] of Array.from(nodesMap.entries())) {
-    if (node.value <= 0.01) {
-      nodesMap.delete(id);
-    }
-  }
-
-  // 2. Process Snapshots & Gaps
-  let totalMarketGains = 0;
-  let totalMarketLosses = 0;
-  let totalMortgageReduction = 0;
-
-  for (const accId of accountIdsToUse) {
-    const acc = accountsMap.get(accId);
-    if (!acc) continue;
-
-    const isNewAccount = newAccountIds.includes(accId);
-    const initValRaw = newAccountInitBals.get(accId) || 0;
-    const initValUSD = convertCurrency(initValRaw, acc.currency, baseCurrency);
-    const signedInitVal = getSignedNetWorthBalance(initValUSD, acc.type);
-
-    const begUSD = isNewAccount ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
-    const endUSD = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
-
-    const isLiab = isLiabilityAccount(acc.type);
-    const signedBeg = getSignedNetWorthBalance(begUSD, acc.type);
-    const signedEnd = getSignedNetWorthBalance(endUSD, acc.type);
-    const actualDeltaUSD = signedEnd - signedBeg;
-
-    const txSum = txSumByAccount.get(accId) || 0;
-    const liabilityUsesNegativeBalances = isLiab && (begUSD < 0 || endUSD < 0);
-    const effectiveTxSum = isLiab && !liabilityUsesNegativeBalances ? -txSum : txSum;
-
-    const gap = roundToCents(actualDeltaUSD - effectiveTxSum - (isNewAccount ? signedInitVal : 0));
-
-    if (isNewAccount) {
-      if (!isLiab) {
-        const nodeId = 'inc_new_accounts';
-        const node = getOrCreateNode(nodeId, 'New Assets', '#10b981', 'new_accounts');
-        node.value = roundToCents(node.value + signedInitVal);
-        addToBreakdown(nodeId, accId, acc.name, acc.type, 0, signedEnd, signedInitVal);
-      } else {
-        const absVal = Math.abs(signedInitVal);
-        const nodeId = 'exp_new_accounts';
-        const node = getOrCreateNode(nodeId, 'New Liabilities', '#ef4444', 'new_accounts');
-        node.value = roundToCents(node.value + absVal);
-        addToBreakdown(nodeId, accId, acc.name, acc.type, 0, signedEnd, -absVal);
-      }
-    }
-
-    if (acc.type.toLowerCase() === 'mortgage' && gap > 0) {
-      totalMortgageReduction += gap;
-
-      const incNodeId = 'inc_mortgage_reduction';
-      const incNode = getOrCreateNode(incNodeId, 'Mortgage Liability Reduction', '#10b981', 'mortgage');
-      incNode.value = roundToCents(incNode.value + gap);
-      addToBreakdown(incNodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
-
-      // exp_mortgage_payment is created during the deduction phase below
-      // at only the amount that can be matched by reducing existing expense nodes,
-      // preventing the outflow side from being inflated beyond what was actually
-      // spent on mortgage payments in the transaction record.
-    } else if (Math.abs(gap) > 0.01) {
-      const accountClass = classifyAccount(acc.type);
-      const isInvest = accountClass === 'brokerage' || accountClass === 'realestate' || accountClass === 'retirement';
-
-      if (gap > 0) {
-        if (isInvest) {
-          totalMarketGains += gap;
-          if (accountClass === 'realestate') {
-            const nodeId = 'inc_real_estate_appreciation';
-            const node = getOrCreateNode(nodeId, 'Real Estate Appreciation', '#8b5cf6', 'market');
-            node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
-          } else {
-            const nodeId = 'inc_market_gains';
-            const node = getOrCreateNode(nodeId, 'Market Gains', '#10b981', 'market');
-            node.value = roundToCents(node.value + gap);
-            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
-          }
-        } else {
-          const nodeId = 'inc_balance_adjustments';
-          const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
-          node.value = roundToCents(node.value + gap);
-          addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, gap);
-        }
-      } else {
-        const absGap = Math.abs(gap);
-        if (isInvest) {
-          totalMarketLosses += absGap;
-          if (accountClass === 'realestate') {
-            const nodeId = 'exp_real_estate_depreciation';
-            const node = getOrCreateNode(nodeId, 'Real Estate Depreciation', '#f43f5e', 'market');
-            node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
-          } else {
-            const nodeId = 'exp_market_losses';
-            const node = getOrCreateNode(nodeId, 'Market Losses', '#ef4444', 'market');
-            node.value = roundToCents(node.value + absGap);
-            addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
-          }
-        } else {
-          const nodeId = 'exp_balance_adjustments';
-          const node = getOrCreateNode(nodeId, 'Cash & Liability Adjustments', '#64748b', 'unaccounted');
-          node.value = roundToCents(node.value + absGap);
-          addToBreakdown(nodeId, accId, acc.name, acc.type, signedBeg, signedEnd, -absGap);
-        }
-      }
-    }
-  }
-
-  // Deduct mortgage principal payments from Category Expenses to avoid double counting.
-  // exp_mortgage_payment is created at only the amount actually deducted, so the
-  // outflow side is not inflated beyond what the transaction record supports.
-  let mortgageDeductionRemaining = totalMortgageReduction;
-  if (mortgageDeductionRemaining > 0) {
-    const expensesNode = nodesMap.get('exp_expenses');
-    if (expensesNode) {
-      const deduct = Math.min(expensesNode.value, mortgageDeductionRemaining);
-      if (deduct > 0.01) {
-        expensesNode.value = roundToCents(expensesNode.value - deduct);
-        totalExpenses = roundToCents(totalExpenses - deduct);
-        const expNode = getOrCreateNode('exp_mortgage_payment', 'Mortgage Payment', '#f43f5e', 'mortgage');
-        expNode.value = roundToCents(expNode.value + deduct);
-        mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
-      }
-    }
-    if (mortgageDeductionRemaining > 0) {
-      const adjNode = nodesMap.get('exp_balance_adjustments');
-      if (adjNode) {
-        const deduct = Math.min(adjNode.value, mortgageDeductionRemaining);
-        if (deduct > 0.01) {
-          adjNode.value = roundToCents(adjNode.value - deduct);
-          const expNode = getOrCreateNode('exp_mortgage_payment', 'Mortgage Payment', '#f43f5e', 'mortgage');
-          expNode.value = roundToCents(expNode.value + deduct);
-          mortgageDeductionRemaining = roundToCents(mortgageDeductionRemaining - deduct);
-        }
-      }
-    }
-  }
-
-  // Clean up any nodes with value <= 0.01 after deductions
-  for (const [id, node] of Array.from(nodesMap.entries())) {
-    if (node.value <= 0.01) {
-      nodesMap.delete(id);
-    }
-  }
-
-  // Compute per-account adjusted breakdowns for balance-change-proportional routing
-  // First pass: sum |delta| per account across all breakdowns
-  const accountAbsDeltaSum = new Map<string, number>();
-  for (const breakdowns of Object.values(accountBreakdowns)) {
-    for (const b of breakdowns) {
-      accountAbsDeltaSum.set(b.id, (accountAbsDeltaSum.get(b.id) || 0) + Math.abs(b.delta));
-    }
-  }
-
-  // Second pass: compute scaling factor per account and apply adjustedDelta
-  for (const breakdowns of Object.values(accountBreakdowns)) {
-    for (const b of breakdowns) {
-      const acc = accountsMap.get(b.id);
-      if (!acc) continue;
-      const isNewAcct = newAccountIds.includes(b.id);
-      const bBegUSD = isNewAcct ? 0 : getEffectiveBalance(beginningBalances, acc, dayBeforeStr, baseCurrency);
-      const bEndUSD = getEffectiveBalance(endingBalances, acc, endDateStr, baseCurrency);
-      const bSignedBeg = getSignedNetWorthBalance(bBegUSD, acc.type);
-      const bSignedEnd = getSignedNetWorthBalance(bEndUSD, acc.type);
-      const absBalChange = Math.abs(bSignedEnd - bSignedBeg);
-      const sumAbs = accountAbsDeltaSum.get(b.id) || 0;
-      const scale = sumAbs > 0.01 ? Math.min(1, absBalChange / sumAbs) : 1;
-      b.adjustedDelta = roundToCents(b.delta * scale);
-    }
-  }
-
-  // 3. Construct the central hub and let net worth change appear as imbalance.
-  const hubId = 'hub_net_worth_change';
-  const hubColor = netWorthChange >= 0 ? '#0ea5e9' : '#ef4444';
-  const hubNode = getOrCreateNode(
-    hubId,
-    netWorthChange >= 0 ? 'Net Worth Increase' : 'Net Worth Decrease',
-    hubColor,
-    'hub'
-  );
-  hubNode.netWorthChange = roundToCents(netWorthChange);
-
-  // Link Inflows/Gains to the Hub
-  const inflowNodes = Array.from(nodesMap.values()).filter(n => n.id.startsWith('inc_'));
-  for (const node of inflowNodes) {
-    addLink(node.id, hubId, node.value);
-  }
-
-  // Link the Hub to Outflows/Destinations
-  const outflowNodes = Array.from(nodesMap.values()).filter(n => n.id.startsWith('exp_'));
-  for (const node of outflowNodes) {
-    addLink(hubId, node.id, node.value);
-  }
-
-  // Define Hub value as the max of total inflows, outflows, or the absolute net worth change.
-  // This guarantees the colored delta bar always fits within the hub node.
-  const totalInflowsSum = roundToCents(inflowNodes.reduce((s, n) => s + n.value, 0));
-  const totalOutflowsSum = roundToCents(outflowNodes.reduce((s, n) => s + n.value, 0));
-  hubNode.value = roundToCents(Math.max(totalInflowsSum, totalOutflowsSum, Math.abs(netWorthChange))) || 0.01;
-  hubNode.visualImbalance = roundToCents(totalInflowsSum - totalOutflowsSum);
-
-  // Set node percentages based on maximum value in the chart
-  const maxNodeValue = Math.max(...Array.from(nodesMap.values()).map(n => n.value)) || 1;
-  for (const node of Array.from(nodesMap.values())) {
+  const maxNodeValue = Math.max(...nodes.map(n => n.value), 1);
+  for (const node of nodes) {
     node.percentage = (node.value / maxNodeValue) * 100;
-    node.accounts = accountBreakdowns[node.id];
   }
 
-  // Ensure nodes are sorted correctly for rendering: Sources, Hub, Destinations
-  const sources = Array.from(nodesMap.values()).filter(n => n.id.startsWith('inc_'));
-  const hub = [hubNode];
-  const destinations = Array.from(nodesMap.values()).filter(n => n.id.startsWith('exp_'));
-
-  const finalNodes = [...sources, ...hub, ...destinations];
-  const roundedNetWorthChange = roundToCents(netWorthChange);
-
-  // Calculate detailed adjustments sums for the Net Worth Drivers section
-  let totalAdjustmentsIn = 0;
-  let totalAdjustmentsOut = 0;
-  for (const node of Array.from(nodesMap.values())) {
-    if (node.id.startsWith('inc_')) {
-      if (node.group === 'unaccounted' || node.group === 'new_accounts' || node.group === 'mortgage') {
-        totalAdjustmentsIn += node.value;
-      }
-    } else if (node.id.startsWith('exp_')) {
-      if (node.group === 'unaccounted' || node.group === 'new_accounts' || node.group === 'mortgage') {
-        totalAdjustmentsOut += node.value;
-      }
-    }
-  }
+  const increaseNodes = nodes.filter(n => n.type === 'increase');
+  const decreaseNodes = nodes.filter(n => n.type === 'decrease');
+  const sortedNodes = [...increaseNodes, hubNode, ...decreaseNodes];
 
   return {
-    nodes: finalNodes,
+    nodes: sortedNodes,
     links,
     summary: {
       beginningNetWorth: roundToCents(beginningNetWorth),
       endingNetWorth: roundToCents(endingNetWorth),
       netWorthChange: roundToCents(netWorthChange),
-      percentChange,
-      reconciliationError: 0,
+      percentChange: roundToCents(percentChange),
       baseCurrency,
-      totalIncome: roundToCents(totalIncome),
-      totalExpenses: roundToCents(totalExpenses),
-      totalMarketGains: roundToCents(totalMarketGains),
-      totalMarketLosses: roundToCents(totalMarketLosses),
-      totalAdjustmentsIn: roundToCents(totalAdjustmentsIn),
-      totalAdjustmentsOut: roundToCents(totalAdjustmentsOut),
-      totalSavings: roundedNetWorthChange > 0 ? roundedNetWorthChange : 0,
-      totalDrawdowns: roundedNetWorthChange < 0 ? Math.abs(roundedNetWorthChange) : 0,
-    }
+      totalIncreases: roundToCents(totalIncreases),
+      totalDecreases: roundToCents(totalDecreases),
+    },
   };
 }
