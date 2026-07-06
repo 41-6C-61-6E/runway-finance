@@ -530,7 +530,7 @@ const SankeyCustomNode = ({
         width={width}
         height={height}
         fill={payload.color || 'var(--color-primary)'}
-        rx={4}
+        rx={0}
         fillOpacity={isDimmed ? 0.3 : 0.95}
         stroke="none"
       />
@@ -543,7 +543,7 @@ const SankeyCustomNode = ({
               width={width}
               height={hubDeltaHeight}
               fill={isNetSurplus ? '#10b981' : '#ef4444'}
-              rx={4}
+              rx={0}
               fillOpacity={isDimmed ? 0.2 : 0.95}
             />
           )}

@@ -112,7 +112,7 @@ const SankeyCustomNode = ({
       <rect
         x={x} y={y} width={width} height={height}
         fill={payload.color || 'var(--color-primary)'}
-        rx={4}
+        rx={0}
         fillOpacity={isDimmed ? 0.3 : 0.95}
         stroke={isHub ? (payload.color || '#0ea5e9') : 'none'}
         strokeWidth={isHub ? 1.5 : 0}
@@ -124,7 +124,7 @@ const SankeyCustomNode = ({
             <rect
               x={x} y={hubDeltaY} width={width} height={hubDeltaHeight}
               fill={hubVisualImbalance >= 0 ? '#10b981' : '#ef4444'}
-              rx={4}
+              rx={0}
               fillOpacity={isDimmed ? 0.2 : 0.95}
             />
           )}
