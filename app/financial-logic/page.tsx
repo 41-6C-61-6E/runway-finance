@@ -8,7 +8,7 @@ import {
   buildNetWorthTraces,
   buildCashFlowTrace,
   buildRealEstateTrace,
-  buildFireTrace,
+  buildInvestmentsTrace,
   buildBudgetTrace,
   buildGoalsTrace,
 } from '@/lib/services/trace-engine';
@@ -20,7 +20,17 @@ interface FetchedData {
   accounts: AccountData[];
   cashFlow: { totalIncome: number; totalExpenses: number; netIncome: number; savingsRate: number };
   realEstate: { totalValue: number; totalMortgage: number; totalEquity: number; overallLtv: number; properties: any[] };
-  fireSettings: { fireNumber: number; currentInvestableAssets: number; percentToFire: number; yearsToFI: number; safeWithdrawalRate: number; targetAnnualExpenses: number };
+  investments: {
+    accounts: any[];
+    holdings: any[];
+    summary: {
+      totalBalance: number;
+      totalCostBasis: number | null;
+      totalUnrealizedGainLoss: number | null;
+      totalUnrealizedReturnPct: number | null;
+      holdingsCount: number;
+    };
+  };
   budgets: { incomeBudgeted: number; incomeActual: number; expenseBudgeted: number; expenseActual: number };
   goals: { totalTarget: number; totalCurrent: number; overallProgress: number };
 }
@@ -29,12 +39,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   netWorth: 'Net Worth',
   cashFlow: 'Cash Flow',
   realEstate: 'Real Estate',
-  fire: 'FIRE',
+  investments: 'Investments',
   budgets: 'Budgets',
   goals: 'Goals',
 };
 
-const CATEGORY_ORDER = ['netWorth', 'cashFlow', 'realEstate', 'fire', 'budgets', 'goals'];
+const CATEGORY_ORDER = ['netWorth', 'cashFlow', 'realEstate', 'investments', 'budgets', 'goals'];
 
 function GroupedTraceTree({ traces }: { traces: CalculationTrace[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(traces.map((t) => t.id)));
@@ -239,11 +249,11 @@ export default function FinancialLogicPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [accountsRes, cashFlowRes, realEstateRes, fireRes, budgetsRes, goalsRes] = await Promise.all([
+                const [accountsRes, cashFlowRes, realEstateRes, investmentsRes, budgetsRes, goalsRes] = await Promise.all([
           fetch('/api/accounts?includeHidden=true'),
           fetch('/api/cash-flow/summary'),
           fetch('/api/real-estate'),
-          fetch('/api/fire/scenarios'),
+          fetch('/api/investments'),
           fetch('/api/cash-flow/budgets?month=' + new Date().toISOString().slice(0, 7)),
           fetch('/api/financial-goals'),
         ]);
@@ -251,13 +261,9 @@ export default function FinancialLogicPage() {
         const accounts: AccountData[] = accountsRes.ok ? await accountsRes.json() : [];
         const cashFlow = cashFlowRes.ok ? await cashFlowRes.json() : {};
         const realEstate = realEstateRes.ok ? await realEstateRes.json() : {};
-        const fireData = fireRes.ok ? await fireRes.json() : [];
+        const investments = investmentsRes.ok ? await investmentsRes.json() : { accounts: [], holdings: [], summary: { totalBalance: 0, totalCostBasis: null, totalUnrealizedGainLoss: null, totalUnrealizedReturnPct: null, holdingsCount: 0 } };
         const budgets = budgetsRes.ok ? await budgetsRes.json() : { income: [], expenses: [] };
         const goals = goalsRes.ok ? await goalsRes.json() : [];
-
-        const fireSettings = Array.isArray(fireData) && fireData.length > 0
-          ? fireData[0]
-          : {};
 
         const incomeBudgeted = (budgets.income ?? []).reduce((s: number, b: any) => s + (parseFloat(b.budgeted ?? b.amount ?? 0) || 0), 0);
         const incomeActual = (budgets.income ?? []).reduce((s: number, b: any) => s + (parseFloat(b.actual ?? 0) || 0), 0);
@@ -282,14 +288,7 @@ export default function FinancialLogicPage() {
             overallLtv: realEstate.overallLtv ?? 0,
             properties: realEstate.properties ?? [],
           },
-          fireSettings: {
-            fireNumber: parseFloat(fireSettings.fireNumber ?? fireSettings.targetAmount ?? 0),
-            currentInvestableAssets: parseFloat(fireSettings.currentInvestableAssets ?? 0),
-            percentToFire: parseFloat(fireSettings.percentToFire ?? 0),
-            yearsToFI: parseFloat(fireSettings.yearsToFI ?? 0),
-            safeWithdrawalRate: parseFloat(fireSettings.safeWithdrawalRate ?? 0.04),
-            targetAnnualExpenses: parseFloat(fireSettings.targetAnnualExpenses ?? 0),
-          },
+          investments,
           budgets: { incomeBudgeted, incomeActual, expenseBudgeted, expenseActual },
           goals: {
             totalTarget,
@@ -310,7 +309,7 @@ export default function FinancialLogicPage() {
       ...buildNetWorthTraces(data.accounts),
       buildCashFlowTrace(data.cashFlow),
       buildRealEstateTrace(data.realEstate),
-      buildFireTrace(data.fireSettings),
+      buildInvestmentsTrace(data.investments),
       buildBudgetTrace({ ...data.budgets, totalBudgeted: data.budgets.incomeBudgeted, totalActual: data.budgets.incomeActual, remaining: data.budgets.incomeActual - data.budgets.incomeBudgeted, percentUsed: data.budgets.incomeBudgeted > 0 ? (data.budgets.incomeActual / data.budgets.incomeBudgeted) * 100 : 0, type: 'income' }),
       buildBudgetTrace({ totalBudgeted: data.budgets.expenseBudgeted, totalActual: data.budgets.expenseActual, remaining: data.budgets.expenseBudgeted - data.budgets.expenseActual, percentUsed: data.budgets.expenseBudgeted > 0 ? (data.budgets.expenseActual / data.budgets.expenseBudgeted) * 100 : 0, type: 'expense' }),
       buildGoalsTrace(data.goals),
