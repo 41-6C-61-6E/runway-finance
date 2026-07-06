@@ -87,7 +87,7 @@ const SankeyCustomNode = ({
 
   const hubDeltaRatio = isHub && maxFlow > 0 ? Math.min(1, imbalance / maxFlow) : 0;
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
-  const hubDeltaY = isNetSurplus ? y + height - hubDeltaHeight : y;
+  const hubDeltaY = y + height - hubDeltaHeight;
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
 
   const safeProps = sanitizeRestProps(restProps);
@@ -125,7 +125,7 @@ const SankeyCustomNode = ({
               x={x} y={hubDeltaY} width={width} height={hubDeltaHeight}
               fill={hubVisualImbalance >= 0 ? '#10b981' : '#ef4444'}
               rx={0}
-              fillOpacity={isDimmed ? 0.2 : 0.95}
+              fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
           <foreignObject

@@ -173,6 +173,11 @@ export async function GET(request: Request) {
 
       const roundToCents = (val: number) => Math.round(val * 100) / 100;
 
+      let totalAssets = 0;
+      let totalLiabilities = 0;
+      const breakdown: Record<string, number> = {};
+      const allBreakdownCategories = new Set<string>();
+
       for (const acc of reportableAccounts) {
         if (!isAccountActiveOnDate(acc, new Date().toISOString().split('T')[0])) {
           continue;
