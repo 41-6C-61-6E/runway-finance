@@ -1,0 +1,10 @@
+{
+  "buildNumber": "26.07.1783354725908",
+  "commits": [
+    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
+    "refactor: update Sankey visualization logic and initialize net worth reporting variables",
+    "fix: clear stale account snapshots during startup healing and update service worker cache version",
+    "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
+    "refactor: inline loading and error states within Sankey chart components for improved rendering logic"
+  ]
+}

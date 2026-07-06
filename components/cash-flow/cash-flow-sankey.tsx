@@ -1103,7 +1103,8 @@ export function CashFlowSankey() {
         title={
           <div className="flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-primary shrink-0" />
-            <span>Cash Flow Sankey</span>
+            <span>Cash Flow</span>
+            <span className="font-normal text-muted-foreground text-xs"> for {windowLabel}</span>
           </div>
         }
       />

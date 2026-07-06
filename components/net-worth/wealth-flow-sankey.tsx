@@ -453,6 +453,7 @@ function DetailModal({
 
 export function WealthFlowSankey() {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('networth-flow-sankey-collapsed');
+  const [isDriversCollapsed, setIsDriversCollapsed] = useCardCollapsed('wealthFlowDrivers');
   const [showFilters, setShowFilters] = useState(false);
 
   const {
@@ -815,7 +816,8 @@ export function WealthFlowSankey() {
           title={
             <div className="flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-primary shrink-0" />
-              <span>Wealth Building Flow</span>
+<span>Wealth Flow</span>
+            <span className="font-normal text-muted-foreground text-xs"> for {windowLabel}</span>
             </div>
           }
         />
@@ -1006,92 +1008,102 @@ export function WealthFlowSankey() {
                   )}
                 </div>
               )}
-
-              {summary && processedData.nodes.length > 0 && (
-                <div className="mt-6 bg-card border border-border/50 rounded-xl p-5">
-                  <h4 className="text-sm font-semibold text-foreground mb-4">
-                    Net Worth Change Drivers <span className="font-normal text-muted-foreground">for {windowLabel}</span>
-                  </h4>
-
-                  <div className="max-w-xl mx-auto space-y-3">
-                    <div className="flex justify-between items-center text-sm font-medium border-b border-border/40 pb-2">
-                      <span className="text-muted-foreground">Beginning Net Worth</span>
-                      <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        Increases
-                      </div>
-                      {drivers.increases.length === 0 ? (
-                        <div className="text-[10px] text-muted-foreground italic pl-4">No increases this period.</div>
-                      ) : (
-                        drivers.increases.map((node) => (
-                          <DriverLedgerSection
-                            key={node.id}
-                            label={node.label}
-                            value={node.value}
-                            sign="+"
-                            accounts={node.accounts}
-                            nodeId={node.id}
-                            onAccountClick={() => handleNodeClick(node.id)}
-                          />
-                        ))
-                      )}
-                      <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1 border-t border-border/40">
-                        <span>Total Increases</span>
-                        <span className="font-mono">+{formatCurrency(summary.totalIncreases)}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                        <TrendingDown className="w-3.5 h-3.5" />
-                        Decreases
-                      </div>
-                      {drivers.decreases.length === 0 ? (
-                        <div className="text-[10px] text-muted-foreground italic pl-4">No decreases this period.</div>
-                      ) : (
-                        drivers.decreases.map((node) => (
-                          <DriverLedgerSection
-                            key={node.id}
-                            label={node.label}
-                            value={node.value}
-                            sign="-"
-                            accounts={node.accounts}
-                            nodeId={node.id}
-                            onAccountClick={() => handleNodeClick(node.id)}
-                          />
-                        ))
-                      )}
-                      <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1 border-t border-border/40">
-                        <span>Total Decreases</span>
-                        <span className="font-mono">-{formatCurrency(summary.totalDecreases)}</span>
-                      </div>
-                    </div>
-
-                    <div className="border-t-2 border-double border-border/80 pt-3 mt-1">
-                      <div className="flex justify-between items-center text-sm font-bold">
-                        <span className="text-foreground">Ending Net Worth</span>
-                        <span className="font-mono">{formatCurrency(summary.endingNetWorth)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center text-[11px] text-muted-foreground pt-1">
-                      <span>Total Net Worth Change</span>
-                      <span className={`font-semibold font-mono ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)}
-                        {' '}({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </>
         )}
       </div>
+
+      {summary && processedData.nodes.length > 0 && (
+        <div className="bg-card border border-border rounded-xl shadow-sm">
+          <CollapsibleCardHeader
+            isCollapsed={isDriversCollapsed}
+            onToggle={setIsDriversCollapsed}
+            title={
+              <div className="flex items-center gap-2">
+                <span>Net Worth Drivers</span>
+                <span className="font-normal text-muted-foreground text-xs">for {windowLabel}</span>
+              </div>
+            }
+          />
+          {!isDriversCollapsed && (
+            <div className="p-5">
+              <div className="max-w-xl mx-auto space-y-3">
+                <div className="flex justify-between items-center text-sm font-medium pb-2">
+                  <span className="text-muted-foreground">Beginning Net Worth</span>
+                  <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Increases
+                  </div>
+                  {drivers.increases.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground italic pl-4">No increases this period.</div>
+                  ) : (
+                    drivers.increases.map((node) => (
+                      <DriverLedgerSection
+                        key={node.id}
+                        label={node.label}
+                        value={node.value}
+                        sign="+"
+                        accounts={node.accounts}
+                        nodeId={node.id}
+                        onAccountClick={() => handleNodeClick(node.id)}
+                      />
+                    ))
+                  )}
+                  <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1">
+                    <span>Total Increases</span>
+                    <span className="font-mono">+{formatCurrency(summary.totalIncreases)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                    <TrendingDown className="w-3.5 h-3.5" />
+                    Decreases
+                  </div>
+                  {drivers.decreases.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground italic pl-4">No decreases this period.</div>
+                  ) : (
+                    drivers.decreases.map((node) => (
+                      <DriverLedgerSection
+                        key={node.id}
+                        label={node.label}
+                        value={node.value}
+                        sign="-"
+                        accounts={node.accounts}
+                        nodeId={node.id}
+                        onAccountClick={() => handleNodeClick(node.id)}
+                      />
+                    ))
+                  )}
+                  <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1">
+                    <span>Total Decreases</span>
+                    <span className="font-mono">-{formatCurrency(summary.totalDecreases)}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 mt-1">
+                  <div className="flex justify-between items-center text-sm font-bold">
+                    <span className="text-foreground">Ending Net Worth</span>
+                    <span className="font-mono">{formatCurrency(summary.endingNetWorth)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground pt-1">
+                  <span>Total Net Worth Change</span>
+                  <span className={`font-semibold font-mono ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)}
+                    {' '}({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {selectedNodeDetails && (
         <DetailModal
@@ -1132,10 +1144,10 @@ function DriverLedgerSection({
       </div>
 
       {accounts && accounts.length > 0 && (
-        <div className="pl-4 border-l-2 border-border/30 ml-2 space-y-0.5 pb-1">
+        <div className="pl-4 ml-2 space-y-0.5 pb-1">
           <table className="w-full text-[10px] text-left border-collapse font-mono">
             <thead>
-              <tr className="border-b border-border/20 text-[8px] uppercase tracking-wider text-muted-foreground/60">
+              <tr className="text-[8px] uppercase tracking-wider text-muted-foreground/60">
                 <th className="py-0.5 pr-2 font-semibold">Account</th>
                 <th className="py-0.5 text-right pr-2 font-semibold">Start</th>
                 <th className="py-0.5 text-right pr-2 font-semibold">End</th>
