@@ -6,7 +6,7 @@ import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache, getUserTransactionsFromCache } from '@/lib/services/search-cache';
 import { userSettings } from '@/lib/db/schema';
-import { eq, and, or, inArray, isNull, sql, gte, lte } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql, gte, lte, lt } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
@@ -555,6 +555,49 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   }
 
   return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
+}
+
+export async function deleteOldPendingTransactions(userId: string): Promise<void> {
+  const dataUserId = await resolveDataUserId(userId);
+  const db = getDb();
+
+  // Check if user enabled deletion of old pending transactions
+  const [settings] = await db
+    .select({ deletePendingOlderThan30Days: userSettings.deletePendingOlderThan30Days })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+
+  if (!settings?.deletePendingOlderThan30Days) {
+    logger.debug(`${LOG_TAG} deleteOldPendingTransactions: Feature disabled for user`, { userId });
+    return;
+  }
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 30);
+  const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+
+  logger.info(`${LOG_TAG} deleteOldPendingTransactions: Cleaning up pending transactions older than ${cutoffDateStr}`, { userId });
+
+  const deletedRows = await db
+    .delete(transactions)
+    .where(
+      and(
+        eq(transactions.userId, dataUserId),
+        eq(transactions.pending, true),
+        lt(transactions.date, cutoffDateStr)
+      )
+    )
+    .returning({ id: transactions.id });
+
+  if (deletedRows.length > 0) {
+    logger.info(`${LOG_TAG} deleteOldPendingTransactions: Cleaned up ${deletedRows.length} old pending transactions`, {
+      userId,
+      deletedCount: deletedRows.length,
+    });
+  } else {
+    logger.info(`${LOG_TAG} deleteOldPendingTransactions: No old pending transactions found to delete`, { userId });
+  }
 }
 
 export async function syncConnection(connectionId: string, userId: string, dekOverride?: Uint8Array): Promise<{
@@ -1164,6 +1207,11 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       await recalculateNetWorthSnapshots(dataUserId, dek);
       logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new accounts`, { userId });
     }
+
+    // Automatically delete pending transactions older than 30 days if enabled
+    await deleteOldPendingTransactions(userId).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to delete old pending transactions (non-fatal):`, err);
+    });
 
     await updateMonthlyCashFlowSummaries(dataUserId, dek);
     await updateCategorySpendingSummaries(dataUserId, dek);

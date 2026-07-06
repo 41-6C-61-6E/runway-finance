@@ -74,6 +74,7 @@ export async function GET() {
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
+      deletePendingOlderThan30Days: created?.deletePendingOlderThan30Days ?? DEFAULTS.deletePendingOlderThan30Days,
     });
   }
 
@@ -129,6 +130,7 @@ export async function GET() {
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
+    deletePendingOlderThan30Days: settings[0].deletePendingOlderThan30Days ?? DEFAULTS.deletePendingOlderThan30Days,
   });
 }
 
@@ -181,9 +183,14 @@ export async function PATCH(request: Request) {
 	const notifyAiProposals = body.notifyAiProposals;
 	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
+	const deletePendingOlderThan30Days = body.deletePendingOlderThan30Days;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
+  }
+
+  if (deletePendingOlderThan30Days !== undefined && typeof deletePendingOlderThan30Days !== 'boolean') {
+    return Response.json({ error: 'Invalid deletePendingOlderThan30Days value' }, { status: 400 });
   }
 
   if (accentColor !== undefined && !ACCENT_NAMES.includes(accentColor) && !/^#[0-9A-Fa-f]{6}$/.test(accentColor)) {
@@ -474,6 +481,7 @@ export async function PATCH(request: Request) {
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
 	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
 	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
+	if (deletePendingOlderThan30Days !== undefined) updates.deletePendingOlderThan30Days = deletePendingOlderThan30Days;
   updates.updatedAt = new Date();
 
   const [updated] = await db

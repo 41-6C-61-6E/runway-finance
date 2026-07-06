@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     endDate = `${endMonth}-${String(new Date(ey, em, 0).getDate()).padStart(2, '0')}`;
   }
 
-  const isRange = startDate !== endDate;
+  const isRange = true;
 
   const db = getDb();
 
