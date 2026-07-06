@@ -29,6 +29,19 @@ try {
     commits = gitLog.split('\n').filter(Boolean);
   } catch (err) {
     console.warn('Failed to retrieve git commits for version info:', err.message);
+    // Fallback: check if version-info.json already exists (e.g. pre-generated on host) and reuse its commits
+    try {
+      const existingInfoPath = path.join(__dirname, '../public/version-info.json');
+      if (fs.existsSync(existingInfoPath)) {
+        const existingInfo = JSON.parse(fs.readFileSync(existingInfoPath, 'utf8'));
+        if (existingInfo && Array.isArray(existingInfo.commits) && existingInfo.commits.length > 0) {
+          commits = existingInfo.commits;
+          console.log('Preserved pre-generated commits from existing version-info.json');
+        }
+      }
+    } catch (readErr) {
+      console.warn('Failed to read existing version-info.json:', readErr.message);
+    }
   }
 
   const versionInfo = {
