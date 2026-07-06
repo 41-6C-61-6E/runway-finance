@@ -31,7 +31,7 @@ export type TraceFormat = 'currency' | 'percentage' | 'ratio' | 'number' | 'year
 export interface CalculationTrace {
   id: string;
   title: string;
-  category: 'netWorth' | 'cashFlow' | 'realEstate' | 'fire' | 'budgets' | 'goals';
+  category: 'netWorth' | 'cashFlow' | 'realEstate' | 'fire' | 'budgets' | 'goals' | 'investments';
   formula: string;
   dataSource: string;
   filters: string[];

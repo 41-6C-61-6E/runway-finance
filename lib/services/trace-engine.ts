@@ -286,3 +286,139 @@ export function buildGoalsTrace(data: {
     result: data.overallProgress ?? 0,
   };
 }
+
+// ─── Investments Traces ──────────────────────────────────────────
+
+export function buildInvestmentsTrace(data: {
+  accounts: any[];
+  holdings: any[];
+  summary: {
+    totalBalance: number;
+    totalCostBasis: number | null;
+    totalUnrealizedGainLoss: number | null;
+    totalUnrealizedReturnPct: number | null;
+    holdingsCount: number;
+  };
+}): CalculationTrace {
+  const steps: CalculationTrace['steps'] = [
+    {
+      label: 'Total Balance',
+      inputs: {},
+      operation: 'sum of all investment account balances',
+      output: data.summary.totalBalance ?? 0,
+    },
+  ];
+
+  if (data.summary.totalCostBasis != null) {
+    steps.push({
+      label: 'Total Cost Basis',
+      inputs: {},
+      operation: 'sum of cost basis of holdings with cost basis data',
+      output: data.summary.totalCostBasis,
+    });
+  }
+
+  if (data.summary.totalUnrealizedGainLoss != null && data.summary.totalCostBasis != null) {
+    const totalValueForCostBasis = data.summary.totalCostBasis + data.summary.totalUnrealizedGainLoss;
+    steps.push({
+      label: 'Unrealized Gain/Loss',
+      inputs: {
+        totalValueForCostBasis,
+        totalCostBasis: data.summary.totalCostBasis,
+      },
+      operation: `${totalValueForCostBasis} − ${data.summary.totalCostBasis}`,
+      output: data.summary.totalUnrealizedGainLoss,
+    });
+
+    if (data.summary.totalUnrealizedReturnPct != null) {
+      steps.push({
+        label: 'Unrealized Return %',
+        inputs: {
+          totalUnrealizedGainLoss: data.summary.totalUnrealizedGainLoss,
+          totalCostBasis: data.summary.totalCostBasis,
+        },
+        operation: `(${data.summary.totalUnrealizedGainLoss} / ${data.summary.totalCostBasis}) × 100`,
+        output: data.summary.totalUnrealizedReturnPct,
+      });
+    }
+  }
+
+  const children: CalculationTrace[] = (data.accounts ?? []).map((acc) => {
+    const accHoldings = (data.holdings ?? []).filter((h) => h.accountId === acc.id);
+    const accCostBasis = accHoldings.reduce((sum, h) => sum + (h.costBasis ?? 0), 0);
+    const accGainLoss = accHoldings.reduce((sum, h) => sum + (h.unrealizedGainLoss ?? 0), 0);
+    const accReturnPct = accCostBasis > 0 ? (accGainLoss / accCostBasis) * 100 : 0;
+
+    const accSteps: CalculationTrace['steps'] = [
+      {
+        label: 'Balance',
+        inputs: {},
+        operation: 'account balance',
+        output: acc.balance,
+      },
+    ];
+
+    if (accCostBasis > 0) {
+      accSteps.push({
+        label: 'Holdings Cost Basis',
+        inputs: {},
+        operation: 'sum of cost basis of holdings in account',
+        output: accCostBasis,
+      });
+      accSteps.push({
+        label: 'Unrealized Gain/Loss',
+        inputs: { value: acc.balance, cost: accCostBasis },
+        operation: `${acc.balance} − ${accCostBasis}`,
+        output: accGainLoss,
+      });
+      accSteps.push({
+        label: 'Unrealized Return %',
+        inputs: { gainLoss: accGainLoss, cost: accCostBasis },
+        operation: `(${accGainLoss} / ${accCostBasis}) × 100`,
+        output: accReturnPct,
+      });
+    }
+
+    return {
+      id: `investmentAccount_${acc.id}`,
+      title: `${acc.name} (${acc.institution || 'Brokerage'})`,
+      category: 'investments',
+      formula: 'Unrealized Gain/Loss = Balance − Cost Basis',
+      dataSource: `/api/investments → account ${acc.id}`,
+      filters: [],
+      typesIncluded: [acc.type],
+      typesExcluded: [],
+      format: 'currency',
+      steps: accSteps,
+      result: acc.balance,
+    };
+  });
+
+  return {
+    id: 'investments',
+    title: 'Investments Summary',
+    category: 'investments',
+    formula: 'Total Balance = Σ investment account balances. Unrealized Gain/Loss = Value − Cost Basis. Return % = Gain/Loss / Cost Basis × 100',
+    dataSource: '/api/investments',
+    filters: ['isHidden = false', 'isExcludedFromNetWorth = false'],
+    typesIncluded: [
+      'investment',
+      'brokerage',
+      'retirement',
+      'rothira',
+      'traditionalira',
+      '401k',
+      '403b',
+      'sepira',
+      'simpleira',
+      '529',
+      'hsa',
+      'health',
+    ],
+    typesExcluded: [],
+    format: 'currency',
+    steps,
+    result: data.summary.totalBalance ?? 0,
+    children,
+  };
+}
