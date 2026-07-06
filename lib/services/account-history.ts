@@ -2,7 +2,7 @@ import { getDb, getPool } from '@/lib/db';
 import { accountSnapshots, transactions, accounts, netWorthSnapshots, userSettings, holdingSnapshots } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql, inArray } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypto';
-import { isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isInvestmentAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
 import { getAccountCurrentBalance } from './asset-estimator';
 
@@ -1031,23 +1031,11 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
     for (const acc of decryptedAccounts) {
       if (acc.isExcludedFromNetWorth || acc.isHidden) continue;
 
-      const accountType = acc.type.toLowerCase();
-      let endEventDateStr: string | undefined = undefined;
-      if (accountType === 'mortgage' && acc.metadata) {
-        try {
-          const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
-          if (meta) {
-            const status = meta.mortgageStatus as string | undefined;
-            endEventDateStr = status === 'paid_off' ? (meta.payoffDate as string | undefined) : (status === 'refinanced' ? (meta.refinanceDate as string | undefined) : undefined);
-          }
-        } catch (err) {
-          // Ignore parse errors
-        }
-      }
-
-      if (endEventDateStr && dateStr > endEventDateStr) {
+      if (!isAccountActiveOnDate(acc, dateStr)) {
         continue;
       }
+
+      const accountType = acc.type.toLowerCase();
 
       const bal = latestByAccount.get(acc.id) ?? 0;
       const convertedBal = convertCurrency(bal, acc.currency || 'USD', baseCurrency);
