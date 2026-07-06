@@ -16,7 +16,7 @@ function ThemedToaster() {
   const { theme } = useTheme();
   // Map custom moonlight/dark themes to dark, daylight to light
   const toastTheme = theme === 'light' ? 'light' : 'dark';
-  return <Toaster richColors position="top-right" theme={toastTheme} />;
+  return <Toaster richColors closeButton position="top-center" theme={toastTheme} />;
 }
 
 export default function ClientLayout({ children }: { children: ReactNode }) {

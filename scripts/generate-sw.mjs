@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,27 @@ try {
   const result = template.replace(/\{\{BUILD_NUMBER\}\}/g, buildNum);
   fs.writeFileSync(outputPath, result, 'utf8');
   console.log(`Successfully generated sw.js with BUILD_NUMBER=${buildNum}`);
+
+  // Generate version-info.json with last 5 git commits
+  let commits = [];
+  try {
+    const gitLog = execSync('git log -n 5 --pretty=format:"%s"', { encoding: 'utf8' });
+    commits = gitLog.split('\n').filter(Boolean);
+  } catch (err) {
+    console.warn('Failed to retrieve git commits for version info:', err.message);
+  }
+
+  const versionInfo = {
+    buildNumber: buildNum,
+    commits,
+  };
+
+  fs.writeFileSync(
+    path.join(__dirname, '../public/version-info.json'),
+    JSON.stringify(versionInfo, null, 2),
+    'utf8'
+  );
+  console.log('Successfully generated version-info.json');
 } catch (err) {
   console.error('Error generating sw.js:', err);
   process.exit(1);
