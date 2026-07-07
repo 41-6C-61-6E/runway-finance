@@ -15,7 +15,6 @@ import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel
 import { GitMerge } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { getMonthRange } from '@/lib/utils/date-window';
 
 interface CategoryData {
   categoryId: string;
@@ -857,26 +856,21 @@ export function CashFlowSankey() {
     })();
 
   const navigateToTransactions = (categoryIds: string) => {
-    const range = getMonthRange(timeframe, windowEnd);
-    const startDate = `${range.start}-01`;
-    const [ey, em] = range.end.split('-').map(Number);
-    const lastDay = new Date(ey, em, 0).getDate();
-    const endDate = `${range.end}-${String(lastDay).padStart(2, '0')}`;
-    router.push(`/transactions?startDate=${startDate}&endDate=${endDate}&categoryIds=${categoryIds}`);
+    router.push(`/transactions?startDate=${dateRange.start}&endDate=${dateRange.end}&categoryIds=${categoryIds}`);
   };
 
   const handleNodeClick = useCallback((nodeId: string) => {
     if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) navigateToTransactions(categoryId);
-  }, [sankeyData, timeframe, windowEnd]);
+  }, [sankeyData, dateRange]);
 
   const handleLinkClick = useCallback((sourceId: string, targetId: string) => {
     const s = getNodeCategoryId(sourceId);
     const t = getNodeCategoryId(targetId);
     const ids = [s, t].filter(Boolean).join(',');
     if (ids) navigateToTransactions(ids);
-  }, [sankeyData, timeframe, windowEnd]);
+  }, [sankeyData, dateRange]);
 
   // Convert named-id links → index-based links that Recharts Sankey requires
   const processedData = useMemo(() => {
