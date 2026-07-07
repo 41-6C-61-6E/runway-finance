@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1783377719172",
+  "buildNumber": "26.07.1783463644801",
   "commits": [
+    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
     "chore: automate service worker generation during build and implement commit history preservation in versioning script",
     "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
     "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
-    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
-    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync"
+    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections."
   ]
 }
