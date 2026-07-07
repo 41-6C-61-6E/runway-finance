@@ -7,6 +7,13 @@ import { eq, and, or, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 
+function isMonthAligned(startStr: string, endStr: string): boolean {
+  if (!startStr.endsWith('-01')) return false;
+  const [ey, em, ed] = endStr.split('-').map(Number);
+  const lastDay = new Date(ey, em, 0).getDate();
+  return ed === lastDay;
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -287,15 +294,26 @@ export async function GET(request: Request) {
     if (isRange) {
       let rows: any[];
       let incomeRows: any[];
+      let spendingTotal = 0;
+      let spendingCount = 0;
+      let incomeTotal = 0;
+      let incomeCount = 0;
 
-      if (!isImportTransactionsEnabled) {
-        const [spending, income, { spendingTotal, spendingCount, incomeTotal, incomeCount }] = await Promise.all([
+      const aligned = isMonthAligned(startDate!, endDate!);
+      const useSummary = isImportTransactionsEnabled && aligned;
+
+      if (!useSummary) {
+        const [spending, income, uncategorized] = await Promise.all([
           fetchTransactionsAggregated(startDate!, endDate!, accountIdList, false),
           fetchTransactionsAggregated(startDate!, endDate!, accountIdList, true),
           fetchUncategorizedTotals(startDate!, endDate!, accountIdList),
         ]);
         rows = spending;
         incomeRows = income;
+        spendingTotal = uncategorized.spendingTotal;
+        spendingCount = uncategorized.spendingCount;
+        incomeTotal = uncategorized.incomeTotal;
+        incomeCount = uncategorized.incomeCount;
       } else {
         // Use summary tables (pre-computed, but encrypted)
         const startYm = startDate!.substring(0, 7);
@@ -360,9 +378,13 @@ export async function GET(request: Request) {
           .from(categoryIncomeSummary)
           .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
           .where(and(...incomeConditions));
-      }
 
-      const { spendingTotal, spendingCount, incomeTotal, incomeCount } = await fetchUncategorizedTotals(startDate!, endDate!, accountIdList);
+        const uncategorized = await fetchUncategorizedTotals(startDate!, endDate!, accountIdList);
+        spendingTotal = uncategorized.spendingTotal;
+        spendingCount = uncategorized.spendingCount;
+        incomeTotal = uncategorized.incomeTotal;
+        incomeCount = uncategorized.incomeCount;
+      }
 
       // Decrypt and aggregate by categoryId
       const categoryMap = new Map<string, any>();
@@ -372,10 +394,10 @@ export async function GET(request: Request) {
       ];
 
       for (const r of allCurrentRows) {
-        const decryptedAmt = isImportTransactionsEnabled ? await decryptField(r.amount, dek) : r.amount;
+        const decryptedAmt = useSummary ? await decryptField(r.amount, dek) : r.amount;
         const catId = r.categoryId ?? '';
         const amount = parseFloat(decryptedAmt);
-        const transactionCount = isImportTransactionsEnabled
+        const transactionCount = useSummary
           ? (r.transactionCount ? parseInt(await decryptField(String(r.transactionCount), dek)) || 0 : 0)
           : (r.transactionCount || 0);
         const isCompound = r.categoryType === 'compound';
@@ -397,7 +419,7 @@ export async function GET(request: Request) {
             existing.amount = Math.max(existing.compoundIncomeAmount || 0, existing.compoundExpenseAmount || 0);
             existing.transactionCount = Math.max(existing.compoundIncomeCount || 0, existing.compoundExpenseCount || 0);
           } else {
-            const categoryName = isImportTransactionsEnabled
+            const categoryName = useSummary
               ? await decryptField(r.categoryName || 'Uncategorized', dek)
               : (r.categoryName || 'Uncategorized');
             categoryMap.set(catId, {
@@ -422,7 +444,7 @@ export async function GET(request: Request) {
           existing.amount += amount;
           existing.transactionCount += transactionCount;
         } else {
-          const categoryName = isImportTransactionsEnabled
+          const categoryName = useSummary
             ? await decryptField(r.categoryName || 'Uncategorized', dek)
             : (r.categoryName || 'Uncategorized');
           categoryMap.set(catId, {
