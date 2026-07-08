@@ -563,18 +563,23 @@ export async function deleteOldPendingTransactions(userId: string): Promise<void
 
   // Check if user enabled deletion of old pending transactions
   const [settings] = await db
-    .select({ deletePendingOlderThan30Days: userSettings.deletePendingOlderThan30Days })
+    .select({ 
+      deletePendingOlderThan30Days: userSettings.deletePendingOlderThan30Days,
+      deletePendingDays: userSettings.deletePendingDays,
+    })
     .from(userSettings)
     .where(eq(userSettings.userId, userId))
     .limit(1);
 
-  if (!settings?.deletePendingOlderThan30Days) {
+  const isEnabled = settings?.deletePendingOlderThan30Days ?? true;
+  if (!isEnabled) {
     logger.debug(`${LOG_TAG} deleteOldPendingTransactions: Feature disabled for user`, { userId });
     return;
   }
 
+  const days = settings?.deletePendingDays ?? 10;
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30);
+  cutoffDate.setDate(cutoffDate.getDate() - days);
   const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
 
   logger.info(`${LOG_TAG} deleteOldPendingTransactions: Cleaning up pending transactions older than ${cutoffDateStr}`, { userId });

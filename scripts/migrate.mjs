@@ -39,7 +39,8 @@ async function runSelfHealingChecks(client) {
       { name: 'notify_budget_alerts', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'notify_large_transactions', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'large_transaction_threshold', type: 'INTEGER NOT NULL DEFAULT 500' },
-      { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
+      { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' }
     ];
 
     for (const col of columnsToCheck) {

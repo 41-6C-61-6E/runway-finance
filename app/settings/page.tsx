@@ -177,8 +177,17 @@ function SettingsPageBody() {
   const settingsContext = useUserSettings();
   const settings = settingsContext?.settings || {};
   const updateSetting = settingsContext?.updateSetting;
-  const deletePendingOlderThan30Days = settings.deletePendingOlderThan30Days ?? false;
+  const deletePendingOlderThan30Days = settings.deletePendingOlderThan30Days ?? true;
+  const deletePendingDays = settings.deletePendingDays ?? 10;
   const [savingDeletePending, setSavingDeletePending] = useState(false);
+  const [savingDeletePendingDays, setSavingDeletePendingDays] = useState(false);
+  const [localDays, setLocalDays] = useState<string>('10');
+
+  useEffect(() => {
+    if (settings.deletePendingDays !== undefined) {
+      setLocalDays(settings.deletePendingDays.toString());
+    }
+  }, [settings.deletePendingDays]);
 
   const handleToggleDeletePending = useCallback(async (checked: boolean) => {
     setSavingDeletePending(true);
@@ -192,6 +201,27 @@ function SettingsPageBody() {
       setSavingDeletePending(false);
     }
   }, [updateSetting]);
+
+  const handleDeletePendingDaysChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalDays(e.target.value);
+  }, []);
+
+  const handleDeletePendingDaysBlur = useCallback(async () => {
+    let val = parseInt(localDays) || 10;
+    if (val < 1) val = 1;
+    setLocalDays(val.toString());
+    
+    if (updateSetting) {
+      setSavingDeletePendingDays(true);
+      try {
+        await updateSetting('deletePendingDays', val);
+      } catch (e) {
+        console.error('Failed to update deletePendingDays', e);
+      } finally {
+        setSavingDeletePendingDays(false);
+      }
+    }
+  }, [localDays, updateSetting]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -1384,6 +1414,64 @@ function SettingsPageBody() {
 
           {accountSubTab === 'automatic' && (
         <>
+          {/* Transaction Settings Section */}
+          <div className="mb-6 pb-6 border-b border-border/60">
+            <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
+            <p className="text-xs text-muted-foreground mb-4 font-normal">
+              Configure cleanup policies and rules for your bank-synced transactions.
+            </p>
+            
+            <div className="p-4 bg-muted/30 border border-border rounded-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-foreground">Automatically Delete Old Pending Transactions</h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Automatically delete pending bank transactions older than a configured number of days during account synchronization. 
+                    Sometimes financial institutions fail to clear pending transactions, causing duplicate or outdated entries to linger indefinitely.
+                  </p>
+                </div>
+                <Switch
+                  checked={deletePendingOlderThan30Days}
+                  onCheckedChange={handleToggleDeletePending}
+                  disabled={savingDeletePending}
+                  id="toggle-delete-pending-old-tx"
+                />
+              </div>
+
+              {deletePendingOlderThan30Days && (
+                <div className="mt-4 pt-4 border-t border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200">
+                  <div className="space-y-0.5">
+                    <label htmlFor="delete-pending-days" className="text-xs font-semibold text-foreground">
+                      Retention Period (Days)
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Pending transactions older than this will be permanently removed.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="delete-pending-days"
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={localDays}
+                      onChange={handleDeletePendingDaysChange}
+                      onBlur={handleDeletePendingDaysBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      disabled={savingDeletePendingDays}
+                      className="w-20 text-center h-8 text-xs font-mono"
+                    />
+                    <span className="text-xs text-muted-foreground">days</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {!hasConnection && (
             <div className="p-8 text-center">
               <Landmark className="w-10 h-10 text-muted-foreground/60 mx-auto mb-3" />
@@ -1552,32 +1640,6 @@ function SettingsPageBody() {
                 })()}
             </div>
           )}
-
-          {/* Transaction Settings Section */}
-          <div className="mt-8 pt-6 border-t border-border/60">
-            <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
-            <p className="text-xs text-muted-foreground mb-4 font-normal">
-              Configure cleanup policies and rules for your bank-synced transactions.
-            </p>
-            
-            <div className="p-4 bg-muted/30 border border-border rounded-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground">Automatically Delete Old Pending Transactions</h3>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                    Automatically delete pending bank transactions older than 30 days during account synchronization. 
-                    Sometimes financial institutions fail to clear pending transactions, causing duplicate or outdated entries to linger indefinitely.
-                  </p>
-                </div>
-                <Switch
-                  checked={deletePendingOlderThan30Days}
-                  onCheckedChange={handleToggleDeletePending}
-                  disabled={savingDeletePending}
-                  id="toggle-delete-pending-old-tx"
-                />
-              </div>
-            </div>
-          </div>
         </>
         )}
 

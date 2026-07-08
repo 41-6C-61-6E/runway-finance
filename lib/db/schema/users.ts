@@ -170,7 +170,8 @@ export const userSettings = pgTable('user_settings', {
   notifyAiProposals: boolean('notify_ai_proposals').notNull().default(true),
   maxNotificationsPerPeriod: integer('max_notifications_per_period').notNull().default(5),
   notificationLimiterPeriodMinutes: integer('notification_limiter_period_minutes').notNull().default(60),
-  deletePendingOlderThan30Days: boolean('delete_pending_older_than_30_days').notNull().default(false),
+  deletePendingOlderThan30Days: boolean('delete_pending_older_than_30_days').notNull().default(true),
+  deletePendingDays: integer('delete_pending_days').notNull().default(10),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

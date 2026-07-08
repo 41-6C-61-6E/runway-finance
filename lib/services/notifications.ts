@@ -495,7 +495,7 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     const arrow = diff > 0 ? '📈' : '📉';
 
     const actualToday = new Date().toISOString().split('T')[0];
-    const timePhrase = snapshotDateStr === actualToday ? 'today' : `on ${snapshotDateStr}`;
+    const timePhrase = snapshotDateStr === actualToday ? 'in the last Day' : `on ${snapshotDateStr}`;
 
     await sendPushNotification(
       userId,

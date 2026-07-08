@@ -25,7 +25,8 @@ export const GENERAL_DEFAULTS = {
     forecast: true,
     suggestions: true,
   },
-  deletePendingOlderThan30Days: false,
+  deletePendingOlderThan30Days: true,
+  deletePendingDays: 10,
 } as const;
 
 // ── Analytics / Chart Settings ───────────────────────────────────────────────
@@ -204,7 +205,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'showMathEnabled', label: 'Show Math Explanations', description: 'Display math/logic descriptions on analytics cards', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.showMathEnabled },
   { key: 'paystubEnabled', label: 'Paystub Enabled', description: 'Enable paystub parsing and forecasting features', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.paystubEnabled },
   { key: 'accountTagVisibility', label: 'Account Tag Visibility', description: 'Control visibility of account tag indicators (JSON object: {sidebar, transactions, legend, budgets, forecast, suggestions})', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.accountTagVisibility },
-  { key: 'deletePendingOlderThan30Days', label: 'Delete Old Pending Transactions', description: 'Automatically delete pending bank transactions older than 30 days during account syncs.', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.deletePendingOlderThan30Days },
+  { key: 'deletePendingOlderThan30Days', label: 'Delete Old Pending Transactions', description: 'Automatically delete pending bank transactions older than configured days during account syncs.', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.deletePendingOlderThan30Days },
+  { key: 'deletePendingDays', label: 'Delete Pending Days', description: 'Number of days to keep pending bank transactions (defaults to 10).', type: 'number', group: 'General', defaultValue: GENERAL_DEFAULTS.deletePendingDays },
 
   // ── Analytics ──
   { key: 'chartColorScheme', label: 'Chart Color Scheme', description: 'Color palette for all charts and graphs', type: 'string', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.chartColorScheme },
