@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, Upload, FileArchive, Loader2 } from 'lucide-react';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
 import { handleSignOut } from '@/components/server-actions';
+import { useUserSettings } from '@/components/user-settings-provider';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -57,6 +58,32 @@ function packForSave(working: SettingsState): Record<string, unknown> {
   return body;
 }
 
+const IANA_TIMEZONES = typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function'
+  ? Intl.supportedValuesOf('timeZone')
+  : [
+      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo',
+    ];
+
+function groupTimezones(tzs: string[]): Record<string, string[]> {
+  const groups: Record<string, string[]> = {};
+  for (const tz of tzs) {
+    const region = tz.split('/')[0];
+    (groups[region] ??= []).push(tz);
+  }
+  const order = ['America', 'Europe', 'Asia', 'Africa', 'Australia', 'Pacific', 'Atlantic', 'Indian', 'Etc'];
+  const sorted: Record<string, string[]> = {};
+  for (const key of order) {
+    if (groups[key]) sorted[key] = groups[key];
+  }
+  for (const key of Object.keys(groups).sort()) {
+    if (!sorted[key]) sorted[key] = groups[key];
+  }
+  return sorted;
+}
+
+const timezoneGroups = IANA_TIMEZONES.length > 0 ? groupTimezones(IANA_TIMEZONES) : {};
+
 export default function AdvancedTab() {
   const [original, setOriginal] = useState<SettingsState | null>(null);
   const [working, setWorking] = useState<SettingsState | null>(null);
@@ -65,6 +92,8 @@ export default function AdvancedTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const { refreshSettings } = useUserSettings() || {};
 
   // Danger zone & sharing status states
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -189,6 +218,7 @@ export default function AdvancedTab() {
       setDirty({});
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      refreshSettings?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
@@ -486,7 +516,21 @@ export default function AdvancedTab() {
                   </div>
 
                   <div className="mt-1.5">
-                    {def.type === 'boolean' ? (
+                    {def.key === 'timezone' && Object.keys(timezoneGroups).length > 0 ? (
+                      <select
+                        value={(currentValue as string) ?? ''}
+                        onChange={(e) => updateValue(def.key, e.target.value)}
+                        className="w-full px-2 py-1 bg-background border border-input rounded text-foreground text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {Object.entries(timezoneGroups).map(([region, tzs]) => (
+                          <optgroup key={region} label={region}>
+                            {tzs.map((tz) => (
+                              <option key={tz} value={tz}>{tz}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    ) : def.type === 'boolean' ? (
                       <input
                         type="text"
                         value={(currentValue as string) ?? 'false'}

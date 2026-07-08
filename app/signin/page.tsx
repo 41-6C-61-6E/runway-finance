@@ -58,7 +58,8 @@ export default function SignInPage() {
           router.push('/');
         }
       } else {
-        const body: Record<string, string> = { username, password };
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const body: Record<string, string> = { username, password, timezone: tz };
         if (email) body.email = email;
         if (pin) body.pin = pin;
 
