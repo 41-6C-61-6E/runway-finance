@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import {
   computeMovingAverage,
@@ -62,6 +63,7 @@ interface ChartResponse {
 
 export function NetWorthChart() {
   const router = useRouter();
+  const { privacyMode } = usePrivacyMode();
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const {
     timeframe, setTimeframe,
@@ -376,9 +378,11 @@ export function NetWorthChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}

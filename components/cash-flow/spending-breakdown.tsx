@@ -18,6 +18,7 @@ import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useTheme } from 'next-themes';
 import { Search, Check, X, PieChart as PieIcon } from 'lucide-react';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 
@@ -74,6 +75,7 @@ const typeOptions = [
 
 export function SpendingBreakdown() {
   const router = useRouter();
+  const { privacyMode } = usePrivacyMode();
   const { theme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('spendingBreakdown');
   const [showFilters, setShowFilters] = useState(false);
@@ -274,9 +276,11 @@ export function SpendingBreakdown() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}

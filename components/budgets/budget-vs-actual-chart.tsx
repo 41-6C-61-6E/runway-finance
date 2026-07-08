@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { Scale } from 'lucide-react';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
 interface BudgetData {
   id: string;
@@ -28,6 +29,7 @@ interface BudgetData {
 
 export function BudgetVsActualChart() {
   const router = useRouter();
+  const { privacyMode } = usePrivacyMode();
   const { periodType, periodKey } = useBudgetPeriod();
 
   const { data, isLoading: loading, error: queryError } = useQuery({
@@ -148,9 +150,11 @@ export function BudgetVsActualChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}

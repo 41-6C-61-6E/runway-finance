@@ -18,6 +18,7 @@ import {
   Legend,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
@@ -69,6 +70,7 @@ async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
 }
 
 export function PerformanceChart() {
+  const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('performanceChart');
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('dollar');
@@ -311,9 +313,11 @@ export function PerformanceChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader isCollapsed={isCollapsed} onToggle={setIsCollapsed} title={headerEl} />
       {!isCollapsed && (
         <>
