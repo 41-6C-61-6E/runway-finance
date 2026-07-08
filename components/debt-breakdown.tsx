@@ -9,6 +9,7 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { TrendingDown } from 'lucide-react';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
 const CHART_COLOR_MAP = [
   'var(--chart-1)',
@@ -80,6 +81,7 @@ interface CategoryEntry {
 
 export function DebtBreakdown() {
   const router = useRouter();
+  const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('debtBreakdown');
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,9 +203,11 @@ export function DebtBreakdown() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}

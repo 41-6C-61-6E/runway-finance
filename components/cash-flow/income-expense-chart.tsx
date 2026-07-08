@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import {
   ComposedChart,
   Bar,
@@ -53,6 +54,7 @@ const typeOptions = [
 
 export function IncomeExpenseChart() {
   const router = useRouter();
+  const { privacyMode } = usePrivacyMode();
   const { data: allData = [], isLoading: loading, error: queryError } = useQuery<MonthlyData[]>({
     queryKey: ['cash-flow-monthly'],
     queryFn: async () => {
@@ -252,9 +254,11 @@ export function IncomeExpenseChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
