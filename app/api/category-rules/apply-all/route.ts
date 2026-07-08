@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { transactions, transactionTags } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -29,7 +29,7 @@ export async function POST() {
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
+    .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false), isNull(transactions.parentId), eq(transactions.ignored, false)));
 
   if (allTxns.length === 0) {
     return NextResponse.json({ updated: 0, total: 0 });

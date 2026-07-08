@@ -62,6 +62,18 @@ type Transaction = {
   source?: string;
   tags?: { id: string; name: string; color: string }[];
   accountTags?: { id: string; name: string; color: string }[];
+  notes?: string | null;
+  splits?: {
+    id: string;
+    amount: string;
+    description?: string | null;
+    categoryId: string | null;
+    categoryName: string | null;
+    categoryColor: string | null;
+    notes: string | null;
+    tags?: { id: string; name: string; color: string }[];
+    category?: { name: string; color: string } | null;
+  }[];
 };
 
 type Category = {
@@ -186,6 +198,38 @@ export default function TransactionTable({
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  const flattenedTransactions = useMemo(() => {
+    const list: (Transaction & { isSplitChild?: boolean; parentTxId?: string })[] = [];
+    for (const tx of transactions) {
+      list.push(tx);
+      if (tx.splits && tx.splits.length > 0) {
+        for (const split of tx.splits) {
+          list.push({
+            id: split.id,
+            parentTxId: tx.id,
+            isSplitChild: true,
+            date: tx.date,
+            postedDate: tx.postedDate,
+            description: split.description || tx.description,
+            payee: tx.payee,
+            amount: split.amount,
+            pending: tx.pending,
+            categoryId: split.categoryId,
+            categoryName: split.category?.name || split.categoryName || null,
+            categoryColor: split.category?.color || split.categoryColor || null,
+            accountName: tx.accountName,
+            reviewed: tx.reviewed,
+            categorizedByAi: false,
+            tags: split.tags,
+            notes: split.notes,
+          });
+        }
+      }
+    }
+    return list;
+  }, [transactions]);
+
   const [total, setTotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -860,15 +904,19 @@ export default function TransactionTable({
             className="rounded border-border bg-background text-primary focus:ring-ring"
           />
         ),
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            checked={row.getIsSelected()}
-            onChange={row.getToggleSelectedHandler()}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded border-border bg-background text-primary focus:ring-ring"
-          />
-        ),
+        cell: ({ row }) => {
+          const tx = row.original as any;
+          if (tx.isSplitChild) return null;
+          return (
+            <input
+              type="checkbox"
+              checked={row.getIsSelected()}
+              onChange={row.getToggleSelectedHandler()}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border-border bg-background text-primary focus:ring-ring"
+            />
+          );
+        },
         enableSorting: false,
         enableHiding: false,
       },
@@ -922,7 +970,7 @@ export default function TransactionTable({
           <SortableHeader column={column} title="Description" />
         ),
         cell: ({ row }) => {
-          const tx = row.original;
+          const tx = row.original as any;
           const isPending = tx.pending;
           const searchQuery =
             tx.payee && tx.description && tx.payee !== tx.description
@@ -931,25 +979,39 @@ export default function TransactionTable({
 
           return (
             <div className="flex items-center justify-between w-full min-w-0 pr-1 group-hover:pr-0">
-              <span
-                className={`text-sm truncate min-w-0 flex-1 ${isPending ? "text-muted-foreground" : "text-foreground"}`}
-              >
-                {tx.payee || tx.description}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
-                    "_blank",
-                    "noopener,noreferrer",
-                  );
-                }}
-                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
-                title="Search on Google"
-              >
-                <Search className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                {tx.isSplitChild && (
+                  <span className="text-muted-foreground/45 select-none pl-3 font-mono">
+                    ↳
+                  </span>
+                )}
+                <span
+                  className={`text-sm truncate min-w-0 ${isPending ? "text-muted-foreground" : "text-foreground"} ${tx.isSplitChild ? "text-muted-foreground/75 font-normal italic" : "font-medium"}`}
+                >
+                  {tx.payee || tx.description}
+                </span>
+                {tx.splits && tx.splits.length > 0 && (
+                  <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0">
+                    Split
+                  </span>
+                )}
+              </div>
+              {!tx.isSplitChild && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(
+                      `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }}
+                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
+                  title="Search on Google"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           );
         },
@@ -1013,6 +1075,10 @@ export default function TransactionTable({
           const parents = categories.filter((c) => !c.parentId);
           const getChildren = (parentId: string) =>
             categories.filter((c) => c.parentId === parentId);
+
+          if (tx.splits && tx.splits.length > 0) {
+            return <span className="text-muted-foreground/45">—</span>;
+          }
 
           return (
             <div>
@@ -1385,7 +1451,7 @@ export default function TransactionTable({
   );
 
   const table = useReactTable({
-    data: transactions,
+    data: flattenedTransactions,
     columns,
     getRowId: (row) => row.id,
     state: {
@@ -1512,7 +1578,15 @@ export default function TransactionTable({
                       className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5 px-3 sm:px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer group w-full ${
                         isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                       }`}
-                      onClick={() => onTransactionClick?.(tx)}
+                      onClick={() => {
+                        const anyTx = tx as any;
+                        if (anyTx.isSplitChild && anyTx.parentTxId) {
+                          const parent = transactions.find((t) => t.id === anyTx.parentTxId);
+                          if (parent) onTransactionClick?.(parent);
+                        } else {
+                          onTransactionClick?.(tx);
+                        }
+                      }}
                     >
                       {/* Row 1, Col 1: Date */}
                       <div className="flex items-center gap-1 min-w-0">
@@ -1522,7 +1596,12 @@ export default function TransactionTable({
                       </div>
                       {/* Row 1, Col 2: Description + pending dot + search spyglass + tags */}
                       <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                        <span className="text-sm text-foreground truncate font-medium">
+                        {(tx as any).isSplitChild && (
+                          <span className="text-muted-foreground/45 select-none pl-3 font-mono">
+                            ↳
+                          </span>
+                        )}
+                        <span className={`text-sm truncate ${isPending ? "text-muted-foreground" : "text-foreground"} ${(tx as any).isSplitChild ? "text-muted-foreground/75 font-normal italic" : "font-medium"}`}>
                           {tx.payee || tx.description}
                         </span>
                         {isPending && (
@@ -1532,24 +1611,31 @@ export default function TransactionTable({
                             </svg>
                           </span>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const searchQuery =
-                              tx.payee && tx.description && tx.payee !== tx.description
-                                ? `${tx.payee} ${tx.description}`
-                                : tx.payee || tx.description;
-                            window.open(
-                              `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
-                              "_blank",
-                              "noopener,noreferrer",
-                            );
-                          }}
-                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1 shrink-0"
-                          title="Search on Google"
-                        >
-                          <Search className="h-3.5 w-3.5" />
-                        </button>
+                        {!(tx as any).isSplitChild && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const searchQuery =
+                                tx.payee && tx.description && tx.payee !== tx.description
+                                  ? `${tx.payee} ${tx.description}`
+                                  : tx.payee || tx.description;
+                              window.open(
+                                `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1 shrink-0"
+                            title="Search on Google"
+                          >
+                            <Search className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {tx.splits && tx.splits.length > 0 && (
+                          <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0">
+                            Split
+                          </span>
+                        )}
                         {txTags.length > 0 && (
                           <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
                             {txTags.map((tag) => (
@@ -1583,47 +1669,50 @@ export default function TransactionTable({
 
                       {/* Row 2, Col 2: Category pill */}
                       <div className="flex items-center min-w-0">
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              const dropdownWidth = 224;
-                              let left = rect.left;
-                              if (left + dropdownWidth > window.innerWidth - 8) {
-                                left = window.innerWidth - dropdownWidth - 8;
-                              }
-                              if (left < 8) left = 8;
-                              const dropdownHeight = 320;
-                              let top = rect.bottom + 4;
-                              if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
-                                top = rect.top - dropdownHeight - 4;
-                              }
-                              setDropdownPos({ top, left });
-                              setOpenCategoryTx(isCatOpen ? null : tx.id);
-                            }}
-                            className="flex items-center gap-1 max-w-full group/cat"
-                          >
-                            {tx.categoryName ? (
-                              <span
-                                className="category-pill px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
-                                style={{
-                                  '--tag-color': tx.categoryColor || "var(--color-primary)",
-                                } as React.CSSProperties}
-                              >
-                                {tx.categorizedByAi && (
-                                  <Sparkles className="h-2.5 w-2.5 shrink-0 opacity-60" />
-                                )}
-                                {tx.categoryName}
-                                <ChevronDown className="h-2.5 w-2.5 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground italic hover:text-foreground transition-colors inline-flex items-center gap-1">
-                                Uncategorized
-                                <ChevronDown className="h-2.5 w-2.5 opacity-30 group-hover/cat:opacity-100 transition-opacity" />
-                              </span>
-                            )}
-                          </button>
+                        {tx.splits && tx.splits.length > 0 ? (
+                          <span className="text-xs text-muted-foreground/45">—</span>
+                        ) : (
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                const dropdownWidth = 224;
+                                let left = rect.left;
+                                if (left + dropdownWidth > window.innerWidth - 8) {
+                                  left = window.innerWidth - dropdownWidth - 8;
+                                }
+                                if (left < 8) left = 8;
+                                const dropdownHeight = 320;
+                                let top = rect.bottom + 4;
+                                if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
+                                  top = rect.top - dropdownHeight - 4;
+                                }
+                                setDropdownPos({ top, left });
+                                setOpenCategoryTx(isCatOpen ? null : tx.id);
+                              }}
+                              className="flex items-center gap-1 max-w-full group/cat"
+                            >
+                              {tx.categoryName ? (
+                                <span
+                                  className="category-pill px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
+                                  style={{
+                                    '--tag-color': tx.categoryColor || "var(--color-primary)",
+                                  } as React.CSSProperties}
+                                >
+                                  {tx.categorizedByAi && (
+                                    <Sparkles className="h-2.5 w-2.5 shrink-0 opacity-60" />
+                                  )}
+                                  {tx.categoryName}
+                                  <ChevronDown className="h-2.5 w-2.5 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground italic hover:text-foreground transition-colors inline-flex items-center gap-1">
+                                  Uncategorized
+                                  <ChevronDown className="h-2.5 w-2.5 opacity-30 group-hover/cat:opacity-100 transition-opacity" />
+                                </span>
+                              )}
+                            </button>
                           {isCatOpen && dropdownPos && (
                             <>
                               <div
@@ -1798,6 +1887,7 @@ export default function TransactionTable({
                             </>
                           )}
                         </div>
+                      )}
 
                       </div>
 
@@ -1915,7 +2005,15 @@ export default function TransactionTable({
                         className={`border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group ${
                           isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                         }`}
-                        onClick={() => onTransactionClick?.(row.original)}
+                        onClick={() => {
+                          const tx = row.original as any;
+                          if (tx.isSplitChild && tx.parentTxId) {
+                            const parent = transactions.find((t) => t.id === tx.parentTxId);
+                            if (parent) onTransactionClick?.(parent);
+                          } else {
+                            onTransactionClick?.(tx);
+                          }
+                        }}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <td

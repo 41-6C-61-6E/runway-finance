@@ -159,6 +159,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (categoryId !== undefined) {
     updateData.categoryId = categoryId;
     updateData.categorizedByAi = false;
+
+    const childCheck = await getDb()
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(and(eq(transactions.parentId, id), eq(transactions.deleted, false)))
+      .limit(1);
+    if (childCheck.length > 0) {
+      await getDb()
+        .delete(transactions)
+        .where(eq(transactions.parentId, id));
+      updateData.ignored = false;
+    }
   }
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
   if (notes !== undefined) updateData.notes = sanitizeText(notes, 2000);

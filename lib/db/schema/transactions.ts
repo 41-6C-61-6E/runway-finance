@@ -57,6 +57,7 @@ export const transactions = pgTable(
     importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     source: text('source').notNull().default('bank'), // 'bank' | 'manual' | 'import' | 'paystub'
     paystubId: uuid('paystub_id'),
+    parentId: uuid('parent_id').references((): any => transactions.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

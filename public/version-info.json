@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1783463644801",
+  "buildNumber": "26.07.1783529956603",
   "commits": [
-    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
-    "chore: automate service worker generation during build and implement commit history preservation in versioning script",
-    "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
-    "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
-    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections."
+    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
+    "feat: add configurable retention period for automatic deletion of pending transactions",
+    "feat: include paystub accounts in cash flow calculations regardless of virtual status",
+    "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
+    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page"
   ]
 }

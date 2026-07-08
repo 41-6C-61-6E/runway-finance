@@ -90,6 +90,18 @@ export const CreateTransactionSchema = z.object({
   pending: z.boolean().optional(),
 });
 
+export const SplitTransactionSchema = z.object({
+  splits: z.array(
+    z.object({
+      amount: z.string().min(1),
+      categoryId: z.string().uuid().nullable().optional(),
+      description: z.string().max(500).optional(),
+      notes: z.string().max(2000).optional(),
+      tagIds: z.array(z.string().uuid()).optional(),
+    })
+  ).min(2),
+});
+
 export const BulkPatchTransactionSchema = z.object({
   ids: z.array(z.string()).min(1).optional(),
   patch: z.object({
