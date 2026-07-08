@@ -6,7 +6,7 @@ const SCHEME_META: Record<ChartColorSchemeId, { name: string; description: strin
   fauntleroy: { name: 'Fauntleroy', description: 'Cream, navy, teal, sky blue, and coral rose' },
   kingston: { name: 'Kingston', description: 'Mint green, deep navy-indigo, warm bronze-gold, light purple, and coral rose' },
   seattle: { name: 'Seattle', description: 'Teal, indigo, cream, sage, and sunset orange' },
-  vashon: { name: 'Vashon', description: 'Warm and vibrant cyan, violet, gold, lime, and peach' },
+  bainbridge: { name: 'Bainbridge', description: 'Emerald green, vibrant orange, cyan, golden yellow, and magenta' },
 };
 
 export const CHART_COLOR_SCHEMES: Record<ChartColorSchemeId, {
@@ -72,14 +72,26 @@ function adjustColorForTheme(colorStr: string, isDark: boolean): string {
   let { l, c, h } = oklch;
 
   if (isDark) {
-    if (l < 0.65) {
-      l = 0.65 + l * 0.12;
+    // Dark mode: ensure minimum lightness for contrast on dark backgrounds.
+    // When boosting lightness, also boost chroma proportionally so the color
+    // doesn't wash out to a muddy gray-brown.
+    if (l < 0.58) {
+      const ratio = 0.58 / Math.max(l, 0.01);
+      c = Math.min(c * ratio, 0.30);
+      l = 0.58;
     }
   } else {
-    if (l > 0.60) {
-      l = 0.60 - (1.0 - l) * 0.15;
+    // Light mode: cap lightness to prevent washout on light backgrounds
+    if (l > 0.78) {
+      l = 0.78;
     }
   }
+
+  // Ensure minimum chroma so chart colors always look vibrant, not gray
+  if (c < 0.10) {
+    c = 0.10;
+  }
+
   return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)})`;
 }
 
