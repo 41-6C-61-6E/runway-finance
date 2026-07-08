@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { username, password, email, pin, sharingEmail, sharingPin } = body;
+    const { username, password, email, pin, sharingEmail, sharingPin, timezone } = body;
 
     logger.debug('Register API: request received', { username, email, isSharedJoin: !!(sharingEmail && sharingPin) });
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         userId: username,
         currency: DEFAULTS.currency,
         locale: DEFAULTS.locale,
-        timezone: DEFAULTS.timezone,
+        timezone: timezone || DEFAULTS.timezone,
         theme: DEFAULTS.theme,
         accentColor: DEFAULTS.accentColor,
         compactMode: DEFAULTS.compactMode,
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       userId: username,
       currency: DEFAULTS.currency,
       locale: DEFAULTS.locale,
-      timezone: DEFAULTS.timezone,
+      timezone: timezone || DEFAULTS.timezone,
       theme: DEFAULTS.theme,
       accentColor: DEFAULTS.accentColor,
       compactMode: DEFAULTS.compactMode,

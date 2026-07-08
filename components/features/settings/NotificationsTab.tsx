@@ -56,6 +56,7 @@ export default function NotificationsTab() {
   const netWorthMilestoneInterval = settings.netWorthMilestoneInterval ?? 100000;
   const notifyDailyNetWorthChange = settings.notifyDailyNetWorthChange !== false;
   const dailyNetWorthAlertTime = (settings.dailyNetWorthAlertTime as string) || '18:00';
+  const userTimezone = (settings.timezone as string) || 'America/New_York';
   const notifyAiProposals = settings.notifyAiProposals !== false;
   const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
   const notificationLimiterPeriodMinutes = settings.notificationLimiterPeriodMinutes ?? 60;
@@ -526,7 +527,9 @@ export default function NotificationsTab() {
                   onChange={(e) => handleUpdateSetting('dailyNetWorthAlertTime', e.target.value)}
                   className="w-[120px] h-8 text-xs"
                 />
-                <span className="text-xs text-muted-foreground">Sent daily at this time</span>
+                <span className="text-xs text-muted-foreground">
+                  Sent daily at this time (<span className="font-mono">{userTimezone}</span>)
+                </span>
               </div>
             )}
 
