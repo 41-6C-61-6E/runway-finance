@@ -140,8 +140,13 @@ export async function GET(request: Request) {
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
       eq(transactions.deleted, false),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false),
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      ),
       or(
         isNull(transactions.categoryId),
         and(
@@ -252,8 +257,13 @@ export async function GET(request: Request) {
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
       eq(transactions.deleted, false),
-      eq(accounts.isHidden, false),
-      eq(accounts.isExcludedFromNetWorth, false),
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      ),
     ];
     if (!isImportTransactionsEnabled) {
       conditions.push(eq(transactions.isImported, false));
