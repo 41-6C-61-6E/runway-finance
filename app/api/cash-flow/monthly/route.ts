@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { monthlyCashFlow, accounts, categories, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, inArray, ne } from 'drizzle-orm';
+import { eq, and, or, gte, inArray, ne } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 
@@ -72,8 +72,13 @@ export async function GET(request: Request) {
         .from(accounts)
         .where(and(
           eq(accounts.userId, dataUserId),
-          eq(accounts.isHidden, false),
-          eq(accounts.isExcludedFromNetWorth, false)
+          or(
+            and(
+              eq(accounts.isHidden, false),
+              eq(accounts.isExcludedFromNetWorth, false)
+            ),
+            eq(accounts.type, 'paystub')
+          )
         ));
 
       if (userAccounts.length > 0) {
