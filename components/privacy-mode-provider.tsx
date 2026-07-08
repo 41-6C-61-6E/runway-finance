@@ -71,6 +71,17 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
     }
   }, [privacyMode]);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+        e.preventDefault();
+        togglePrivacyMode();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePrivacyMode]);
+
   return (
     <PrivacyModeContext.Provider value={{ privacyMode, togglePrivacyMode, loading }}>
       {children}

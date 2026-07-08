@@ -146,7 +146,7 @@ const SankeyCustomNode = ({
                 {payload.label}
               </div>
               {hubVisualImbalance !== undefined && (
-                <div style={{
+                <div className="blur-number" style={{
                   fontSize: isMobile ? 13 : 17, fontWeight: 800,
                   color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
                   lineHeight: 1.3,
@@ -363,19 +363,19 @@ function DetailModal({
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Increases</div>
-                <div className="text-sm font-bold text-emerald-500 font-mono mt-1">
+                <div className="text-sm font-bold text-emerald-500 font-mono mt-1 blur-number">
                   +{formatCurrency(node.visualImbalance !== undefined && node.visualImbalance >= 0 ? node.visualImbalance : 0)}
                 </div>
               </div>
               <div className="bg-card border border-border/40 rounded-xl p-3 text-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Net Change</div>
-                <div className={`text-sm font-bold font-mono mt-1 ${(node.netWorthChange || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <div className={`text-sm font-bold font-mono mt-1 blur-number ${(node.netWorthChange || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {(node.netWorthChange || 0) >= 0 ? '+' : ''}{formatCurrency(node.netWorthChange || 0)}
                 </div>
               </div>
               <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Decreases</div>
-                <div className="text-sm font-bold text-rose-500 font-mono mt-1">
+                <div className="text-sm font-bold text-rose-500 font-mono mt-1 blur-number">
                   -{formatCurrency(node.visualImbalance !== undefined && node.visualImbalance < 0 ? Math.abs(node.visualImbalance) : 0)}
                 </div>
               </div>
@@ -387,7 +387,7 @@ function DetailModal({
               isIncrease ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'
             }`}>
               <span className="text-sm text-muted-foreground font-semibold">Total {isIncrease ? 'Increase' : 'Decrease'}</span>
-              <span className={`text-lg font-bold font-mono ${isIncrease ? 'text-emerald-500' : 'text-rose-500'}`}>
+              <span className={`text-lg font-bold font-mono blur-number ${isIncrease ? 'text-emerald-500' : 'text-rose-500'}`}>
                 {isIncrease ? '+' : '-'}{formatCurrency(node.value)}
               </span>
             </div>
@@ -423,12 +423,12 @@ function DetailModal({
                       return (
                         <tr key={acc.id} className="hover:bg-muted/10 transition-colors">
                           <td className="p-2.5 font-medium text-foreground truncate max-w-[120px]">{acc.name}</td>
-                          <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(acc.beginningBalance)}</td>
-                          <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(acc.endingBalance)}</td>
-                          <td className={`p-2.5 text-right font-mono ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.beginningBalance)}</td>
+                          <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.endingBalance)}</td>
+                          <td className={`p-2.5 text-right font-mono blur-number ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}
                           </td>
-                          <td className={`p-2.5 text-right font-mono font-semibold ${nwImpact >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          <td className={`p-2.5 text-right font-mono font-semibold blur-number ${nwImpact >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {nwImpact >= 0 ? '+' : ''}{formatCurrency(nwImpact)}
                           </td>
                         </tr>
@@ -1037,7 +1037,7 @@ export function WealthFlowSankey() {
               <div className="max-w-xl mx-auto space-y-3">
                 <div className="flex justify-between items-center text-sm font-medium pb-2">
                   <span className="text-muted-foreground">Beginning Net Worth</span>
-                  <span className="font-mono font-semibold">{formatCurrency(summary.beginningNetWorth)}</span>
+                  <span className="font-mono font-semibold blur-number">{formatCurrency(summary.beginningNetWorth)}</span>
                 </div>
 
                 <div className="space-y-2">
@@ -1062,7 +1062,7 @@ export function WealthFlowSankey() {
                   )}
                   <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1">
                     <span>Total Increases</span>
-                    <span className="font-mono">+{formatCurrency(summary.totalIncreases)}</span>
+                    <span className="font-mono blur-number">+{formatCurrency(summary.totalIncreases)}</span>
                   </div>
                 </div>
 
@@ -1088,20 +1088,20 @@ export function WealthFlowSankey() {
                   )}
                   <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground pt-1">
                     <span>Total Decreases</span>
-                    <span className="font-mono">-{formatCurrency(summary.totalDecreases)}</span>
+                    <span className="font-mono blur-number">-{formatCurrency(summary.totalDecreases)}</span>
                   </div>
                 </div>
 
                 <div className="pt-3 mt-1">
                   <div className="flex justify-between items-center text-sm font-bold">
                     <span className="text-foreground">Ending Net Worth</span>
-                    <span className="font-mono">{formatCurrency(summary.endingNetWorth)}</span>
+                    <span className="font-mono blur-number">{formatCurrency(summary.endingNetWorth)}</span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-center text-[11px] text-muted-foreground pt-1">
                   <span>Total Net Worth Change</span>
-                  <span className={`font-semibold font-mono ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  <span className={`font-semibold font-mono blur-number ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)}
                     {' '}({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
                   </span>
@@ -1145,7 +1145,7 @@ function DriverLedgerSection({
             </span>
           )}
         </span>
-        <span className="font-mono font-semibold text-muted-foreground">
+        <span className="font-mono font-semibold text-muted-foreground blur-number">
           {sign}{formatCurrency(value)}
         </span>
       </div>
@@ -1165,9 +1165,9 @@ function DriverLedgerSection({
               {accounts.map((acc) => (
                 <tr key={acc.id} className="hover:bg-muted/5 cursor-pointer" onClick={onAccountClick}>
                   <td className="py-0.5 pr-2 truncate max-w-[120px] font-sans text-muted-foreground/80">{acc.name}</td>
-                  <td className="py-0.5 text-right pr-2 text-muted-foreground/60">{formatCurrency(acc.beginningBalance)}</td>
-                  <td className="py-0.5 text-right pr-2 text-muted-foreground/60">{formatCurrency(acc.endingBalance)}</td>
-                  <td className="py-0.5 text-right font-semibold text-muted-foreground">
+                  <td className="py-0.5 text-right pr-2 text-muted-foreground/60 blur-number">{formatCurrency(acc.beginningBalance)}</td>
+                  <td className="py-0.5 text-right pr-2 text-muted-foreground/60 blur-number">{formatCurrency(acc.endingBalance)}</td>
+                  <td className="py-0.5 text-right font-semibold text-muted-foreground blur-number">
                     {acc.signedNWDelta >= 0 ? '+' : ''}{formatCurrency(acc.signedNWDelta)}
                   </td>
                 </tr>

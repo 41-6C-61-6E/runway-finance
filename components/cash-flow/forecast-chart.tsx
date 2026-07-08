@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
 interface ChartSeries {
   id: string;
@@ -26,6 +27,7 @@ const LINE_COLORS = [
 ];
 
 export function ForecastChart({ data, showProjections = true }: ForecastChartProps) {
+  const { privacyMode } = usePrivacyMode();
   const visibleData = useMemo(() => {
     return showProjections
       ? data
@@ -97,9 +99,11 @@ export function ForecastChart({ data, showProjections = true }: ForecastChartPro
 
   return (
     <div className="h-[320px] touch-pan-y">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
         <div className="min-w-max h-full px-2 pb-2">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>

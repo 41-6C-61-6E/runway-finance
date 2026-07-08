@@ -13,6 +13,7 @@ import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel
 import { List } from 'lucide-react';
 import { getMonthRange, getPeriodLabel } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 
 interface CategoryData {
@@ -39,6 +40,7 @@ function MiniSparkline({ value, prev: rawPrev, isIncome }: { value: number; prev
   const y1 = h - (prev / max) * h;
   const y2 = h - (value / max) * h;
   const isUp = value >= prev;
+  const { privacyMode } = usePrivacyMode();
 
   let lineColor: string;
   if (isIncome) {
@@ -57,7 +59,7 @@ function MiniSparkline({ value, prev: rawPrev, isIncome }: { value: number; prev
       />
       <circle cx={x1} cy={y1} r={2.5} fill={lineColor} />
       <circle cx={x2} cy={y2} r={2.5} fill={lineColor} />
-      <title>{`${formatCurrency(prev)} → ${formatCurrency(value)}`}</title>
+      {!privacyMode && <title>{`${formatCurrency(prev)} → ${formatCurrency(value)}`}</title>}
     </svg>
   );
 }

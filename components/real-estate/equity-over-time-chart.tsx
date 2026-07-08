@@ -18,6 +18,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
@@ -60,6 +61,7 @@ interface RealEstateData {
 }
 
 export function EquityOverTimeChart() {
+  const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('equityOverTimeChart');
   const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<RealEstateData | null>(null);
@@ -522,9 +524,11 @@ export function EquityOverTimeChart() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <div className="sr-only" aria-live="polite">
-        {srSummary}
-      </div>
+      {!privacyMode && (
+        <div className="sr-only" aria-live="polite">
+          {srSummary}
+        </div>
+      )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}

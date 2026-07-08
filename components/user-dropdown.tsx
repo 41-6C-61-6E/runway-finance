@@ -287,7 +287,10 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
           <div className="h-px bg-border mx-2" />
 
           <div className="px-3 py-1.5 flex items-center justify-between">
-            <span className="text-sm text-foreground">Privacy Mode</span>
+            <div className="flex flex-col">
+              <span className="text-sm text-foreground">Privacy Mode</span>
+              <span className="text-[10px] text-muted-foreground/60">Ctrl+Shift+P</span>
+            </div>
             <Switch
               checked={privacyMode ?? false}
               onCheckedChange={togglePrivacyMode}

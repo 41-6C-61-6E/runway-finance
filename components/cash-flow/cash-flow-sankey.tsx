@@ -570,7 +570,7 @@ const SankeyCustomNode = ({
               }}>
                 {payload.label}
               </div>
-              <div style={{
+              <div className="blur-number" style={{
                 fontSize: isMobileSize ? 13 : 17,
                 fontWeight: 800,
                 color: isNetSurplus ? '#10b981' : '#ef4444',
