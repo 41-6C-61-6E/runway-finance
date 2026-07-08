@@ -6,6 +6,7 @@ type UserSettingsContextType = {
   settings: Record<string, any>;
   updateSetting: (key: string, value: any) => Promise<void>;
   loading: boolean;
+  refreshSettings: () => Promise<void>;
 };
 
 const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
@@ -58,15 +59,16 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       if (!res.ok) {
         throw new Error('Failed to update setting');
       }
+      // Re-fetch to pick up any changes made outside this provider (e.g. AdvancedTab)
+      await fetchSettings();
     } catch (e) {
       console.error(`Failed to update setting ${key}`, e);
-      // Re-fetch to ensure state consistency with database
       await fetchSettings();
     }
   }, [fetchSettings]);
 
   return (
-    <UserSettingsContext.Provider value={{ settings, updateSetting, loading }}>
+    <UserSettingsContext.Provider value={{ settings, updateSetting, loading, refreshSettings: fetchSettings }}>
       {children}
     </UserSettingsContext.Provider>
   );
