@@ -15,6 +15,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceArea,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
@@ -304,7 +305,7 @@ export function NetWorthChart() {
         <TooltipRow
           label="Change"
           value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
-          color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+          color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
         />
         <TooltipRow label="Starting Net Worth" value={formatCurrency(point.startNetWorth)} color="var(--color-chart-1)" />
         <TooltipRow label="Ending Net Worth" value={formatCurrency(point.endNetWorth)} color="var(--color-chart-1)" />
@@ -486,6 +487,12 @@ export function NetWorthChart() {
                       content={<AreaTooltip />}
                       cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }}
                     />
+                    <ReferenceArea
+                      y1={0}
+                      y2={areaYDomain[0]}
+                      fill="var(--color-chart-5)"
+                      fillOpacity={0.04}
+                    />
                     <Area
                       type="monotone"
                       dataKey="netWorth"
@@ -540,7 +547,7 @@ export function NetWorthChart() {
                       {barData.map((entry, index) => (
                         <Cell
                           key={index}
-                          fill={entry.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-destructive)'}
+                          fill={entry.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
                           onClick={handleNavigateToFlows}
                           style={{ cursor: 'pointer' }}
                         />

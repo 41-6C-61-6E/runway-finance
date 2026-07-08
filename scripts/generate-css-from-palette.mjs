@@ -42,7 +42,7 @@ for (const [schemeId, colors] of Object.entries(palette.chartSchemes)) {
   css += `[data-chart-scheme="${schemeId}"] {\n`;
   css += formatVarDeclarations(colors);
   css += `\n}\n`;
-  if (schemeId !== 'vashon') css += '\n';
+  if (schemeId !== 'monarch') css += '\n';
 }
 
 css += '\n';

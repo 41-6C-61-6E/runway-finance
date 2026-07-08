@@ -135,12 +135,12 @@
 }
 
 [data-chart-scheme="kingston"] {
-  --chart-1: oklch(0.6435 0.1053 154.44);
-  --chart-2: oklch(0.6475 0.1011 234.84);
-  --chart-3: oklch(0.6133 0.1765 342.77);
-  --chart-4: oklch(0.8568 0.1382 84.46);
-  --chart-5: oklch(0.6891 0.1652 41.55);
-  --chart-synthetic: oklch(0.75 0.09 155);
+  --chart-1: oklch(0.65 0.12 150);
+  --chart-2: oklch(0.40 0.12 265);
+  --chart-3: oklch(0.60 0.16 60);
+  --chart-4: oklch(0.75 0.10 295);
+  --chart-5: oklch(0.65 0.16 10);
+  --chart-synthetic: oklch(0.75 0.07 150);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 
@@ -154,13 +154,14 @@
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
 
-[data-chart-scheme="vashon"] {
-  --chart-1: oklch(0.82 0.12 135);
-  --chart-2: oklch(0.5 0.085 333);
-  --chart-3: oklch(0.799 0.098 188.8);
-  --chart-4: oklch(0.891 0.1 92.7);
-  --chart-5: oklch(0.84 0.083 23);
-  --chart-synthetic: oklch(0.80 0.08 200);
+[data-chart-scheme="bainbridge"] {
+  --chart-1: oklch(0.58 0.14 162);
+  --chart-2: oklch(0.68 0.20 38);
+  --chart-3: oklch(0.70 0.13 220);
+  --chart-4: oklch(0.81 0.16 82);
+  --chart-5: oklch(0.48 0.22 335);
+  --chart-synthetic: oklch(0.75 0.07 162);
   --destructive-synthetic: oklch(0.65 0.1 25);
 }
+
 

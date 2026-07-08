@@ -12,7 +12,7 @@ type DirtyMap = Record<string, true>;
 
 const STRING_OPTIONS: Record<string, string[]> = {
   theme: ['light', 'moonlight', 'dark'],
-  chartColorScheme: ['fauntleroy', 'kingston', 'seattle', 'vashon'],
+  chartColorScheme: ['fauntleroy', 'kingston', 'seattle', 'bainbridge'],
   forecastMode: ['historical', 'budget', 'hybrid'],
   defaultChartTimeRange: ['1m', '3m', '6m', '1y', '5y', 'ytd', 'all'],
   defaultChartType: ['line', 'bar'],
