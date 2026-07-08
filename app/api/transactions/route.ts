@@ -22,6 +22,7 @@ import {
   inArray,
   notInArray,
   isNull,
+  isNotNull,
 } from "drizzle-orm";
 import {
   TransactionFilterSchema,
@@ -76,6 +77,18 @@ function buildCategoryConditions(
         or(
           isNull(transactions.categoryId),
           inArray(transactions.categoryId, validCategoryIds),
+          inArray(
+            transactions.id,
+            getDb()
+              .select({ parentId: transactions.parentId })
+              .from(transactions)
+              .where(
+                and(
+                  inArray(transactions.categoryId, validCategoryIds),
+                  isNotNull(transactions.parentId)
+                )
+              )
+          ),
         ),
       ];
     }
@@ -85,7 +98,23 @@ function buildCategoryConditions(
     }
 
     if (validCategoryIds.length > 0) {
-      return [inArray(transactions.categoryId, validCategoryIds)];
+      return [
+        or(
+          inArray(transactions.categoryId, validCategoryIds),
+          inArray(
+            transactions.id,
+            getDb()
+              .select({ parentId: transactions.parentId })
+              .from(transactions)
+              .where(
+                and(
+                  inArray(transactions.categoryId, validCategoryIds),
+                  isNotNull(transactions.parentId)
+                )
+              )
+          )
+        )
+      ];
     }
 
     return [sql`false`];
@@ -97,7 +126,23 @@ function buildCategoryConditions(
     }
 
     if (UUID_PATTERN.test(categoryId)) {
-      return [eq(transactions.categoryId, categoryId)];
+      return [
+        or(
+          eq(transactions.categoryId, categoryId),
+          inArray(
+            transactions.id,
+            getDb()
+              .select({ parentId: transactions.parentId })
+              .from(transactions)
+              .where(
+                and(
+                  eq(transactions.categoryId, categoryId),
+                  isNotNull(transactions.parentId)
+                )
+              )
+          )
+        )
+      ];
     }
 
     return [sql`false`];
@@ -108,10 +153,24 @@ function buildCategoryConditions(
     const validIds = ids.filter((id) => UUID_PATTERN.test(id));
     if (validIds.length > 0) {
       return [
-        or(
-          isNull(transactions.categoryId),
-          notInArray(transactions.categoryId, validIds),
-        ),
+        and(
+          or(
+            isNull(transactions.categoryId),
+            notInArray(transactions.categoryId, validIds),
+          ),
+          notInArray(
+            transactions.id,
+            getDb()
+              .select({ parentId: transactions.parentId })
+              .from(transactions)
+              .where(
+                and(
+                  inArray(transactions.categoryId, validIds),
+                  isNotNull(transactions.parentId)
+                )
+              )
+          )
+        )
       ];
     }
   }
@@ -225,6 +284,7 @@ export async function GET(request: Request) {
       eq(accounts.type, 'paystub')
     ),
     eq(transactions.deleted, false),
+    isNull(transactions.parentId),
   ];
 
   if (filters.search) {
@@ -299,7 +359,13 @@ export async function GET(request: Request) {
         .where(inArray(transactionTags.tagId, tagIdList));
       const txIds = taggedTxIds.map((r) => r.transactionId);
       if (txIds.length > 0) {
-        whereConditions.push(inArray(transactions.id, txIds));
+        const childTxnsWithTags = await getDb()
+          .select({ parentId: transactions.parentId })
+          .from(transactions)
+          .where(and(inArray(transactions.id, txIds), isNotNull(transactions.parentId)));
+        const parentIds = childTxnsWithTags.map(c => c.parentId).filter(Boolean) as string[];
+        const allMatchedIds = Array.from(new Set([...txIds, ...parentIds]));
+        whereConditions.push(inArray(transactions.id, allMatchedIds));
       } else {
         // No transactions match these tags — return empty
         whereConditions.push(sql`false`);
@@ -312,7 +378,13 @@ export async function GET(request: Request) {
       .where(eq(transactionTags.tagId, filters.tagId));
     const txIds = taggedTxIds.map((r) => r.transactionId);
     if (txIds.length > 0) {
-      whereConditions.push(inArray(transactions.id, txIds));
+      const childTxnsWithTags = await getDb()
+        .select({ parentId: transactions.parentId })
+        .from(transactions)
+        .where(and(inArray(transactions.id, txIds), isNotNull(transactions.parentId)));
+      const parentIds = childTxnsWithTags.map(c => c.parentId).filter(Boolean) as string[];
+      const allMatchedIds = Array.from(new Set([...txIds, ...parentIds]));
+      whereConditions.push(inArray(transactions.id, allMatchedIds));
     } else {
       whereConditions.push(sql`false`);
     }
@@ -669,7 +741,7 @@ export async function GET(request: Request) {
       returned: txnsWithTags.length,
     });
     return NextResponse.json({
-      data: txnsWithTags,
+      data: await attachSplits(txnsWithTags, dek),
       total: totalBeforeFilters,
       totalAmount: null, // calculated lazily by client
       limit: filters.limit,
@@ -869,12 +941,85 @@ export async function GET(request: Request) {
     returned: slicedWithTags.length,
   });
   return NextResponse.json({
-    data: slicedWithTags,
+    data: await attachSplits(slicedWithTags, dek),
     total,
     totalAmount,
     limit: filters.limit,
     offset: filters.offset,
   });
+}
+
+async function attachSplits(txns: any[], dek: Uint8Array) {
+  if (txns.length === 0) return txns;
+  const parentIds = txns.map((tx: any) => tx.id);
+  const childTxns = await getDb()
+    .select({
+      transaction: transactions,
+      category: {
+        id: categories.id,
+        name: categories.name,
+        color: categories.color,
+      }
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(and(inArray(transactions.parentId, parentIds), eq(transactions.deleted, false)));
+
+  const decryptedChildren = await Promise.all(
+    childTxns.map(async (row) => {
+      const tx = await decryptRow("transactions", row.transaction, dek);
+      let category = row.category;
+      if (category?.name) {
+        category = {
+          ...category,
+          name: await decryptField(category.name, dek),
+        };
+      }
+      return { ...tx, category };
+    })
+  );
+
+  const childIds = decryptedChildren.map((c: any) => c.id);
+  const childTagRows = childIds.length > 0
+    ? await getDb()
+        .select({
+          transactionId: transactionTags.transactionId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(transactionTags)
+        .leftJoin(tags, eq(transactionTags.tagId, tags.id))
+        .where(inArray(transactionTags.transactionId, childIds))
+    : [];
+
+  const childTagsByTxId = new Map<string, any[]>();
+  for (const row of childTagRows) {
+    const name = row.tagName ? await decryptField(row.tagName, dek) : '';
+    const tag = { id: row.tagId, name, color: row.tagColor };
+    const existing = childTagsByTxId.get(row.transactionId) ?? [];
+    existing.push(tag);
+    childTagsByTxId.set(row.transactionId, existing);
+  }
+
+  const decryptedChildrenWithTags = decryptedChildren.map((c: any) => ({
+    ...c,
+    tags: childTagsByTxId.get(c.id) ?? [],
+  }));
+
+  const finalSplitsByParentId = new Map<string, any[]>();
+  for (const child of decryptedChildrenWithTags) {
+    if (child.parentId) {
+      const existing = finalSplitsByParentId.get(child.parentId) ?? [];
+      existing.push(child);
+      finalSplitsByParentId.set(child.parentId, existing);
+    }
+  }
+
+  return txns.map((tx: any) => ({
+    ...tx,
+    splits: finalSplitsByParentId.get(tx.id) ?? [],
+  }));
 }
 
 export async function PATCH(request: Request) {

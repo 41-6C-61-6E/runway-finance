@@ -32,6 +32,7 @@ export async function GET() {
       .returning();
 
     return Response.json({
+      timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode ?? DEFAULTS.privacyMode,
       accentColor: created?.accentColor ?? DEFAULTS.accentColor,
       chartVisibility: created?.chartVisibility ?? DEFAULTS.chartVisibility,
@@ -88,6 +89,7 @@ export async function GET() {
   }
 
   return Response.json({
+    timezone: settings[0].timezone,
     privacyMode: settings[0].privacyMode,
     accentColor: settings[0].accentColor ?? DEFAULTS.accentColor,
     chartVisibility: settings[0].chartVisibility ?? DEFAULTS.chartVisibility,
@@ -143,6 +145,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
+  const timezone = body.timezone;
   const privacyMode = body.privacyMode;
   const accentColor = body.accentColor;
   const chartVisibility = body.chartVisibility;
@@ -391,6 +394,7 @@ export async function PATCH(request: Request) {
       .insert(userSettings)
       .values({
         userId: session.user.id,
+        timezone: timezone ?? DEFAULTS.timezone,
         privacyMode,
         accentColor: accentColor ?? DEFAULTS.accentColor,
         chartColorScheme: chartColorScheme ?? DEFAULTS.chartColorScheme,
@@ -399,6 +403,7 @@ export async function PATCH(request: Request) {
       .returning();
 
     return Response.json({
+      timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode,
       accentColor: created?.accentColor,
       chartVisibility: created?.chartVisibility ?? DEFAULTS.chartVisibility,
@@ -437,6 +442,7 @@ export async function PATCH(request: Request) {
 
   const dek = await getSessionDEK();
   const updates: Record<string, any> = {};
+  if (timezone !== undefined) updates.timezone = timezone;
   if (privacyMode !== undefined) updates.privacyMode = privacyMode;
   if (accentColor !== undefined) updates.accentColor = accentColor;
   if (chartVisibility !== undefined) updates.chartVisibility = chartVisibility;
@@ -644,6 +650,7 @@ export async function PATCH(request: Request) {
   }
 
     return Response.json({
+      timezone: updated.timezone,
       privacyMode: updated.privacyMode,
       accentColor: updated.accentColor,
       chartVisibility: updated.chartVisibility ?? DEFAULTS.chartVisibility,
