@@ -477,6 +477,13 @@
       "when": 1783400000000,
       "tag": "0067_add_hide_from_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1783529142515,
+      "tag": "0068_material_jack_power",
+      "breakpoints": true
     }
   ]
 }
