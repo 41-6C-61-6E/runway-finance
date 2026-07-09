@@ -96,11 +96,6 @@ export const CARD_MATH: Record<string, { title: string; description: string }> =
     description:
       'Income: Variance = actual − budgeted, % Achieved = actual / budgeted × 100. Expenses: Remaining = budgeted − actual, % Used = actual / budgeted × 100. All values are summed across budget items of each type.',
   },
-  budgetVsActualChart: {
-    title: 'Budget vs Actual Chart',
-    description:
-      'Bar chart comparing budgeted amounts against actual spending per category for the selected period.',
-  },
   budgetTable: {
     title: 'Budget Items Table',
     description:
