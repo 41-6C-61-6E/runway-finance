@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getCurrentMonth, getMonthRange, snapToPeriod, formatMonth, getPeriodLabel } from '@/lib/utils/date-window';
+import { getCurrentMonth, getMonthRange, snapToPeriod, formatMonth, getPeriodLabel, getPreciseDateRange } from '@/lib/utils/date-window';
 
 describe('date-window utilities', () => {
   beforeEach(() => {
@@ -110,6 +110,23 @@ describe('date-window utilities', () => {
 
     it('returns YTD label for "ytd"', () => {
       expect(getPeriodLabel('2026-06', 'ytd')).toBe('YTD 2026');
+    });
+
+    it('returns "Previous 24 Hours" for "1d"', () => {
+      expect(getPeriodLabel('2026-06', '1d')).toBe('Previous 24 Hours');
+    });
+  });
+
+  describe('getPreciseDateRange', () => {
+
+    it('returns yesterday to today range for "1d"', () => {
+      const range = getPreciseDateRange('1d');
+      expect(range).toEqual({ start: '2026-06-14', end: '2026-06-15' });
+    });
+
+    it('returns 7 days ago to today range for "7d"', () => {
+      const range = getPreciseDateRange('7d');
+      expect(range).toEqual({ start: '2026-06-08', end: '2026-06-15' });
     });
   });
 });
