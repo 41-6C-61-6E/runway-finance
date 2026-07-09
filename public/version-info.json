@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1783636878600",
+  "buildNumber": "26.07.1783637539340",
   "commits": [
+    "refactor: remove budget-vs-actual-chart component and update README feature documentation",
     "refactor: remove budget-vs-actual-chart component and related references",
     "refactor: simplify savings chart by removing dual-axis, adding average rate reference line, and updating presets",
     "feat: add interactive modal to IncomeExpenseChart for detailed monthly savings breakdown analysis",
-    "feat: integrate savings rate data and visualization into spending dashboard",
-    "refactor: normalize all financial currency fields to cent-based strings using formatToCents throughout services and API routes."
+    "feat: integrate savings rate data and visualization into spending dashboard"
   ]
 }
