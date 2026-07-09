@@ -134,11 +134,14 @@ export async function POST(request: Request, { params }: RouteParams) {
         .orderBy(desc(transactions.date))
         .limit(200);
 
-      // Build account name map
+      // Build account name map (exclude hidden/excluded accounts)
       const accountRows = await db
-        .select({ id: accounts.id, name: accounts.name })
+        .select({ id: accounts.id, name: accounts.name, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
         .where(eq(accounts.userId, session.user.id));
+      const visibleAccountIds = new Set(
+        accountRows.filter(a => !a.isHidden && !a.isExcludedFromNetWorth).map(a => a.id)
+      );
       const accountNameMap = new Map<string, string>();
       for (const acc of accountRows) {
         accountNameMap.set(acc.id, await decryptField(acc.name, dek));
@@ -146,6 +149,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       const matches: TransactionMatch[] = [];
       for (const tx of txRows) {
+        if (!visibleAccountIds.has(tx.accountId)) continue;
         const decDesc = await decryptField(tx.description, dek);
         const decPayee = tx.payee ? await decryptField(tx.payee, dek) : '';
         const decMemo = tx.memo ? await decryptField(tx.memo, dek) : '';
@@ -203,7 +207,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     // ── Account Balance preview ──────────────────────────────────────────
     if (rule.triggerType === 'account_balance') {
       const accountRows = await db
-        .select({ id: accounts.id, name: accounts.name, balance: accounts.balance })
+        .select({ id: accounts.id, name: accounts.name, balance: accounts.balance, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
         .where(eq(accounts.userId, session.user.id));
 
@@ -212,16 +216,18 @@ export async function POST(request: Request, { params }: RouteParams) {
           id: acc.id,
           name: await decryptField(acc.name, dek),
           balance: parseFloat(await decryptField(acc.balance, dek)) || 0,
+          isHidden: acc.isHidden,
+          isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
         }))
       );
 
       const balanceMap = new Map(decryptedAccounts.map(a => [a.id, a.balance]));
 
-      // Filter to target account if specified
+      // Exclude hidden/excluded accounts
       const targetAccountId = rule.criteria?.accountId;
-      const candidateAccounts = targetAccountId
-        ? decryptedAccounts.filter(a => a.id === targetAccountId)
-        : decryptedAccounts;
+      const candidateAccounts = decryptedAccounts.filter(a =>
+        !a.isHidden && !a.isExcludedFromNetWorth && (targetAccountId ? a.id === targetAccountId : true)
+      );
 
       const matches: BalanceMatch[] = [];
       for (const acc of candidateAccounts) {
