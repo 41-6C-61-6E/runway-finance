@@ -15,7 +15,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'settings' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows' },
-  { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
+  { href: '/spending', label: 'Spend / Save', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments' },
