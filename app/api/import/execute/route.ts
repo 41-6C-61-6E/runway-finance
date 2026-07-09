@@ -7,7 +7,7 @@ import { parseCsv, parseDateField, determineTransactionSign } from '@/lib/utils/
 import { transactions, accountSnapshots, accounts, categories, importLog } from '@/lib/db/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots, formatToCents, roundToCents } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 import { logger } from '@/lib/logger';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
@@ -190,8 +190,7 @@ export async function POST(request: Request) {
               parsedAmount = determineTransactionSign(parsedAmount, mapped.type);
             }
 
-            const amount = parsedAmount.toString();
-            const encryptedAmount = await encryptField(amount, dek);
+            const encryptedAmount = await encryptField(formatToCents(roundToCents(parsedAmount)), dek);
             const encryptedDescription = await encryptField(mapped.description || '', dek);
             const encryptedPayee = mapped.payee ? await encryptField(mapped.payee, dek) : null;
             const encryptedMemo = mapped.memo ? await encryptField(mapped.memo, dek) : null;
@@ -216,8 +215,9 @@ export async function POST(request: Request) {
               },
             };
           } else {
-            const balance = mapped.balance?.replace(/[^0-9.\-]/g, '') || '0';
-            const encryptedBalance = await encryptField(balance, dek);
+            const rawBalance = parseFloat(mapped.balance?.replace(/[^0-9.\-]/g, '') || '0');
+            const roundedBalance = isNaN(rawBalance) ? 0 : roundToCents(rawBalance);
+            const encryptedBalance = await encryptField(formatToCents(roundedBalance), dek);
 
             return {
               type: 'snapshot',

@@ -1,6 +1,6 @@
 import { getDb, getPool } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories, transactionTags } from '@/lib/db/schema';
-import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, convertCurrency } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, convertCurrency, formatToCents } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
@@ -143,7 +143,8 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
         // Ignore json parse error
       }
     }
-    const encryptedBalance = await encryptField(acc.balance, dek);
+    const balanceVal = parseFloat(acc.balance) || 0;
+    const encryptedBalance = await encryptField(formatToCents(balanceVal), dek);
     await getDb()
       .insert(accountSnapshots)
       .values({
@@ -775,7 +776,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         .limit(1);
 
       let skipBalanceUpdate = false;
-      let targetBalance = sfAccount.balance;
+      let targetBalance = await encryptField(formatToCents(parseFloat(sfAccount.balance) || 0), dek);
       let targetBalanceDate = new Date(sfAccount['balance-date'] * 1000);
 
       if (existingAccount) {
@@ -913,7 +914,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         name: sfAccount.name,
         type: inferAccountType(sfAccount),
         currency: sfAccount.currency,
-        balance: sfAccount.balance,
+        balance: formatToCents(parseFloat(sfAccount.balance) || 0),
         transactionsFetched: sfAccount.transactions?.length ?? 0,
         transactionsNew: 0,
         transactionsPending: 0,

@@ -120,6 +120,7 @@ vi.mock('@/lib/services/sync', () => ({
 vi.mock('@/lib/services/account-history', () => ({
   generateHistoricalAccountSnapshots: vi.fn(),
   getEarliestTransactionDate: vi.fn().mockResolvedValue('2026-05-01'),
+  formatToCents: (val: number) => (Math.round(val * 100) / 100).toFixed(2),
 }));
 
 import { getPlaidClient } from '@/lib/plaid';
