@@ -3,6 +3,7 @@ import { financialGoals, accounts, goalAllocationHistory, userSettings } from '@
 import { and, eq, asc, desc, inArray, isNotNull } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
+import { formatToCents } from '@/lib/services/account-history';
 
 export interface GoalAllocation {
   goalId: string;
@@ -421,13 +422,13 @@ export async function snapshotAllocationsToHistory(userId: string): Promise<void
         goalId: goal.goalId as any,
         accountId: goal.linkedAccountId as any,
         snapshotDate: new Date().toISOString().split('T')[0],
-        accountBalance: String(goal.accountBalance),
-        allocatedAmount: String(goal.allocatedAmount),
-        desiredAmount: String(goal.desiredAllocation),
+        accountBalance: formatToCents(goal.accountBalance),
+        allocatedAmount: formatToCents(goal.allocatedAmount),
+        desiredAmount: formatToCents(goal.desiredAllocation),
         percentage: String(goal.percentage),
         sortOrder: goal.sortOrder,
         isUnderfunded: goal.isUnderfunded,
-        remainingOnAccount: String(goal.remainingOnAccount),
+        remainingOnAccount: formatToCents(goal.remainingOnAccount),
       });
     }
   }
