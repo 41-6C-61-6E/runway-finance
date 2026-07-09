@@ -35,6 +35,12 @@ export function roundToCents(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+export function formatToCents(value: number): string {
+  if (isNaN(value) || !isFinite(value)) return '0.00';
+  return (Math.round(value * 100) / 100).toFixed(2);
+}
+
+
 async function getLatestRealSnapshot(
   accountId: string,
   userId: string,
@@ -872,7 +878,7 @@ export async function generateHistoricalAccountSnapshots(
             userId,
             accountId,
             snapshotDate: dateStr,
-            balance: String(roundToCents(bal)),
+            balance: formatToCents(bal),
             isSynthetic: true,
             isImported: isAccountImported,
           });
@@ -1065,9 +1071,9 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
     const nwValues = {
       userId,
       snapshotDate: dateStr,
-      totalAssets: String(totalAssets),
-      totalLiabilities: String(totalLiabilities),
-      netWorth: String(netWorth),
+      totalAssets: formatToCents(totalAssets),
+      totalLiabilities: formatToCents(totalLiabilities),
+      netWorth: formatToCents(netWorth),
       breakdown,
     };
 
@@ -1419,7 +1425,7 @@ export async function generateInvestmentMarketSnapshots(
         userId,
         accountId,
         snapshotDate: dateStr,
-        balance: String(roundToCents(bal)),
+        balance: formatToCents(bal),
         isSynthetic: true,
         isImported: isAccountImported,
       });

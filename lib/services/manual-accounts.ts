@@ -12,7 +12,7 @@ import type { ApiConfig } from '@/lib/services/asset-estimator';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate, formatToCents } from '@/lib/services/account-history';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -370,7 +370,7 @@ export async function createManualAccount(input: {
     externalId: manualExternalId(),
     name: input.name,
     currency: input.currency ?? 'USD',
-    balance: String(initialValue),
+    balance: formatToCents(initialValue),
     balanceDate: new Date(),
     type: accountType,
     metadata: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null,
@@ -393,7 +393,7 @@ export async function createManualAccount(input: {
       accountId: account.id,
       externalId: adjExternalId(),
       date: nowISO(),
-      amount: String(initialValue),
+      amount: formatToCents(initialValue),
       description: `Initial ${input.name} value`,
       payee: null,
       memo: null,
@@ -542,7 +542,7 @@ export async function syncManualAccount(
   logger.info(`${LOG_TAG} Sync comparison for ${accountId} (${account.type}): oldBalance=${oldBalance}, newValue=${newValue}, delta=${delta}`);
 
   const accountUpdate: any = {
-    balance: dek ? await encryptField(String(newValue), dek) : String(newValue),
+    balance: dek ? await encryptField(formatToCents(newValue), dek) : formatToCents(newValue),
     balanceDate: new Date(),
     updatedAt: new Date(),
   };
@@ -572,7 +572,7 @@ export async function syncManualAccount(
       accountId,
       externalId: adjExternalId(),
       date: nowISO(),
-      amount: String(delta),
+      amount: formatToCents(delta),
       description: `${assetTypeLabels[account.type] ?? account.name} value adjustment`,
       payee: null,
       memo: null,
@@ -680,7 +680,7 @@ export async function adjustManualAccountValue(
 
     const updatedMeta = { ...meta, amountOz };
     const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
-    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
     await db.update(accounts).set({
       balance: encryptedBalance,
       balanceDate: new Date(),
@@ -688,7 +688,7 @@ export async function adjustManualAccountValue(
       metadata: encryptedMeta,
     }).where(eq(accounts.id, accountId));
   } else {
-    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
     await db.update(accounts).set({
       balance: encryptedBalance,
       balanceDate: new Date(),
@@ -704,7 +704,7 @@ export async function adjustManualAccountValue(
       accountId,
       externalId: adjExternalId(),
       date: nowISO(),
-      amount: String(delta),
+      amount: formatToCents(delta),
       description: note ?? `${account.name} value adjustment`,
       payee: null,
       memo: null,
@@ -788,7 +788,7 @@ export async function addAccountSnapshot(
 
     const updatedMeta = { ...meta, amountOz };
     const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
-    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
     
     // Update current account balance only if snapshot date is >= current balanceDate
     const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
@@ -806,7 +806,7 @@ export async function addAccountSnapshot(
       }).where(eq(accounts.id, accountId));
     }
   } else {
-    const encryptedBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
     // Update current account balance only if snapshot date is >= current balanceDate
     const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
     if (date >= currentBalanceDate) {
@@ -819,18 +819,18 @@ export async function addAccountSnapshot(
   }
 
   // Insert or update the snapshot in account_snapshots (isSynthetic = false, isImported = true)
-  const encryptedSnapshotBalance = dek ? await encryptField(String(finalNewValue), dek) : String(finalNewValue);
+  const encryptedSnapshotBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
   await db.insert(accountSnapshots).values({
     userId,
     accountId,
     snapshotDate: date,
-    balance: String(encryptedSnapshotBalance),
+    balance: encryptedSnapshotBalance,
     isSynthetic: false,
     isImported: true,
   }).onConflictDoUpdate({
     target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
     set: {
-      balance: String(encryptedSnapshotBalance),
+      balance: encryptedSnapshotBalance,
       isSynthetic: false,
       isImported: true,
     },
@@ -955,18 +955,19 @@ async function createAccountSnapshotsForUser(userId: string, dek?: Uint8Array) {
         // Ignore json parse error
       }
     }
-    const decryptedBalance = dek ? await decryptField(acc.balance, dek) : acc.balance;
-    const encryptedBalance = dek ? await encryptField(decryptedBalance, dek) : decryptedBalance;
+    const decryptedBalance = parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance) || 0;
+    const formattedBalance = formatToCents(decryptedBalance);
+    const encryptedBalance = dek ? await encryptField(formattedBalance, dek) : formattedBalance;
     
     await db.insert(accountSnapshots).values({
       userId,
       accountId: acc.id,
       snapshotDate: today,
-      balance: String(encryptedBalance),
+      balance: encryptedBalance,
       isSynthetic: false,
     }).onConflictDoUpdate({
       target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-      set: { balance: String(encryptedBalance), isSynthetic: false },
+      set: { balance: encryptedBalance, isSynthetic: false },
     });
   }
 }
