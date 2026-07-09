@@ -74,7 +74,7 @@ export function AssetAllocation() {
         <div className="flex-1 flex flex-col justify-center p-5">
           <div className="w-full bg-muted rounded-full overflow-hidden flex" style={{ height: '12px' }}>
             <div
-              className="bg-chart-1 h-full transition-all"
+              className="bg-constructive h-full transition-all"
               style={{ width: `${assetPct}%` }}
             />
             <div
@@ -84,7 +84,7 @@ export function AssetAllocation() {
           </div>
           <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:gap-2 mt-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-chart-1" />
+              <span className="w-2.5 h-2.5 rounded-full bg-constructive" />
               <span className="text-xs text-muted-foreground">Assets:</span>
               <span className="text-xs font-semibold text-foreground tabular-nums">{assetPct.toFixed(0)}%</span>
               <span className="text-xs text-muted-foreground tabular-nums financial-value">({formatCurrency(totals.totalAssets)})</span>

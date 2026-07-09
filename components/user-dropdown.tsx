@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Star, Key, LogOut, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { SEMANTIC } from '@/lib/colors/palette';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
-import { handleSignOut } from '@/components/server-actions';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
 import { toast } from 'sonner';
 
@@ -313,15 +312,14 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
 
           <div className="h-px bg-border mx-2" />
 
-          <form action={handleSignOut}>
-            <button
-              type="submit"
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            >
-              <LogOut className="w-4 h-4 text-muted-foreground" />
-              Sign Out
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectTo: '/signin' })}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <LogOut className="w-4 h-4 text-muted-foreground" />
+            Sign Out
+          </button>
 
           <div className="h-px bg-border mx-2" />
 

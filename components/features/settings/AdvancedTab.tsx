@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, Upload, FileArchive, Loader2 } from 'lucide-react';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
-import { handleSignOut } from '@/components/server-actions';
+import { signOut } from 'next-auth/react';
 import { useUserSettings } from '@/components/user-settings-provider';
 import {
   AlertDialog,
@@ -155,7 +155,7 @@ export default function AdvancedTab() {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
       }
-      await handleSignOut();
+      await signOut({ redirectTo: '/signin' });
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete account');
       setDeleting(false);
