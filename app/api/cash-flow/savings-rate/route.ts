@@ -76,6 +76,14 @@ export async function GET(request: Request) {
     // 4. Fetch decrypted transactions from cache
     const decryptedTxns = await getUserTransactionsFromCache(dataUserId, dek);
 
+    // Precompute which accounts have transactions in our dataset to handle manual/un-synced accounts cleanly
+    const accountsWithTransactions = new Set<string>();
+    for (const tx of decryptedTxns) {
+      if (!tx.ignored) {
+        accountsWithTransactions.add(tx.accountId);
+      }
+    }
+
     // 5. Aggregate month-by-month
     const monthlyStats: Record<
       string,
@@ -88,8 +96,32 @@ export async function GET(request: Request) {
         paystubHsa: number;
         brokerage: number;
         savingsAccount: number;
+        details: {
+          retirement: Array<{ description: string; date: string; amount: number; accountName: string }>;
+          hsa: Array<{ description: string; date: string; amount: number; accountName: string }>;
+          brokerage: Array<{ description: string; date: string; amount: number; accountName: string }>;
+          savingsAccount: Array<{ description: string; date: string; amount: number; accountName: string }>;
+          income: Array<{ description: string; date: string; amount: number; accountName: string }>;
+          expenses: Array<{ description: string; date: string; amount: number; accountName: string }>;
+        };
       }
     > = {};
+
+    const addDetail = (
+      stats: typeof monthlyStats[string],
+      bucket: 'retirement' | 'hsa' | 'brokerage' | 'savingsAccount' | 'income' | 'expenses',
+      description: string,
+      date: string,
+      amount: number,
+      accountName: string
+    ) => {
+      stats.details[bucket].push({
+        description: description || 'Transfer',
+        date,
+        amount: Math.round(amount * 100) / 100,
+        accountName: accountName || 'Unknown Account',
+      });
+    };
 
     for (const tx of decryptedTxns) {
       if (tx.ignored) continue;
@@ -112,43 +144,57 @@ export async function GET(request: Request) {
           paystubHsa: 0,
           brokerage: 0,
           savingsAccount: 0,
+          details: {
+            retirement: [],
+            hsa: [],
+            brokerage: [],
+            savingsAccount: [],
+            income: [],
+            expenses: [],
+          },
         };
       }
       const stats = monthlyStats[yearMonth];
 
       const category = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined;
 
-      // Skip report-excluded categories
+      // Skip report-excluded categories only for standard income/expenses cash flows
       let excluded = category?.excludeFromReports ?? false;
       if (!excluded && category?.parentId) {
         const parent = categoryMap.get(category.parentId);
         if (parent?.excludeFromReports) excluded = true;
       }
-      if (excluded) continue;
 
       // A. Standard Cash Flow Income / Expenses
-      if (category?.categoryType !== 'transfer') {
+      if (!excluded && category?.categoryType !== 'transfer') {
+        const acc = accountMap.get(tx.accountId);
         if (category?.categoryType === 'compound') {
           const absAmt = Math.abs(amount);
           stats.income += absAmt;
           stats.expenses += absAmt;
+          addDetail(stats, 'income', tx.description, tx.date, absAmt, acc?.name || 'Account');
+          addDetail(stats, 'expenses', tx.description, tx.date, absAmt, acc?.name || 'Account');
         } else if (amount > 0) {
           if (category && !category.isIncome) {
             stats.expenses -= amount;
+            addDetail(stats, 'expenses', tx.description, tx.date, -amount, acc?.name || 'Account');
           } else {
             stats.income += amount;
+            addDetail(stats, 'income', tx.description, tx.date, amount, acc?.name || 'Account');
           }
         } else if (amount < 0) {
           const absAmt = Math.abs(amount);
           if (category && category.isIncome) {
             stats.income -= absAmt;
+            addDetail(stats, 'income', tx.description, tx.date, -absAmt, acc?.name || 'Account');
           } else {
             stats.expenses += absAmt;
+            addDetail(stats, 'expenses', tx.description, tx.date, absAmt, acc?.name || 'Account');
           }
         }
       }
 
-      // B. Savings Flow Analysis
+      // B. Savings Flow Analysis (Runs even if category is excluded-from-reports)
       const acc = accountMap.get(tx.accountId);
       const accountType = acc?.type?.toLowerCase() || '';
       const categoryName = category?.name || '';
@@ -157,24 +203,31 @@ export async function GET(request: Request) {
       const parentCategoryName = parentCategory?.name || '';
 
       const isRetirementCategory =
-        categoryName.includes('Retirement') ||
-        categoryName.includes('401k') ||
-        categoryName.includes('IRA') ||
-        categoryName.includes('Pension') ||
-        parentCategoryName.includes('Retirement');
+        categoryName.toLowerCase().includes('retirement') ||
+        categoryName.toLowerCase().includes('401k') ||
+        categoryName.toLowerCase().includes('ira') ||
+        categoryName.toLowerCase().includes('pension') ||
+        parentCategoryName.toLowerCase().includes('retirement');
 
       const isHsaCategory =
-        categoryName.includes('HSA') ||
-        categoryName.includes('FSA') ||
-        (parentCategoryName.includes('Health & Medical') && categoryName.includes('Contribution'));
+        categoryName.toLowerCase().includes('hsa') ||
+        categoryName.toLowerCase().includes('fsa') ||
+        (parentCategoryName.toLowerCase().includes('health & medical') && categoryName.toLowerCase().includes('contribution'));
 
-      const isSavingsTransferCategory = categoryName === 'Transfer to Savings';
+      const isSavingsTransferCategory =
+        categoryName.toLowerCase().includes('savings') &&
+        category?.categoryType === 'transfer';
 
       const isInvestmentTransferCategory =
-        categoryName === 'Transfer to Investment' ||
-        categoryName.includes('Brokerage') ||
-        categoryName.includes('Buy') ||
-        (categoryName.includes('Contribution') && (accountType === 'investment' || accountType === 'brokerage'));
+        categoryName.toLowerCase().includes('investment') ||
+        categoryName.toLowerCase().includes('brokerage') ||
+        categoryName.toLowerCase().includes('investing') ||
+        categoryName.toLowerCase().includes('stock') ||
+        (category?.categoryType === 'transfer' && (
+          categoryName.toLowerCase().includes('vanguard') ||
+          categoryName.toLowerCase().includes('fidelity') ||
+          categoryName.toLowerCase().includes('schwab')
+        ));
 
       // Case 1: Paystub Virtual Accounts (pre-tax paycheck deductions)
       if (tx.source === 'paystub' && amount < 0) {
@@ -182,9 +235,11 @@ export async function GET(request: Request) {
         if (isRetirementCategory) {
           stats.retirement += absAmt;
           stats.paystubRetirement += absAmt;
+          addDetail(stats, 'retirement', categoryName || tx.description || 'Pre-tax Retirement Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
         } else if (isHsaCategory) {
           stats.hsa += absAmt;
           stats.paystubHsa += absAmt;
+          addDetail(stats, 'hsa', categoryName || tx.description || 'Pre-tax HSA Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
         }
       }
       // Case 2: Standard Bank/Asset Accounts
@@ -193,88 +248,100 @@ export async function GET(request: Request) {
         if (['retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira'].includes(accountType)) {
           if (amount > 0) {
             stats.retirement += amount;
+            addDetail(stats, 'retirement', tx.description, tx.date, amount, acc?.name || 'Retirement');
           } else {
             stats.retirement -= Math.abs(amount);
+            addDetail(stats, 'retirement', tx.description, tx.date, amount, acc?.name || 'Retirement');
           }
         }
         // HSA Accounts
         else if (['hsa', 'health'].includes(accountType)) {
           if (amount > 0) {
             stats.hsa += amount;
+            addDetail(stats, 'hsa', tx.description, tx.date, amount, acc?.name || 'HSA');
           } else {
             stats.hsa -= Math.abs(amount);
+            addDetail(stats, 'hsa', tx.description, tx.date, amount, acc?.name || 'HSA');
           }
         }
         // Brokerage Accounts
         else if (['investment', 'brokerage', 'crypto', 'metals', '529', 'otherinvestment', 'otherInvestment'].includes(accountType)) {
           if (amount > 0) {
             stats.brokerage += amount;
+            addDetail(stats, 'brokerage', tx.description, tx.date, amount, acc?.name || 'Brokerage');
           } else {
             stats.brokerage -= Math.abs(amount);
+            addDetail(stats, 'brokerage', tx.description, tx.date, amount, acc?.name || 'Brokerage');
           }
         }
         // Savings Accounts
         else if (accountType === 'savings') {
           if (amount > 0) {
             stats.savingsAccount += amount;
+            addDetail(stats, 'savingsAccount', tx.description, tx.date, amount, acc?.name || 'Savings');
           } else {
             stats.savingsAccount -= Math.abs(amount);
+            addDetail(stats, 'savingsAccount', tx.description, tx.date, amount, acc?.name || 'Savings');
           }
         }
-        // Depository (Checking/Cash) Outflows to Unconnected Destination Accounts
+        // Depository (Checking/Cash) Outflows to Unconnected or Un-synced/Manual Destination Accounts
         else if (['checking', 'cash'].includes(accountType) && amount < 0) {
           const absAmt = Math.abs(amount);
-          if (isRetirementCategory && !hasConnectedRetirementAccounts(decryptedAccounts)) {
+          if (isRetirementCategory && !hasConnectedRetirementAccountsWithTx(decryptedAccounts)) {
             stats.retirement += absAmt;
-          } else if (isHsaCategory && !hasConnectedHsaAccounts(decryptedAccounts)) {
+            addDetail(stats, 'retirement', tx.description, tx.date, absAmt, acc?.name || 'Checking');
+          } else if (isHsaCategory && !hasConnectedHsaAccountsWithTx(decryptedAccounts)) {
             stats.hsa += absAmt;
-          } else if (isSavingsTransferCategory && !hasConnectedSavingsAccounts(decryptedAccounts)) {
+            addDetail(stats, 'hsa', tx.description, tx.date, absAmt, acc?.name || 'Checking');
+          } else if (isSavingsTransferCategory && !hasConnectedSavingsAccountsWithTx(decryptedAccounts)) {
             stats.savingsAccount += absAmt;
-          } else if (isInvestmentTransferCategory && !hasConnectedInvestmentAccounts(decryptedAccounts)) {
+            addDetail(stats, 'savingsAccount', tx.description, tx.date, absAmt, acc?.name || 'Checking');
+          } else if (isInvestmentTransferCategory && !hasConnectedInvestmentAccountsWithTx(decryptedAccounts)) {
             stats.brokerage += absAmt;
+            addDetail(stats, 'brokerage', tx.description, tx.date, absAmt, acc?.name || 'Checking');
           }
         }
       }
     }
 
-    // Helper functions to check connected account types
-    function hasConnectedSavingsAccounts(accountsList: any[]) {
-      return accountsList.some(a => a.type === 'savings' && !a.isHidden && !a.isExcludedFromNetWorth);
+    // Helper functions to check connected account types (requiring at least one synced transaction)
+    function hasConnectedSavingsAccountsWithTx(accountsList: any[]) {
+      return accountsList.some(a => a.type === 'savings' && !a.isHidden && !a.isExcludedFromNetWorth && accountsWithTransactions.has(a.id));
     }
-    function hasConnectedInvestmentAccounts(accountsList: any[]) {
+    function hasConnectedInvestmentAccountsWithTx(accountsList: any[]) {
       return accountsList.some(a =>
         ['investment', 'brokerage', 'crypto', 'metals', '529', 'otherinvestment', 'otherInvestment'].includes(a.type) &&
         !a.isHidden &&
-        !a.isExcludedFromNetWorth
+        !a.isExcludedFromNetWorth &&
+        accountsWithTransactions.has(a.id)
       );
     }
-    function hasConnectedRetirementAccounts(accountsList: any[]) {
+    function hasConnectedRetirementAccountsWithTx(accountsList: any[]) {
       return accountsList.some(a =>
         ['retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira'].includes(a.type) &&
         !a.isHidden &&
-        !a.isExcludedFromNetWorth
+        !a.isExcludedFromNetWorth &&
+        accountsWithTransactions.has(a.id)
       );
     }
-    function hasConnectedHsaAccounts(accountsList: any[]) {
+    function hasConnectedHsaAccountsWithTx(accountsList: any[]) {
       return accountsList.some(a =>
         ['hsa', 'health'].includes(a.type) &&
         !a.isHidden &&
-        !a.isExcludedFromNetWorth
+        !a.isExcludedFromNetWorth &&
+        accountsWithTransactions.has(a.id)
       );
     }
 
     // Convert aggregated map to a sorted list and finalize leftover cash / savings rate
     const result = Object.entries(monthlyStats)
       .map(([yearMonth, stats]) => {
-        // Leftover cash is standard cash flow surplus (income - expenses)
-        // minus all savings components that did not go into expenses (i.e. bank transfers).
-        // Since paystub retirement & HSA deductions are already in stats.expenses, they are NOT subtracted from leftover cash.
-        const nonPaystubRetirement = Math.max(0, stats.retirement - stats.paystubRetirement);
-        const nonPaystubHsa = Math.max(0, stats.hsa - stats.paystubHsa);
+        // Total savings is standard net cash flow (surplus) + pre-tax paycheck savings
+        const totalSavings = (stats.income - stats.expenses) + stats.paystubRetirement + stats.paystubHsa;
 
-        const leftoverCash = (stats.income - stats.expenses) - stats.brokerage - stats.savingsAccount - nonPaystubRetirement - nonPaystubHsa;
+        // Leftover cash is total savings minus all specific tracked savings categories
+        const leftoverCash = totalSavings - stats.retirement - stats.hsa - stats.brokerage - stats.savingsAccount;
 
-        const totalSavings = stats.retirement + stats.hsa + stats.brokerage + stats.savingsAccount + leftoverCash;
         const savingsRate = stats.income > 0 ? totalSavings / stats.income : 0;
 
         return {
@@ -289,6 +356,14 @@ export async function GET(request: Request) {
             brokerage: Math.round(stats.brokerage * 100) / 100,
             savingsAccount: Math.round(stats.savingsAccount * 100) / 100,
             cash: Math.round(leftoverCash * 100) / 100,
+          },
+          details: {
+            retirement: stats.details.retirement,
+            hsa: stats.details.hsa,
+            brokerage: stats.details.brokerage,
+            savingsAccount: stats.details.savingsAccount,
+            income: stats.details.income,
+            expenses: stats.details.expenses,
           },
         };
       })

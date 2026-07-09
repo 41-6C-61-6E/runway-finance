@@ -46,7 +46,6 @@ export const CHARTS = {
     label: 'Budgets',
     charts: {
       budgetSummary: 'Summary Cards',
-      budgetVsActualChart: 'Budget vs Actual Chart',
       budgetTable: 'Budget Items Table',
     },
   },
