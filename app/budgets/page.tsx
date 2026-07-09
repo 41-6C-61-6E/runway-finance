@@ -3,7 +3,6 @@
 import { Suspense } from 'react';
 import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets/budget-period-selector';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
-import { BudgetVsActualChart } from '@/components/budgets/budget-vs-actual-chart';
 import { BudgetTable } from '@/components/budgets/budget-table';
 import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -29,17 +28,6 @@ function BudgetsContent() {
               <MathDescription chartId="budgetSummary" />
             </div>
           </Suspense>
-        )}
-
-        {isVisible('budgetVsActualChart') && (
-          <div className="mt-5 sm:mt-6">
-            <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <div>
-                <BudgetVsActualChart />
-                <MathDescription chartId="budgetVsActualChart" />
-              </div>
-            </Suspense>
-          </div>
         )}
 
         {isVisible('budgetTable') && (
