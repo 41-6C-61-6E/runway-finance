@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow } from '@/lib/crypto';
+import { formatToCents } from '@/lib/services/account-history';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -37,7 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let updateData: Record<string, unknown> = {};
   if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
   if (body.periodType !== undefined) updateData.periodType = body.periodType;
-  if (body.amount !== undefined) updateData.amount = String(body.amount);
+  if (body.amount !== undefined) updateData.amount = formatToCents(parseFloat(String(body.amount)) || 0);
   if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring;
   if (body.periodKey !== undefined) {
     updateData.yearMonth = body.periodKey || null;

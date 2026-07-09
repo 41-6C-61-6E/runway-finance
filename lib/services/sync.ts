@@ -259,9 +259,9 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     insertValues.push({
       userId,
       yearMonth,
-      totalIncome: String(data.income),
-      totalExpenses: String(data.expenses),
-      netCashFlow: String(netCashFlow),
+      totalIncome: formatToCents(data.income),
+      totalExpenses: formatToCents(data.expenses),
+      netCashFlow: formatToCents(netCashFlow),
       transactionCount: String(data.count),
     });
   }
@@ -394,7 +394,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
           categoryId: catData.categoryId as any,
           accountId: catData.accountId as any,
           yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
+          amount: formatToCents(catData.amount),
           transactionCount: String(catData.count),
         });
       }
@@ -531,7 +531,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
           categoryId: catData.categoryId as any,
           accountId: catData.accountId as any,
           yearMonth: catData.yearMonth,
-          amount: String(catData.amount),
+          amount: formatToCents(catData.amount),
           transactionCount: String(catData.count),
         });
       }

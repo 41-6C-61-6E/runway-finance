@@ -128,6 +128,12 @@ async function main() {
     let totalSnapshotsUpdated = 0;
     let totalTransactionsUpdated = 0;
     let totalNetWorthUpdated = 0;
+    let totalMcfUpdated = 0;
+    let totalCssUpdated = 0;
+    let totalCisUpdated = 0;
+    let totalBudgetsUpdated = 0;
+    let totalGoalsUpdated = 0;
+    let totalGahUpdated = 0;
 
     for (const user of usersResult.rows) {
       if (!user.username) {
@@ -269,6 +275,203 @@ async function main() {
         console.log(`  Updated ${nwUpdated} net worth snapshot(s).`);
         totalNetWorthUpdated += nwUpdated;
       }
+
+      // 5. Clean up monthly cash flow
+      const mcfResult = await client.query(
+        'SELECT year_month, total_income, total_expenses, net_cash_flow FROM monthly_cash_flow WHERE user_id = $1',
+        [user.username]
+      );
+
+      let mcfUpdated = 0;
+      for (const m of mcfResult.rows) {
+        try {
+          const decInc = await decryptField(m.total_income, dek);
+          const decExp = await decryptField(m.total_expenses, dek);
+          const decNet = await decryptField(m.net_cash_flow, dek);
+
+          const formInc = formatToCents(parseFloat(decInc) || 0);
+          const formExp = formatToCents(parseFloat(decExp) || 0);
+          const formNet = formatToCents(parseFloat(decNet) || 0);
+
+          if (decInc !== formInc || decExp !== formExp || decNet !== formNet) {
+            const encInc = await encryptField(formInc, dek);
+            const encExp = await encryptField(formExp, dek);
+            const encNet = await encryptField(formNet, dek);
+
+            await client.query(
+              'UPDATE monthly_cash_flow SET total_income = $1, total_expenses = $2, net_cash_flow = $3 WHERE user_id = $4 AND year_month = $5',
+              [encInc, encExp, encNet, user.username, m.year_month]
+            );
+            mcfUpdated++;
+          }
+        } catch (err) {
+          console.error(`    [Error] Failed to decrypt/update monthly cash flow for user ${user.username} date ${m.year_month}:`, err.message);
+        }
+      }
+      if (mcfUpdated > 0) {
+        console.log(`  Updated ${mcfUpdated} monthly cash flow summary row(s).`);
+        totalMcfUpdated += mcfUpdated;
+      }
+
+      // 6. Clean up category spending summaries
+      const cssResult = await client.query(
+        'SELECT category_id, account_id, year_month, amount FROM category_spending_summary WHERE user_id = $1',
+        [user.username]
+      );
+
+      let cssUpdated = 0;
+      for (const s of cssResult.rows) {
+        try {
+          const decAmt = await decryptField(s.amount, dek);
+          if (!decAmt) continue;
+
+          const formAmt = formatToCents(parseFloat(decAmt) || 0);
+          if (decAmt !== formAmt) {
+            const encAmt = await encryptField(formAmt, dek);
+            await client.query(
+              'UPDATE category_spending_summary SET amount = $1 WHERE user_id = $2 AND category_id = $3 AND account_id = $4 AND year_month = $5',
+              [encAmt, user.username, s.category_id, s.account_id, s.year_month]
+            );
+            cssUpdated++;
+          }
+        } catch (err) {
+          console.error(`    [Error] Failed to decrypt/update category spending summary for user ${user.username} cat ${s.category_id}:`, err.message);
+        }
+      }
+      if (cssUpdated > 0) {
+        console.log(`  Updated ${cssUpdated} category spending summary row(s).`);
+        totalCssUpdated += cssUpdated;
+      }
+
+      // 7. Clean up category income summaries
+      const cisResult = await client.query(
+        'SELECT category_id, account_id, year_month, amount FROM category_income_summary WHERE user_id = $1',
+        [user.username]
+      );
+
+      let cisUpdated = 0;
+      for (const s of cisResult.rows) {
+        try {
+          const decAmt = await decryptField(s.amount, dek);
+          if (!decAmt) continue;
+
+          const formAmt = formatToCents(parseFloat(decAmt) || 0);
+          if (decAmt !== formAmt) {
+            const encAmt = await encryptField(formAmt, dek);
+            await client.query(
+              'UPDATE category_income_summary SET amount = $1 WHERE user_id = $2 AND category_id = $3 AND account_id = $4 AND year_month = $5',
+              [encAmt, user.username, s.category_id, s.account_id, s.year_month]
+            );
+            cisUpdated++;
+          }
+        } catch (err) {
+          console.error(`    [Error] Failed to decrypt/update category income summary for user ${user.username} cat ${s.category_id}:`, err.message);
+        }
+      }
+      if (cisUpdated > 0) {
+        console.log(`  Updated ${cisUpdated} category income summary row(s).`);
+        totalCisUpdated += cisUpdated;
+      }
+
+      // 8. Clean up budgets
+      const budgetsResult = await client.query(
+        'SELECT id, amount FROM budgets WHERE user_id = $1',
+        [user.username]
+      );
+
+      let budgetsUpdated = 0;
+      for (const b of budgetsResult.rows) {
+        try {
+          const decrypted = await decryptField(b.amount, dek);
+          if (!decrypted) continue;
+
+          const formatted = formatToCents(parseFloat(decrypted) || 0);
+          if (decrypted !== formatted) {
+            const encrypted = await encryptField(formatted, dek);
+            await client.query(
+              'UPDATE budgets SET amount = $1 WHERE id = $2',
+              [encrypted, b.id]
+            );
+            budgetsUpdated++;
+          }
+        } catch (err) {
+          console.error(`    [Error] Failed to decrypt/update budget ${b.id}:`, err.message);
+        }
+      }
+      if (budgetsUpdated > 0) {
+        console.log(`  Updated ${budgetsUpdated} budget amount(s).`);
+        totalBudgetsUpdated += budgetsUpdated;
+      }
+
+      // 9. Clean up financial goals
+      const goalsResult = await client.query(
+        'SELECT id, target_amount, current_amount, reserve, allocated_amount FROM financial_goals WHERE user_id = $1',
+        [user.username]
+      );
+
+      let goalsUpdated = 0;
+      for (const g of goalsResult.rows) {
+        try {
+          const decTar = await decryptField(g.target_amount, dek);
+          const decCur = await decryptField(g.current_amount, dek);
+          const decRes = await decryptField(g.reserve, dek);
+          const decAlloc = g.allocated_amount || ''; // NOT encrypted
+
+          const formTar = formatToCents(parseFloat(decTar) || 0);
+          const formCur = formatToCents(parseFloat(decCur) || 0);
+          const formRes = formatToCents(parseFloat(decRes) || 0);
+          const formAlloc = decAlloc ? formatToCents(parseFloat(decAlloc) || 0) : '';
+
+          if (decTar !== formTar || decCur !== formCur || decRes !== formRes || (decAlloc && decAlloc !== formAlloc)) {
+            const encTar = await encryptField(formTar, dek);
+            const encCur = await encryptField(formCur, dek);
+            const encRes = await encryptField(formRes, dek);
+
+            await client.query(
+              'UPDATE financial_goals SET target_amount = $1, current_amount = $2, reserve = $3, allocated_amount = $4 WHERE id = $5',
+              [encTar, encCur, encRes, formAlloc || null, g.id]
+            );
+            goalsUpdated++;
+          }
+        } catch (err) {
+          console.error(`    [Error] Failed to decrypt/update financial goal ${g.id}:`, err.message);
+        }
+      }
+      if (goalsUpdated > 0) {
+        console.log(`  Updated ${goalsUpdated} financial goal amount(s).`);
+        totalGoalsUpdated += goalsUpdated;
+      }
+
+      // 10. Clean up goal allocation history (plaintext columns)
+      const gahResult = await client.query(
+        'SELECT id, account_balance, allocated_amount, desired_amount, remaining_on_account FROM goal_allocation_history WHERE user_id = $1',
+        [user.username]
+      );
+
+      let gahUpdated = 0;
+      for (const g of gahResult.rows) {
+        const decBal = g.account_balance;
+        const decAlloc = g.allocated_amount;
+        const decDes = g.desired_amount;
+        const decRem = g.remaining_on_account;
+
+        const formBal = formatToCents(parseFloat(decBal) || 0);
+        const formAlloc = formatToCents(parseFloat(decAlloc) || 0);
+        const formDes = formatToCents(parseFloat(decDes) || 0);
+        const formRem = formatToCents(parseFloat(decRem) || 0);
+
+        if (decBal !== formBal || decAlloc !== formAlloc || decDes !== formDes || decRem !== formRem) {
+          await client.query(
+            'UPDATE goal_allocation_history SET account_balance = $1, allocated_amount = $2, desired_amount = $3, remaining_on_account = $4 WHERE id = $5',
+            [formBal, formAlloc, formDes, formRem, g.id]
+          );
+          gahUpdated++;
+        }
+      }
+      if (gahUpdated > 0) {
+        console.log(`  Updated ${gahUpdated} goal allocation history row(s).`);
+        totalGahUpdated += gahUpdated;
+      }
     }
 
     console.log('\n-----------------------------------------');
@@ -277,9 +480,17 @@ async function main() {
     console.log(`- Account snapshots updated: ${totalSnapshotsUpdated}`);
     console.log(`- Transactions updated: ${totalTransactionsUpdated}`);
     console.log(`- Net worth snapshots updated: ${totalNetWorthUpdated}`);
+    console.log(`- Monthly cash flow updated: ${totalMcfUpdated}`);
+    console.log(`- Category spending summaries updated: ${totalCssUpdated}`);
+    console.log(`- Category income summaries updated: ${totalCisUpdated}`);
+    console.log(`- Budgets updated: ${totalBudgetsUpdated}`);
+    console.log(`- Financial goals updated: ${totalGoalsUpdated}`);
+    console.log(`- Goal allocation histories updated: ${totalGahUpdated}`);
     console.log('-----------------------------------------');
     console.log('Precision cleanup completed successfully!');
 
+  } catch (err) {
+    console.error('Fatal error during execution:', err.message);
   } finally {
     client.release();
     await pool.end();
