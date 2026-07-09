@@ -10,7 +10,7 @@ import {
   holdings,
   holdingSnapshots,
 } from '@/lib/db/schema';
-import { generateHistoricalAccountSnapshots, getEarliestTransactionDate } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, formatToCents } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
@@ -301,7 +301,8 @@ export async function syncPlaidConnection(
         logger.debug(`${LOG_TAG} Skipping sync-disabled Plaid account: ${plaidAcc.name} (${plaidAcc.account_id})`);
         continue;
       }
-      const balance = plaidAcc.balances.current != null ? String(plaidAcc.balances.current) : '0';
+      const rawBalance = plaidAcc.balances.current != null ? parseFloat(String(plaidAcc.balances.current)) : 0;
+      const balance = formatToCents(isNaN(rawBalance) ? 0 : rawBalance);
       const balanceDate = new Date();
 
       const [existingAccount] = await getDb()

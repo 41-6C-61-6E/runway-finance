@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from 'vitest';
 import { accountSnapshots, transactions, accounts, userSettings, holdingSnapshots } from '@/lib/db/schema';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, cleanupTransientZeroSnapshots } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, cleanupTransientZeroSnapshots, formatToCents } from '@/lib/services/account-history';
 
 // Mock variables to control query responses
 let mockRealSnapshotsResponse: any[] = [];
@@ -161,7 +161,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-02',
-        balance: '10',
+        balance: '10.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -169,7 +169,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-03',
-        balance: '30',
+        balance: '30.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -177,7 +177,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-04',
-        balance: '30',
+        balance: '30.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -185,7 +185,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-05',
-        balance: '25',
+        balance: '25.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -243,7 +243,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-02',
-        balance: '85',
+        balance: '85.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -251,7 +251,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-03',
-        balance: '105',
+        balance: '105.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -259,7 +259,7 @@ describe('account-history', () => {
         userId: 'user_123',
         accountId: 'acct_123',
         snapshotDate: '2026-05-05',
-        balance: '115',
+        balance: '115.00',
         isSynthetic: true,
         isImported: true,
       });
@@ -348,9 +348,9 @@ describe('account-history', () => {
       // Yesterday's transaction = 30. So end of 2026-05-19 balance = 900 - 30 = 870.
       // 2026-05-19 transaction = 20. So end of 2026-05-18 balance = 870 - 20 = 850.
       
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-20', balance: '900' });
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-19', balance: '870' });
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-18', balance: '850' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-20', balance: '900.00' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-19', balance: '870.00' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-18', balance: '850.00' });
     });
 
     it('sets isImported to false if the account is not imported', async () => {
@@ -466,8 +466,8 @@ describe('account-history', () => {
         }
       }
 
-      expect(inserted).toContainEqual({ snapshotDate: '2026-06-08', balance: '50' });
-      expect(inserted).toContainEqual({ snapshotDate: '2026-06-09', balance: '60' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-06-08', balance: '50.00' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-06-09', balance: '60.00' });
     });
   });
 
@@ -524,18 +524,18 @@ describe('account-history', () => {
       // totalAssets = 5000, totalLiabilities = 250000, netWorth = -245000
       const day1 = mockInsertValues.find(v => v.snapshotDate === '2025-10-06');
       expect(day1).toBeDefined();
-      expect(day1.totalAssets).toBe('5000');
-      expect(day1.totalLiabilities).toBe('250000');
-      expect(day1.netWorth).toBe('-245000');
+      expect(day1.totalAssets).toBe('5000.00');
+      expect(day1.totalLiabilities).toBe('250000.00');
+      expect(day1.netWorth).toBe('-245000.00');
       expect(day1.breakdown.mortgage.value).toBe(250000);
 
       // Day 2: 2025-10-07 (refinance date)
       // totalAssets = 5100, totalLiabilities = 0, netWorth = 5100
       const day2 = mockInsertValues.find(v => v.snapshotDate === '2025-10-07');
       expect(day2).toBeDefined();
-      expect(day2.totalAssets).toBe('5100');
-      expect(day2.totalLiabilities).toBe('0');
-      expect(day2.netWorth).toBe('5100');
+      expect(day2.totalAssets).toBe('5100.00');
+      expect(day2.totalLiabilities).toBe('0.00');
+      expect(day2.netWorth).toBe('5100.00');
       expect(day2.breakdown.mortgage.value).toBe(0);
 
       // Day 3: 2025-10-08 (after refinance date)
@@ -543,9 +543,9 @@ describe('account-history', () => {
       // Mortgage breakdown should not exist (excluded) or have count 0
       const day3 = mockInsertValues.find(v => v.snapshotDate === '2025-10-08');
       expect(day3).toBeDefined();
-      expect(day3.totalAssets).toBe('5200');
-      expect(day3.totalLiabilities).toBe('0');
-      expect(day3.netWorth).toBe('5200');
+      expect(day3.totalAssets).toBe('5200.00');
+      expect(day3.totalLiabilities).toBe('0.00');
+      expect(day3.netWorth).toBe('5200.00');
       expect(day3.breakdown.mortgage).toBeUndefined();
     });
   });
@@ -677,7 +677,7 @@ describe('account-history', () => {
         const callParams = mockPoolQuery.mock.calls[0][1];
         // row schema: userId, accountId, snapshotDate, balance, isSynthetic, isImported
         expect(callParams[2]).toBe('2026-05-29');
-        expect(callParams[3]).toBe('1050'); // 1050
+        expect(callParams[3]).toBe('1050.00'); // 1050
       } finally {
         global.fetch = originalFetch;
       }
@@ -720,8 +720,8 @@ describe('account-history', () => {
         }
       }
       expect(inserted).toHaveLength(2);
-      expect(inserted[0]).toEqual({ date: '2026-05-28', balance: '500' });
-      expect(inserted[1]).toEqual({ date: '2026-05-29', balance: '600' });
+      expect(inserted[0]).toEqual({ date: '2026-05-28', balance: '500.00' });
+      expect(inserted[1]).toEqual({ date: '2026-05-29', balance: '600.00' });
     });
 
     it('supports ticker mapping, constant price mapping, and carry-forward lookback on weekends', async () => {
@@ -821,7 +821,7 @@ describe('account-history', () => {
         const callParams = mockPoolQuery.mock.calls[0][1];
         
         expect(callParams[2]).toBe('2026-06-07');
-        expect(callParams[3]).toBe('5500'); // 5600 valuation - 100 discrepancy
+        expect(callParams[3]).toBe('5500.00'); // 5600 valuation - 100 discrepancy
       } finally {
         global.fetch = originalFetch;
       }
@@ -877,8 +877,8 @@ describe('account-history', () => {
       // 2026-05-04 change is 0. Balance at 2026-05-03 is 1000.
       // 2026-05-03 has a payment of +200. So before that, balance was 1000 + 200 = 1200.
       // So balance on 2026-05-02 is 1200.
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '1000' });
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '1200' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '1000.00' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '1200.00' });
     });
 
     it('corrects liability signs dynamically for negative credit card balances', async () => {
@@ -926,8 +926,8 @@ describe('account-history', () => {
       // Backward pass:
       // 2026-05-03 balance is -1000.
       // 2026-05-02 balance = -1000 - 200 = -1200.
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '-1000' });
-      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '-1200' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-03', balance: '-1000.00' });
+      expect(inserted).toContainEqual({ snapshotDate: '2026-05-02', balance: '-1200.00' });
     });
 
     it('enforces strict two-decimal-place rounding on all generated daily snapshots', async () => {
@@ -1003,9 +1003,9 @@ describe('account-history', () => {
       expect(mockInsertValues).toHaveLength(1);
       const snapshot = mockInsertValues[0];
       // Total assets in EUR should be: 109 USD converted to EUR (= 100 EUR) + 200 EUR = 300 EUR
-      expect(snapshot.totalAssets).toBe('300');
-      expect(snapshot.totalLiabilities).toBe('0');
-      expect(snapshot.netWorth).toBe('300');
+      expect(snapshot.totalAssets).toBe('300.00');
+      expect(snapshot.totalLiabilities).toBe('0.00');
+      expect(snapshot.netWorth).toBe('300.00');
     });
 
     it('does not generate synthetic snapshots for investment accounts before the first holdings sync date', async () => {
@@ -1160,6 +1160,20 @@ describe('account-history', () => {
       const txPoint = inserted.find(s => s.snapshotDate === '2026-05-10');
       expect(txPoint).toBeDefined();
       expect(parseFloat(txPoint.balance)).toBe(100); // Rolled back from 100 on 2026-06-01: balance before transaction is 60, after is 100
+    });
+  });
+
+  describe('formatToCents helper function', () => {
+    it('enforces exact dollars and cents double-decimal precision', () => {
+      expect(formatToCents(123)).toBe('123.00');
+      expect(formatToCents(123.4)).toBe('123.40');
+      expect(formatToCents(123.456)).toBe('123.46');
+      expect(formatToCents(0.004)).toBe('0.00');
+      expect(formatToCents(0.005)).toBe('0.01');
+      expect(formatToCents(-9.422365110367537e-10)).toBe('0.00');
+      expect(formatToCents(-10.005)).toBe('-10.01');
+      expect(formatToCents(NaN)).toBe('0.00');
+      expect(formatToCents(Infinity)).toBe('0.00');
     });
   });
 });

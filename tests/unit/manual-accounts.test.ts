@@ -99,6 +99,8 @@ vi.mock('@/lib/services/account-history', () => {
     generateHistoricalAccountSnapshots: mockGenerateHistorical,
     recalculateNetWorthSnapshots: mockRecalculate,
     getAccountEarliestCalculationDate: vi.fn(async () => '2023-01-01'),
+    roundToCents: (val: number) => Math.round(val * 100) / 100,
+    formatToCents: (val: number) => (Math.round(val * 100) / 100).toFixed(2),
   };
 });
 
@@ -144,7 +146,7 @@ describe('manual-accounts service - addAccountSnapshot', () => {
     // Expect account to be updated with new balance and date
     expect(mockUpdateValues).toHaveLength(1);
     expect(mockUpdateValues[0]).toEqual({
-      balance: '1200',
+      balance: '1200.00',
       balanceDate: new Date('2026-06-02'),
       updatedAt: expect.any(Date),
     });
@@ -154,7 +156,7 @@ describe('manual-accounts service - addAccountSnapshot', () => {
       userId: 'user_123',
       accountId: 'acc_123',
       snapshotDate: '2026-06-02',
-      balance: '1200',
+      balance: '1200.00',
       isSynthetic: false,
       isImported: true,
     });
@@ -204,7 +206,7 @@ describe('manual-accounts service - addAccountSnapshot', () => {
       userId: 'user_123',
       accountId: 'acc_123',
       snapshotDate: '2026-06-02',
-      balance: '1200',
+      balance: '1200.00',
       isSynthetic: false,
       isImported: true,
     });
