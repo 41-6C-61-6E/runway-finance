@@ -104,7 +104,7 @@ export function useDateWindow(
   const dateRange = useMemo(() => getPreciseDateRange(timeframe, windowEnd), [timeframe, windowEnd]);
 
   const periodOptions = useMemo(() => {
-    if (timeframe === 'all' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return [];
+    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return [];
     const options: { label: string; value: string }[] = [];
     const count = timeframe === '1m' ? 24 : 12;
     const cursor = new Date();
