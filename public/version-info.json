@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1783529956603",
+  "buildNumber": "26.07.1783614280912",
   "commits": [
-    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
-    "feat: add configurable retention period for automatic deletion of pending transactions",
-    "feat: include paystub accounts in cash flow calculations regardless of virtual status",
-    "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
-    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page"
+    "refactor: standardize account balance storage to two-decimal string format and add precision cleanup scripts",
+    "refactor: restrict real estate accounts to weekly or manual sync frequency with automatic coercion",
+    "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
+    "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
+    "feat: implement privacy mode for sensitive financial data and chart accessibility labels"
   ]
 }
