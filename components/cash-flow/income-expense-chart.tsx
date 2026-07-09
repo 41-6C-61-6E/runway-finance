@@ -199,6 +199,22 @@ export function IncomeExpenseChart() {
   const minSavingsVal = Math.min(...savingsValues, 0);
   const maxSavingsVal = Math.max(...savingsValues, 100);
 
+  const leftSavingsMin = minSavingsVal * 1.15;
+  const leftSavingsMax = maxSavingsVal * 1.15;
+
+  // Aligning zero between left and right Y-axis for the Savings Rate Chart
+  const { rightSavingsMin, rightSavingsMax } = useMemo(() => {
+    let minR = 0;
+    let maxR = 100;
+    if (leftSavingsMin < 0 && leftSavingsMax > 0) {
+      minR = 100 * (leftSavingsMin / leftSavingsMax);
+    } else if (leftSavingsMin < 0 && leftSavingsMax <= 0) {
+      minR = 100;
+      maxR = 0;
+    }
+    return { rightSavingsMin: minR, rightSavingsMax: maxR };
+  }, [leftSavingsMin, leftSavingsMax]);
+
   // Custom ticks to force 0 to be labeled
   const leftYAxisTicks = useMemo(() => {
     const ticks = [0];
@@ -217,8 +233,8 @@ export function IncomeExpenseChart() {
 
   const savingsYAxisTicks = useMemo(() => {
     const ticks = [0];
-    const min = minSavingsVal * 1.15;
-    const max = maxSavingsVal * 1.15;
+    const min = leftSavingsMin;
+    const max = leftSavingsMax;
     if (min < 0) {
       ticks.push(min);
       ticks.push(min / 2);
@@ -228,7 +244,17 @@ export function IncomeExpenseChart() {
       ticks.push(max);
     }
     return Array.from(new Set(ticks.map(v => Math.round(v)))).sort((a, b) => a - b);
-  }, [minSavingsVal, maxSavingsVal]);
+  }, [leftSavingsMin, leftSavingsMax]);
+
+  const rightSavingsTicks = useMemo(() => {
+    const range = leftSavingsMax - leftSavingsMin;
+    if (range === 0) return [0, 20, 40, 60, 80, 100];
+    return savingsYAxisTicks.map((tick) => {
+      const ratio = (tick - leftSavingsMin) / range;
+      const rightVal = rightSavingsMin + ratio * (rightSavingsMax - rightSavingsMin);
+      return Math.round(rightVal);
+    });
+  }, [savingsYAxisTicks, leftSavingsMin, leftSavingsMax, rightSavingsMin, rightSavingsMax]);
 
   const formatXTick = useCallback((d: string) => {
     return formatChartXAxisDate(d + '-01', timeframe, { isMonthly: true });
@@ -605,8 +631,8 @@ export function IncomeExpenseChart() {
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={[0, 100]}
-                      ticks={[0, 20, 40, 60, 80, 100]}
+                      domain={[rightSavingsMin, rightSavingsMax]}
+                      ticks={rightSavingsTicks}
                       tickFormatter={(v) => `${v}%`}
                     />
                     <ReferenceLine y={0} yAxisId="left" stroke="var(--color-border)" strokeWidth={1} />

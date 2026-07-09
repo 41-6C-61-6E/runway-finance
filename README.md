@@ -18,42 +18,41 @@
 
 ---
 
-## 📸 Screenshots
-
-*Replace placeholder images with actual screenshots by updating the URLs below.*
-
-| Transactions | Net Worth | Cash Flow |
-|:---:|:---:|:---:|
-| ![Transactions](https://via.placeholder.com/600x400/1a1a2e/ffffff?text=Transactions+View) | ![Net Worth](https://via.placeholder.com/600x400/1a1a2e/ffffff?text=Net+Worth+Dashboard) | ![Cash Flow](https://via.placeholder.com/600x400/1a1a2e/ffffff?text=Cash+Flow+Reports) |
-
----
-
 ## ✨ Features
 
 ### 💰 Financial Tracking
-- **Accounts** — Connect bank/brokerage accounts via SimpleFIN or add them manually; track balances and values over time
-- **Transactions** — Full ledger with filtering, searching, bulk editing, detail drawers, and auto-categorization rules
-- **Net Worth** — Real-time net worth dashboard with debt-to-asset ratio, asset allocation charts, and goal progress tracking
-- **Cash Flow** — Income vs. expense analysis, Sankey diagrams, category breakdowns, budget vs. actual, and savings rate
+- **Accounts** — Connect bank/brokerage accounts via Plaid or SimpleFIN, or manage them manually; track balances and values over time.
+- **Transactions** — Full ledger with filtering, searching, bulk editing, detail drawers, tags, and auto-categorization rules.
+- **Net Worth** — Real-time net worth dashboard with debt-to-asset ratio, asset allocation charts, and goal progress tracking.
+- **Spend / Save** — Detailed cash flow analysis, income vs. expenses, category spending breakdown, cash vs. credit card usage, and category summaries.
+- **Flows** — Wealth Flow and Cash Flow visualization via interactive Sankey diagrams.
 
 ### 📊 Budgeting & Planning
-- **Budgets** — Category-based budgets with period selection, visual budget vs. actual charts, and cash flow forecasting
-- **FIRE Planning** — Financial independence calculator, safe withdrawal rate analysis, multi-scenario comparison, and year-by-year retirement projections
-- **Goals** — Track savings goals with progress percentages and reserve calculations
-- **Real Estate** — Property portfolio tracking with equity-over-time charts and allocation views
+- **Budgets** — Category-based budgets with period selection, visual budget vs. actual charts, and cash flow forecasting.
+- **Real Estate** — Property portfolio tracking with equity-over-time charts, allocation views, and integration with FRED/RentCast APIs for valuations.
+- **Investments** — Comprehensive investments tracker for stocks, mutual funds, and crypto holdings, with live stock quotes, cost basis calculations, unrealized gain/loss tracking, and tax breakdowns.
+- **Goals** — Track savings goals with progress percentages, reserve calculations, and goal allocation/projections.
+- **Plans** — Planning and projections engine (coming soon).
 
-### 🔒 Security & Privacy
-- **Authentication** — Single-user credentials via NextAuth v5 with bcrypt password hashing (optional Google OAuth)
-- **Encryption** — AES-256-GCM encryption for sensitive data (API keys, credentials) using native Node.js crypto
-- **Privacy Mode** — Blur sensitive financial data with a single toggle
-- **Registration Control** — Pin-protected registration and one-time enable/disable
+### 🔒 Security, Privacy & Sharing
+- **Authentication** — Single-user credentials via NextAuth v5 with bcrypt password hashing (optional Google OAuth).
+- **Encryption** — AES-256-GCM encryption for sensitive data (API keys, credentials, SimpleFIN/Plaid access tokens) using native Node.js crypto.
+- **Privacy Mode** — Blur sensitive financial data with a single toggle.
+- **Registration Control** — PIN-protected registration and one-time enable/disable.
+- **Account Sharing** — Sharing dashboard and inviting users to view or edit accounts securely.
+
+### 🔔 Notifications & Payroll
+- **Notifications & Alerts** — Configurable custom alert rules (e.g. transaction matches criteria, balance thresholds, savings milestones) with web push notification support.
+- **Payroll & Paystubs** — Paystub tracking, automated paystub generation scheduler, and deduction/line item mapping.
 
 ### 🛠 Developer Experience
-- **Data Export** — CSV, JSON, and ZIP export of all user data
-- **PWA Support** — Installable progressive web app with service worker caching
-- **Dark by Default** — Sleek dark theme with accent color customization
-- **Background Sync** — Configurable cron-based automated transaction sync via SimpleFIN
-- **Docker-Native** — Full stack (PostgreSQL + Next.js) in a single `docker compose` command
+- **Data Explorer** — In-app database logs, table explorer, and SQL runner.
+- **Financial Logic** — Detailed, interactive trace engine tree explaining how every single financial metric is calculated.
+- **Data Export** — CSV, JSON, and ZIP export of all user data.
+- **PWA Support** — Installable progressive web app with service worker caching.
+- **Dark by Default** — Sleek dark theme with accent color customization.
+- **Background Sync** — Configurable automated transaction sync via Plaid or SimpleFIN using native Next.js-instrumentation startup schedulers.
+- **Docker-Native** — Full stack (PostgreSQL + Next.js) in a single `docker compose` command.
 
 ---
 
@@ -62,107 +61,17 @@
 | Category | Technology |
 |---|---|
 | **Framework** | Next.js 16 (App Router, Turbopack), React 19, TypeScript 5.9 |
-| **Styling** | Tailwind CSS 4, shadcn/ui (Radix UI primitives), Tremor |
-| **Authentication** | NextAuth v5 (beta), bcryptjs |
-| **Database** | PostgreSQL 16, Drizzle ORM, drizzle-kit |
+| **Styling** | Tailwind CSS 4, shadcn/ui (Radix UI primitives) |
+| **Authentication** | NextAuth v5 (beta.30), bcryptjs |
+| **Database** | PostgreSQL, Drizzle ORM, drizzle-kit |
 | **State & Data** | TanStack Query, TanStack Table |
 | **Forms & Validation** | React Hook Form, Zod 4 |
-| **Charts & Visualization** | Nivo, Recharts 3 |
-| **Drag & Drop** | dnd-kit |
-| **Background Jobs** | node-cron |
+| **Charts & Visualization** | Recharts 3 |
+| **Push Notifications** | Web Push (web-push) |
 | **Encryption** | AES-256-GCM (Node.js `crypto` module) |
 | **Testing** | Vitest, Testing Library, Playwright |
 | **Package Manager** | pnpm |
 | **Deployment** | Docker, Docker Compose |
-
----
-
-## 📁 Project Structure
-
-```
-personal-finance/
-├── app/                          # Next.js App Router pages & layouts
-│   ├── accounts/                 # Account management pages
-│   ├── ai-suggestions/           # AI-powered financial insights
-│   ├── api/                      # API route handlers (all require auth)
-│   │   ├── auth/[...nextauth]/   # NextAuth handlers
-│   │   ├── connections/          # SimpleFIN connections + sync
-│   │   ├── accounts/             # Account CRUD
-│   │   ├── transactions/         # Transaction CRUD + bulk ops
-│   │   ├── categories/           # Category management
-│   │   ├── category-rules/       # Auto-categorization rules
-│   │   ├── net-worth/            # Net worth snapshots
-│   │   ├── cash-flow/            # Cash flow summaries
-│   │   ├── fire/                 # FIRE scenarios
-│   │   ├── budgets/              # Budget CRUD
-│   │   ├── financial-goals/      # Savings goals
-│   │   ├── real-estate/          # Real estate properties
-│   │   ├── manual-accounts/      # Manual account types
-│   │   ├── llm/                  # LLM/AI integration
-│   │   └── user-settings/        # User preferences
-│   ├── budgets/                  # Budget management pages
-│   ├── cash-flow/                # Cash flow reports
-│   ├── financial-logic/          # Financial calculation pages
-│   ├── fire/                     # FIRE planning pages
-│   ├── goals/                    # Goals tracking pages
-│   ├── net-worth/                # Net worth dashboard
-│   ├── real-estate/              # Real estate portfolio pages
-│   ├── settings/                 # User settings pages
-│   ├── signin/                   # Authentication pages
-│   ├── spending/                 # Spending analysis pages
-│   ├── transactions/             # Transaction ledger pages
-│   ├── client-layout.tsx         # Client-side root layout
-│   ├── layout.tsx                # Server-side root layout
-│   └── page.tsx                  # Home/dashboard route
-├── components/                   # React components
-│   ├── accounts/                 # Account-specific components
-│   ├── budgets/                  # Budget components
-│   ├── cash-flow/                # Cash flow chart components
-│   ├── charts/                   # Shared chart components
-│   ├── features/                 # Feature flag components
-│   ├── financial-logic/          # Financial calculation components
-│   ├── fire/                     # FIRE planning components
-│   ├── goals/                    # Goal tracking components
-│   ├── net-worth/                # Net worth components
-│   ├── real-estate/              # Real estate components
-│   ├── settings/                 # Settings components
-│   ├── ui/                       # shadcn/ui primitive components
-│   ├── sidebar.tsx               # Navigation sidebar
-│   ├── authenticated-layout.tsx  # Authenticated layout wrapper
-│   └── ...                       # Other shared components
-├── config/                       # App configuration & defaults
-├── drizzle/                      # Database migration SQL files
-├── lib/                          # Core business logic & utilities
-│   ├── db/                       # Database schema, queries, seeds
-│   │   ├── schema.ts             # Drizzle schema (20+ tables)
-│   │   ├── seed-categories.ts    # Default category seeding
-│   │   ├── seed-default-rules.ts # Default rule seeding
-│   │   └── seed-indexes.ts       # Database index creation
-│   ├── hooks/                    # Custom React hooks
-│   ├── services/                 # Business logic
-│   │   ├── sync.ts               # SimpleFIN sync service
-│   │   ├── rules-engine.ts       # Auto-categorization engine
-│   │   ├── account-history.ts    # Balance history
-│   │   ├── manual-accounts.ts    # Manual account management
-│   │   └── retirement.ts         # FIRE/retirement calculations
-│   ├── types/                    # TypeScript type definitions
-│   ├── validations/              # Zod validation schemas
-│   ├── auth.ts                   # NextAuth configuration
-│   ├── crypto.ts                 # Encryption utilities
-│   ├── simplefin.ts              # SimpleFIN HTTP client
-│   └── utils/                    # General helpers
-├── public/                       # Static assets and PWA files
-├── scripts/                      # Build and utility scripts
-├── styles/                       # Global CSS
-├── tests/                        # Unit and integration tests
-│   └── unit/                     # Unit tests
-├── Dockerfile                    # Multi-stage Docker build
-├── compose.yml                   # Docker Compose configuration
-├── drizzle.config.ts             # Drizzle ORM configuration
-├── next.config.js                # Next.js configuration
-├── tsconfig.json                 # TypeScript configuration
-└── vitest.config.ts              # Vitest configuration
-```
 
 ---
 
@@ -203,6 +112,9 @@ openssl rand -hex 32
 
 # Generate an encryption key for sensitive data
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Generate VAPID keys for push notifications
+pnpm run generate-vapid-keys
 ```
 
 ### Running Locally
@@ -218,13 +130,13 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The application will be available at [http://localhost:3000](http://localhost:3000).
+The application will be available at [http://localhost:3001](http://localhost:3001).
 
 ### First-Time Setup
 
-1. Open [http://localhost:3000/signin](http://localhost:3000/signin) and create the first admin user
-2. Set `ALLOW_REGISTRATION=false` in `.env.local` to lock down registration
-3. Optionally set a `REGISTRATION_PIN` for additional protection
+1. Open [http://localhost:3001/signin](http://localhost:3001/signin) and create the first admin user.
+2. Set `ALLOW_REGISTRATION=false` in `.env.local` to lock down registration.
+3. Optionally set a `REGISTRATION_PIN` for additional protection.
 
 ---
 
@@ -235,16 +147,25 @@ All variables are defined in `.env.example`. Copy it to `.env.local` and configu
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `NEXTAUTH_SECRET` | ✅ | — | 64-char hex signing secret. Generate with `openssl rand -hex 32` |
-| `NEXTAUTH_URL` | ✅ | — | Base URL of the app (e.g. `http://localhost:3000`) |
+| `NEXTAUTH_URL` | ✅ | — | Base URL of the app (e.g. `http://localhost:3001` or `http://localhost:3000` for prod) |
+| `POSTGRES_DB` | ✅ | `personal_finance` | Database name |
 | `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
-| `POSTGRES_PASSWORD` | ✅ | — | Password for the PostgreSQL `postgres` user |
+| `POSTGRES_PASSWORD` | ✅ | — | Password for the PostgreSQL `postgres` user (used by docker compose) |
 | `ENCRYPTION_KEY` | ✅ | — | 64-char hex key for AES-256-GCM encryption |
 | `ALLOW_REGISTRATION` | ✅ | `true` | Set to `false` after creating the first user |
 | `REGISTRATION_PIN` | ❌ | — | PIN required for new account creation |
-| `SYNC_CRON_SCHEDULE` | ❌ | `0 */6 * * *` | Cron expression for SimpleFIN auto-sync. Empty to disable |
-| `DEBUG` | ❌ | `false` | Set to `true` for verbose debug logging |
+| `FRED_API_KEY` | ❌ | — | Federal Reserve Economic Data API key (optional — for historical home price estimation) |
+| `RENTCAST_API_KEY` | ❌ | — | RentCast API key (optional — for real estate property valuation) |
+| `BUG_REPORTING` | ❌ | `false` | Enable collaborative bug reporting dropdown |
 | `GOOGLE_CLIENT_ID` | ❌ | — | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | ❌ | — | Google OAuth client secret (optional) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`| ❌ | — | VAPID public key (optional — for web push notifications) |
+| `VAPID_PRIVATE_KEY` | ❌ | — | VAPID private key (optional — for web push notifications) |
+| `VAPID_SUBJECT` | ❌ | — | VAPID subject email, e.g. `mailto:admin@example.com` (optional) |
+| `AI_PROVIDER_NAME` | ❌ | — | Auto-seed AI provider name (e.g. "OpenAI", "Ollama") |
+| `AI_PROVIDER_ENDPOINT` | ❌ | — | Auto-seed AI provider API base endpoint (e.g. "https://api.openai.com/v1") |
+| `AI_PROVIDER_MODEL` | ❌ | — | Auto-seed AI provider model ID (e.g. "gpt-4o-mini") |
+| `AI_PROVIDER_API_KEY` | ❌ | — | Auto-seed AI provider API key (optional) |
 
 ---
 
@@ -252,8 +173,8 @@ All variables are defined in `.env.example`. Copy it to `.env.local` and configu
 
 | Script | Description |
 |---|---|
-| `pnpm dev` | Start development server with Turbopack on port 3000 |
-| `pnpm build` | Create production build |
+| `pnpm dev` | Start development server with Turbopack on port 3001 (auto-generates CSS color palettes and PWA service worker) |
+| `pnpm build` | Create production build (auto-generates CSS color palettes and PWA service worker) |
 | `pnpm start` | Start production server on port 3000 |
 | `pnpm preview` | Alias for `start` |
 | `pnpm lint` | Run ESLint across the codebase |
@@ -268,6 +189,9 @@ All variables are defined in `.env.example`. Copy it to `.env.local` and configu
 | `pnpm db:studio` | Open Drizzle Studio (web-based database explorer) |
 | `pnpm db:indexes` | Create optimized database indexes |
 | `pnpm upgrade` | Upgrade Next.js to the latest version |
+| `pnpm generate-colors` | Run script to generate custom Tailwind/CSS colors from configured palette |
+| `pnpm generate-pwa-icons` | Generate PWA app icon assets |
+| `pnpm generate-vapid-keys` | Generate a public/private VAPID keypair for push notifications |
 
 ---
 
@@ -290,9 +214,6 @@ Build and deploy the full stack with Docker Compose:
 ```bash
 # Build the Docker image
 docker build -t personal-finance:latest .
-
-# Or pull from Docker Hub (when published)
-# docker pull alanracek/personal-finance:latest
 
 # Start the full stack (PostgreSQL + app)
 docker compose up -d
@@ -340,28 +261,35 @@ The project uses:
 
 ### Schema
 
-The database schema is defined in `lib/db/schema.ts` using Drizzle ORM. Migrations live in the `drizzle/` directory as versioned SQL files.
+The database schema is defined across files in `lib/db/schema/` using Drizzle ORM, and re-exported from `lib/db/schema.ts`. Migrations live in the `drizzle/` directory as versioned SQL files.
 
 **Key tables:**
 
 | Table | Purpose |
 |---|---|
 | `user`, `session`, `account`, `verification` | NextAuth core tables |
-| `user_settings` | User preferences (currency, locale, theme, privacy mode, chart settings) |
+| `user_settings` | User preferences (currency, locale, theme, privacy mode, chart visibility, etc.) |
 | `simplefin_connections` | SimpleFIN Bridge connections (encrypted access URLs) |
-| `accounts` | Financial accounts (checking, savings, investment, loan, etc.) |
-| `transactions` | Transaction records with categorization |
+| `plaid_connections` | Plaid account sync connections |
+| `sync_logs` | SimpleFIN/Plaid sync operation history |
+| `accounts` | Financial accounts (checking, savings, investment, credit, loan, etc.) |
+| `holdings`, `holding_snapshots` | Stock, mutual fund, and crypto holdings and balance history |
+| `transactions` | Transaction records with categories, tags, and bank metadata |
 | `categories` | Transaction categories with color and icon support |
+| `tags` | Custom tags for budgets, goals, and transactions |
 | `category_rules` | Auto-categorization rules |
-| `sync_logs` | Sync operation history |
-| `net_worth_snapshots` | Daily net worth history |
+| `net_worth_snapshots` | Daily aggregated net worth history |
 | `account_snapshots` | Per-account balance history over time |
 | `monthly_cash_flow` | Pre-aggregated monthly income/expense summaries |
 | `category_spending_summary` | Monthly spending by category |
+| `category_income_summary` | Monthly income by category |
 | `budgets` | Category-based budgets |
 | `financial_goals` | Savings goals with targets and progress |
-| `fire_scenarios` | FIRE planning scenario configurations |
-| `retirement_projections` | Year-by-year retirement projections |
+| `goal_allocation_history` | Account balance allocation snapshots towards financial goals |
+| `paystubs`, `paystub_line_items`, `paystub_field_mappings` | Payroll paystub entries, line items, and template parsers |
+| `custom_alert_rules`, `sent_notifications`, `push_subscriptions` | Web push subscriptions and custom conditional alerting engine triggers |
+| `ai_proposals` | AI-generated categorization/insight suggestions |
+| `ai_providers` | AI/LLM endpoint configurations |
 
 ### Managing Migrations
 
@@ -386,7 +314,7 @@ pnpm db:studio
 
 All API routes require authentication via NextAuth session.
 
-### Connections
+### Connections & Plaid
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -395,6 +323,9 @@ All API routes require authentication via NextAuth session.
 | `DELETE` | `/api/connections/:id` | Delete a connection (requires `X-Confirm-Delete: true` header) |
 | `POST` | `/api/connections/:id/sync` | Trigger manual sync |
 | `GET` | `/api/connections/:id/sync-logs` | View sync history |
+| `POST` | `/api/plaid/create-link-token` | Generate a link token for Plaid Link client initialization |
+| `POST` | `/api/plaid/exchange-public-token`| Exchange Plaid public token for secure access token |
+| `POST` | `/api/plaid/sync` | Sync Plaid connection transactions and balances |
 
 ### Accounts
 
@@ -408,12 +339,12 @@ All API routes require authentication via NextAuth session.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/transactions` | List transactions with filtering, pagination, sorting |
+| `GET` | `/api/transactions` | List transactions with filtering, pagination, sorting, search, and tags |
 | `GET` | `/api/transactions/:id` | Get transaction details |
 | `PATCH` | `/api/transactions/:id` | Update single transaction |
 | `PATCH` | `/api/transactions` | Bulk update transactions |
 
-Additional endpoints are available for categories, category rules, net worth, cash flow, FIRE scenarios, budgets, financial goals, real estate, manual accounts, LLM integration, and user settings.
+Additional endpoints are available for categories, tags, category rules, net worth, cash flow, wealth flow, budgets, financial goals, real estate, manual accounts, LLM/AI suggestions, push notifications, paystubs, backup/export, and user settings.
 
 ---
 
@@ -428,11 +359,11 @@ Export all your data from the Settings page in three formats:
 
 ## 🔒 Security
 
-- Sensitive data (SimpleFIN access URLs) encrypted with AES-256-GCM at rest
-- Delete operations require `X-Confirm-Delete: true` header to prevent accidental deletions
-- Single-user authentication with registration lock after first user
-- Input sanitization on all free-text fields
-- Registration PIN protection for new account creation
+- Sensitive data (SimpleFIN and Plaid access credentials) encrypted with AES-256-GCM at rest.
+- Delete operations require `X-Confirm-Delete: true` header to prevent accidental deletions.
+- Single-user authentication with registration lock after the first user.
+- PIN protection option for new user registration.
+- Input sanitization on all free-text fields.
 
 ---
 
@@ -440,7 +371,6 @@ Export all your data from the Settings page in three formats:
 
 Planned features and improvements:
 
-- [ ] Investments page with holdings and performance metrics
 - [ ] Projection lab with screen-grab visualization
 - [ ] Multi-currency support
 - [ ] Recurring transaction templates
@@ -501,7 +431,8 @@ See the [LICENSE](LICENSE) file for full terms.
 - [shadcn/ui](https://ui.shadcn.com/) — Beautifully styled components built with Radix UI and Tailwind CSS
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM with a native PostgreSQL driver
 - [SimpleFIN](https://simplefin.org/) — Open banking bridge protocol
-- [Tremor](https://tremor.so/) — Data visualization components
+- [Plaid](https://plaid.com/) — Financial data transfer network APIs
+- [Recharts](https://recharts.org/) — Redesigned charting library built with React
 - [Lucide](https://lucide.dev/) — Beautiful & consistent icons
 
 ---
