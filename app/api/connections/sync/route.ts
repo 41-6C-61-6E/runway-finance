@@ -206,6 +206,25 @@ export async function POST(request: Request) {
               }
               const meta = JSON.parse(raw) as Record<string, unknown>;
               syncFrequency = (meta.syncFrequency as string) || 'manual';
+
+              const isRealEstate = [
+                'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+                'single-family', 'condo', 'townhouse', 'multi-family'
+              ].includes(acc.type);
+              if (isRealEstate && syncFrequency === 'daily') {
+                syncFrequency = 'weekly';
+                try {
+                  meta.syncFrequency = 'weekly';
+                  const updatedMeta = JSON.stringify(meta);
+                  const encryptedMeta = dek ? await (await import('@/lib/crypto')).encryptField(updatedMeta, dek) : updatedMeta;
+                  await getDb()
+                    .update(accounts)
+                    .set({ metadata: encryptedMeta, updatedAt: new Date() })
+                    .where(eq(accounts.id, acc.id));
+                } catch (dbErr) {
+                  logger.error('Failed to save coerced syncFrequency in connection sync', { accountId: acc.id, error: String(dbErr) });
+                }
+              }
             } catch {}
             manualAccountScheduler.schedule(acc.id, userId, syncFrequency, refreshed.balanceDate);
           }

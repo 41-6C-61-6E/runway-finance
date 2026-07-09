@@ -353,6 +353,17 @@ export async function createManualAccount(input: {
 
   const initialValue = input.initialValue ?? 0;
 
+  const REAL_ESTATE_TYPES = [
+    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+    'single-family', 'condo', 'townhouse', 'multi-family'
+  ];
+  const isRealEstate = REAL_ESTATE_TYPES.includes(accountType);
+
+  const meta = input.metadata ? { ...input.metadata } : {};
+  if (isRealEstate && meta.syncFrequency === 'daily') {
+    meta.syncFrequency = 'weekly';
+  }
+
   const rawValues = {
     userId: input.userId,
     connectionId: null,
@@ -362,7 +373,7 @@ export async function createManualAccount(input: {
     balance: String(initialValue),
     balanceDate: new Date(),
     type: accountType,
-    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+    metadata: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null,
     institution: null,
     isHidden: false,
     isExcludedFromNetWorth: false,
@@ -398,7 +409,6 @@ export async function createManualAccount(input: {
   await ensureEmployerContributions(input.userId, dek);
 
   // Generate synthetic historical snapshots if purchase info is present
-  const meta = input.metadata ?? {};
   const hasPurchaseHistory = !!meta.purchaseDate && (!!meta.purchasePrice || accountType === 'metals');
   if (hasPurchaseHistory) {
     try {

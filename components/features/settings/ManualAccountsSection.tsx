@@ -674,20 +674,27 @@ export default function ManualAccountsSection() {
     return !canSync(account) || account.type === 'metals';
   };
 
-  const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
-    <div>
-      <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
-      <select
-        value={meta.syncFrequency || 'manual'}
-        onChange={(e) => setMeta({ ...meta, syncFrequency: e.target.value })}
-        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-      >
-        {SYNC_FREQUENCIES.map((f) => (
-          <option key={f.value} value={f.value}>{f.label}</option>
-        ))}
-      </select>
-    </div>
-  );
+  const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void, accountType?: string) => {
+    const isRealEstate = accountType && REAL_ESTATE_TYPES.includes(accountType);
+    const frequencies = isRealEstate
+      ? SYNC_FREQUENCIES.filter((f) => f.value !== 'daily')
+      : SYNC_FREQUENCIES;
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
+        <select
+          value={meta.syncFrequency || 'manual'}
+          onChange={(e) => setMeta({ ...meta, syncFrequency: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {frequencies.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
 
   const valuationMethodField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
     <div>
@@ -857,7 +864,7 @@ export default function ManualAccountsSection() {
             />
           </div>
           {linkedMortgageField(createMeta, setCreateMeta)}
-          {syncFrequencyField(createMeta, setCreateMeta)}
+          {syncFrequencyField(createMeta, setCreateMeta, createType)}
         </>
       );
     }
@@ -927,7 +934,7 @@ export default function ManualAccountsSection() {
                 required
               />
             </div>
-            {syncFrequencyField(createMeta, setCreateMeta)}
+            {syncFrequencyField(createMeta, setCreateMeta, createType)}
           </>
         );
       case 'gold':
@@ -953,7 +960,7 @@ export default function ManualAccountsSection() {
                 onChange={(e) => setCreateMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
               />
             </div>
-            {syncFrequencyField(createMeta, setCreateMeta)}
+            {syncFrequencyField(createMeta, setCreateMeta, createType)}
           </>
         );
       case 'loan':
@@ -1177,7 +1184,7 @@ export default function ManualAccountsSection() {
                         className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="manual">Manual</option>
-                        <option value="daily">Daily</option>
+                        {!REAL_ESTATE_TYPES.includes(account.type) && <option value="daily">Daily</option>}
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
                       </select>
@@ -1527,7 +1534,7 @@ export default function ManualAccountsSection() {
                   />
                 </div>
                 {linkedMortgageField(editMeta, (m) => setEditMeta(m))}
-                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m), editAccount?.type)}
               </>
             )}
 
@@ -1602,7 +1609,7 @@ export default function ManualAccountsSection() {
                     placeholder="e.g., wpkh(xpub...)"
                   />
                 </div>
-                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m), editAccount?.type)}
               </>
             )}
 
@@ -1625,7 +1632,7 @@ export default function ManualAccountsSection() {
                     onChange={(e) => setEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
                   />
                 </div>
-                {syncFrequencyField(editMeta, (m) => setEditMeta(m))}
+                {syncFrequencyField(editMeta, (m) => setEditMeta(m), editAccount?.type)}
               </>
             )}
 
