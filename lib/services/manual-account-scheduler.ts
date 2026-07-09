@@ -4,7 +4,7 @@ import { syncManualAccount, readApiConfig } from '@/lib/services/manual-accounts
 import { getServerDEK } from '@/lib/crypto-context';
 import { eq, and, isNull } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
-import { decryptField } from '@/lib/crypto';
+import { decryptField, encryptField } from '@/lib/crypto';
 import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
 const LOG_TAG = '[manual-account-scheduler]';
@@ -19,6 +19,15 @@ const SYNC_INTERVALS: Record<string, number> = {
 };
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
+
+const REAL_ESTATE_TYPES = [
+  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+  'single-family', 'condo', 'townhouse', 'multi-family'
+];
+
+export function isRealEstateType(type: string): boolean {
+  return REAL_ESTATE_TYPES.includes(type);
+}
 
 async function canSyncUser(userId: string): Promise<boolean> {
   try {
@@ -48,6 +57,50 @@ async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<s
     return 'manual';
   }
 }
+
+async function coerceAndSaveSyncFrequency(
+  accountRow: any,
+  dek: Uint8Array,
+  db: any
+): Promise<string> {
+  const syncFrequency = await extractSyncFrequency(accountRow, dek);
+  if (isRealEstateType(accountRow.type) && syncFrequency === 'daily') {
+    try {
+      let raw: string;
+      if (typeof accountRow.metadata === 'string') {
+        raw = await decryptField(accountRow.metadata, dek);
+      } else {
+        raw = JSON.stringify(accountRow.metadata || '{}');
+      }
+      const meta = JSON.parse(raw) as Record<string, unknown>;
+      meta.syncFrequency = 'weekly';
+
+      const updatedMeta = JSON.stringify(meta);
+      const encryptedMeta = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
+
+      await db
+        .update(accounts)
+        .set({
+          metadata: encryptedMeta,
+          updatedAt: new Date(),
+        })
+        .where(eq(accounts.id, accountRow.id));
+
+      logger.info(`${LOG_TAG} Coerced daily sync frequency to weekly for real estate account`, {
+        accountId: accountRow.id,
+        userId: accountRow.userId,
+      });
+      return 'weekly';
+    } catch (err) {
+      logger.error(`${LOG_TAG} Failed to update coerced frequency in DB`, {
+        accountId: accountRow.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return syncFrequency;
+}
+
 
 class ManualAccountScheduler {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -100,7 +153,7 @@ class ManualAccountScheduler {
         }
       }
 
-      const syncFrequency = await extractSyncFrequency(row, dek);
+      const syncFrequency = await coerceAndSaveSyncFrequency(row, dek, db);
       if (this.schedule(row.id, row.userId, syncFrequency, row.balanceDate)) {
         scheduled++;
       }
@@ -166,7 +219,7 @@ class ManualAccountScheduler {
     const dek = await getServerDEK(userId);
     for (const row of userAccounts) {
       if (!SYNCABLE_TYPES.includes(row.type as typeof SYNCABLE_TYPES[number])) continue;
-      const syncFrequency = await extractSyncFrequency(row, dek);
+      const syncFrequency = await coerceAndSaveSyncFrequency({ ...row, userId }, dek, db);
       this.schedule(row.id, userId, syncFrequency, row.balanceDate);
     }
   }
@@ -216,7 +269,9 @@ class ManualAccountScheduler {
       const db = getDb();
       const [updated] = await db
         .select({
+          id: accounts.id,
           userId: accounts.userId,
+          type: accounts.type,
           balanceDate: accounts.balanceDate,
           metadata: accounts.metadata,
         })
@@ -227,7 +282,7 @@ class ManualAccountScheduler {
       if (!updated) return;
 
       const dek = await getServerDEK(updated.userId);
-      const syncFrequency = await extractSyncFrequency(updated, dek);
+      const syncFrequency = await coerceAndSaveSyncFrequency(updated, dek, db);
 
       if (syncFrequency === 'manual') return;
 
