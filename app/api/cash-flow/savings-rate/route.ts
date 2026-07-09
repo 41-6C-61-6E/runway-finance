@@ -280,6 +280,8 @@ export async function GET(request: Request) {
         return {
           yearMonth,
           income: Math.round(stats.income * 100) / 100,
+          expenses: Math.round(stats.expenses * 100) / 100,
+          netCashFlow: Math.round((stats.income - stats.expenses) * 100) / 100,
           savingsRate: Math.round(savingsRate * 10000) / 10000, // 4 decimal precision
           savings: {
             retirement: Math.round(stats.retirement * 100) / 100,
