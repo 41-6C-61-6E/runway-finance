@@ -753,6 +753,15 @@ export async function checkTransactionAlerts(
 ) {
   try {
     const db = getDb();
+
+    const [acct] = await db
+      .select({ isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, tx.accountId)))
+      .limit(1);
+
+    if (!acct || acct.isHidden || acct.isExcludedFromNetWorth) return;
+
     const rules = await db
       .select()
       .from(customAlertRules)
@@ -853,12 +862,13 @@ export async function checkAccountBalanceAlerts(
     if (rules.length === 0) return;
 
     const [acc] = await db
-      .select({ id: accounts.id, name: accounts.name })
+      .select({ id: accounts.id, name: accounts.name, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
       .from(accounts)
       .where(and(eq(accounts.userId, userId), eq(accounts.id, accountId)))
       .limit(1);
 
     if (!acc) return;
+    if (acc.isHidden || acc.isExcludedFromNetWorth) return;
     const accName = await decryptField(acc.name, dek);
 
     for (const rule of rules) {
