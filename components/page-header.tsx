@@ -18,7 +18,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeaderProps) {
   const { sidebarWidth } = useSidebar();
-  const { privacyMode } = usePrivacyMode();
+  const { privacyMode, shortcutLabel } = usePrivacyMode();
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
@@ -76,7 +76,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         }`}
       >
         {privacyMode && (
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 mr-0.5" title="Privacy mode active — Ctrl+Shift+P to toggle">
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 mr-0.5" title={`Privacy mode active — ${shortcutLabel} to toggle`}>
             <EyeOff className="w-3 h-3 text-primary" />
           </div>
         )}
@@ -118,7 +118,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
         <div className="flex items-center gap-1">
           {privacyMode && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 border border-primary/20 mr-1" title="Privacy mode active — Ctrl+Shift+P to toggle">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 border border-primary/20 mr-1" title={`Privacy mode active — ${shortcutLabel} to toggle`}>
               <EyeOff className="w-3.5 h-3.5 text-primary" />
               <span className="text-[10px] font-medium text-primary hidden lg:inline">Private</span>
             </div>
