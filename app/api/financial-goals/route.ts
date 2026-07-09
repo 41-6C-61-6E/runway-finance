@@ -7,6 +7,7 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, encryptRow, decryptField } from '@/lib/crypto';
 import { computeGoalAllocations, findSharedAccounts, getGoalAllocation } from '@/lib/services/goal-allocation';
+import { formatToCents } from '@/lib/services/account-history';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -137,14 +138,14 @@ export async function POST(req: NextRequest) {
       name,
       description: description || null,
       type,
-      targetAmount: String(targetAmount),
-      currentAmount: String(currentAmount || 0),
+      targetAmount: formatToCents(parseFloat(String(targetAmount)) || 0),
+      currentAmount: formatToCents(parseFloat(String(currentAmount || 0)) || 0),
       targetDate: targetDate || null,
       categoryId: categoryId || null,
       status: status || 'active',
       linkedAccountId: linkedAccountId || null,
       percentage: percentage != null ? String(percentage) : '100',
-      reserve: reserve != null ? String(reserve) : '0',
+      reserve: reserve != null ? formatToCents(parseFloat(String(reserve)) || 0) : '0.00',
       sortOrder: sortOrder != null ? Number(sortOrder) : 0,
     }, dek);
 
@@ -202,12 +203,12 @@ export async function PATCH(req: NextRequest) {
     const updateData: Record<string, unknown> = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.targetAmount !== undefined) updateData.targetAmount = String(updates.targetAmount);
-    if (updates.currentAmount !== undefined) updateData.currentAmount = String(updates.currentAmount);
+    if (updates.targetAmount !== undefined) updateData.targetAmount = formatToCents(parseFloat(String(updates.targetAmount)) || 0);
+    if (updates.currentAmount !== undefined) updateData.currentAmount = formatToCents(parseFloat(String(updates.currentAmount)) || 0);
     if (updates.targetDate !== undefined) updateData.targetDate = updates.targetDate || null;
     if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId || null;
     if (updates.percentage !== undefined) updateData.percentage = String(updates.percentage);
-    if (updates.reserve !== undefined) updateData.reserve = String(updates.reserve);
+    if (updates.reserve !== undefined) updateData.reserve = formatToCents(parseFloat(String(updates.reserve)) || 0);
     if (updates.status !== undefined) updateData.status = updates.status;
     if (updates.sortOrder !== undefined) updateData.sortOrder = Number(updates.sortOrder);
     if (updates.linkedAccountId !== undefined) updateData.linkedAccountId = updates.linkedAccountId || null;

@@ -6,6 +6,7 @@ import { eq, and, or, isNull, sql, inArray, gte, lt } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
+import { formatToCents } from '@/lib/services/account-history';
 
 function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
   let start: Date;
@@ -289,7 +290,7 @@ export async function POST(request: Request) {
       periodType: (body.periodType as string) || 'monthly',
       yearMonth: body.periodKey as string ?? null,
       periodKey: body.periodKey as string ?? null,
-      amount: String(body.amount ?? 0),
+      amount: formatToCents(parseFloat(String(body.amount ?? 0)) || 0),
       isRecurring: body.isRecurring !== false,
       fundingAccountId: (body.fundingAccountId as string) ?? null,
       rollover: body.rollover === true,
