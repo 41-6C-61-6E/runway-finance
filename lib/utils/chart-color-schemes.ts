@@ -113,8 +113,9 @@ export function applyChartColorScheme(id: ChartColorSchemeId) {
     r.style.setProperty(`--chart-${i + 1}`, adjusted);
   });
 
-  const baseColorAdjusted = adjustColorForTheme(scheme.colors[0], isDark);
-  r.style.setProperty('--chart-synthetic', muteOklchColor(baseColorAdjusted));
+  const constructiveColorAdjusted = adjustColorForTheme(scheme.colors[0], isDark);
+  r.style.setProperty('--constructive', constructiveColorAdjusted);
+  r.style.setProperty('--chart-synthetic', muteOklchColor(constructiveColorAdjusted));
   r.style.setProperty('--destructive-synthetic', isDark ? 'oklch(0.72 0.12 25)' : 'oklch(0.5 0.12 25)');
 }
 
@@ -136,6 +137,7 @@ export function resetChartColorScheme() {
   for (let i = 1; i <= 5; i++) {
     r.style.removeProperty(`--chart-${i}`);
   }
+  r.style.removeProperty('--constructive');
   r.style.removeProperty('--chart-synthetic');
   r.style.removeProperty('--destructive-synthetic');
 }

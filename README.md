@@ -405,7 +405,7 @@ Issues, pull requests, and suggestions are welcome. Feel free to fork and adapt 
 | Contributor | Role |
 |---|---|
 | **Alan Racek** | Original author, architecture, core development |
-| **Ehsan Ghaffar** | Initial contributions |
+| **Ehsan Ghaffar** | Next.js Starter Template |
 
 ---
 
