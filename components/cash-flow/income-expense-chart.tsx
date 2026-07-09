@@ -60,7 +60,7 @@ const MONTH_MAP: Record<TimeRange, number> = {
   '1m': 1, '3m': 3, '6m': 6, '1y': 12, '5y': 60, 'ytd': 12, 'all': 120,
 };
 
-const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', 'ytd', 'all'].includes(p.value));
+const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', 'ytd', 'all', '30d', '365d', '5y'].includes(p.value));
 
 const typeOptions = [
   { value: 'bar' as ChartType, label: 'Bar' },
@@ -161,9 +161,15 @@ export function IncomeExpenseChart() {
       brokerage: d.savings.brokerage,
       savingsAccount: d.savings.savingsAccount,
       cash: d.savings.cash,
-      savingsRate: d.savingsRate * 100, // percentage e.g. 32.5
+      savingsRate: d.savingsRate * 100,
     }));
   }, [windowedSavingsData]);
+
+  const avgSavingsRate = useMemo(() => {
+    if (savingsChartData.length === 0) return 0;
+    const total = savingsChartData.reduce((sum, d) => sum + d.savingsRate, 0);
+    return total / savingsChartData.length;
+  }, [savingsChartData]);
 
   const xAxisTicks = useMemo(() => {
     return getChartXTicksUnified(data, timeframe, isMobile, 'yearMonth');
@@ -274,7 +280,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Income, Expenses & Savings Rate</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -292,7 +298,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Income, Expenses & Savings Rate</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -314,7 +320,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Income, Expenses & Savings Rate</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -340,7 +346,7 @@ export function IncomeExpenseChart() {
         title={
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-            <span>Income, Expenses & Savings Rate</span>
+            <span>Net Income & Savings Rate</span>
           </div>
         }
       />
@@ -524,7 +530,7 @@ export function IncomeExpenseChart() {
               </div>
             </div>
 
-            {/* ── Right Column: Savings Rate (Stacked Bar + Line) ── */}
+            {/* ── Right Column: Savings Rate (Stacked Bar + Avg Line) ── */}
             <div className="flex-1 min-w-0 p-2.5 sm:p-5">
               <div className="flex items-center gap-1.5 mb-3">
                 <TrendingUp className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -544,43 +550,24 @@ export function IncomeExpenseChart() {
                       minTickGap={30}
                     />
                     <YAxis
-                      yAxisId="left"
                       tickLine={false}
                       axisLine={{ stroke: 'var(--color-border)' }}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                       domain={[minSavingsVal * 1.15, maxSavingsVal * 1.15]}
                       tickFormatter={formatSavingsYTick}
                     />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={[0, 100]}
-                      tickFormatter={(v) => `${v}%`}
-                    />
-                    <ReferenceLine y={0} yAxisId="left" stroke="var(--color-border)" strokeWidth={1} />
+                    <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                     <RechartsTooltip content={<SavingsTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
                     
                     {/* Stacked bars for savings breakdown */}
-                    <Bar yAxisId="left" dataKey="retirement" name="Retirement" stackId="savings" fill="var(--color-chart-1)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
-                    <Bar yAxisId="left" dataKey="hsa" name="HSA" stackId="savings" fill="var(--color-chart-2)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
-                    <Bar yAxisId="left" dataKey="brokerage" name="Brokerage" stackId="savings" fill="var(--color-chart-3)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
-                    <Bar yAxisId="left" dataKey="savingsAccount" name="Savings" stackId="savings" fill="var(--color-chart-4)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
-                    <Bar yAxisId="left" dataKey="cash" name="Cash" stackId="savings" fill="var(--color-chart-5)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar dataKey="retirement" name="Retirement" stackId="savings" fill="var(--color-chart-1)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar dataKey="hsa" name="HSA" stackId="savings" fill="var(--color-chart-2)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar dataKey="brokerage" name="Brokerage" stackId="savings" fill="var(--color-chart-3)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar dataKey="savingsAccount" name="Savings" stackId="savings" fill="var(--color-chart-4)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar dataKey="cash" name="Cash" stackId="savings" fill="var(--color-chart-5)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
                     
-                    {/* Line overlay for the Savings Rate percentage */}
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="savingsRate"
-                      name="Savings Rate"
-                      stroke="var(--color-primary)"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
+                    {/* Average Savings Rate horizontal line with label */}
+                    <ReferenceLine y={avgSavingsRate} stroke="var(--color-primary)" strokeWidth={2} strokeDasharray="6 3" />
                     <Legend
                       verticalAlign="bottom"
                       iconType="circle"
@@ -592,6 +579,10 @@ export function IncomeExpenseChart() {
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
+                {/* On-chart savings rate label overlay */}
+                <div className="absolute top-0 right-3 sm:right-5 mt-1 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 text-xs font-bold text-primary shadow-sm">
+                  Avg. Savings Rate: {avgSavingsRate.toFixed(1)}%
+                </div>
               </div>
             </div>
           </div>
