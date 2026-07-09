@@ -19,7 +19,7 @@ interface UserDropdownProps {
 export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
-  const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
+  const { privacyMode, togglePrivacyMode, loading: privacyModeLoading, shortcutLabel } = usePrivacyMode();
   const [open, setOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
@@ -289,7 +289,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
           <div className="px-3 py-1.5 flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-sm text-foreground">Privacy Mode</span>
-              <span className="text-[10px] text-muted-foreground/60">Ctrl+Shift+P</span>
+              <span className="text-[10px] text-muted-foreground/60">{shortcutLabel}</span>
             </div>
             <Switch
               checked={privacyMode ?? false}
