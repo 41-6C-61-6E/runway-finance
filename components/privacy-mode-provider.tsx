@@ -18,6 +18,7 @@ type PrivacyModeContextType = {
   privacyMode: boolean;
   togglePrivacyMode: () => Promise<void>;
   loading: boolean;
+  shortcutLabel: string;
 };
 
 const PrivacyModeContext = createContext<PrivacyModeContextType | null>(null);
@@ -25,6 +26,12 @@ const PrivacyModeContext = createContext<PrivacyModeContextType | null>(null);
 export function PrivacyModeProvider({ children }: { children: React.ReactNode }) {
   const [privacyMode, setPrivacyMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [shortcutLabel, setShortcutLabel] = useState('Ctrl+Shift+P');
+
+  useEffect(() => {
+    const isMac = typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent || navigator.platform || '');
+    setShortcutLabel(isMac ? 'Cmd+Shift+P' : 'Ctrl+Shift+P');
+  }, []);
 
   const fetchPrivacyMode = useCallback(async () => {
     try {
@@ -73,7 +80,8 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+      const isKeyP = e.key === 'p' || e.key === 'P';
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && isKeyP) {
         e.preventDefault();
         togglePrivacyMode();
       }
@@ -83,7 +91,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
   }, [togglePrivacyMode]);
 
   return (
-    <PrivacyModeContext.Provider value={{ privacyMode, togglePrivacyMode, loading }}>
+    <PrivacyModeContext.Provider value={{ privacyMode, togglePrivacyMode, loading, shortcutLabel }}>
       {children}
     </PrivacyModeContext.Provider>
   );
