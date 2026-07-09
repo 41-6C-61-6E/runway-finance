@@ -1004,8 +1004,10 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               logger.error('[sync] Failed to run custom transaction alert checks:', e);
             });
 
-            // Transaction alert check
-            if (settings?.notifyLargeTransactions) {
+            // Transaction alert check (skip for hidden/excluded accounts)
+            if (upserted.isHidden || upserted.isExcludedFromNetWorth) {
+              // skip
+            } else if (settings?.notifyLargeTransactions) {
               const absAmount = Math.abs(amountNum);
               if (absAmount >= (settings.largeTransactionThreshold ?? 100)) {
                 const decDesc = sfTx.description;
