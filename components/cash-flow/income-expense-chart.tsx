@@ -28,7 +28,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
-import { ArrowRightLeft, TrendingUp } from 'lucide-react';
+import { ArrowRightLeft, TrendingUp, Info } from 'lucide-react';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -43,6 +43,8 @@ interface MonthlyData {
 interface SavingsRatePoint {
   yearMonth: string;
   income: number;
+  expenses: number;
+  netCashFlow: number;
   savingsRate: number;
   savings: {
     retirement: number;
@@ -68,6 +70,7 @@ const typeOptions = [
 export function IncomeExpenseChart() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
+  const [selectedSavingsPoint, setSelectedSavingsPoint] = useState<any | null>(null);
 
   // Query 1: Monthly cash flow
   const { data: allData = [], isLoading: cashFlowLoading, error: cashFlowError } = useQuery<MonthlyData[]>({
@@ -150,6 +153,9 @@ export function IncomeExpenseChart() {
     return windowedSavingsData.map((d) => ({
       month: formatSafeUTCDate(d.yearMonth + '-01', { month: 'short', year: '2-digit' }),
       yearMonth: d.yearMonth,
+      income: d.income,
+      expenses: d.expenses,
+      netCashFlow: d.netCashFlow,
       retirement: d.savings.retirement,
       hsa: d.savings.hsa,
       brokerage: d.savings.brokerage,
@@ -558,11 +564,11 @@ export function IncomeExpenseChart() {
                     <RechartsTooltip content={<SavingsTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
                     
                     {/* Stacked bars for savings breakdown */}
-                    <Bar yAxisId="left" dataKey="retirement" name="Retirement" stackId="savings" fill="var(--color-chart-1)" maxBarSize={24} />
-                    <Bar yAxisId="left" dataKey="hsa" name="HSA" stackId="savings" fill="var(--color-chart-2)" maxBarSize={24} />
-                    <Bar yAxisId="left" dataKey="brokerage" name="Brokerage" stackId="savings" fill="var(--color-chart-3)" maxBarSize={24} />
-                    <Bar yAxisId="left" dataKey="savingsAccount" name="Savings" stackId="savings" fill="var(--color-chart-4)" maxBarSize={24} />
-                    <Bar yAxisId="left" dataKey="cash" name="Cash" stackId="savings" fill="var(--color-chart-5)" maxBarSize={24} />
+                    <Bar yAxisId="left" dataKey="retirement" name="Retirement" stackId="savings" fill="var(--color-chart-1)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar yAxisId="left" dataKey="hsa" name="HSA" stackId="savings" fill="var(--color-chart-2)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar yAxisId="left" dataKey="brokerage" name="Brokerage" stackId="savings" fill="var(--color-chart-3)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar yAxisId="left" dataKey="savingsAccount" name="Savings" stackId="savings" fill="var(--color-chart-4)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                    <Bar yAxisId="left" dataKey="cash" name="Cash" stackId="savings" fill="var(--color-chart-5)" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
                     
                     {/* Line overlay for the Savings Rate percentage */}
                     <Line
@@ -590,6 +596,123 @@ export function IncomeExpenseChart() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Savings Breakdown Popup Modal ── */}
+      {selectedSavingsPoint && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedSavingsPoint(null)}
+        >
+          <div
+            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Savings Analysis — {formatChartXAxisDate(selectedSavingsPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedSavingsPoint(null)}
+                className="text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-5 bg-background text-sm">
+              {/* Summary Hero Box */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-center space-y-1">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Savings Rate</div>
+                <div className="text-3xl font-extrabold text-primary font-mono blur-number">
+                  {selectedSavingsPoint.savingsRate.toFixed(1)}%
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Total Saved: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedSavingsPoint.retirement + selectedSavingsPoint.hsa + selectedSavingsPoint.brokerage + selectedSavingsPoint.savingsAccount + selectedSavingsPoint.cash)}</span>
+                  {' '}of Gross Income: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedSavingsPoint.income)}</span>
+                </div>
+              </div>
+
+              {/* Cash Flow Inputs & Outputs */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Income & Cash Flow</h4>
+                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-muted/5">
+                  <div className="flex justify-between p-3">
+                    <span className="text-muted-foreground">Gross Income (A)</span>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.income)}</span>
+                  </div>
+                  <div className="flex justify-between p-3">
+                    <span className="text-muted-foreground">Expenses & Taxes (B)</span>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.expenses)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-muted/20">
+                    <span className="text-muted-foreground font-medium">Net Cash Flow (A − B)</span>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.netCashFlow)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Savings Contributions Breakdown */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Savings breakdown</h4>
+                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden">
+                  <div className="flex justify-between p-3 hover:bg-muted/5 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-chart-1" style={{ backgroundColor: 'var(--color-chart-1)' }} />
+                      <span className="text-muted-foreground">Retirement Contributions</span>
+                    </div>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.retirement)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 hover:bg-muted/5 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-chart-2" style={{ backgroundColor: 'var(--color-chart-2)' }} />
+                      <span className="text-muted-foreground">HSA / FSA Contributions</span>
+                    </div>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.hsa)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 hover:bg-muted/5 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-chart-3" style={{ backgroundColor: 'var(--color-chart-3)' }} />
+                      <span className="text-muted-foreground">Brokerage / Investments</span>
+                    </div>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.brokerage)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 hover:bg-muted/5 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-chart-4" style={{ backgroundColor: 'var(--color-chart-4)' }} />
+                      <span className="text-muted-foreground">Savings Inflows</span>
+                    </div>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.savingsAccount)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 hover:bg-muted/5 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-chart-5" style={{ backgroundColor: 'var(--color-chart-5)' }} />
+                      <span className="text-muted-foreground">Cash (Leftover checking surplus)</span>
+                    </div>
+                    <span className="font-semibold font-mono text-foreground blur-number">{formatCurrency(selectedSavingsPoint.cash)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-primary/[0.03] font-semibold text-foreground border-t border-border">
+                    <span>Total Savings (C)</span>
+                    <span className="font-mono blur-number">{formatCurrency(selectedSavingsPoint.retirement + selectedSavingsPoint.hsa + selectedSavingsPoint.brokerage + selectedSavingsPoint.savingsAccount + selectedSavingsPoint.cash)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informative Note */}
+              <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 flex items-start gap-2 leading-relaxed">
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
+                <span>
+                  <strong>Calculation Formula:</strong> Pre-tax retirement and HSA contributions are isolated from paycheck deductions. Transfers into savings and brokerage accounts are tracked as savings inflows. Leftover cash represents any remaining net income left in your primary bank accounts.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
