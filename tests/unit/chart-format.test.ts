@@ -21,30 +21,30 @@ describe('chart-format utilities', () => {
       expect(formatChartYAxisCurrency(0, 0, 1000)).toBe('$0');
     });
 
-    it('formats millions with narrow range to 3 decimals to avoid repeated labels', () => {
-      // Range = $20,000. Under 50k, so 3 decimal places
+    it('formats millions with narrow range to 3 decimals (max 4 sig figs to distinguish step)', () => {
+      // Range = $20,000. Step = $5,000. maxAbs = $1,360,000. sigFigs = 4
       expect(formatChartYAxisCurrency(1340000, 1340000, 1360000)).toBe('$1.340M');
       expect(formatChartYAxisCurrency(1355000, 1340000, 1360000)).toBe('$1.355M');
     });
 
     it('formats millions with medium range to 2 decimals', () => {
-      // Range = $100,000. Under 200k, so 2 decimal places
+      // Range = $100,000. Step = $25,000. maxAbs = $1,400,000. sigFigs = 3
       expect(formatChartYAxisCurrency(1340000, 1300000, 1400000)).toBe('$1.34M');
     });
 
-    it('formats millions with large range to 0 decimals', () => {
-      // Range = $3,000,000. Above 1M, so 0 decimals
-      expect(formatChartYAxisCurrency(3000000, 1000000, 4000000)).toBe('$3M');
+    it('formats millions with large range to 2 decimals (max 3 sig figs)', () => {
+      // Range = $3,000,000. Above 1M, sigFigs = 3
+      expect(formatChartYAxisCurrency(3000000, 1000000, 4000000)).toBe('$3.00M');
     });
 
     it('formats thousands with narrow range', () => {
-      // Range = 40. Under 50, so 2 decimals
-      expect(formatChartYAxisCurrency(1020, 1000, 1040)).toBe('$1.02K');
+      // Range = 40. Under 50, sigFigs = 4
+      expect(formatChartYAxisCurrency(1020, 1000, 1040)).toBe('$1.020K');
     });
 
     it('formats thousands with normal range', () => {
-      // Range = 5000. Above 200, so 0 decimals
-      expect(formatChartYAxisCurrency(15000, 10000, 20000)).toBe('$15K');
+      // Range = 5000. Above 200, sigFigs = 3
+      expect(formatChartYAxisCurrency(15000, 10000, 20000)).toBe('$15.0K');
     });
 
     it('formats small values below 1000', () => {
@@ -59,12 +59,12 @@ describe('chart-format utilities', () => {
       // Range = $1,050,000. Large range, but values under 1M should be in K
       expect(formatChartYAxisCurrency(250000, 0, 1050000)).toBe('$250K');
       expect(formatChartYAxisCurrency(500000, 0, 1050000)).toBe('$500K');
-      expect(formatChartYAxisCurrency(1200000, 0, 1200000)).toBe('$1.2M');
+      expect(formatChartYAxisCurrency(1200000, 0, 1200000)).toBe('$1.20M');
     });
 
     it('preserves precision for fractional thousands when range is large', () => {
       // Range = $5,000. Large range (>= 200), but values have fractional thousands
-      expect(formatChartYAxisCurrency(1500, 0, 5000)).toBe('$1.5K');
+      expect(formatChartYAxisCurrency(1500, 0, 5000)).toBe('$1.50K');
       expect(formatChartYAxisCurrency(1250, 0, 5000)).toBe('$1.25K');
     });
   });
@@ -99,15 +99,15 @@ describe('chart-format utilities', () => {
         date: `2026-06-${String(i + 1).padStart(2, '0')}`,
       }));
 
-      // Desktop: max 8 ticks
+      // Desktop: max 12 ticks
       const desktopTicks = getChartXTicksUnified(data, '1m', false);
-      expect(desktopTicks.length).toBeLessThanOrEqual(8);
+      expect(desktopTicks.length).toBeLessThanOrEqual(12);
       expect(desktopTicks[0]).toBe('2026-06-01');
       expect(desktopTicks[desktopTicks.length - 1]).toBe('2026-06-30');
 
-      // Mobile: max 4 ticks
+      // Mobile: max 6 ticks
       const mobileTicks = getChartXTicksUnified(data, '1m', true);
-      expect(mobileTicks.length).toBeLessThanOrEqual(4);
+      expect(mobileTicks.length).toBeLessThanOrEqual(6);
       expect(mobileTicks[0]).toBe('2026-06-01');
       expect(mobileTicks[mobileTicks.length - 1]).toBe('2026-06-30');
     });
@@ -129,15 +129,15 @@ describe('chart-format utilities', () => {
         { date: '2026-06-01' },
       ];
 
-      // Desktop: max 8 ticks
+      // Desktop: max 12 ticks
       const desktopTicks = getChartXTicksUnified(data, '1y', false);
-      expect(desktopTicks.length).toBe(8);
+      expect(desktopTicks.length).toBe(12);
       expect(desktopTicks[0]).toBe('2025-07-01');
       expect(desktopTicks[desktopTicks.length - 1]).toBe('2026-06-01');
 
-      // Mobile: max 4 ticks
+      // Mobile: max 6 ticks
       const mobileTicks = getChartXTicksUnified(data, '1y', true);
-      expect(mobileTicks.length).toBe(4);
+      expect(mobileTicks.length).toBe(6);
       expect(mobileTicks[0]).toBe('2025-07-01');
       expect(mobileTicks[mobileTicks.length - 1]).toBe('2026-06-01');
     });

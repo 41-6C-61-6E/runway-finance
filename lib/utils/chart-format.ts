@@ -15,54 +15,37 @@ export function formatChartYAxisCurrency(
   const sign = value < 0 ? '-' : '';
   if (absV === 0) return '$0';
 
-  if (absV >= 1000000) {
-    let decimals = 1;
-    if (range === 0) decimals = 1;
-    else if (range < 50000) decimals = 3;
-    else if (range < 200000) decimals = 2;
-    else if (range < 1000000) decimals = 1;
-    else decimals = 0;
+  // Calculate dynamic sigFigs for the entire axis based on range and step size
+  const step = range / 4;
+  let sigFigs = 3;
+  if (step > 0) {
+    const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+    sigFigs = Math.max(3, Math.ceil(Math.log10(maxAbs / step)) + 1);
+  }
 
-    const vM = absV / 1000000;
-    const formattedWithDecimals = vM.toFixed(decimals);
-    const formattedWithMaxPrecision = vM.toFixed(3);
-
-    if (parseFloat(formattedWithDecimals) !== parseFloat(formattedWithMaxPrecision)) {
-      if (parseFloat(vM.toFixed(1)) === parseFloat(formattedWithMaxPrecision)) {
-        decimals = 1;
-      } else if (parseFloat(vM.toFixed(2)) === parseFloat(formattedWithMaxPrecision)) {
-        decimals = 2;
-      } else {
-        decimals = 3;
-      }
+  const formatWithSigFigs = (x: number, sf: number): string => {
+    if (x === 0) return '0';
+    const integerDigits = Math.floor(Math.log10(x)) + 1;
+    if (integerDigits > sf) {
+      const factor = Math.pow(10, integerDigits - sf);
+      const rounded = Math.round(x / factor) * factor;
+      return rounded.toFixed(0);
     }
+    const decimals = Math.max(0, sf - integerDigits);
+    return x.toFixed(decimals);
+  };
 
-    return `${sign}$${vM.toFixed(decimals)}M`;
+  if (absV >= 1000000) {
+    const vM = absV / 1000000;
+    return `${sign}$${formatWithSigFigs(vM, sigFigs)}M`;
   }
 
   if (absV >= 1000) {
-    let decimals = 0;
-    if (range === 0) decimals = 0;
-    else if (range < 50) decimals = 2;
-    else if (range < 200) decimals = 1;
-    else decimals = 0;
-
     const vK = absV / 1000;
-    const formattedWithDecimals = vK.toFixed(decimals);
-    const formattedWithMaxPrecision = vK.toFixed(2);
-
-    if (parseFloat(formattedWithDecimals) !== parseFloat(formattedWithMaxPrecision)) {
-      if (parseFloat(vK.toFixed(1)) === parseFloat(formattedWithMaxPrecision)) {
-        decimals = 1;
-      } else {
-        decimals = 2;
-      }
-    }
-
-    return `${sign}$${vK.toFixed(decimals)}K`;
+    return `${sign}$${formatWithSigFigs(vK, sigFigs)}K`;
   }
 
-  return `${sign}$${absV.toFixed(0)}`;
+  return `${sign}$${formatWithSigFigs(absV, sigFigs)}`;
 }
 
 /**
@@ -134,7 +117,7 @@ export function getChartXTicksUnified<T extends { [key: string]: any }>(
   if (!data || data.length === 0) return [];
 
   const dates = data.map((d) => String(d[dateKey]));
-  const maxTicks = isMobile ? 4 : 8;
+  const maxTicks = isMobile ? 6 : 12;
 
   if (dates.length <= maxTicks) {
     return dates;

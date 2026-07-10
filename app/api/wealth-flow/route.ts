@@ -33,6 +33,7 @@ export async function GET(request: Request) {
   let endMonth = searchParams.get('endMonth');
   let startDate = searchParams.get('startDate');
   let endDate = searchParams.get('endDate');
+  const timeframe = searchParams.get('timeframe') || undefined;
   const accountIdsParam = searchParams.get('accountIds') || '';
   const accountIds = accountIdsParam ? accountIdsParam.split(',').filter(Boolean) : [];
 
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await calculateWealthFlow(dataUserId, startDate, endDate, dek, accountIds);
+    const data = await calculateWealthFlow(dataUserId, startDate, endDate, dek, accountIds, timeframe);
     return NextResponse.json(data);
   } catch (error) {
     logger.error('[api-wealth-flow] Error calculating wealth flow', {

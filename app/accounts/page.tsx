@@ -330,13 +330,25 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
     const vals = visibleMiniData.map(d => d.balance ?? 0);
     const rawMax = Math.max(...vals, 10);
     const rawMin = Math.min(...vals, 0);
-    // Add 10% padding
-    const padding = (rawMax - rawMin) * 0.1 || 10;
+    const crossesZero = rawMin < 0;
+    const range = rawMax - rawMin;
+    if (crossesZero) {
+      const padding = range * 0.12 || 10;
+      return { minVal: rawMin - padding, maxVal: rawMax + padding };
+    }
+    // All-positive: anchor to actual data min for tighter framing
+    const dataMin = Math.min(...vals);
+    const padding = Math.max(range * 0.08, range < 100 ? 20 : range * 0.08);
     return {
-      minVal: Math.max(0, rawMin - padding),
+      minVal: dataMin > 0 ? Math.max(0, dataMin - padding) : 0,
       maxVal: rawMax + padding,
     };
   }, [visibleMiniData]);
+
+  const miniYTicks = useMemo(() => {
+    const step = (maxVal - minVal) / 4;
+    return [0, 1, 2, 3, 4].map((i) => minVal + step * i);
+  }, [minVal, maxVal]);
 
   const miniTicks = useMemo(() => {
     if (visibleMiniData.length < 2) return [];
@@ -417,12 +429,8 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
                       axisLine={false}
                       tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
                       domain={[minVal, maxVal]}
-                      tickFormatter={(v) => {
-                        const absV = Math.abs(v);
-                        if (absV >= 1000000) return `$${(absV / 1000000).toFixed(1)}M`;
-                        if (absV >= 1000) return `$${(absV / 1000).toFixed(0)}K`;
-                        return `$${absV.toFixed(0)}`;
-                      }}
+                      ticks={miniYTicks}
+                      tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
                     />
                     <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
                     <Area
@@ -1241,6 +1249,9 @@ export default function AccountsPage() {
   }, [timeframe]);
 
   // ── Calculate dynamic Y-axis bounds based on visible data ──────────────────
+  // When data is all-positive (e.g. short timescale), anchor to the actual data
+  // range instead of always from 0, so small changes are visually amplified.
+  // When data crosses zero (assets + liabilities), keep 0 in the domain.
   const { minVal, maxVal } = useMemo(() => {
     if (visibleData.length === 0) {
       return { minVal: 0, maxVal: 1000 };
@@ -1257,19 +1268,32 @@ export default function AccountsPage() {
 
     const rawMax = Math.max(...allValues, 1000);
     const rawMin = Math.min(...allValues, 0);
-    const maxValue = rawMax * 1.15;
-    const minValue = rawMin < 0 ? rawMin * 1.15 : 0;
+    const crossesZero = rawMin < 0;
+
+    if (crossesZero) {
+      // Data spans positive and negative — anchor to 0 with proportional padding
+      const range = rawMax - rawMin;
+      const pad = range * 0.12 || 500;
+      return { minVal: rawMin - pad, maxVal: rawMax + pad };
+    }
+
+    // All-positive (or all-zero) data: zoom into the actual range
+    const dataMin = Math.min(...allValues);
+    const range = rawMax - (dataMin > 0 ? dataMin : 0);
+    // Tight padding: 8% of the range, but at least a small absolute floor
+    const pad = Math.max(range * 0.08, range < 100 ? 50 : range * 0.08);
+    const minValue = dataMin > 0 ? Math.max(0, dataMin - pad) : 0;
+    const maxValue = rawMax + pad;
     return { minVal: minValue, maxVal: maxValue };
   }, [visibleData, selectedSeriesKeys]);
 
   // Calculate dynamic Y-axis width based on formatted label length to reduce left margin padding
   const yAxisWidth = useMemo(() => {
     const step = (maxVal - minVal) / 4;
-    const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-    const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
+    const ticks = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
     
     let maxLength = 0;
-    for (const v of withZero) {
+    for (const v of ticks) {
       const absV = Math.abs(v);
       const sign = v < 0 ? '-' : '';
       let formatted = '';
@@ -2186,9 +2210,7 @@ export default function AccountsPage() {
                                     width={yAxisWidth}
                                     ticks={(() => {
                                       const step = (maxVal - minVal) / 4;
-                                      const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                                      const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                                      return withZero;
+                                      return [0, 1, 2, 3, 4].map((i) => minVal + step * i);
                                     })()}
                                     tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
                                   />
@@ -2262,9 +2284,7 @@ export default function AccountsPage() {
                                     width={yAxisWidth}
                                     ticks={(() => {
                                       const step = (maxVal - minVal) / 4;
-                                      const raw = [0, 1, 2, 3, 4].map((i) => minVal + step * i);
-                                      const withZero = Array.from(new Set([...raw, 0])).sort((a, b) => a - b);
-                                      return withZero;
+                                      return [0, 1, 2, 3, 4].map((i) => minVal + step * i);
                                     })()}
                                     tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
                                   />
