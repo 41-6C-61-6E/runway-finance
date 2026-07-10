@@ -534,7 +534,7 @@ export function WealthFlowSankey() {
         setError(null);
 
         const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
-        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`;
+        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}${acctParam}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Failed to load wealth flow data (${res.status})`);

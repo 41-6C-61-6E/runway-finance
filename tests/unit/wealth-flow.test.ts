@@ -87,6 +87,7 @@ describe('wealth-flow service (snapshot-only)', () => {
     startDate: string,
     endDate: string,
     filterAccountIds?: string[],
+    timeframe?: string,
   ) {
     const dbMock = {
       select: vi.fn(() => ({
@@ -111,7 +112,7 @@ describe('wealth-flow service (snapshot-only)', () => {
     const dbModule = await import('@/lib/db');
     (dbModule.getDb as any).mockReturnValue(dbMock);
 
-    return calculateWealthFlow('user_1', startDate, endDate, mockDek, filterAccountIds);
+    return calculateWealthFlow('user_1', startDate, endDate, mockDek, filterAccountIds, timeframe);
   }
 
   it('calculates positive net worth change from asset growth', async () => {
@@ -375,5 +376,49 @@ describe('wealth-flow service (snapshot-only)', () => {
     const decCreditLoans = result.nodes.find(n => n.id === 'dec_credit_loans');
     expect(decCreditLoans).toBeDefined();
     expect(decCreditLoans!.value).toBe(700);
+  });
+
+  it('does not subtract 1 day from start date for rolling days timeframes like 1d', async () => {
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-06-28', balance: '1000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-29', balance: '2000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '3000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-29', '2026-06-30', undefined, '1d');
+
+    expect(result.summary.beginningNetWorth).toBe(2000);
+    expect(result.summary.endingNetWorth).toBe(3000);
+    expect(result.summary.netWorthChange).toBe(1000);
+  });
+
+  it('falls back to live balance from accounts table when target date is today', async () => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    const day = parts.find(p => p.type === 'day')?.value;
+    const todayStr = `${year}-${month}-${day}`;
+
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false, balance: '5000.00' },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-06-29', balance: '2000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-29', todayStr, undefined, '1d');
+
+    expect(result.summary.beginningNetWorth).toBe(2000);
+    expect(result.summary.endingNetWorth).toBe(5000);
+    expect(result.summary.netWorthChange).toBe(3000);
   });
 });

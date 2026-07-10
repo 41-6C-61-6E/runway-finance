@@ -82,12 +82,27 @@ function getSignedNetWorthBalance(balance: number, accountType: string): number 
   return isLiabilityAccount(accountType) ? -Math.abs(balance) : balance;
 }
 
+function formatInTimezone(date: Date, tz: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export async function calculateWealthFlow(
   userId: string,
   startDateStr: string,
   endDateStr: string,
   dek: Uint8Array,
-  filterAccountIds?: string[]
+  filterAccountIds?: string[],
+  timeframe?: string
 ): Promise<WealthFlowData> {
   const db = getDb();
 
@@ -98,6 +113,7 @@ export async function calculateWealthFlow(
     .limit(1);
   const userSetting = userSettingsList[0];
   const baseCurrency = userSetting?.currency || 'USD';
+  const userTz = userSetting?.timezone || 'America/New_York';
 
   const allAccounts = await db
     .select()
@@ -134,9 +150,14 @@ export async function calculateWealthFlow(
     reportableAccounts.map((a: any) => [a.id, a])
   );
 
-  const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');
-  dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
-  const dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
+  let dayBeforeStr: string;
+  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
+    dayBeforeStr = startDateStr;
+  } else {
+    const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');
+    dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
+    dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
+  }
 
   const beginningAccountIds = accountIdsToUse.filter((id) => {
     const acc = accountsMap.get(id);
@@ -147,8 +168,24 @@ export async function calculateWealthFlow(
     return acc ? isAccountActiveOnDate(acc, endDateStr) : false;
   });
 
-  const beginningBalances = await getBalancesOnDate(db, userId, dayBeforeStr, beginningAccountIds, dek);
-  const endingBalances = await getBalancesOnDate(db, userId, endDateStr, endingAccountIds, dek);
+  const todayStr = formatInTimezone(new Date(), userTz);
+
+  const getBalances = async (targetDate: string, accountIds: string[]) => {
+    if (targetDate === todayStr) {
+      const result: Record<string, number> = {};
+      for (const id of accountIds) {
+        const acc = accountsMap.get(id);
+        if (acc) {
+          result[id] = parseFloat(acc.balance) || 0;
+        }
+      }
+      return result;
+    }
+    return getBalancesOnDate(db, userId, targetDate, accountIds, dek);
+  };
+
+  const beginningBalances = await getBalances(dayBeforeStr, beginningAccountIds);
+  const endingBalances = await getBalances(endDateStr, endingAccountIds);
 
   const accountIdsWithEndButNoBeg = Object.keys(endingBalances).filter(id => !(id in beginningBalances));
   const earliestBalances = accountIdsWithEndButNoBeg.length > 0
