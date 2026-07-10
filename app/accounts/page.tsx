@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart,
   Area,
@@ -31,6 +31,9 @@ import {
   ArrowRight,
   Filter,
   Plus,
+  AlertCircle,
+  AlertTriangle,
+  BellOff,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -72,7 +75,10 @@ interface Account {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   connectionId?: string | null;
+  plaidConnectionId?: string | null;
   tags?: { id: string; name: string; color: string }[];
+  metadata?: Record<string, any> | string | null;
+  syncStatus?: { status: 'ok' | 'warning' | 'error'; reason?: string; lastSyncAt?: string } | null;
 }
 
 type TagItem = {
@@ -544,6 +550,46 @@ const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] =>
 // ── Main Accounts Dashboard Page ─────────────────────────────────────────────
 export default function AccountsPage() {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  const [mutingAccountId, setMutingAccountId] = useState<string | null>(null);
+
+  const handleMuteSyncAlerts = useCallback(async (account: Account) => {
+    setMutingAccountId(account.id);
+    try {
+      let currentMetadata: Record<string, any> = {};
+      if (typeof account.metadata === 'string' && account.metadata.trim() !== '') {
+        try {
+          currentMetadata = JSON.parse(account.metadata);
+        } catch {}
+      } else if (typeof account.metadata === 'object' && account.metadata !== null) {
+        currentMetadata = account.metadata;
+      }
+
+      const payload = {
+        metadata: {
+          ...currentMetadata,
+          muteSyncWarnings: true,
+        }
+      };
+
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to mute sync alerts');
+      
+      // Invalidate queries to reload accounts list
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    } catch (err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
+      setMutingAccountId(null);
+    }
+  }, [queryClient]);
+
   const settingsContext = useUserSettings();
   const showLegendTags = settingsContext?.settings?.accountTagVisibility?.legend !== false;
   const { hideSubheadings } = useAccountSubheadings();
@@ -1565,6 +1611,56 @@ export default function AccountsPage() {
 
       <PageContent maxWidth="max-w-6xl" className="space-y-5 sm:space-y-6">
         <>
+          {/* Sync Issues Alert Banner */}
+          {(() => {
+            const staleAccounts = allAccounts.filter(
+              (acc) => acc.syncStatus && acc.syncStatus.status !== 'ok'
+            );
+            if (staleAccounts.length === 0) return null;
+
+            return (
+              <div className="bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 rounded-xl p-4 flex gap-3 text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1">
+                  <h4 className="font-bold text-amber-800 dark:text-amber-400">
+                    Some accounts may not be updating properly ({staleAccounts.length})
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    We detected sync errors or stale balances. This can happen if credentials expired or data providers returned cached data.
+                  </p>
+                  <ul className="text-xs text-amber-700/90 dark:text-amber-300/80 list-disc pl-4 space-y-1 mt-2">
+                    {staleAccounts.slice(0, 3).map((acc) => (
+                      <li key={acc.id}>
+                        <span className="font-semibold text-foreground mr-1">{acc.name}</span>
+                        <span className="text-muted-foreground mr-2">({acc.institution || 'Manual'})</span>
+                        <span className="text-foreground">{acc.syncStatus?.reason}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleMuteSyncAlerts(acc)}
+                          disabled={mutingAccountId === acc.id}
+                          className="ml-3 text-[10px] text-amber-600 dark:text-amber-400 hover:underline hover:text-amber-700 font-semibold cursor-pointer inline-flex items-center gap-0.5"
+                        >
+                          <BellOff className="w-2.5 h-2.5" />
+                          {mutingAccountId === acc.id ? 'Muting...' : 'Mute alerts'}
+                        </button>
+                      </li>
+                    ))}
+                    {staleAccounts.length > 3 && (
+                      <li className="text-muted-foreground">and {staleAccounts.length - 3} other accounts...</li>
+                    )}
+                  </ul>
+                </div>
+                <div className="shrink-0">
+                  <Link
+                    href="/settings?tab=accounts&sub=connections"
+                    className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline hover:text-amber-700 dark:hover:text-amber-300"
+                  >
+                    Manage Connections
+                  </Link>
+                </div>
+              </div>
+            );
+          })()}
 
             {/* ── Graphics / Chart Card ── */}
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
@@ -2846,6 +2942,18 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                             <div className="min-w-0 flex-1">
                                               <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
+                                                {acc.syncStatus && acc.syncStatus.status !== 'ok' && (
+                                                  <span 
+                                                    className="flex-shrink-0 cursor-help"
+                                                    title={acc.syncStatus.reason}
+                                                  >
+                                                    {acc.syncStatus.status === 'error' ? (
+                                                      <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                                    ) : (
+                                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                    )}
+                                                  </span>
+                                                )}
                                                 {acc.isHidden && (
                                                   <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
                                                 )}
@@ -2986,6 +3094,18 @@ onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                                   <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                       <span className="text-xs font-medium text-foreground truncate">{acc.name}</span>
+                                                      {acc.syncStatus && acc.syncStatus.status !== 'ok' && (
+                                                        <span 
+                                                          className="flex-shrink-0 cursor-help"
+                                                          title={acc.syncStatus.reason}
+                                                        >
+                                                          {acc.syncStatus.status === 'error' ? (
+                                                            <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                                          ) : (
+                                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                          )}
+                                                        </span>
+                                                      )}
                                                       {acc.isHidden && (
                                                         <span className="text-[9px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
                                                       )}

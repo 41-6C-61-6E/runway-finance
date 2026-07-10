@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
@@ -6,9 +7,10 @@ interface ChartTooltipProps {
   children: ReactNode;
   x?: number;
   y?: number;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function ChartTooltip({ children, x, y }: ChartTooltipProps) {
+export function ChartTooltip({ children, x, y, containerRef }: ChartTooltipProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [translateX, setTranslateX] = useState<number>(0);
   const [translateY, setTranslateY] = useState<number>(0);
@@ -16,6 +18,14 @@ export function ChartTooltip({ children, x, y }: ChartTooltipProps) {
   useIsomorphicLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    if (containerRef && containerRef.current && typeof x === 'number' && typeof y === 'number') {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const initialLeft = containerRect.left + x;
+      const initialTop = containerRect.top + y;
+      el.style.left = `${initialLeft}px`;
+      el.style.top = `${initialTop}px`;
+    }
 
     // Reset styles to measure original position
     el.style.transform = 'none';
@@ -38,12 +48,14 @@ export function ChartTooltip({ children, x, y }: ChartTooltipProps) {
 
     setTranslateX(tx);
     setTranslateY(ty);
-  }, [children, x, y]);
+  }, [children, x, y, containerRef]);
 
-  return (
+  const tooltipContent = (
     <div
       ref={ref}
       style={{
+        position: containerRef ? 'fixed' : 'absolute',
+        zIndex: 9999,
         background: 'var(--color-card)',
         border: '1px solid var(--color-border)',
         borderRadius: '0.5rem',
@@ -54,15 +66,24 @@ export function ChartTooltip({ children, x, y }: ChartTooltipProps) {
         lineHeight: 1.5,
         minWidth: 160,
         maxWidth: 'min(380px, calc(100vw - 32px))',
+        maxHeight: 'calc(100vh - 32px)',
+        overflowY: 'auto',
         width: 'max-content',
         transform: `translate(${translateX}px, ${translateY}px)`,
         transition: 'transform 0.05s ease-out',
         boxSizing: 'border-box',
+        pointerEvents: 'none',
       }}
     >
       {children}
     </div>
   );
+
+  if (containerRef && typeof window !== 'undefined') {
+    return createPortal(tooltipContent, document.body);
+  }
+
+  return tooltipContent;
 }
 
 interface TooltipRowProps {
@@ -73,7 +94,7 @@ interface TooltipRowProps {
 
 export function TooltipRow({ label, value, color }: TooltipRowProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', width: '100%' }}>
       {color && (
         <span
           style={{
@@ -86,8 +107,14 @@ export function TooltipRow({ label, value, color }: TooltipRowProps) {
           }}
         />
       )}
-      <span style={{ color: 'var(--color-muted-foreground)' }}>{label}:</span>
-      <span className="blur-number" style={{ fontWeight: 600 }}>{value}</span>
+      <span style={{ 
+        color: 'var(--color-muted-foreground)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        minWidth: 0,
+        flexShrink: 1
+      }}>{label}:</span>
+      <span className="blur-number" style={{ fontWeight: 600, flexShrink: 0, marginLeft: 'auto' }}>{value}</span>
     </div>
   );
 }
@@ -103,3 +130,4 @@ export function TooltipHeader({ children }: TooltipHeaderProps) {
     </div>
   );
 }
+
