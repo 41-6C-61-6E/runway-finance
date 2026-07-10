@@ -18,7 +18,7 @@ type Account = {
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Record<string, any> | string | null;
   connectionId?: string | null;
   plaidConnectionId?: string | null;
   tags?: { id: string; name: string; color: string }[];
@@ -318,7 +318,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     }
 
     if (isInvestmentAccount(account.type)) {
-      const meta = account.metadata ?? {};
+      const meta = (account.metadata ?? {}) as any;
       setIgnoreSettlementTransactions(!!meta.ignoreSettlementTransactions);
     } else {
       setIgnoreSettlementTransactions(false);
