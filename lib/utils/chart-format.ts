@@ -15,9 +15,7 @@ export function formatChartYAxisCurrency(
   const sign = value < 0 ? '-' : '';
   if (absV === 0) return '$0';
 
-  const maxAbs = Math.max(Math.abs(min), Math.abs(max));
-
-  if (maxAbs >= 1000000) {
+  if (absV >= 1000000) {
     let decimals = 1;
     if (range === 0) decimals = 1;
     else if (range < 50000) decimals = 3;
@@ -25,17 +23,43 @@ export function formatChartYAxisCurrency(
     else if (range < 1000000) decimals = 1;
     else decimals = 0;
 
-    return `${sign}$${(absV / 1000000).toFixed(decimals)}M`;
+    const vM = absV / 1000000;
+    const formattedWithDecimals = vM.toFixed(decimals);
+    const formattedWithMaxPrecision = vM.toFixed(3);
+
+    if (parseFloat(formattedWithDecimals) !== parseFloat(formattedWithMaxPrecision)) {
+      if (parseFloat(vM.toFixed(1)) === parseFloat(formattedWithMaxPrecision)) {
+        decimals = 1;
+      } else if (parseFloat(vM.toFixed(2)) === parseFloat(formattedWithMaxPrecision)) {
+        decimals = 2;
+      } else {
+        decimals = 3;
+      }
+    }
+
+    return `${sign}$${vM.toFixed(decimals)}M`;
   }
 
-  if (maxAbs >= 1000) {
+  if (absV >= 1000) {
     let decimals = 0;
     if (range === 0) decimals = 0;
     else if (range < 50) decimals = 2;
     else if (range < 200) decimals = 1;
     else decimals = 0;
 
-    return `${sign}$${(absV / 1000).toFixed(decimals)}K`;
+    const vK = absV / 1000;
+    const formattedWithDecimals = vK.toFixed(decimals);
+    const formattedWithMaxPrecision = vK.toFixed(2);
+
+    if (parseFloat(formattedWithDecimals) !== parseFloat(formattedWithMaxPrecision)) {
+      if (parseFloat(vK.toFixed(1)) === parseFloat(formattedWithMaxPrecision)) {
+        decimals = 1;
+      } else {
+        decimals = 2;
+      }
+    }
+
+    return `${sign}$${vK.toFixed(decimals)}K`;
   }
 
   return `${sign}$${absV.toFixed(0)}`;

@@ -54,6 +54,19 @@ describe('chart-format utilities', () => {
     it('handles negative values correctly', () => {
       expect(formatChartYAxisCurrency(-1340000, -1360000, -1340000)).toBe('-$1.340M');
     });
+
+    it('formats values under 1M in K even when max range is in millions', () => {
+      // Range = $1,050,000. Large range, but values under 1M should be in K
+      expect(formatChartYAxisCurrency(250000, 0, 1050000)).toBe('$250K');
+      expect(formatChartYAxisCurrency(500000, 0, 1050000)).toBe('$500K');
+      expect(formatChartYAxisCurrency(1200000, 0, 1200000)).toBe('$1.2M');
+    });
+
+    it('preserves precision for fractional thousands when range is large', () => {
+      // Range = $5,000. Large range (>= 200), but values have fractional thousands
+      expect(formatChartYAxisCurrency(1500, 0, 5000)).toBe('$1.5K');
+      expect(formatChartYAxisCurrency(1250, 0, 5000)).toBe('$1.25K');
+    });
   });
 
   describe('formatChartXAxisDate', () => {
