@@ -413,7 +413,6 @@ function DetailModal({
                       <th className="p-2.5">Account</th>
                       <th className="p-2.5 text-right">Start</th>
                       <th className="p-2.5 text-right">End</th>
-                      <th className="p-2.5 text-right">Delta</th>
                       <th className="p-2.5 text-right">NW Impact</th>
                     </tr>
                   </thead>
@@ -425,9 +424,6 @@ function DetailModal({
                           <td className="p-2.5 font-medium text-foreground truncate max-w-[120px]">{acc.name}</td>
                           <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.beginningBalance)}</td>
                           <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.endingBalance)}</td>
-                          <td className={`p-2.5 text-right font-mono blur-number ${acc.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {acc.delta >= 0 ? '+' : ''}{formatCurrency(acc.delta)}
-                          </td>
                           <td className={`p-2.5 text-right font-mono font-semibold blur-number ${nwImpact >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {nwImpact >= 0 ? '+' : ''}{formatCurrency(nwImpact)}
                           </td>
@@ -709,7 +705,7 @@ export function WealthFlowSankey() {
             const sourceNode = data.source;
             const targetNode = data.target;
             return (
-              <ChartTooltip x={x} y={y}>
+              <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
                 <TooltipHeader>
                   {sourceNode.label ?? sourceNode.name} → {targetNode.label ?? targetNode.name}
                 </TooltipHeader>
@@ -725,7 +721,7 @@ export function WealthFlowSankey() {
           const accounts = node.accounts as WealthFlowAccountDetail[] | undefined;
 
           return (
-            <ChartTooltip x={x} y={y}>
+            <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
               <TooltipHeader>
                 {node.label || node.name}
               </TooltipHeader>

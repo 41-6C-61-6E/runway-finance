@@ -740,6 +740,7 @@ export function CashFlowSankey() {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
   const accountFilterRef = useRef<HTMLDivElement>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -1041,7 +1042,7 @@ export function CashFlowSankey() {
           const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
 
           return (
-            <ChartTooltip x={x} y={y}>
+            <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
               <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
               <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
               {showPercentages && (
@@ -1058,7 +1059,7 @@ export function CashFlowSankey() {
 
           if (data.isHub) {
             return (
-              <ChartTooltip x={x} y={y}>
+              <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
                 <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
                 <TooltipRow label="Net Change" value={formatCurrency(data.netChange)} color={data.netChange >= 0 ? '#10b981' : '#ef4444'} />
                 <TooltipRow label="Total Flow" value={formatCurrency(data.value)} />
@@ -1069,7 +1070,7 @@ export function CashFlowSankey() {
             ? `${data.percentage.toFixed(1)}%`
             : formatCurrency(data.value);
           return (
-            <ChartTooltip x={x} y={y}>
+            <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
               <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
               <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
               {showPercentages && data.value !== undefined && (
@@ -1265,7 +1266,7 @@ export function CashFlowSankey() {
           </CollapsibleFilterPanel>
 
           {/* Content: loading / error / empty / chart */}
-          <div style={{ height: chartHeight }} className="w-full touch-pan-y">
+          <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full touch-pan-y">
             <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
               <div className="min-w-max h-full px-2 pb-2">
                 {loading ? (

@@ -54,13 +54,29 @@ export async function GET(request: Request) {
     .orderBy(asc(accounts.displayOrder));
 
   const decrypted = await decryptRows('accounts', result, dek);
+
+  // Compute sync health statuses for all decrypted accounts
+  let syncStatuses: Record<string, any> = {};
+  try {
+    const { getAccountsSyncStatus } = await import('@/lib/services/sync-health');
+    syncStatuses = await getAccountsSyncStatus(userId, dataUserId, dek, decrypted);
+  } catch (err: any) {
+    logger.error('Failed to compute sync health statuses', { error: err.message });
+  }
+
+  const decryptedWithHealth = decrypted.map((acc: any) => ({
+    ...acc,
+    syncStatus: syncStatuses[acc.id] ?? { status: 'ok' },
+  }));
+
   const scoped = includeHidden
-    ? decrypted
-    : decrypted.filter(
+    ? decryptedWithHealth
+    : decryptedWithHealth.filter(
         (acc) =>
           isReportableAccount(acc) ||
           (includeVirtual && (acc.type === 'paystub' || acc.externalId?.startsWith('virtual-')))
       );
+
 
   // Batch fetch tags for these accounts
   const accountIds = scoped.map((a: any) => a.id);
