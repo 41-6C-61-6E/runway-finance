@@ -30,12 +30,14 @@ import {
   ChevronUp,
   Link2,
   ArrowUpDown,
-  Bell
+  Bell,
+  BellOff
 } from 'lucide-react';
 import ModeToggle from '@/components/mode-toggle';
 import { useSidebar } from '@/components/sidebar-context';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
@@ -105,6 +107,8 @@ type Account = {
   isExcludedFromNetWorth: boolean;
   balanceDate: string | null;
   tags?: { id: string; name: string; color: string }[];
+  metadata?: Record<string, any> | string | null;
+  syncStatus?: { status: 'ok' | 'warning' | 'error'; reason?: string; lastSyncAt?: string } | null;
 };
 
 const SETTINGS_TABS = [
@@ -441,6 +445,7 @@ function SettingsPageBody() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
+  const [mutingAccountId, setMutingAccountId] = useState<string | null>(null);
   const [accountFilter, setAccountFilter] = useState<'all' | 'visible' | 'included' | 'hidden' | 'excluded' | 'plaid' | 'simplefin'>('all');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
@@ -502,6 +507,44 @@ function SettingsPageBody() {
       setAccountsLoading(false);
     }
   }, []);
+
+  const handleMuteSyncAlerts = useCallback(async (account: Account) => {
+    setMutingAccountId(account.id);
+    try {
+      let currentMetadata: Record<string, any> = {};
+      const rawMeta = account.metadata as any;
+      if (typeof rawMeta === 'string' && rawMeta.trim() !== '') {
+        try {
+          currentMetadata = JSON.parse(rawMeta);
+        } catch {}
+      } else if (typeof rawMeta === 'object' && rawMeta !== null) {
+        currentMetadata = rawMeta;
+      }
+
+      const payload = {
+        metadata: {
+          ...currentMetadata,
+          muteSyncWarnings: true,
+        }
+      };
+
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to mute sync alerts');
+      
+      // Reload accounts list
+      fetchAccounts();
+    } catch (err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
+      setMutingAccountId(null);
+    }
+  }, [fetchAccounts]);
 
   const handleRemap = useCallback(async () => {
     if (!remapSourceId || !remapTargetId) {
@@ -1414,6 +1457,50 @@ function SettingsPageBody() {
 
           {accountSubTab === 'automatic' && (
         <>
+          {(() => {
+            const staleAccounts = accounts.filter(
+              (acc) => acc.syncStatus && acc.syncStatus.status !== 'ok'
+            );
+            if (staleAccounts.length === 0) return null;
+
+            return (
+              <div className="mb-6 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 rounded-xl p-4 flex gap-3 text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1">
+                  <h4 className="font-bold text-amber-800 dark:text-amber-400">
+                    Some accounts may not be updating properly ({staleAccounts.length})
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    We detected sync errors or stale balances. This can happen if credentials expired or data providers returned cached data.
+                  </p>
+                  <ul className="text-xs text-amber-700/90 dark:text-amber-300/80 list-disc pl-4 space-y-1 mt-2">
+                    {staleAccounts.slice(0, 3).map((acc) => (
+                      <li key={acc.id} className="flex items-center flex-wrap gap-x-2">
+                        <span className="font-semibold text-foreground">{acc.name}</span>
+                        <span className="text-muted-foreground">({acc.institution || 'Manual'})</span>
+                        <span className="text-foreground">— {acc.syncStatus?.reason}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMuteSyncAlerts(acc);
+                          }}
+                          disabled={mutingAccountId === acc.id}
+                          className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline hover:text-amber-700 font-semibold cursor-pointer inline-flex items-center gap-0.5 ml-1"
+                        >
+                          <BellOff className="w-2.5 h-2.5" />
+                          {mutingAccountId === acc.id ? 'Muting...' : 'Mute alerts'}
+                        </button>
+                      </li>
+                    ))}
+                    {staleAccounts.length > 3 && (
+                      <li className="text-muted-foreground">and {staleAccounts.length - 3} other accounts...</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            );
+          })()}
           {/* Transaction Settings Section */}
           <div className="mb-6 pb-6 border-b border-border/60">
             <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
@@ -1591,6 +1678,26 @@ function SettingsPageBody() {
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                                   <span className="text-foreground font-medium text-sm truncate max-w-[120px] sm:max-w-xs">{account.name}</span>
+                                  {account.syncStatus && account.syncStatus.status !== 'ok' && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span 
+                                          className="flex-shrink-0 cursor-help"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {account.syncStatus.status === 'error' ? (
+                                            <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                          ) : (
+                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                          )}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[240px]">
+                                        <p className="font-semibold">{account.syncStatus.status === 'error' ? 'Connection Error' : 'Sync Warning'}</p>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">{account.syncStatus.reason}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
                                   {account.tags && account.tags.length > 0 && (
                                     <div className="flex items-center gap-1 flex-wrap">
                                       {account.tags.map((tag) => (
