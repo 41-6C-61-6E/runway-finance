@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/comp
 import { Switch } from '@/components/ui/switch';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
+import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell, Loader2 } from 'lucide-react';
 
 type Account = {
   id: string;
@@ -21,6 +22,7 @@ type Account = {
   connectionId?: string | null;
   plaidConnectionId?: string | null;
   tags?: { id: string; name: string; color: string }[];
+  syncStatus?: { status: 'ok' | 'warning' | 'error'; reason?: string; lastSyncAt?: string } | null;
 };
 
 type TagItem = {
@@ -127,6 +129,87 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [tagSearch, setTagSearch] = useState('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
 
+  const [syncingConnection, setSyncingConnection] = useState(false);
+  const [resyncingConnection, setResyncingConnection] = useState(false);
+  const [syncingAccount, setSyncingAccount] = useState(false);
+  const [muteSyncWarnings, setMuteSyncWarnings] = useState(false);
+
+  let metaObj: Record<string, any> = {};
+  if (account) {
+    const rawMeta = account.metadata as any;
+    if (typeof rawMeta === 'string' && rawMeta.trim() !== '') {
+      try {
+        metaObj = JSON.parse(rawMeta);
+      } catch {}
+    } else if (typeof rawMeta === 'object' && rawMeta !== null) {
+      metaObj = rawMeta;
+    }
+  }
+  const isCryptoApi = account?.type === 'crypto' && typeof metaObj.xpub === 'string' && metaObj.xpub.trim() !== '';
+  const isMetalsApi = account?.type === 'metals' && typeof metaObj.amountOz !== 'undefined' && parseFloat(String(metaObj.amountOz)) > 0;
+  const isRealEstateApi = [
+    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+    'single-family', 'condo', 'townhouse', 'multi-family'
+  ].includes(account?.type || '') && typeof metaObj.address === 'string' && metaObj.address.trim() !== '';
+  const isApiDrivenManual = isCryptoApi || isMetalsApi || isRealEstateApi;
+
+  const handleSyncConnection = async () => {
+    const connId = account?.connectionId || account?.plaidConnectionId;
+    if (!connId) return;
+    setSyncingConnection(true);
+    try {
+      const res = await fetch(`/api/connections/${connId}/sync`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to sync connection');
+      invalidateAllFinanceQueries(queryClient);
+      onSuccess();
+    } catch (err: any) {
+      alert(err.message || 'An error occurred during sync');
+    } finally {
+      setSyncingConnection(false);
+    }
+  };
+
+  const handleFullResync = async () => {
+    const connId = account?.plaidConnectionId;
+    if (!connId) return;
+    if (!confirm('This will clear the sync cursor and trigger a full re-sync of up to 2 years of history. Are you sure?')) return;
+    setResyncingConnection(true);
+    try {
+      const res = await fetch(`/api/connections/${connId}/reset-cursor`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to start full re-sync');
+      invalidateAllFinanceQueries(queryClient);
+      onSuccess();
+    } catch (err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
+      setResyncingConnection(false);
+    }
+  };
+
+  const handleSyncAccount = async () => {
+    if (!account) return;
+    setSyncingAccount(true);
+    try {
+      const res = await fetch(`/api/manual-accounts/${account.id}/sync`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to sync account');
+      invalidateAllFinanceQueries(queryClient);
+      onSuccess();
+    } catch (err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
+      setSyncingAccount(false);
+    }
+  };
+
   const handleUnlink = useCallback(async () => {
     if (!account) return;
     if (
@@ -204,6 +287,17 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     setIsExcludedFromNetWorth(account.isExcludedFromNetWorth);
     setTagIds(account.tags?.map((t) => t.id) ?? []);
 
+    let mObj: Record<string, any> = {};
+    const rawMeta = account.metadata as any;
+    if (typeof rawMeta === 'string') {
+      try {
+        mObj = JSON.parse(rawMeta);
+      } catch {}
+    } else if (typeof rawMeta === 'object' && rawMeta !== null) {
+      mObj = rawMeta;
+    }
+    setMuteSyncWarnings(!!mObj.muteSyncWarnings);
+
     if (account.type === 'mortgage') {
       const meta = account.metadata ?? {};
       const flat: Record<string, string> = {};
@@ -243,8 +337,24 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         tagIds,
       };
 
+      let currentMetadata: Record<string, any> = {};
+      const rawMeta = account.metadata as any;
+      if (typeof rawMeta === 'string' && rawMeta.trim() !== '') {
+        try {
+          currentMetadata = JSON.parse(rawMeta);
+        } catch {}
+      } else if (typeof rawMeta === 'object' && rawMeta !== null) {
+        currentMetadata = rawMeta;
+      }
+
+      const baseMetadata = {
+        ...currentMetadata,
+        muteSyncWarnings,
+      };
+
       if (type === 'mortgage') {
         const metadata: Record<string, unknown> = {
+          ...baseMetadata,
           originalLoanAmount: parseFloat(mortgageMeta.originalLoanAmount || '0'),
           interestRate: parseFloat(mortgageMeta.interestRate || '0'),
           termMonths: parseInt(mortgageMeta.termMonths || '360', 10),
@@ -275,11 +385,11 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         }
       } else if (isInvestmentAccount(type)) {
         payload.metadata = {
-          ...(account.metadata || {}),
+          ...baseMetadata,
           ignoreSettlementTransactions,
         };
       } else {
-        payload.metadata = account.metadata || null;
+        payload.metadata = baseMetadata;
       }
 
       onSuccess();
@@ -298,7 +408,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, onSuccess, queryClient]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, muteSyncWarnings, onSuccess, queryClient]);
 
   if (!account || !open) return null;
 
@@ -371,6 +481,92 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
             <div className={`font-mono text-2xl font-bold mt-1 text-foreground financial-value`}>{text}</div>
             <div className="text-xs text-muted-foreground mt-1">{account.currency}</div>
           </div>
+
+          {/* Sync Health & Actions */}
+          {(account.connectionId || account.plaidConnectionId || isCryptoApi || isMetalsApi || isRealEstateApi) && (
+            <div className="p-4 bg-muted/40 border border-border rounded-xl space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Sync Status & Actions</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  account.syncStatus?.status === 'ok' ? 'bg-chart-1/10 text-chart-1' :
+                  account.syncStatus?.status === 'error' ? 'bg-destructive/10 text-destructive' :
+                  'bg-amber-500/10 text-amber-600 dark:text-amber-500'
+                }`}>
+                  {account.syncStatus?.status === 'ok' ? 'Healthy' :
+                   account.syncStatus?.status === 'error' ? 'Error' : 'Warning'}
+                </span>
+              </div>
+
+              {account.syncStatus && account.syncStatus.status !== 'ok' && (
+                <div className={`p-3 rounded-lg border text-xs flex gap-2 ${
+                  account.syncStatus.status === 'error'
+                    ? 'bg-destructive/5 text-destructive border-destructive/10'
+                    : 'bg-amber-500/5 text-amber-600 dark:text-amber-500 border-amber-500/10'
+                }`}>
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">{account.syncStatus.status === 'error' ? 'Sync Error: ' : 'Sync Warning: '}</span>
+                    <span className="text-muted-foreground">{account.syncStatus.reason}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 pt-1 border-t border-border/40">
+                {/* Plaid / SimpleFIN manual sync connection buttons */}
+                {(account.connectionId || account.plaidConnectionId) && (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSyncConnection}
+                      disabled={syncingConnection}
+                      className="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {syncingConnection ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      Sync Connection
+                    </button>
+
+                    {account.plaidConnectionId && (
+                      <button
+                        type="button"
+                        onClick={handleFullResync}
+                        disabled={resyncingConnection}
+                        className="px-3 py-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        title="Clear sync cursor and re-pull full history"
+                      >
+                        {resyncingConnection ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Full Re-sync
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* API driven manual accounts sync button */}
+                {isApiDrivenManual && !account.connectionId && !account.plaidConnectionId && (
+                  <button
+                    type="button"
+                    onClick={handleSyncAccount}
+                    disabled={syncingAccount}
+                    className="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {syncingAccount ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    Sync Account Now
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Editable fields */}
           <div className="space-y-4">
@@ -564,6 +760,21 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-normal">
                     When generating daily estimated balance snapshots, ignore matching positive/negative transaction pairs on the same date (e.g. money market settlement sweeps).
+                  </p>
+                </div>
+              )}
+
+              {(account.connectionId || account.plaidConnectionId || isCryptoApi || isMetalsApi || isRealEstateApi) && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground/80">Mute sync alerts</span>
+                    <Switch
+                      checked={muteSyncWarnings}
+                      onCheckedChange={setMuteSyncWarnings}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-normal">
+                    Mute warnings about connection failures, sync delays, or stagnant balances for this account.
                   </p>
                 </div>
               )}
