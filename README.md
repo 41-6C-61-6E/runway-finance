@@ -414,7 +414,7 @@ Issues, pull requests, and suggestions are welcome. Feel free to fork and adapt 
 This project is licensed under the [MIT License](LICENSE).
 
 ```
-Copyright (c) 2025–2026 Ehsan Ghaffar & Alan Racek
+Copyright (c) 2025–2026 Alan Racek
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files, to deal in the Software
