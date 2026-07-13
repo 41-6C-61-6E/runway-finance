@@ -260,16 +260,16 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
         </div>
 
         {/* Account Tabs and Sector Toggle */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
           {/* Segmented Account Filter */}
           {accountsWithHoldings.length > 0 && (
-            <div className="flex bg-muted/65 border border-border rounded-lg p-0.5 max-w-full overflow-x-auto scrollbar-none">
+            <div className="flex border-b border-border/60 gap-5 max-w-full overflow-x-auto scrollbar-none pb-0.5 -mb-px">
               <button
                 onClick={() => setSelectedAccountId('all')}
-                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`pb-1.5 px-1 text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all border-b-2 cursor-pointer ${
                   selectedAccountId === 'all'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 All Accounts
@@ -278,10 +278,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                 <button
                   key={acc.id}
                   onClick={() => setSelectedAccountId(acc.id)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                  className={`pb-1.5 px-1 text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all border-b-2 cursor-pointer ${
                     selectedAccountId === acc.id
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {acc.institution ? `${acc.institution} - ${acc.name}` : acc.name}

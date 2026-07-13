@@ -5,7 +5,6 @@ import { formatCurrency } from '@/lib/utils/format';
 import { Home, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
 import { MortgagePaydownChart } from './mortgage-paydown-chart';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { cn } from '@/lib/utils';
@@ -483,7 +482,6 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                       propertyName={property.name}
                       inline={true}
                     />
-                    <MathDescription chartId="mortgagePaydown" />
                   </div>
                 )}
               </div>

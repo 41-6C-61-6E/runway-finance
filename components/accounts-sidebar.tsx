@@ -61,6 +61,16 @@ export default function AccountsSidebar() {
       if (!subMap.has(subGroup)) subMap.set(subGroup, []);
       subMap.get(subGroup)!.push(acc);
     }
+    // Sort accounts in each subgroup by absolute balance descending
+    for (const subMap of map.values()) {
+      for (const [subGroup, accs] of subMap.entries()) {
+        subMap.set(subGroup, [...accs].sort((a, b) => {
+          const balanceA = parseFloat(a.balance) || 0;
+          const balanceB = parseFloat(b.balance) || 0;
+          return Math.abs(balanceB) - Math.abs(balanceA);
+        }));
+      }
+    }
     return map;
   }, [visibleAccounts]);
 
@@ -126,6 +136,11 @@ export default function AccountsSidebar() {
         allAccounts.push(acc);
       }
     }
+    allAccounts.sort((a, b) => {
+      const balanceA = parseFloat(a.balance) || 0;
+      const balanceB = parseFloat(b.balance) || 0;
+      return Math.abs(balanceB) - Math.abs(balanceA);
+    });
     return allAccounts.map((account) => (
       <AccountRow key={account.id} account={account} onOpenDrawer={onOpen} />
     ));

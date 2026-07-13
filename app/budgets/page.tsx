@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets/budget-period-selector';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Wallet } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -25,7 +24,6 @@ function BudgetsContent() {
           <Suspense fallback={<LoadingSpinner category="summary" />}>
             <div>
               <BudgetSummary />
-              <MathDescription chartId="budgetSummary" />
             </div>
           </Suspense>
         )}
@@ -35,7 +33,6 @@ function BudgetsContent() {
             <Suspense fallback={<LoadingSpinner category="summary" />}>
               <div>
                 <BudgetTable />
-                <MathDescription chartId="budgetTable" />
               </div>
             </Suspense>
           </div>

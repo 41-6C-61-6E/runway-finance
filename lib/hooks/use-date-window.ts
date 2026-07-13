@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
@@ -38,6 +38,8 @@ export function useDateWindow(
 
   const timeframe = controlledTimeframe !== undefined ? controlledTimeframe : timeframeState;
 
+  const lastSyncedParamRef = useRef<TimeRange | null>(null);
+
   const setTimeframe = (tf: TimeRange) => {
     if (controlledTimeframe === undefined) {
       _setTimeframe(tf);
@@ -46,16 +48,22 @@ export function useDateWindow(
   };
 
   useEffect(() => {
-    if (searchParams) {
-      const paramTf = searchParams.get('timeframe') as TimeRange | null;
-      const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all'];
-      if (paramTf && validTfs.includes(paramTf)) {
-        if (timeframe !== paramTf) {
-          setTimeframe(paramTf);
-        }
+    if (controlledTimeframe !== undefined) return;
+    if (!searchParams) return;
+
+    const paramTf = searchParams.get('timeframe') as TimeRange | null;
+    const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all'];
+    if (paramTf && validTfs.includes(paramTf)) {
+      if (lastSyncedParamRef.current !== paramTf) {
+        lastSyncedParamRef.current = paramTf;
+        _setTimeframe(paramTf);
       }
     }
-  }, [searchParams, timeframe]);
+  }, [searchParams, controlledTimeframe, _setTimeframe]);
+
+  useEffect(() => {
+    lastSyncedParamRef.current = timeframe;
+  }, [timeframe]);
 
   useEffect(() => {
     const snapped = snapToPeriod(windowEnd, timeframe);

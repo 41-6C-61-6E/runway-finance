@@ -5,9 +5,8 @@ import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useImportedData } from '@/lib/hooks/use-imported-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
-import { useShowMath } from '@/lib/hooks/use-show-math';
 import { useMarketDataForSnapshots } from '@/lib/hooks/use-market-data-snapshots';
-import { Check, Calculator, Database, RefreshCw, AlertTriangle, Play, HelpCircle } from 'lucide-react';
+import { Check, Database, RefreshCw, AlertTriangle, Play, HelpCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
@@ -66,9 +65,8 @@ export default function AnalyticsTab() {
   const { settings, loading: synthLoading, isEnabled, updateSettings } = useSyntheticData();
   const { settings: importSettings, loading: importLoading, isEnabled: isImportEnabled, updateSettings: updateImportSettings } = useImportedData();
   const { defaults, loading: defaultsLoading, updateDefaults } = useChartDefaults();
-  const { enabled: showMathEnabled, loading: mathLoading, updateEnabled: updateShowMath } = useShowMath();
   const { enabled: useMarketDataEnabled, loading: marketDataLoading, updateEnabled: updateUseMarketData } = useMarketDataForSnapshots();
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'data' | 'charts'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'data'>('general');
 
   const [recalcStatus, setRecalcStatus] = useState<any>(null);
   const [recalcLoading, setRecalcLoading] = useState(false);
@@ -122,7 +120,7 @@ export default function AnalyticsTab() {
     }
   };
 
-  const loading = visLoading || synthLoading || importLoading || defaultsLoading || mathLoading || marketDataLoading;
+  const loading = visLoading || synthLoading || importLoading || defaultsLoading || marketDataLoading;
 
   if (loading) {
     return <div className="text-muted-foreground py-4">Loading...</div>;
@@ -131,19 +129,18 @@ export default function AnalyticsTab() {
   return (
     <div>
       {/* Sub-Tabs */}
-      <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5 max-w-md mb-6">
+      <div className="flex border-b border-border/60 w-full max-w-md gap-6 mb-6">
         {([
           { key: 'general' as const, label: 'General' },
           { key: 'data' as const, label: 'Data Sources' },
-          { key: 'charts' as const, label: 'Chart Visibility' },
         ]).map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+            className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
               activeSubTab === tab.key
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}
@@ -154,30 +151,6 @@ export default function AnalyticsTab() {
       {/* Tab: General */}
       {activeSubTab === 'general' && (
         <div className="space-y-8">
-          {/* ── Show the Math ──────────────────────────────────────────────── */}
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Show the Math</h2>
-            <p className="text-xs text-muted-foreground mb-4">
-              When enabled, displays a description of the logic and math used to calculate
-              each analytics card&rsquo;s values below the card.
-            </p>
-            <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 border border-border rounded-lg">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Calculator className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-foreground">Show math explanations on cards</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Explains the formulas and data sources behind each chart and summary card.
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={showMathEnabled}
-                onCheckedChange={updateShowMath}
-              />
-            </div>
-          </div>
-
           {/* ── Chart Defaults ──────────────────────────────────────────────── */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Chart Defaults</h2>
@@ -235,6 +208,41 @@ export default function AnalyticsTab() {
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ── Chart Visibility ─────────────────────────────────────────── */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>
+            <p className="text-xs text-muted-foreground mb-6">
+              Toggle charts on or off per page. Hidden charts will not be displayed.
+            </p>
+
+            <div className="space-y-8">
+              {(Object.entries(CHARTS) as [string, { label: string; charts: Record<string, string> }][]).map(
+                ([pageKey, page]) => (
+                  <div key={pageKey}>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">{page.label}</h3>
+                    <div className="space-y-2">
+                      {Object.entries(page.charts).map(([chartId, chartLabel]) => {
+                        const visible = visibility[chartId] !== false;
+                        return (
+                          <div
+                            key={chartId}
+                            className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg"
+                          >
+                            <span className="text-sm text-foreground">{chartLabel}</span>
+                            <Switch
+                              checked={visible}
+                              onCheckedChange={(checked) => updateVisibility(chartId, checked)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -468,42 +476,6 @@ export default function AnalyticsTab() {
         </div>
       )}
 
-      {/* Tab: Chart Visibility */}
-      {activeSubTab === 'charts' && (
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>
-          <p className="text-xs text-muted-foreground mb-6">
-            Toggle charts on or off per page. Hidden charts will not be displayed.
-          </p>
-
-          <div className="space-y-8">
-            {(Object.entries(CHARTS) as [string, { label: string; charts: Record<string, string> }][]).map(
-              ([pageKey, page]) => (
-                <div key={pageKey}>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">{page.label}</h3>
-                  <div className="space-y-2">
-                    {Object.entries(page.charts).map(([chartId, chartLabel]) => {
-                      const visible = visibility[chartId] !== false;
-                      return (
-                        <div
-                          key={chartId}
-                          className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg"
-                        >
-                          <span className="text-sm text-foreground">{chartLabel}</span>
-                          <Switch
-                            checked={visible}
-                            onCheckedChange={(checked) => updateVisibility(chartId, checked)}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

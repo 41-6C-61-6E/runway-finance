@@ -1540,6 +1540,17 @@ export default function AccountsPage() {
       subMap.get(subGroup)!.push(acc);
     }
 
+    // Sort accounts in each subgroup by absolute balance descending
+    for (const subMap of map.values()) {
+      for (const [subGroup, accs] of subMap.entries()) {
+        subMap.set(subGroup, [...accs].sort((a, b) => {
+          const balanceA = parseFloat(a.balance) || 0;
+          const balanceB = parseFloat(b.balance) || 0;
+          return Math.abs(balanceB) - Math.abs(balanceA);
+        }));
+      }
+    }
+
     return map;
   }, [filteredAllAccounts, hierarchyShowHidden, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags]);
 
@@ -2888,6 +2899,11 @@ export default function AccountsPage() {
                                       flatAccs.push({ acc, subgroup });
                                     }
                                   }
+                                  flatAccs.sort((a, b) => {
+                                    const balanceA = parseFloat(a.acc.balance) || 0;
+                                    const balanceB = parseFloat(b.acc.balance) || 0;
+                                    return Math.abs(balanceB) - Math.abs(balanceA);
+                                  });
                                   return flatAccs.map(({ acc, subgroup }) => {
                                     const isLiabSub = isLiabilityAccount(acc.type);
                                     const accStats = getTrendStats([acc]);

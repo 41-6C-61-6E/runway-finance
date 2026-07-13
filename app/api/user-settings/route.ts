@@ -48,7 +48,6 @@ export async function GET() {
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
       cardCollapsedStates: created?.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
-      showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       paystubEnabled: created?.paystubEnabled ?? DEFAULTS.paystubEnabled,
       aiSystemPrompt: created?.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
       aiAutoAnalyze: created?.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
@@ -108,7 +107,6 @@ export async function GET() {
     hideAccountsSidebarByDefault: settings[0].hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: settings[0].chartSelections ?? DEFAULTS.chartSelections,
     cardCollapsedStates: settings[0].cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
-    showMathEnabled: settings[0].showMathEnabled ?? DEFAULTS.showMathEnabled,
     paystubEnabled: settings[0].paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: settings[0].aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: settings[0].aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
@@ -161,7 +159,6 @@ export async function PATCH(request: Request) {
   const hideAccountsSidebarByDefault = body.hideAccountsSidebarByDefault;
   const chartSelections = body.chartSelections;
   const cardCollapsedStates = body.cardCollapsedStates;
-	const showMathEnabled = body.showMathEnabled;
 	const aiSystemPrompt = body.aiSystemPrompt;
 	const aiAutoAnalyze = body.aiAutoAnalyze;
 	const aiAutoApprove = body.aiAutoApprove;
@@ -285,10 +282,6 @@ export async function PATCH(request: Request) {
   if (apiKeys !== undefined && (typeof apiKeys !== 'object' || apiKeys === null || Array.isArray(apiKeys))) {
     return Response.json({ error: 'Invalid apiKeys value' }, { status: 400 });
   }
-
-	if (showMathEnabled !== undefined && typeof showMathEnabled !== 'boolean') {
-		return Response.json({ error: 'Invalid showMathEnabled value' }, { status: 400 });
-	}
 
 	if (paystubEnabled !== undefined && typeof paystubEnabled !== 'boolean') {
 		return Response.json({ error: 'Invalid paystubEnabled value' }, { status: 400 });
@@ -420,7 +413,6 @@ export async function PATCH(request: Request) {
       hideAccountsSidebarByDefault: created?.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: created?.chartSelections ?? DEFAULTS.chartSelections,
       cardCollapsedStates: created?.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
-      showMathEnabled: created?.showMathEnabled ?? DEFAULTS.showMathEnabled,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
       notifySyncErrors: created?.notifySyncErrors ?? DEFAULTS.notifySyncErrors,
@@ -465,7 +457,6 @@ export async function PATCH(request: Request) {
     const existingStates = (settings[0].cardCollapsedStates as Record<string, any>) || {};
     updates.cardCollapsedStates = { ...existingStates, ...cardCollapsedStates };
   }
-	if (showMathEnabled !== undefined) updates.showMathEnabled = showMathEnabled;
 	if (paystubEnabled !== undefined) updates.paystubEnabled = paystubEnabled;
 	if (aiSystemPrompt !== undefined) updates.aiSystemPrompt = aiSystemPrompt;
 	if (aiAutoAnalyze !== undefined) updates.aiAutoAnalyze = aiAutoAnalyze;
@@ -668,7 +659,6 @@ export async function PATCH(request: Request) {
       hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
     cardCollapsedStates: updated.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
-    showMathEnabled: updated.showMathEnabled ?? DEFAULTS.showMathEnabled,
     paystubEnabled: updated.paystubEnabled ?? DEFAULTS.paystubEnabled,
     aiSystemPrompt: updated.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
     aiAutoAnalyze: updated.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,

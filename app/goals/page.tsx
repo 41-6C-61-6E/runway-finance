@@ -5,7 +5,6 @@ import { GoalsSummary } from '@/components/goals/goals-summary';
 import { GoalsList } from '@/components/goals/goals-list';
 import { MilestonesProjections } from '@/components/goals/milestones-projections';
 import { GoalInflowProvider } from '@/components/goals/goal-inflow-context';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Target } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -24,7 +23,6 @@ function GoalsContent() {
             <Suspense fallback={<LoadingSpinner category="summary" />}>
               <div>
                 <GoalsSummary />
-                <MathDescription chartId="goalsSummary" />
               </div>
             </Suspense>
           )}
@@ -34,7 +32,6 @@ function GoalsContent() {
               <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <div>
                   <MilestonesProjections />
-                  <MathDescription chartId="milestonesProjections" />
                 </div>
               </Suspense>
             </div>
@@ -45,7 +42,6 @@ function GoalsContent() {
               <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <div>
                   <GoalsList />
-                  <MathDescription chartId="goalsList" />
                 </div>
               </Suspense>
             </div>

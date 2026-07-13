@@ -5,7 +5,6 @@ import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
 import { AssetAllocation } from '@/components/net-worth/asset-allocation';
 import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
 import { DebtBreakdown } from '@/components/debt-breakdown';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -30,7 +29,6 @@ function NetWorthContent() {
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div className="space-y-5 sm:space-y-6">
                 <NetWorthChart />
-                <MathDescription chartId="netWorthChart" />
               </div>
             </Suspense>
           </div>
@@ -40,7 +38,6 @@ function NetWorthContent() {
           <Suspense fallback={<LoadingSpinner category="summary" />}>
             <div className="space-y-5 sm:space-y-6">
               <NetWorthSummary />
-              <MathDescription chartId="netWorthSummary" />
             </div>
           </Suspense>
         )}
@@ -49,7 +46,6 @@ function NetWorthContent() {
           <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
             <div className="space-y-5 sm:space-y-6">
               <DebtToAssetRatio />
-              <MathDescription chartId="debtToAssetRatio" />
             </div>
           </Suspense>
         )}
@@ -60,7 +56,6 @@ function NetWorthContent() {
               <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div className="h-full space-y-5">
                   <DebtToAssetRatio />
-                  <MathDescription chartId="debtToAssetRatio" />
                 </div>
               </Suspense>
             )}

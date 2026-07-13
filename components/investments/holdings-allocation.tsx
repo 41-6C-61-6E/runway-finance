@@ -205,15 +205,15 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       {!isCollapsed && (
         <div className="flex-1 flex flex-col p-4 sm:p-5">
           {/* Group By Filter Toggles */}
-          <div className="flex bg-muted/65 border border-border rounded-lg p-0.5 self-center mb-5 shrink-0">
+          <div className="flex border-b border-border/60 gap-6 self-center mb-5 shrink-0">
             {groupOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setGroupBy(opt.value)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                   groupBy === opt.value
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {opt.label}

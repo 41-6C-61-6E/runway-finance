@@ -239,15 +239,15 @@ export default function NotificationsTab() {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Segmented Sub-Tab Switcher (Accounts Page Style) */}
-      <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5 w-full mb-6">
+      <div className="flex border-b border-border/60 w-full gap-6 mb-6">
         {(['subscriptions', 'alerts', 'custom'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveSubTab(tab)}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${
+            className={`pb-2 px-1 text-xs font-semibold capitalize transition-all border-b-2 -mb-px cursor-pointer ${
               activeSubTab === tab
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab === 'subscriptions' ? 'Subscriptions' : tab === 'alerts' ? 'Alerts' : 'Custom'}
