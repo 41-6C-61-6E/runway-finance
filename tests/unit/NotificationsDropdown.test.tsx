@@ -128,13 +128,12 @@ describe('NotificationsDropdown Component', () => {
     // 2. Click trash button to trigger confirmation dialog
     fireEvent.click(trashButton);
 
-    // Verify confirmation dialog text appears
-    expect(screen.getByText('Clear All Notifications')).toBeDefined();
+    // Verify confirmation warning text appears
     expect(
       screen.getByText('Are you sure you want to permanently clear all notifications? This action cannot be undone.')
     ).toBeDefined();
 
-    // Click 'Clear All' action button in alert dialog
+    // Click 'Clear All' action button in inline banner
     const clearButton = screen.getByRole('button', { name: 'Clear All' });
     
     // Simulate mousedown to ensure the click outside handler handles it properly

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { InvestmentsSummary } from '@/components/investments/investments-summary';
 import { PerformanceChart } from '@/components/investments/performance-chart';
@@ -137,12 +136,11 @@ export default function InvestmentsPage() {
                   portfolioHistory={portfolioHistory}
                   quotes={quotes}
                 />
-                <MathDescription chartId="investmentsSummary" />
               </div>
             )}
 
             {/* ── Tabs Selector ── */}
-            <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 w-full overflow-x-auto scrollbar-none snap-x snap-mandatory gap-1 mb-5 sm:mb-6">
+            <div className="flex border-b border-border w-full overflow-x-auto scrollbar-none snap-x snap-mandatory gap-6 mb-5 sm:mb-6">
               {([
                 { id: 'overview', label: 'Overview' },
                 { id: 'holdings', label: 'Holdings & Portfolio' },
@@ -151,10 +149,10 @@ export default function InvestmentsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 min-w-[125px] snap-start text-center py-2 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  className={`pb-2.5 px-1 snap-start text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
                     activeTab === tab.id
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {tab.label}
@@ -170,13 +168,11 @@ export default function InvestmentsPage() {
                     {isVisible('performanceChart') && (
                       <div className="lg:col-span-2">
                         <PerformanceChart />
-                        <MathDescription chartId="performanceChart" />
                       </div>
                     )}
                     {isVisible('taxBreakdown') && (
                       <div className="lg:col-span-1">
                         <TaxBreakdown accounts={data.accounts} />
-                        <MathDescription chartId="taxBreakdown" />
                       </div>
                     )}
                   </div>
@@ -185,7 +181,6 @@ export default function InvestmentsPage() {
                 {isVisible('holdingsAllocationChart') && (
                   <div>
                     <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
-                    <MathDescription chartId="holdingsAllocationChart" />
                   </div>
                 )}
               </div>
@@ -197,7 +192,6 @@ export default function InvestmentsPage() {
                 {isVisible('topHoldings') && (
                   <div>
                     <HoldingSparklineCards holdings={data.holdings} quotes={quotes} />
-                    <MathDescription chartId="topHoldings" />
                   </div>
                 )}
 
@@ -212,7 +206,6 @@ export default function InvestmentsPage() {
                       </div>
                       <HoldingsTable holdings={data.holdings} accounts={data.accounts} quotes={quotes} />
                     </div>
-                    <MathDescription chartId="holdingsTable" />
                   </div>
                 )}
               </div>
@@ -228,13 +221,11 @@ export default function InvestmentsPage() {
                       totalAnnualIncome={incomeData?.totalAnnual || 0}
                       loading={loading}
                     />
-                    <MathDescription chartId="incomeDividends" />
                   </div>
                 )}
                 {isVisible('recentActivity') && (
                   <div>
                     <RecentActivity transactions={incomeData?.transactions || []} />
-                    <MathDescription chartId="recentActivity" />
                   </div>
                 )}
               </div>

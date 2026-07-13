@@ -44,6 +44,37 @@ function getYearStart(dateStr: string): string {
   return dateStr.slice(0, 4) + '-01-01';
 }
 
+function getBucketPeriodEnd(key: string, bucketSize: NetWorthChangeBucketSize): string {
+  const [y, m] = key.split('-').map(Number);
+  switch (bucketSize) {
+    case 'daily':
+      return key;
+    case 'weekly': {
+      const d = new Date(key + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 6);
+      return d.toISOString().split('T')[0];
+    }
+    case 'biweekly': {
+      const d = new Date(key + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 13);
+      return d.toISOString().split('T')[0];
+    }
+    case 'monthly': {
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      return `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    }
+    case 'quarterly': {
+      const endMonth = m + 2;
+      const lastDay = new Date(Date.UTC(y, endMonth, 0)).getUTCDate();
+      return `${y}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    }
+    case 'yearly':
+      return `${y}-12-31`;
+    default:
+      return key;
+  }
+}
+
 const bucketFns: Record<NetWorthChangeBucketSize, (dateStr: string) => string> = {
   daily: (d) => d,
   weekly: getWeekStart,
@@ -99,15 +130,20 @@ export function computeNetWorthChangeBarData(
   const barData: NetWorthChangeBarDataPoint[] = [];
   let previousEndPoint: ChangeBarChartPoint | null = null;
   const sortedBuckets = Array.from(buckets.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const overallEndDate = sorted[sorted.length - 1].date;
 
   for (const [key, points] of sortedBuckets) {
     points.sort((a, b) => a.date.localeCompare(b.date));
     const endPoint = points[points.length - 1];
     const startPoint = previousEndPoint ?? points[0];
+
+    const calendarEnd = getBucketPeriodEnd(key, bucketSize);
+    const finalEndDate = calendarEnd > overallEndDate ? overallEndDate : calendarEnd;
+
     barData.push({
       date: key,
-      startDate: startPoint.date,
-      endDate: endPoint.date,
+      startDate: previousEndPoint ? key : startPoint.date,
+      endDate: finalEndDate,
       change: endPoint.netWorth - startPoint.netWorth,
       startNetWorth: startPoint.netWorth,
       endNetWorth: endPoint.netWorth,

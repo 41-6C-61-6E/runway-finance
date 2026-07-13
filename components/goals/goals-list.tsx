@@ -244,10 +244,10 @@ export function GoalsList() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit">
+        <div className="flex items-center justify-between mb-4 w-full">
+          <div className="flex gap-6 border-b border-border w-full sm:w-auto pb-0.5">
             {filters.map((f) => (
-              <div key={f.key} className="px-4 py-2 rounded-md bg-muted/50 animate-pulse" />
+              <div key={f.key} className="w-20 h-7 bg-muted/30 animate-pulse border-b-2 border-transparent" />
             ))}
           </div>
           <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
@@ -316,20 +316,20 @@ export function GoalsList() {
   return (
     <div>
       {/* Filters & Actions */}
-      <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-5">
-        <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit">
+      <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-5 w-full">
+        <div className="flex gap-6 border-b border-border w-full sm:w-auto">
           {filters.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 filter === f.key
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {f.label}
-              <span className={`ml-1 ${filter === f.key ? 'text-primary-foreground/70' : 'text-muted-foreground/50'}`}>
+              <span className={`ml-1 ${filter === f.key ? 'text-primary/70' : 'text-muted-foreground/50'}`}>
                 {f.count}
               </span>
             </button>

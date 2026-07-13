@@ -69,15 +69,15 @@ export function RecentActivity({ transactions }: RecentActivityProps) {
         <div className="flex-1 flex flex-col p-4 sm:p-5 gap-3">
           {/* Type filter */}
           {transactions.length > 0 && (
-            <div className="flex bg-muted/50 border border-border rounded-lg p-0.5 self-start flex-wrap gap-0.5">
+            <div className="flex border-b border-border w-full gap-6 overflow-x-auto scrollbar-none pb-0.5 mb-1">
               {FILTER_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFilter(opt.value)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`pb-2 px-1 text-xs font-semibold whitespace-nowrap transition-all border-b-2 -mb-px cursor-pointer ${
                     filter === opt.value
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {opt.label}

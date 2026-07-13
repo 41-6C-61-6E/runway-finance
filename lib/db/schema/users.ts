@@ -138,7 +138,6 @@ export const userSettings = pgTable('user_settings', {
   hideAccountsSidebarByDefault: boolean('hide_accounts_sidebar_by_default').notNull().default(true),
   chartSelections: jsonb('chart_selections').default({}),
   cardCollapsedStates: jsonb('card_collapsed_states').default({}),
-  showMathEnabled: boolean('show_math_enabled').notNull().default(false),
   paystubEnabled: boolean('paystub_enabled').notNull().default(false),
   aiSystemPrompt: text('ai_system_prompt'),
   aiAutoAnalyze: boolean('ai_auto_analyze').notNull().default(false),

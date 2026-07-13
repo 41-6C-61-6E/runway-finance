@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { PropertyCards } from '@/components/real-estate/property-cards';
 import { EquityOverTimeChart } from '@/components/real-estate/equity-over-time-chart';
 import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-allocation-chart';
-import { MathDescription } from '@/components/features/settings/math-description';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Home } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -24,7 +23,6 @@ function RealEstateContent() {
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
                 <EquityOverTimeChart />
-                <MathDescription chartId="equityOverTimeChart" />
               </div>
             </Suspense>
           </div>
@@ -36,7 +34,6 @@ function RealEstateContent() {
               <div className="lg:col-span-2">
                 <Suspense fallback={<LoadingSpinner category="chart" />}>
                   <PropertyCards />
-                  <MathDescription chartId="propertyCards" />
                 </Suspense>
               </div>
             )}
@@ -44,7 +41,6 @@ function RealEstateContent() {
               <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div>
                   <PortfolioAllocationChart />
-                  <MathDescription chartId="portfolioAllocationChart" />
                 </div>
               </Suspense>
             )}

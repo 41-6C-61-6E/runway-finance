@@ -1407,7 +1407,7 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex bg-muted/80 border border-border/30 rounded-lg p-0.5 w-full mb-5 sm:mb-6">
+          <div className="flex border-b border-border/60 w-full gap-6 mb-5 sm:mb-6">
             <button
               onClick={() => {
                 setAccountSubTab('connections');
@@ -1415,10 +1415,10 @@ function SettingsPageBody() {
                 params.set('sub', 'connections');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'connections'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Connections
@@ -1430,10 +1430,10 @@ function SettingsPageBody() {
                 params.set('sub', 'automatic');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'automatic'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Automatic Accounts
@@ -1445,10 +1445,10 @@ function SettingsPageBody() {
                 params.set('sub', 'manual');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'manual'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Manual Accounts

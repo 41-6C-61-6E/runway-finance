@@ -53,11 +53,39 @@ describe('net worth change bars', () => {
 
     expect(bucketSize).toBe('monthly');
     expect(june).toMatchObject({
-      startDate: '2026-05-31',
+      startDate: '2026-06-01',
       endDate: '2026-06-30',
       change: 11296,
       startNetWorth: 130000,
       endNetWorth: 141296,
+    });
+  });
+
+  it('extends past periods to calendar end and clamps current period to overall end', () => {
+    const points = [
+      // 2024 (historical)
+      { date: '2024-01-01', netWorth: 50000 },
+      { date: '2024-12-25', netWorth: 60000 }, // ends early on Dec 25
+      // 2025 (current/last period in data)
+      { date: '2025-01-01', netWorth: 60000 },
+      { date: '2025-06-15', netWorth: 70000 }, // ends early on Jun 15, which is also overall end date of dataset
+    ];
+
+    const { barData, bucketSize } = computeNetWorthChangeBarData(points);
+
+    expect(bucketSize).toBe('yearly');
+    expect(barData).toHaveLength(2);
+
+    // 2024 bucket should go to Dec 31
+    expect(barData[0]).toMatchObject({
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
+    });
+
+    // 2025 bucket should clamp to the dataset overall end date (2025-06-15)
+    expect(barData[1]).toMatchObject({
+      startDate: '2025-01-01',
+      endDate: '2025-06-15',
     });
   });
 });

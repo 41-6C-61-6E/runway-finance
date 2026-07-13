@@ -86,7 +86,6 @@ export async function POST(request: Request) {
         hideAccountSubheadings: DEFAULTS.hideAccountSubheadings,
         hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
         chartSelections: DEFAULTS.chartSelections,
-        showMathEnabled: DEFAULTS.showMathEnabled,
       });
 
       logger.info('Register API: shared account member created', { username, inviterUserId });
@@ -149,7 +148,6 @@ export async function POST(request: Request) {
       hideAccountSubheadings: DEFAULTS.hideAccountSubheadings,
       hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: DEFAULTS.chartSelections,
-      showMathEnabled: DEFAULTS.showMathEnabled,
     });
 
     logger.info('Register API: user created', { username });
