@@ -1026,7 +1026,9 @@ export function CashFlowSankey() {
       isAnimationActive={false}
       allowEscapeViewBox={{ x: true, y: true }}
       content={(props: any) => {
-        const { active, payload, x, y } = props;
+          const { active, payload, coordinate } = props;
+          const x = coordinate?.x;
+          const y = coordinate?.y;
         if (!active || !payload || !payload.length) return null;
         const data = payload[0].payload;
 
