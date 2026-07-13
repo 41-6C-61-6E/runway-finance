@@ -57,7 +57,7 @@ import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { Sparkline } from '@/components/ui/sparkline';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/format';
-import { getChartXTicks, formatSafeUTCDate } from '@/lib/utils/date';
+import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
@@ -1544,8 +1544,8 @@ export default function AccountsPage() {
     for (const subMap of map.values()) {
       for (const [subGroup, accs] of subMap.entries()) {
         subMap.set(subGroup, [...accs].sort((a, b) => {
-          const balanceA = parseFloat(a.balance) || 0;
-          const balanceB = parseFloat(b.balance) || 0;
+          const balanceA = a.balance || 0;
+          const balanceB = b.balance || 0;
           return Math.abs(balanceB) - Math.abs(balanceA);
         }));
       }
@@ -2900,8 +2900,8 @@ export default function AccountsPage() {
                                     }
                                   }
                                   flatAccs.sort((a, b) => {
-                                    const balanceA = parseFloat(a.acc.balance) || 0;
-                                    const balanceB = parseFloat(b.acc.balance) || 0;
+                                    const balanceA = a.acc.balance || 0;
+                                    const balanceB = b.acc.balance || 0;
                                     return Math.abs(balanceB) - Math.abs(balanceA);
                                   });
                                   return flatAccs.map(({ acc, subgroup }) => {

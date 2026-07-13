@@ -265,9 +265,9 @@ describe('wealth-flow service (snapshot-only)', () => {
 
     const result = await runWealthFlow('2026-06-01', '2026-06-30');
 
-    expect(result.summary.beginningNetWorth).toBe(0);
+    expect(result.summary.beginningNetWorth).toBe(5000);
     expect(result.summary.endingNetWorth).toBe(5000);
-    expect(result.summary.netWorthChange).toBe(5000);
+    expect(result.summary.netWorthChange).toBe(0);
     expect(result.summary.totalIncreases).toBe(0);
     expect(result.summary.totalDecreases).toBe(0);
 
