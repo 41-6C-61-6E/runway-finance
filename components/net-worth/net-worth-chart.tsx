@@ -17,7 +17,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
@@ -38,6 +38,7 @@ import { Activity, TrendingUp, BarChart3 } from 'lucide-react';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { Switch } from '@/components/ui/switch';
 
 interface ChartPoint {
   date: string;
@@ -80,6 +81,19 @@ export function NetWorthChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showPercent, setShowPercent] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('finance:net-worth-chart:show-percent');
+    if (saved !== null) {
+      setShowPercent(saved === 'true');
+    }
+  }, []);
+
+  const handlePercentChange = (checked: boolean) => {
+    setShowPercent(checked);
+    localStorage.setItem('finance:net-worth-chart:show-percent', String(checked));
+  };
 
   const handleNavigateToFlows = useCallback(() => {
     router.push(`/flows?timeframe=${timeframe}`);
@@ -191,16 +205,34 @@ export function NetWorthChart() {
     [chartData]
   );
 
+  const barDataWithPercent = useMemo(() => {
+    return barData.map((d) => {
+      const percentChange = d.startNetWorth !== 0
+        ? (d.change / Math.abs(d.startNetWorth)) * 100
+        : 0;
+      return {
+        ...d,
+        percentChange,
+      };
+    });
+  }, [barData]);
+
   const barYDomain = useMemo(() => {
-    if (barData.length === 0) return [-1000, 1000] as [number, number];
-    const values = barData.map((d) => d.change);
+    if (barDataWithPercent.length === 0) return [-1000, 1000] as [number, number];
+    const values = barDataWithPercent.map((d) => showPercent ? d.percentChange : d.change);
     const rawMax = Math.max(...values, 0);
     const rawMin = Math.min(...values, 0);
     const range = rawMax - rawMin;
-    const pad = range === 0 ? 500 : range * 0.05;
-    const minPad = Math.max(pad, 500);
-    return [rawMin - minPad, rawMax + minPad] as [number, number];
-  }, [barData]);
+    if (showPercent) {
+      const pad = range === 0 ? 5 : range * 0.05;
+      const minPad = Math.max(pad, 2);
+      return [rawMin - minPad, rawMax + minPad] as [number, number];
+    } else {
+      const pad = range === 0 ? 500 : range * 0.05;
+      const minPad = Math.max(pad, 500);
+      return [rawMin - minPad, rawMax + minPad] as [number, number];
+    }
+  }, [barDataWithPercent, showPercent]);
 
   const areaYDomain = useMemo(() => {
     if (processedData.length === 0) return [-1000, 1000] as [number, number];
@@ -248,7 +280,7 @@ export function NetWorthChart() {
 
   const areaTicks = useMemo(() => getChartXTicksUnified(processedData, timeframe, isMobile), [processedData, timeframe, isMobile]);
 
-  const barTicks = useMemo(() => getChartXTicksUnified(barData, timeframe, isMobile), [barData, timeframe, isMobile]);
+  const barTicks = useMemo(() => getChartXTicksUnified(barDataWithPercent, timeframe, isMobile), [barDataWithPercent, timeframe, isMobile]);
 
 
 
@@ -266,8 +298,11 @@ export function NetWorthChart() {
   }, [areaYDomain]);
 
   const formatBarYTick = useCallback((v: number) => {
+    if (showPercent) {
+      return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+    }
     return formatChartYAxisCurrency(v, barYDomain[0], barYDomain[1]);
-  }, [barYDomain]);
+  }, [barYDomain, showPercent]);
 
   const AreaTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -302,16 +337,31 @@ export function NetWorthChart() {
     return (
       <ChartTooltip>
         <TooltipHeader>{dateHeader}</TooltipHeader>
-        <TooltipRow
-          label="Change"
-          value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
-          color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
-        />
+        {showPercent ? (
+          <>
+            <TooltipRow
+              label="Change (%)"
+              value={formatPercent(point.percentChange)}
+              color={point.percentChange >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+            />
+            <TooltipRow
+              label="Change"
+              value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
+              color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+            />
+          </>
+        ) : (
+          <TooltipRow
+            label="Change"
+            value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
+            color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+          />
+        )}
         <TooltipRow label="Starting Net Worth" value={formatCurrency(point.startNetWorth)} color="var(--color-chart-1)" />
         <TooltipRow label="Ending Net Worth" value={formatCurrency(point.endNetWorth)} color="var(--color-chart-1)" />
       </ChartTooltip>
     );
-  }, []);
+  }, [showPercent]);
 
   if (loading) {
     return (
@@ -508,16 +558,28 @@ export function NetWorthChart() {
               </div>
             </div>
             <div className="flex-1 min-w-0 p-2.5 sm:p-5">
-              <div className="flex items-center gap-1.5 mb-2">
-                <BarChart3 className="w-3.5 h-3.5 text-chart-1" />
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="w-3.5 h-3.5 text-chart-1" />
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Change</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="show-percent-change" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer select-none">
+                    Show %
+                  </label>
+                  <Switch
+                    id="show-percent-change"
+                    checked={showPercent}
+                    onCheckedChange={handlePercentChange}
+                  />
+                </div>
               </div>
               <div className="h-[180px] sm:h-[220px] w-full relative touch-pan-y">
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                   <BarChart
                     role="img"
                     aria-label="Net Worth Change Bar Chart"
-                    data={barData}
+                    data={barDataWithPercent}
                     margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                     barCategoryGap="20%"
                   >
@@ -543,11 +605,11 @@ export function NetWorthChart() {
                       content={<BarTooltip />}
                       cursor={{ fill: 'var(--color-border)', opacity: 0.15 }}
                     />
-                    <Bar dataKey="change" maxBarSize={48} radius={[3, 3, 0, 0]}>
-                      {barData.map((entry, index) => (
+                    <Bar dataKey={showPercent ? "percentChange" : "change"} maxBarSize={48} radius={[3, 3, 0, 0]}>
+                      {barDataWithPercent.map((entry, index) => (
                         <Cell
                           key={index}
-                          fill={entry.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+                          fill={(showPercent ? entry.percentChange : entry.change) >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
                           onClick={handleNavigateToFlows}
                           style={{ cursor: 'pointer' }}
                         />
