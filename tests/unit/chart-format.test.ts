@@ -71,16 +71,16 @@ describe('chart-format utilities', () => {
 
   describe('formatChartXAxisDate', () => {
     it('formats with short month and year when isMonthly is true (non-ambiguous format)', () => {
-      expect(formatChartXAxisDate('2026-06-01', '1y', { isMonthly: true })).toBe('Jun 26\'');
-      expect(formatChartXAxisDate('2025-12-01', '1y', { isMonthly: true })).toBe('Dec 25\'');
+      expect(formatChartXAxisDate('2026-06-01', '1y', { isMonthly: true })).toBe('Jun 2026');
+      expect(formatChartXAxisDate('2025-12-01', '1y', { isMonthly: true })).toBe('Dec 2025');
     });
 
     it('formats daily dates in the current year as MMM DD', () => {
       expect(formatChartXAxisDate('2026-07-02', '1y')).toBe('Jul 02');
     });
 
-    it('formats daily dates in a previous year as MMM DD, YY\'', () => {
-      expect(formatChartXAxisDate('2025-07-02', '1y')).toBe('Jul 02, 25\'');
+    it('formats daily dates in a previous year as MMM DD, YYYY', () => {
+      expect(formatChartXAxisDate('2025-07-02', '1y')).toBe('Jul 02, 2025');
     });
 
     it('formats yearly ticks as YYYY', () => {

@@ -81,8 +81,7 @@ export function formatChartXAxisDate(
   const isShort = timeframe === '1m' || timeframe === '7d' || timeframe === '30d';
   if (options?.isMonthly && !isShort) {
     const formatted = formatSafeUTCDate(dateInput, { month: 'short' });
-    const shortYear = String(yearVal).slice(-2);
-    return `${formatted} ${shortYear}'`;
+    return `${formatted} ${yearVal}`;
   }
 
   if (timeframe === '5y' || timeframe === 'all') {
@@ -99,8 +98,7 @@ export function formatChartXAxisDate(
     return formatSafeUTCDate(dateInput, { month: 'short', day: '2-digit' });
   } else {
     const formatted = formatSafeUTCDate(dateInput, { month: 'short', day: '2-digit' });
-    const shortYear = String(yearVal).slice(-2);
-    return `${formatted}, ${shortYear}'`;
+    return `${formatted}, ${yearVal}`;
   }
 }
 
@@ -117,7 +115,31 @@ export function getChartXTicksUnified<T extends { [key: string]: any }>(
   if (!data || data.length === 0) return [];
 
   const dates = data.map((d) => String(d[dateKey]));
-  const maxTicks = isMobile ? 6 : 12;
+  
+  // Dynamically determine the maximum number of ticks based on screen width if client-side
+  let maxTicks = isMobile ? 6 : 12;
+  if (typeof window !== 'undefined') {
+    const width = window.innerWidth;
+    if (isMobile) {
+      if (width < 375) {
+        maxTicks = 4;
+      } else if (width < 600) {
+        maxTicks = 6;
+      } else {
+        maxTicks = 8;
+      }
+    } else {
+      if (width < 900) {
+        maxTicks = 10;
+      } else if (width < 1200) {
+        maxTicks = 14;
+      } else if (width < 1600) {
+        maxTicks = 18;
+      } else {
+        maxTicks = 24;
+      }
+    }
+  }
 
   if (dates.length <= maxTicks) {
     return dates;

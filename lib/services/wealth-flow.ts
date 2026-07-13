@@ -20,7 +20,7 @@ const GROUP_CONFIG: Record<string, AccountGroupConfig> = {
   cash: {
     label: 'Bank & Cash',
     incLabel: 'Cash Accumulated',
-    decLabel: 'Cash Spent',
+    decLabel: 'Cash Outflow',
     incColor: '#10b981',
     decColor: '#ef4444',
     description: 'Net change in your checking, savings, and cash account balances. This could include income, transfers, interest, spending, and fees.',
@@ -218,12 +218,8 @@ export async function calculateWealthFlow(
     const signedEnd = getSignedNetWorthBalance(end, acc.type);
     const signedNWDelta = signedEnd - signedBeg;
 
-    if (hasBeg) {
-      beginningNetWorth += getSignedNetWorthBalance(beg, acc.type);
-    }
-    if (hasEnd) {
-      endingNetWorth += getSignedNetWorthBalance(end, acc.type);
-    }
+    beginningNetWorth += getSignedNetWorthBalance(beg, acc.type);
+    endingNetWorth += getSignedNetWorthBalance(end, acc.type);
 
     accountDetails.push({
       id,

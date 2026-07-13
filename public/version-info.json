@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1783956182958",
+  "buildNumber": "26.07.1783960780558",
   "commits": [
+    "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic.",
     "refactor: enhance chart Y-axis scaling for positive-only data and update wealth flow calculations to support current-day balances.",
     "feat: replace sync issue banner with interactive tooltips for account sync statuses",
     "feat: integrate account sync health monitoring, status display in UI, and manual sync controls",
-    "fix: improve chart currency formatting precision and scope, and update collapsible header component styles",
-    "chore: update copyright attribution"
+    "fix: improve chart currency formatting precision and scope, and update collapsible header component styles"
   ]
 }
