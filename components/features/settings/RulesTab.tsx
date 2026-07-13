@@ -696,7 +696,7 @@ export default function RulesTab() {
       </div>
 
       {/* Sub-Tabs */}
-      <div className="flex flex-wrap rounded-lg bg-card border border-border mb-3 overflow-hidden">
+      <div className="flex border-b border-border/60 w-full gap-6 mb-4 pb-0.5">
         {([
           { key: 'my' as const, label: 'My Rules', count: rules.filter((r) => !r.isSystem && !r.createdByAi).length },
           { key: 'system' as const, label: 'System Rules', count: systemRules.length },
@@ -705,18 +705,18 @@ export default function RulesTab() {
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-[11px] sm:text-sm font-medium transition-colors border ${
+            className={`pb-2 px-1 text-[11px] sm:text-sm font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
               activeSubTab === tab.key
-                ? 'bg-primary text-primary-foreground border-primary/30'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border/50'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}
             <span
-              className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+              className={`ml-1.5 text-xs ${
                 activeSubTab === tab.key
-                  ? 'bg-primary-foreground/20 text-primary-foreground/80'
-                  : 'bg-muted text-muted-foreground'
+                  ? 'text-primary/70'
+                  : 'text-muted-foreground/50'
               }`}
             >
               {tab.count}

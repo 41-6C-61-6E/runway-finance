@@ -256,23 +256,23 @@ export function DebtBreakdown() {
             </div>
           </CollapsibleFilterPanel>
           <div className="px-3 sm:px-5 py-4">
-          <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 w-full gap-1 mb-5 sm:mb-6">
+          <div className="flex border-b border-border w-full gap-6 mb-5 sm:mb-6">
             <button
               onClick={() => setActiveTab('assets')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
                 activeTab === 'assets'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Assets
             </button>
             <button
               onClick={() => setActiveTab('debt')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+              className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
                 activeTab === 'debt'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Debt

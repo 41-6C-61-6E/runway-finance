@@ -162,6 +162,25 @@ export async function GET(request: Request) {
       .orderBy(netWorthSnapshots.snapshotDate);
 
     if (snapshots.length === 0) {
+      const startStr = startDate.toISOString().split('T')[0];
+      const endStr = endDate.toISOString().split('T')[0];
+      const todayStr = formatInTimezone(new Date(), userTz);
+
+      if (!(todayStr >= startStr && todayStr <= endStr)) {
+        return NextResponse.json({
+          data: [],
+          categories: [],
+          summary: {
+            current: 0,
+            previous: 0,
+            change: 0,
+            percentChange: 0,
+            includedAccounts: 0,
+            totalAccounts: 0,
+          },
+        });
+      }
+
       // Fallback: use current account balances
       const userAccounts = await getDb()
         .select()
@@ -179,7 +198,7 @@ export async function GET(request: Request) {
       const allBreakdownCategories = new Set<string>();
 
       for (const acc of reportableAccounts) {
-        if (!isAccountActiveOnDate(acc, new Date().toISOString().split('T')[0])) {
+        if (!isAccountActiveOnDate(acc, todayStr)) {
           continue;
         }
         const balance = parseFloat(acc.balance) || 0;
@@ -204,7 +223,7 @@ export async function GET(request: Request) {
       totalLiabilities = roundToCents(totalLiabilities);
       const netWorth = roundToCents(totalAssets - totalLiabilities);
       const currentSnapshot: Record<string, any> = {
-        date: new Date().toISOString().split('T')[0],
+        date: todayStr,
         netWorth,
         totalAssets,
         totalLiabilities,
@@ -240,51 +259,55 @@ export async function GET(request: Request) {
       isImported: false,
     }));
 
-    // Fetch live accounts to get today's balance
-    const userAccounts = await getDb()
-      .select()
-      .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
-
-    const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
-    const reportableAccounts = filterReportableAccounts(decryptedAccounts);
-
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
     const todayStr = formatInTimezone(new Date(), userTz);
 
-    let liveAssets = 0;
-    let liveLiabilities = 0;
-    for (const acc of reportableAccounts) {
-      if (!isAccountActiveOnDate(acc, todayStr)) {
-        continue;
-      }
-      const balance = parseFloat(acc.balance) || 0;
-      const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
-      const accountType = acc.type.toLowerCase();
-      if (isAssetAccount(accountType)) {
-        liveAssets += convertedBal;
-      } else if (isLiabilityAccount(accountType)) {
-        liveLiabilities += Math.abs(convertedBal);
-      }
-    }
-    const roundToCents = (val: number) => Math.round(val * 100) / 100;
-    const liveNetWorth = roundToCents(liveAssets - liveLiabilities);
-    liveAssets = roundToCents(liveAssets);
-    liveLiabilities = roundToCents(liveLiabilities);
+    if (todayStr >= startStr && todayStr <= endStr) {
+      // Fetch live accounts to get today's balance
+      const userAccounts = await getDb()
+        .select()
+        .from(accounts)
+        .where(eq(accounts.userId, dataUserId));
 
-    const lastPoint = formattedData[formattedData.length - 1];
-    if (lastPoint && lastPoint.date === todayStr) {
-      lastPoint.netWorth = liveNetWorth;
-      lastPoint.totalAssets = liveAssets;
-      lastPoint.totalLiabilities = liveLiabilities;
-    } else if (!lastPoint || lastPoint.date < todayStr) {
-      formattedData.push({
-        date: todayStr,
-        netWorth: liveNetWorth,
-        totalAssets: liveAssets,
-        totalLiabilities: liveLiabilities,
-        isSynthetic: false,
-        isImported: false,
-      });
+      const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
+      const reportableAccounts = filterReportableAccounts(decryptedAccounts);
+
+      let liveAssets = 0;
+      let liveLiabilities = 0;
+      for (const acc of reportableAccounts) {
+        if (!isAccountActiveOnDate(acc, todayStr)) {
+          continue;
+        }
+        const balance = parseFloat(acc.balance) || 0;
+        const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
+        const accountType = acc.type.toLowerCase();
+        if (isAssetAccount(accountType)) {
+          liveAssets += convertedBal;
+        } else if (isLiabilityAccount(accountType)) {
+          liveLiabilities += Math.abs(convertedBal);
+        }
+      }
+      const roundToCents = (val: number) => Math.round(val * 100) / 100;
+      const liveNetWorth = roundToCents(liveAssets - liveLiabilities);
+      liveAssets = roundToCents(liveAssets);
+      liveLiabilities = roundToCents(liveLiabilities);
+
+      const lastPoint = formattedData[formattedData.length - 1];
+      if (lastPoint && lastPoint.date === todayStr) {
+        lastPoint.netWorth = liveNetWorth;
+        lastPoint.totalAssets = liveAssets;
+        lastPoint.totalLiabilities = liveLiabilities;
+      } else if (!lastPoint || lastPoint.date < todayStr) {
+        formattedData.push({
+          date: todayStr,
+          netWorth: liveNetWorth,
+          totalAssets: liveAssets,
+          totalLiabilities: liveLiabilities,
+          isSynthetic: false,
+          isImported: false,
+        });
+      }
     }
 
     // Calculate summary stats from aggregated data

@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
-import { useShowMath } from '@/lib/hooks/use-show-math';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { buildDebtToAssetTrace } from '@/lib/services/trace-engine';
-import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Percent } from 'lucide-react';
 
@@ -41,7 +38,6 @@ interface AccountData {
 }
 
 export function DebtToAssetRatio() {
-  const { enabled: showMath } = useShowMath();
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,11 +85,6 @@ export function DebtToAssetRatio() {
       rating: ratingInfo,
     };
   }, [accounts]);
-
-  const debtTrace = useMemo(() => {
-    if (!showMath || accounts.length === 0) return null;
-    return buildDebtToAssetTrace(accounts);
-  }, [accounts, showMath]);
 
   const pct = ratio * 100;
 
@@ -208,8 +199,6 @@ export function DebtToAssetRatio() {
               </div>
             </div>
           </div>
-
-          {showMath && debtTrace && <CalculationTraceOverlay trace={debtTrace} />}
         </div>
       )}
     </div>

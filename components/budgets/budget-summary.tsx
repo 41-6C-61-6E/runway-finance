@@ -3,9 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
-import { useShowMath } from '@/lib/hooks/use-show-math';
-import { buildBudgetTrace } from '@/lib/services/trace-engine';
-import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,7 +35,6 @@ function MetricRow({ label, value, valueClass }: { label: string; value: string;
 
 export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
-  const { enabled: showMath } = useShowMath();
   const [budgets, setBudgets] = useState<BudgetData[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useCardCollapsed('budgetSummary');
@@ -188,33 +184,6 @@ export function BudgetSummary() {
           </CardContent>
         )}
       </Card>
-
-      {showMath && (
-        <>
-          {hasIncome && (
-            <CalculationTraceOverlay
-              trace={buildBudgetTrace({
-                totalBudgeted: totalIncomeBudgeted,
-                totalActual: totalIncomeActual,
-                remaining: incomeRemaining,
-                percentUsed: incomePercent,
-                type: 'income',
-              })}
-            />
-          )}
-          {hasExpenses && (
-            <CalculationTraceOverlay
-              trace={buildBudgetTrace({
-                totalBudgeted: totalExpenseBudgeted,
-                totalActual: totalExpenseActual,
-                remaining: expenseRemaining,
-                percentUsed: expensePercent,
-                type: 'expense',
-              })}
-            />
-          )}
-        </>
-      )}
     </div>
   );
 }

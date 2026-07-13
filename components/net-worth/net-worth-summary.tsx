@@ -4,14 +4,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/account-types';
-import { useShowMath } from '@/lib/hooks/use-show-math';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { buildNetWorthTraces } from '@/lib/services/trace-engine';
-import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { Sparkline } from '@/components/ui/sparkline';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import type { AccountData, ChartPoint, CalculationTrace } from '@/lib/types/financial';
+import type { AccountData, ChartPoint } from '@/lib/types/financial';
 import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
 import { DollarSign } from 'lucide-react';
 
@@ -46,7 +43,6 @@ export function NetWorthSummary() {
   const [investmentData, setInvestmentData] = useState<InvestmentHistoryPoint[]>([]);
   const [investmentSummary, setInvestmentSummary] = useState<InvestmentHistoryResponse['summary'] | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
-  const { enabled: showMath } = useShowMath();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'totals' | 'percentages'>('totals');
@@ -108,8 +104,6 @@ export function NetWorthSummary() {
 
     return { totalAssets, totalLiabilities, totalInvestments, netWorth: totalAssets - totalLiabilities, assetByType, liabilityByType };
   }, [accounts]);
-
-  const traces = useMemo(() => showMath ? buildNetWorthTraces(accounts) : [], [accounts, showMath]);
 
   const processedData = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -190,7 +184,7 @@ export function NetWorthSummary() {
   const investmentDelta = investmentSummary?.change ?? 0;
   const investmentPct = investmentSummary?.percentChange ?? 0;
 
-  const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean, trace?: CalculationTrace) => (
+  const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean) => (
     <div className="p-4 sm:p-5">
       <div className="flex items-center justify-between sm:justify-start gap-0 sm:gap-3 mb-2 sm:mb-3">
         <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</h3>
@@ -207,7 +201,6 @@ export function NetWorthSummary() {
           <div className="text-xs text-muted-foreground mt-0.5">in the last 1 year</div>
         </div>
       </div>
-      {showMath && trace && <CalculationTraceOverlay trace={trace} />}
     </div>
   );
 
@@ -277,10 +270,10 @@ export function NetWorthSummary() {
       />
       {!isCollapsed && (
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
-          {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive, traces[0])}
-          {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, !liabilityTrendPositive, traces[1])}
-          {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive, undefined)}
-          {section('Investments', totals.totalInvestments, investmentDelta, investmentPct, investmentHistory, investmentTrendPositive, undefined)}
+          {section('Total Assets', totals.totalAssets, deltas.assets, deltas.pctAssets, assetHistory, assetTrendPositive)}
+          {section('Total Liabilities', totals.totalLiabilities, -deltas.liabilities, -deltas.pctLiabilities, liabilityHistory, !liabilityTrendPositive)}
+          {section('Net Worth', totals.netWorth, deltas.netWorth, deltas.pctNetWorth, netWorthHistory, netWorthTrendPositive)}
+          {section('Investments', totals.totalInvestments, investmentDelta, investmentPct, investmentHistory, investmentTrendPositive)}
         </div>
       )}
     </div>

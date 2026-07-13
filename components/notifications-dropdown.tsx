@@ -5,17 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+
 
 interface UserNotification {
   id: string;
@@ -51,6 +41,7 @@ interface NotificationsDropdownProps {
 export default function NotificationsDropdown({ onOpenChange }: NotificationsDropdownProps = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [shouldWiggle, setShouldWiggle] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -118,6 +109,9 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
 
   useEffect(() => {
     onOpenChangeRef.current?.(open);
+    if (!open) {
+      setShowConfirmClear(false);
+    }
   }, [open]);
 
   // Initial fetch, polling setup, and window focus sync
@@ -226,6 +220,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       if (res.ok) {
         setNotifications([]);
         toast.success('All notifications cleared.');
+        setShowConfirmClear(false);
         try {
           const bc = new BroadcastChannel('notification-updates');
           bc.postMessage({ type: 'REFRESH' });
@@ -308,29 +303,14 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
                 </button>
               )}
               {notifications.length > 0 && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus:outline-none"
-                      aria-label="Clear all notifications"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Clear All Notifications</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to permanently clear all notifications? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearAll}>Clear All</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmClear(true)}
+                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus:outline-none"
+                  aria-label="Clear all notifications"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               )}
               <button
                 type="button"
@@ -345,6 +325,31 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
               </button>
             </div>
           </div>
+
+          {/* Inline Confirmation Banner */}
+          {showConfirmClear && (
+            <div className="px-4 py-3 bg-destructive/5 border-b border-border animate-in slide-in-from-top-2 fade-in duration-200">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Are you sure you want to permanently clear all notifications? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmClear(false)}
+                  className="px-2.5 py-1 text-[11px] font-medium rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="px-2.5 py-1 text-[11px] font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded transition-colors"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* List */}
           <div className="flex-1 overflow-y-auto divide-y divide-border no-scrollbar">

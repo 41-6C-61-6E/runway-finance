@@ -262,23 +262,23 @@ export default function DataExplorerPage() {
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
             {/* Tabs */}
-            <div className="flex bg-muted/40 border border-border/50 rounded-xl p-1 w-full gap-1 mb-5 sm:mb-6">
+            <div className="flex border-b border-border w-full gap-6 mb-5 sm:mb-6">
               <button
                 onClick={() => setActiveTab('explore')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
                   activeTab === 'explore'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Explore Data
               </button>
               <button
                 onClick={() => setActiveTab('cleanup')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
                   activeTab === 'cleanup'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Data Cleanup

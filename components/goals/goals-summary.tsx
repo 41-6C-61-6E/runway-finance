@@ -1,10 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/goals';
-import { useShowMath } from '@/lib/hooks/use-show-math';
-import { buildGoalsTrace } from '@/lib/services/trace-engine';
-import { CalculationTraceOverlay } from '@/components/financial-logic/calculation-trace';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,22 +30,10 @@ interface SummaryData {
 }
 
 export function GoalsSummary() {
-  const { enabled: showMath } = useShowMath();
   const [collapsed, setCollapsed] = useCardCollapsed('goalsSummary');
   const [breakdownCollapsed, setBreakdownCollapsed] = useCardCollapsed('goalsBreakdown');
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
-  const goalsTrace = useMemo(
-    () =>
-      data
-        ? buildGoalsTrace({
-            totalTarget: data.totalTarget,
-            totalCurrent: data.totalCurrent,
-            overallProgress: data.overallProgress,
-          })
-        : null,
-    [data]
-  );
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -273,8 +258,6 @@ export function GoalsSummary() {
           </CardContent>
         )}
       </Card>
-
-      {showMath && goalsTrace && <CalculationTraceOverlay trace={goalsTrace} />}
     </div>
   );
 }
