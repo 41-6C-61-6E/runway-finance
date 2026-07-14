@@ -57,6 +57,7 @@ async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
       '1d': '1d', '7d': '5d', '30d': '1mo', '365d': '1y',
       '1m': '1mo', '3m': '3mo', '6m': '6mo', '1y': '1y',
       '5y': '5y', 'ytd': 'ytd', 'all': '10y',
+      '1d_discrete': '1d',
     };
     const range = rangeMap[timeframe] || '1y';
     const url = `/api/investments/quotes/benchmark?ticker=SPY&range=${range}`;
@@ -326,7 +327,7 @@ export function PerformanceChart() {
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
               <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe.toUpperCase()}
+                {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
               </span>
             }
           >
@@ -460,7 +461,7 @@ export function PerformanceChart() {
               <div className="w-full md:w-60 shrink-0 p-3 sm:p-5 flex flex-col justify-center space-y-4">
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    {timeframe.toUpperCase()} Change
+                    {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()} Change
                   </span>
                   <div className={`flex items-baseline gap-1 font-bold text-2xl ${isChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
                     <span>{isChangePositive ? '+' : ''}</span>

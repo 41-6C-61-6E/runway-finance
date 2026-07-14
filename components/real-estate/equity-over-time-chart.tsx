@@ -552,7 +552,7 @@ export function EquityOverTimeChart() {
                 {properties.find(p => p.id === selectedPropertyId)?.name ?? 'ALL PROPERTIES'}
               </span>,
               <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe.toUpperCase()}
+                {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
               </span>,
             ]}
             rightActions={
@@ -565,6 +565,7 @@ export function EquityOverTimeChart() {
                   options={periodOptions}
                   currentValue={windowEnd}
                   onSelect={setWindowEnd}
+                  timeframe={timeframe}
                 />
               )
             }
