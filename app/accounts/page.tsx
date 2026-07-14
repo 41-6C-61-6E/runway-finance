@@ -393,6 +393,7 @@ function AccountTransactions({ accountId, historyData, isLiability, hierarchyTim
                 options={periodOptions}
                 currentValue={windowEnd}
                 onSelect={setWindowEnd}
+                timeframe={timeframe}
               />
             )}
           </div>
@@ -1378,6 +1379,7 @@ export default function AccountsPage() {
       '7d': '7d',
       '1d': '1d',
       ytd: '3m',
+      '1d_discrete': '1d_discrete',
     };
     const nextTimeframe = zoomMap[timeframe];
     if (nextTimeframe === timeframe) return; // already at minimum zoom level
@@ -1667,7 +1669,7 @@ export default function AccountsPage() {
                     feedback={
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                          {timeframe.toUpperCase()}
+                          {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
                         </span>
                         <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                           {chartType === 'line' ? 'Area' : 'Bar'}
@@ -1692,6 +1694,7 @@ export default function AccountsPage() {
                           options={periodOptions}
                           currentValue={windowEnd}
                           onSelect={setWindowEnd}
+                          timeframe={timeframe}
                         />
                       )
                     }

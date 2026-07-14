@@ -264,6 +264,15 @@ export function NetWorthChart() {
     const { cx, cy, payload } = props;
     if (!cx || !cy || !payload) return null;
     const color = payload.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)';
+
+    const handleClick = () => {
+      if (payload.date) {
+        router.push(`/flows?timeframe=1d_discrete&date=${payload.date}`);
+      } else {
+        handleNavigateToFlows();
+      }
+    };
+
     return (
       <circle
         cx={cx}
@@ -272,11 +281,19 @@ export function NetWorthChart() {
         fill={color}
         stroke="var(--color-background)"
         strokeWidth={2}
-        onClick={handleNavigateToFlows}
+        onClick={handleClick}
         style={{ cursor: 'pointer' }}
       />
     );
-  }, [handleNavigateToFlows]);
+  }, [handleNavigateToFlows, router]);
+
+  const handleBarClick = useCallback((entry: any) => {
+    if (bucketSize === 'daily' && entry.endDate) {
+      router.push(`/flows?timeframe=1d_discrete&date=${entry.endDate}`);
+    } else {
+      router.push(`/flows?timeframe=${timeframe}`);
+    }
+  }, [bucketSize, timeframe, router]);
 
   const areaTicks = useMemo(() => getChartXTicksUnified(processedData, timeframe, isMobile), [processedData, timeframe, isMobile]);
 
@@ -451,7 +468,7 @@ export function NetWorthChart() {
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
               <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe.toUpperCase()}
+                {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
               </span>
             }
             rightActions={
@@ -464,6 +481,7 @@ export function NetWorthChart() {
                   options={periodOptions}
                   currentValue={windowEnd}
                   onSelect={setWindowEnd}
+                  timeframe={timeframe}
                 />
               )
             }
@@ -610,7 +628,7 @@ export function NetWorthChart() {
                         <Cell
                           key={index}
                           fill={(showPercent ? entry.percentChange : entry.change) >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
-                          onClick={handleNavigateToFlows}
+                          onClick={() => handleBarClick(entry)}
                           style={{ cursor: 'pointer' }}
                         />
                       ))}

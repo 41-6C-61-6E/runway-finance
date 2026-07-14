@@ -52,14 +52,21 @@ export function useDateWindow(
     if (!searchParams) return;
 
     const paramTf = searchParams.get('timeframe') as TimeRange | null;
-    const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all'];
+    const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all', '1d_discrete'];
     if (paramTf && validTfs.includes(paramTf)) {
       if (lastSyncedParamRef.current !== paramTf) {
         lastSyncedParamRef.current = paramTf;
         _setTimeframe(paramTf);
       }
     }
-  }, [searchParams, controlledTimeframe, _setTimeframe]);
+
+    const paramDate = searchParams.get('date');
+    if (paramDate) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate)) {
+        setWindowEnd(paramDate);
+      }
+    }
+  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd]);
 
   useEffect(() => {
     lastSyncedParamRef.current = timeframe;
@@ -75,6 +82,16 @@ export function useDateWindow(
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 
   const prevWindow = () => {
+    if (timeframe === '1d_discrete') {
+      const dateParts = windowEnd.split('-');
+      const y = Number(dateParts[0]);
+      const m = Number(dateParts[1]);
+      const d = dateParts[2] ? Number(dateParts[2]) : 1;
+      const prevDate = new Date(y, m - 1, d);
+      prevDate.setDate(prevDate.getDate() - 1);
+      setWindowEnd(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`);
+      return;
+    }
     const [y, m] = windowEnd.split('-').map(Number);
     const d = new Date(y, m - 1, 1);
     d.setMonth(d.getMonth() - shift);
@@ -82,6 +99,22 @@ export function useDateWindow(
   };
 
   const nextWindow = () => {
+    if (timeframe === '1d_discrete') {
+      const dateParts = windowEnd.split('-');
+      const y = Number(dateParts[0]);
+      const m = Number(dateParts[1]);
+      const d = dateParts[2] ? Number(dateParts[2]) : 1;
+      const nextDate = new Date(y, m - 1, d);
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+      
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (nextStr <= todayStr) {
+        setWindowEnd(nextStr);
+      }
+      return;
+    }
     const [y, m] = windowEnd.split('-').map(Number);
     const next = new Date(y, m - 1, 1);
     next.setMonth(next.getMonth() + shift);
@@ -96,6 +129,11 @@ export function useDateWindow(
 
   const isNextDisabled = useMemo(() => {
     if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return true;
+    if (timeframe === '1d_discrete') {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      return windowEnd >= todayStr;
+    }
     const [y, m] = windowEnd.split('-').map(Number);
     const nextEnd = new Date(y, m - 1, 1);
     nextEnd.setMonth(nextEnd.getMonth() + shift);
@@ -104,7 +142,7 @@ export function useDateWindow(
     return `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}` > currentMonth;
   }, [timeframe, windowEnd, shift, currentMonth]);
 
-  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd' && timeframe !== '1d' && timeframe !== '7d' && timeframe !== '30d' && timeframe !== '365d';
+  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd';
 
   const windowLabel = useMemo(() => getPeriodLabel(windowEnd, timeframe), [windowEnd, timeframe]);
 
@@ -112,7 +150,7 @@ export function useDateWindow(
   const dateRange = useMemo(() => getPreciseDateRange(timeframe, windowEnd), [timeframe, windowEnd]);
 
   const periodOptions = useMemo(() => {
-    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return [];
+    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d' || timeframe === '1d_discrete') return [];
     const options: { label: string; value: string }[] = [];
     const count = timeframe === '1m' ? 24 : 12;
     const cursor = new Date();

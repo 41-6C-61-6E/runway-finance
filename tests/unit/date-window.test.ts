@@ -48,6 +48,11 @@ describe('date-window utilities', () => {
       const range = getMonthRange('1y', '2026-06');
       expect(range).toEqual({ start: '2025-07', end: '2026-06' });
     });
+
+    it('returns correct range for "1d_discrete"', () => {
+      const range = getMonthRange('1d_discrete', '2026-06-15');
+      expect(range).toEqual({ start: '2026-06', end: '2026-06' });
+    });
   });
 
   describe('snapToPeriod', () => {
@@ -78,6 +83,12 @@ describe('date-window utilities', () => {
 
     it('snaps future 1m to current month', () => {
       expect(snapToPeriod('2026-12', '1m')).toBe('2026-06');
+    });
+
+    it('handles 1d_discrete timeframe (snaps to same day or first day of month or today)', () => {
+      expect(snapToPeriod('2026-06-15', '1d_discrete')).toBe('2026-06-15');
+      expect(snapToPeriod('2026-06', '1d_discrete')).toBe('2026-06-15');
+      expect(snapToPeriod('2026-05', '1d_discrete')).toBe('2026-05-01');
     });
   });
 
@@ -115,6 +126,10 @@ describe('date-window utilities', () => {
     it('returns "Previous 24 Hours" for "1d"', () => {
       expect(getPeriodLabel('2026-06', '1d')).toBe('Previous 24 Hours');
     });
+
+    it('returns formatted date for "1d_discrete"', () => {
+      expect(getPeriodLabel('2026-06-15', '1d_discrete')).toBe('Jun 15, 2026');
+    });
   });
 
   describe('getPreciseDateRange', () => {
@@ -127,6 +142,11 @@ describe('date-window utilities', () => {
     it('returns 7 days ago to today range for "7d"', () => {
       const range = getPreciseDateRange('7d');
       expect(range).toEqual({ start: '2026-06-08', end: '2026-06-15' });
+    });
+
+    it('returns single day range for "1d_discrete"', () => {
+      const range = getPreciseDateRange('1d_discrete', '2026-06-12');
+      expect(range).toEqual({ start: '2026-06-12', end: '2026-06-12' });
     });
   });
 });
