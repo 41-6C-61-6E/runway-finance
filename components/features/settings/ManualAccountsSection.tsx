@@ -1197,6 +1197,9 @@ export default function ManualAccountsSection() {
                         {!REAL_ESTATE_TYPES.includes(account.type) && <option value="daily">Daily</option>}
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
+                        {REAL_ESTATE_TYPES.includes(account.type) && (
+                          <option value="best">Best (Auto-calculated)</option>
+                        )}
                       </select>
                     </div>
                   </div>
