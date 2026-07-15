@@ -56,7 +56,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         const meta = JSON.parse(raw) as Record<string, unknown>;
         syncFrequency = (meta.syncFrequency as string) || 'manual';
       } catch {}
-      manualAccountScheduler.schedule(id, userId, syncFrequency, refreshed.balanceDate);
+      await manualAccountScheduler.schedule(id, userId, syncFrequency, refreshed.balanceDate);
     }
   }
 
