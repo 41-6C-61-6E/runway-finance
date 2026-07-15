@@ -109,7 +109,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const isRealEstate = REAL_ESTATE_TYPES.includes(account.type);
     const meta = { ...(body.metadata as Record<string, unknown>) };
     if (isRealEstate && meta.syncFrequency === 'daily') {
-      meta.syncFrequency = 'weekly';
+      meta.syncFrequency = 'best';
     }
     updateData.metadata = meta;
   }
@@ -175,7 +175,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const decrypted = await decryptRow('accounts', updated, dek);
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
     const syncFrequency = (meta.syncFrequency as string) || 'manual';
-    manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
+    await manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
 
     // Regenerate synthetic history snapshots if the account type is supported
     const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];

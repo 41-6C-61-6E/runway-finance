@@ -119,7 +119,7 @@ describe('Real Estate Coercion Logic', () => {
   });
 
   describe('createManualAccount daily coercion', () => {
-    it('coerces daily sync frequency to weekly for real estate account', async () => {
+    it('coerces daily sync frequency to best for real estate account', async () => {
       const mockInput = {
         userId: 'user_123',
         name: 'My House',
@@ -133,12 +133,12 @@ describe('Real Estate Coercion Logic', () => {
       const account = await createManualAccount(mockInput);
       expect(account).toBeDefined();
 
-      // Check that metadata was coerced to weekly
+      // Check that metadata was coerced to best
       expect(mockInsertValues.length).toBeGreaterThan(0);
       const insertedAccount = mockInsertValues[0];
       expect(insertedAccount.metadata).toBeDefined();
       const meta = JSON.parse(insertedAccount.metadata);
-      expect(meta.syncFrequency).toBe('weekly');
+      expect(meta.syncFrequency).toBe('best');
     });
 
     it('does not coerce daily sync frequency for non-real estate accounts', async () => {
