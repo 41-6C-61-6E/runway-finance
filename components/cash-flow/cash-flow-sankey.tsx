@@ -12,9 +12,10 @@ import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { GitMerge } from 'lucide-react';
+import { GitMerge, ChevronDown, Search } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { Switch } from '@/components/ui/switch';
 
 interface CategoryData {
   categoryId: string;
@@ -850,6 +851,12 @@ export function CashFlowSankey() {
     });
   };
 
+  const selectOnly = (accountId: string) => {
+    const next = new Set(allAccounts.map((a) => a.id));
+    next.delete(accountId);
+    setExcludedAccountIds(next);
+  };
+
   const getNodeCategoryId = (nodeId: string): string | undefined =>
     (() => {
       const node = sankeyData?.nodes.find((n) => n.id === nodeId);
@@ -1149,7 +1156,6 @@ export function CashFlowSankey() {
             }
           >
             <div className="space-y-4">
-              {/* Row 1: Time Range */}
               <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <TimeRangeFilter
@@ -1157,111 +1163,144 @@ export function CashFlowSankey() {
                     onChange={setTimeframe}
                   />
                 </div>
-              </div>
 
-              {/* Row 2: Metric Toggle and Accounts Selection */}
-              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/30 border border-border/30 rounded-xl">
                 {/* Percentage switch */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Show Percentage</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <span className="text-[10px] text-muted-foreground font-semibold">{showPercentages ? '%' : '$'}</span>
-                    <button
-                      onClick={() => setShowPercentages((v) => !v)}
-                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                        showPercentages ? 'bg-primary' : 'bg-muted-foreground/30'
-                      }`}
-                      type="button"
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
-                          showPercentages ? 'translate-x-[14px]' : 'translate-x-[2px]'
-                        }`}
-                      />
-                    </button>
+                <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+                  <Switch
+                    checked={showPercentages}
+                    onCheckedChange={setShowPercentages}
+                    id="cash-flow-show-percentages"
+                  />
+                  <label
+                    htmlFor="cash-flow-show-percentages"
+                    className="text-xs font-medium text-muted-foreground cursor-pointer"
+                  >
+                    Show Percentage
                   </label>
                 </div>
 
                 {/* Hide Top Categories switch */}
-                <div className="flex items-center gap-1.5 border-l border-border/30 pl-4">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Hide Top Categories</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <button
-                      onClick={() => setHideParents((v) => !(v ?? isMobile))}
-                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                        actualHideParents ? 'bg-primary' : 'bg-muted-foreground/30'
-                      }`}
-                      type="button"
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 rounded-full bg-background transition-transform ${
-                          actualHideParents ? 'translate-x-[14px]' : 'translate-x-[2px]'
-                        }`}
-                      />
-                    </button>
+                <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+                  <Switch
+                    checked={actualHideParents}
+                    onCheckedChange={(checked) => setHideParents(checked)}
+                    id="cash-flow-hide-categories"
+                  />
+                  <label
+                    htmlFor="cash-flow-hide-categories"
+                    className="text-xs font-medium text-muted-foreground cursor-pointer"
+                  >
+                    Hide Top Categories
                   </label>
                 </div>
 
                 {/* Account filter dropdown */}
                 {allAccounts.length > 0 && (
-                  <div className="relative flex items-center gap-1.5 border-l border-border/30 pl-4" ref={accountFilterRef}>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Filtered Accounts</span>
-                    <button
-                      type="button"
-                      onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
-                      className="px-2.5 py-1 bg-background border border-input rounded-lg text-foreground text-[10px] focus:outline-none focus:ring-2 focus:ring-ring flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <span>Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}</span>
-                      <svg className={`h-3 w-3 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {accountFilterOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-52 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 flex flex-col">
-                        <div className="p-2 border-b border-border">
-                          <input
-                            type="text"
-                            value={accountSearch}
-                            onChange={(e) => setAccountSearch(e.target.value)}
-                            placeholder="Search accounts..."
-                            className="w-full px-2 py-1 bg-background border border-input rounded text-[10px] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                          />
-                        </div>
-                        <div className="overflow-y-auto flex-1 p-1">
-                          {filteredAccounts.length === 0 ? (
-                            <div className="px-2 py-3 text-[10px] text-muted-foreground text-center">No results</div>
-                          ) : (
-                            <>
-                              <label className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
-                                  onChange={() => {
+                  <div className="relative flex items-center gap-2 border-l border-border/30 pl-4" ref={accountFilterRef}>
+                    <span className="text-xs font-medium text-muted-foreground select-none">
+                      Filtered Accounts:
+                    </span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
+                        className="text-xs bg-background border border-border rounded-lg px-3 py-1.5 hover:bg-muted text-foreground flex items-center gap-1.5 whitespace-nowrap transition-colors select-none cursor-pointer"
+                      >
+                        <span>
+                          Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}
+                        </span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {accountFilterOpen && (
+                        <div className="absolute left-0 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-50 p-2 space-y-2">
+                          <div className="relative flex items-center bg-muted/30 border border-border rounded-lg px-2 py-1">
+                            <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5 shrink-0" />
+                            <input
+                              type="text"
+                              value={accountSearch}
+                              onChange={(e) => setAccountSearch(e.target.value)}
+                              placeholder="Search accounts..."
+                              className="bg-transparent border-none text-xs text-foreground focus:outline-none w-full"
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin">
+                            {filteredAccounts.length === 0 ? (
+                              <div className="px-2 py-3 text-xs text-muted-foreground text-center">No results</div>
+                            ) : (
+                              <>
+                                <div
+                                  className="flex items-center gap-2 p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer border-b border-border/45 pb-2 mb-1.5 font-semibold"
+                                  onClick={() => {
                                     const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
                                     const next = new Set(excludedAccountIds);
                                     filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
                                     setExcludedAccountIds(next);
                                   }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring"
-                                />
-                                Select All
-                              </label>
-                              {filteredAccounts.map((acc) => (
-                                <label key={acc.id} className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-foreground/80 hover:bg-muted rounded cursor-pointer">
+                                >
                                   <input
                                     type="checkbox"
-                                    checked={!excludedAccountIds.has(acc.id)}
-                                    onChange={() => toggleAccount(acc.id)}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring"
+                                    checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
+                                      const next = new Set(excludedAccountIds);
+                                      filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
+                                      setExcludedAccountIds(next);
+                                    }}
+                                    className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
                                   />
-                                  {acc.name}
-                                </label>
-                              ))}
-                            </>
+                                  <span>Select All</span>
+                                </div>
+                                {filteredAccounts.map((a) => {
+                                  const isExcluded = excludedAccountIds.has(a.id);
+                                  return (
+                                    <div
+                                      key={a.id}
+                                      className="flex items-center justify-between p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer group"
+                                      onClick={() => toggleAccount(a.id)}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={!isExcluded}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            toggleAccount(a.id);
+                                          }}
+                                          className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
+                                        />
+                                        <span className={`truncate ${isExcluded ? 'text-muted-foreground/60' : 'text-foreground'}`}>
+                                          {a.name}
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          selectOnly(a.id);
+                                        }}
+                                        className="text-[10px] text-primary hover:underline px-1 py-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 shrink-0"
+                                      >
+                                        only
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </div>
+
+                          {excludedAccountIds.size > 0 && (
+                            <button
+                              onClick={() => setExcludedAccountIds(new Set())}
+                              className="w-full text-[10px] bg-muted/40 text-primary border border-border hover:bg-muted text-center py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                            >
+                              Reset Account Filters
+                            </button>
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

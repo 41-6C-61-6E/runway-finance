@@ -11,7 +11,7 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeftRight, HelpCircle, Search, Eye, EyeOff, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { ArrowLeftRight, HelpCircle, Search, Eye, EyeOff, TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import type { WealthFlowData, WealthFlowNode, WealthFlowSummary, WealthFlowAccountDetail } from '@/lib/types/financial';
@@ -872,16 +872,17 @@ export function WealthFlowSankey() {
                   </div>
 
                   <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                    <button
-                      onClick={() => setShowPercentages(!showPercentages)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                        showPercentages
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background hover:bg-muted text-muted-foreground border-border'
-                      }`}
+                    <Switch
+                      checked={showPercentages}
+                      onCheckedChange={setShowPercentages}
+                      id="wealth-flow-show-percentages"
+                    />
+                    <label
+                      htmlFor="wealth-flow-show-percentages"
+                      className="text-xs font-medium text-muted-foreground cursor-pointer"
                     >
                       Show percentages (%)
-                    </button>
+                    </label>
                   </div>
 
                   <div className="flex items-center gap-2 border-l border-border/30 pl-4">
@@ -892,90 +893,125 @@ export function WealthFlowSankey() {
                     />
                     <label
                       htmlFor="wealth-flow-account-routing"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer"
+                      className="text-xs font-medium text-muted-foreground cursor-pointer"
                     >
                       Per account
                     </label>
                   </div>
-                </div>
 
-                {allAccounts.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Filters:
-                    </span>
-                    <div className="relative" ref={accountFilterRef}>
-                      <button
-                        onClick={() => setAccountFilterOpen(!accountFilterOpen)}
-                        className="text-xs bg-background border border-border rounded-lg px-3 py-1.5 hover:bg-muted text-foreground flex items-center gap-1.5"
-                      >
-                        <span>
-                          Accounts
-                          {excludedAccountIds.size > 0
-                            ? ` (${allAccounts.length - excludedAccountIds.size})`
-                            : ''}
-                        </span>
-                      </button>
+                  {allAccounts.length > 0 && (
+                    <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+                      <span className="text-xs font-medium text-muted-foreground select-none">
+                        Filtered Accounts:
+                      </span>
+                      <div className="relative" ref={accountFilterRef}>
+                        <button
+                          type="button"
+                          onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
+                          className="text-xs bg-background border border-border rounded-lg px-3 py-1.5 hover:bg-muted text-foreground flex items-center gap-1.5 whitespace-nowrap transition-colors select-none cursor-pointer"
+                        >
+                          <span>
+                            Accounts
+                            {excludedAccountIds.size > 0
+                              ? ` (${allAccounts.length - excludedAccountIds.size})`
+                              : ''}
+                          </span>
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} />
+                        </button>
 
-                      {accountFilterOpen && (
-                        <div className="absolute left-0 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-50 p-2 space-y-2">
-                          <div className="relative flex items-center bg-muted/30 border border-border rounded-lg px-2 py-1">
-                            <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5 shrink-0" />
-                            <input
-                              type="text"
-                              placeholder="Search accounts..."
-                              value={accountSearch}
-                              onChange={(e) => setAccountSearch(e.target.value)}
-                              className="bg-transparent border-none text-xs text-foreground focus:outline-none w-full"
-                            />
-                          </div>
+                        {accountFilterOpen && (
+                          <div className="absolute left-0 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-50 p-2 space-y-2">
+                            <div className="relative flex items-center bg-muted/30 border border-border rounded-lg px-2 py-1">
+                              <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5 shrink-0" />
+                              <input
+                                type="text"
+                                placeholder="Search accounts..."
+                                value={accountSearch}
+                                onChange={(e) => setAccountSearch(e.target.value)}
+                                className="bg-transparent border-none text-xs text-foreground focus:outline-none w-full"
+                              />
+                            </div>
 
-                          <div className="max-h-60 overflow-y-auto space-y-0.5">
-                            {filteredAccountsList.map((a) => {
-                              const isExcluded = excludedAccountIds.has(a.id);
-                              return (
-                                <div
-                                  key={a.id}
-                                  className="flex items-center justify-between p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer"
-                                  onClick={() => toggleAccount(a.id)}
-                                >
-                                  <span className={isExcluded ? 'text-muted-foreground/60' : 'text-foreground'}>
-                                    {a.name}
-                                  </span>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={(e) => {
+                            <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin">
+                              {filteredAccountsList.length === 0 ? (
+                                <div className="px-2 py-3 text-xs text-muted-foreground text-center">No results</div>
+                              ) : (
+                                <>
+                                  <div
+                                    className="flex items-center gap-2 p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer border-b border-border/45 pb-2 mb-1.5 font-semibold"
+                                    onClick={() => {
+                                      const allSelected = filteredAccountsList.every((a) => !excludedAccountIds.has(a.id));
+                                      const next = new Set(excludedAccountIds);
+                                      filteredAccountsList.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
+                                      setExcludedAccountIds(next);
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={filteredAccountsList.every((a) => !excludedAccountIds.has(a.id))}
+                                      onChange={(e) => {
                                         e.stopPropagation();
-                                        selectOnly(a.id);
+                                        const allSelected = filteredAccountsList.every((a) => !excludedAccountIds.has(a.id));
+                                        const next = new Set(excludedAccountIds);
+                                        filteredAccountsList.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
+                                        setExcludedAccountIds(next);
                                       }}
-                                      className="text-[10px] text-primary hover:underline px-1 py-0.5"
-                                    >
-                                      only
-                                    </button>
-                                    {isExcluded ? (
-                                      <EyeOff className="w-3.5 h-3.5 text-muted-foreground/40" />
-                                    ) : (
-                                      <Eye className="w-3.5 h-3.5 text-primary" />
-                                    )}
+                                      className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
+                                    />
+                                    <span>Select All</span>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                  {filteredAccountsList.map((a) => {
+                                    const isExcluded = excludedAccountIds.has(a.id);
+                                    return (
+                                      <div
+                                        key={a.id}
+                                        className="flex items-center justify-between p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer group"
+                                        onClick={() => toggleAccount(a.id)}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                          <input
+                                            type="checkbox"
+                                            checked={!isExcluded}
+                                            onChange={(e) => {
+                                              e.stopPropagation();
+                                              toggleAccount(a.id);
+                                            }}
+                                            className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
+                                          />
+                                          <span className={`truncate ${isExcluded ? 'text-muted-foreground/60' : 'text-foreground'}`}>
+                                            {a.name}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            selectOnly(a.id);
+                                          }}
+                                          className="text-[10px] text-primary hover:underline px-1 py-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 shrink-0"
+                                        >
+                                          only
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </div>
 
-                          {excludedAccountIds.size > 0 && (
-                            <button
-                              onClick={clearExcluded}
-                              className="w-full text-[10px] bg-muted/40 text-primary border border-border hover:bg-muted text-center py-1 rounded"
-                            >
-                              Reset Account Filters
-                            </button>
-                          )}
-                        </div>
-                      )}
+                            {excludedAccountIds.size > 0 && (
+                              <button
+                                onClick={clearExcluded}
+                                className="w-full text-[10px] bg-muted/40 text-primary border border-border hover:bg-muted text-center py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                              >
+                                Reset Account Filters
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </CollapsibleFilterPanel>
 

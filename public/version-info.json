@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784073593667",
+  "buildNumber": "26.07.1784074092598",
   "commits": [
+    "feat: add responsive mobile layout to filter panel, update build version, and correct Next.js type reference path",
     "feat: add 1d_discrete timeframe support and drill-down navigation for daily chart data",
     "feat: add percentage toggle to net worth chart, update Sankey tooltip positioning, and bump build version",
     "feat: add percentage-based change toggle to net worth chart and improve axis formatting logic",
-    "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic.",
-    "refactor: enhance chart Y-axis scaling for positive-only data and update wealth flow calculations to support current-day balances."
+    "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic."
   ]
 }
