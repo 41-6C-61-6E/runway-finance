@@ -35,10 +35,10 @@ export function CollapsibleFilterPanel({
           <button
             type="button"
             onClick={onToggle}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0"
+            className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0"
           >
             <Filter size={12} className="text-primary shrink-0" />
-            <span>Options</span>
+            <span className="hidden sm:inline">Options</span>
             {isOpen ? (
               <ChevronUp size={12} className="text-muted-foreground/60 shrink-0" />
             ) : (
