@@ -51,11 +51,11 @@ export function CollapsibleFilterPanel({
 
           {/* Selected Filter/Date Range Feedback (displays only whole indicators that fit) */}
           {feedbackItems && feedbackItems.length > 0 ? (
-            <OverflowAware className="text-[11px] font-medium text-muted-foreground py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
+            <OverflowAware className="hidden md:flex text-[11px] font-medium text-muted-foreground py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
               {feedbackItems}
             </OverflowAware>
           ) : feedback && (
-            <div className="text-[11px] font-medium text-muted-foreground flex flex-wrap items-center gap-1.5 overflow-hidden max-h-[24px] py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
+            <div className="hidden md:flex text-[11px] font-medium text-muted-foreground flex-wrap items-center gap-1.5 overflow-hidden max-h-[24px] py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
               {feedback}
             </div>
           )}
