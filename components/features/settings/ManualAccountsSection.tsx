@@ -677,8 +677,18 @@ export default function ManualAccountsSection() {
   const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void, accountType?: string) => {
     const isRealEstate = accountType && REAL_ESTATE_TYPES.includes(accountType);
     const frequencies = isRealEstate
-      ? SYNC_FREQUENCIES.filter((f) => f.value !== 'daily')
-      : SYNC_FREQUENCIES;
+      ? [
+          { value: 'manual', label: 'Manual only' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+          { value: 'best', label: 'Best (Auto-calculated)' },
+        ]
+      : [
+          { value: 'manual', label: 'Manual only' },
+          { value: 'daily', label: 'Daily' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+        ];
 
     return (
       <div>

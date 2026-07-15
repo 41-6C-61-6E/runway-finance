@@ -361,7 +361,7 @@ export async function createManualAccount(input: {
 
   const meta = input.metadata ? { ...input.metadata } : {};
   if (isRealEstate && meta.syncFrequency === 'daily') {
-    meta.syncFrequency = 'weekly';
+    meta.syncFrequency = 'best';
   }
 
   const rawValues = {

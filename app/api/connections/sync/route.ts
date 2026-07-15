@@ -212,9 +212,9 @@ export async function POST(request: Request) {
                 'single-family', 'condo', 'townhouse', 'multi-family'
               ].includes(acc.type);
               if (isRealEstate && syncFrequency === 'daily') {
-                syncFrequency = 'weekly';
+                syncFrequency = 'best';
                 try {
-                  meta.syncFrequency = 'weekly';
+                  meta.syncFrequency = 'best';
                   const updatedMeta = JSON.stringify(meta);
                   const encryptedMeta = dek ? await (await import('@/lib/crypto')).encryptField(updatedMeta, dek) : updatedMeta;
                   await getDb()
@@ -226,7 +226,7 @@ export async function POST(request: Request) {
                 }
               }
             } catch {}
-            manualAccountScheduler.schedule(acc.id, userId, syncFrequency, refreshed.balanceDate);
+            await manualAccountScheduler.schedule(acc.id, userId, syncFrequency, refreshed.balanceDate);
           }
         }
 

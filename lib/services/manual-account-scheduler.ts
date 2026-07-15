@@ -73,7 +73,7 @@ async function coerceAndSaveSyncFrequency(
         raw = JSON.stringify(accountRow.metadata || '{}');
       }
       const meta = JSON.parse(raw) as Record<string, unknown>;
-      meta.syncFrequency = 'weekly';
+      meta.syncFrequency = 'best';
 
       const updatedMeta = JSON.stringify(meta);
       const encryptedMeta = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
@@ -86,11 +86,11 @@ async function coerceAndSaveSyncFrequency(
         })
         .where(eq(accounts.id, accountRow.id));
 
-      logger.info(`${LOG_TAG} Coerced daily sync frequency to weekly for real estate account`, {
+      logger.info(`${LOG_TAG} Coerced daily sync frequency to best for real estate account`, {
         accountId: accountRow.id,
         userId: accountRow.userId,
       });
-      return 'weekly';
+      return 'best';
     } catch (err) {
       logger.error(`${LOG_TAG} Failed to update coerced frequency in DB`, {
         accountId: accountRow.id,
@@ -106,8 +106,97 @@ class ManualAccountScheduler {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private _isRunning = false;
 
+  private bestIntervalCache: number | null = null;
+  private lastCacheTime = 0;
+  private CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+
   get isRunning(): boolean {
     return this._isRunning;
+  }
+
+  clearBestIntervalCache(): void {
+    this.bestIntervalCache = null;
+    this.lastCacheTime = 0;
+  }
+
+  async getBestInterval(db: any): Promise<number> {
+    const now = Date.now();
+    if (this.bestIntervalCache !== null && (now - this.lastCacheTime) < this.CACHE_TTL_MS) {
+      return this.bestIntervalCache;
+    }
+
+    try {
+      const accountRows = await db
+        .select({
+          id: accounts.id,
+          userId: accounts.userId,
+          type: accounts.type,
+          metadata: accounts.metadata,
+        })
+        .from(accounts)
+        .where(isNull(accounts.connectionId));
+
+      const serverDekMap = new Map<string, Uint8Array>();
+      let nWeekly = 0;
+      let nMonthly = 0;
+      let nBest = 0;
+
+      for (const row of accountRows) {
+        if (!isRealEstateType(row.type)) continue;
+
+        let dek = serverDekMap.get(row.userId);
+        if (!dek) {
+          try {
+            dek = await getServerDEK(row.userId);
+            serverDekMap.set(row.userId, dek);
+          } catch {
+            continue; // Skip if we cannot decrypt metadata for this user
+          }
+        }
+
+        const freq = await extractSyncFrequency(row, dek);
+        if (freq === 'weekly') {
+          nWeekly++;
+        } else if (freq === 'monthly') {
+          nMonthly++;
+        } else if (freq === 'best') {
+          nBest++;
+        }
+      }
+
+      const totalLimit = 50;
+      // weekly calls/month ~ 4.2857 (30 / 7). monthly calls/month = 1.
+      const allocated = (nMonthly * 1.0) + (nWeekly * (30 / 7));
+      const remaining = Math.max(1, totalLimit - allocated);
+
+      let intervalMs: number;
+      if (nBest <= 0) {
+        intervalMs = 30 * 24 * 60 * 60 * 1000; // default to monthly
+      } else {
+        const callsPerBestPerMonth = remaining / nBest;
+        const days = 30 / callsPerBestPerMonth;
+        // Cap to minimum of 1 day to prevent over-syncing
+        const cappedDays = Math.max(1, days);
+        intervalMs = cappedDays * 24 * 60 * 60 * 1000;
+      }
+
+      this.bestIntervalCache = intervalMs;
+      this.lastCacheTime = now;
+      logger.info(`${LOG_TAG} Recalculated 'best' sync interval`, {
+        nWeekly,
+        nMonthly,
+        nBest,
+        remainingCalls: remaining,
+        intervalDays: Math.round((intervalMs / (24 * 60 * 60 * 1000)) * 100) / 100,
+      });
+
+      return intervalMs;
+    } catch (err) {
+      logger.error(`${LOG_TAG} Error calculating best interval, falling back to monthly`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return 30 * 24 * 60 * 60 * 1000; // default to monthly
+    }
   }
 
   async init(): Promise<void> {
@@ -154,7 +243,7 @@ class ManualAccountScheduler {
       }
 
       const syncFrequency = await coerceAndSaveSyncFrequency(row, dek, db);
-      if (this.schedule(row.id, row.userId, syncFrequency, row.balanceDate)) {
+      if (await this.schedule(row.id, row.userId, syncFrequency, row.balanceDate)) {
         scheduled++;
       }
     }
@@ -163,17 +252,22 @@ class ManualAccountScheduler {
     logger.info(`${LOG_TAG} Scheduler initialized`, { total: accountRows.length, scheduled, skipped });
   }
 
-  schedule(
+  async schedule(
     id: string,
     userId: string,
     syncFrequency: string,
     balanceDate: Date | null
-  ): boolean {
+  ): Promise<boolean> {
     this.cancel(id);
+    this.clearBestIntervalCache(); // Ensure cache is cleared on schedule update
 
     if (syncFrequency === 'manual') return false;
 
-    const interval = SYNC_INTERVALS[syncFrequency];
+    let interval = SYNC_INTERVALS[syncFrequency];
+    if (syncFrequency === 'best') {
+      interval = await this.getBestInterval(getDb());
+    }
+
     if (!interval) return false;
 
     const now = Date.now();
@@ -188,6 +282,7 @@ class ManualAccountScheduler {
       accountId: id,
       frequency: syncFrequency,
       delay: `${Math.round(delay / 1000 / 60)}m`,
+      intervalDays: Math.round((interval / (24 * 60 * 60 * 1000)) * 100) / 100,
     });
 
     return true;
@@ -199,6 +294,7 @@ class ManualAccountScheduler {
       clearTimeout(existing);
       this.timers.delete(id);
     }
+    this.clearBestIntervalCache(); // Clear best cache on changes
   }
 
   async scheduleForUser(userId: string): Promise<void> {
@@ -220,7 +316,7 @@ class ManualAccountScheduler {
     for (const row of userAccounts) {
       if (!SYNCABLE_TYPES.includes(row.type as typeof SYNCABLE_TYPES[number])) continue;
       const syncFrequency = await coerceAndSaveSyncFrequency({ ...row, userId }, dek, db);
-      this.schedule(row.id, userId, syncFrequency, row.balanceDate);
+      await this.schedule(row.id, userId, syncFrequency, row.balanceDate);
     }
   }
 
@@ -289,7 +385,7 @@ class ManualAccountScheduler {
       if (dekUnavailable) return;
 
       if (syncSuccess) {
-        this.schedule(id, updated.userId, syncFrequency, updated.balanceDate);
+        await this.schedule(id, updated.userId, syncFrequency, updated.balanceDate);
       } else {
         const timer = setTimeout(() => this.execute(id, updated.userId), RETRY_DELAY_MS);
         this.timers.set(id, timer);
