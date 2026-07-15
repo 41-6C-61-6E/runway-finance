@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
+import { simplifinConnections, plaidConnections, userSettings } from '@/lib/db/schema';
 import { syncConnection } from '@/lib/services/sync';
 import { syncPlaidConnection } from '@/lib/services/plaid-sync';
 import { getServerDEK } from '@/lib/crypto-context';
@@ -18,6 +18,30 @@ const SYNC_INTERVALS: Record<string, number> = {
 };
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
+
+function getUtcTimestamp(year: number, month: number, day: number, hour: number, minute: number, tz: string): number {
+  const utcDate = new Date(Date.UTC(year, month, day, hour, minute));
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(utcDate);
+  const formattedYear = parseInt(parts.find(p => p.type === 'year')!.value, 10);
+  const formattedMonth = parseInt(parts.find(p => p.type === 'month')!.value, 10) - 1;
+  const formattedDay = parseInt(parts.find(p => p.type === 'day')!.value, 10);
+  const formattedHour = parseInt(parts.find(p => p.type === 'hour')!.value, 10);
+  const formattedMinute = parseInt(parts.find(p => p.type === 'minute')!.value, 10);
+  
+  const hourVal = formattedHour === 24 ? 0 : formattedHour;
+  const diffMs = Date.UTC(year, month, day, hour, minute) - Date.UTC(formattedYear, formattedMonth, formattedDay, hourVal, formattedMinute);
+  return utcDate.getTime() + diffMs;
+}
 
 async function canSyncUser(userId: string): Promise<boolean> {
   try {
@@ -74,7 +98,7 @@ class SyncScheduler {
         skipped++;
         continue;
       }
-      if (this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt)) {
+      if (await this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt, conn.userId)) {
         scheduled++;
       }
     }
@@ -83,11 +107,12 @@ class SyncScheduler {
     logger.info(`${LOG_TAG} Scheduler initialized`, { total: allConnections.length, scheduled, skipped });
   }
 
-  schedule(
+  async schedule(
     id: string,
     syncFrequency: string,
-    lastSyncAt: Date | null
-  ): boolean {
+    lastSyncAt: Date | null,
+    userId?: string
+  ): Promise<boolean> {
     this.cancel(id);
 
     if (syncFrequency === 'manual') return false;
@@ -97,8 +122,94 @@ class SyncScheduler {
 
     const now = Date.now();
     const lastSyncTime = lastSyncAt ? lastSyncAt.getTime() : 0;
-    const nextSyncTime = lastSyncTime + interval;
-    const delay = Math.max(0, nextSyncTime - now);
+    let delay = 0;
+
+    if (syncFrequency === 'daily') {
+      let finalUserId = userId;
+      if (!finalUserId) {
+        const db = getDb();
+        const [sfConn] = await db
+          .select({ userId: simplifinConnections.userId })
+          .from(simplifinConnections)
+          .where(eq(simplifinConnections.id, id))
+          .limit(1);
+        if (sfConn) {
+          finalUserId = sfConn.userId;
+        } else {
+          const [pConn] = await db
+            .select({ userId: plaidConnections.userId })
+            .from(plaidConnections)
+            .where(eq(plaidConnections.id, id))
+            .limit(1);
+          if (pConn) {
+            finalUserId = pConn.userId;
+          }
+        }
+      }
+
+      if (finalUserId) {
+        const db = getDb();
+        const [settings] = await db
+          .select({
+            timezone: userSettings.timezone,
+            dailyNetWorthAlertTime: userSettings.dailyNetWorthAlertTime,
+          })
+          .from(userSettings)
+          .where(eq(userSettings.userId, finalUserId))
+          .limit(1);
+
+        const userTz = settings?.timezone || 'America/New_York';
+        const alertTime = settings?.dailyNetWorthAlertTime || '18:00';
+        const [alertHour, alertMinute] = alertTime.split(':').map(Number);
+
+        // Target time is 1 hour before the alert time
+        let targetHour = alertHour - 1;
+        let targetMinute = alertMinute;
+        if (targetHour < 0) {
+          targetHour += 24;
+        }
+
+        // Determine current date in user's timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: userTz,
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          second: 'numeric',
+          hour12: false,
+        });
+        const parts = formatter.formatToParts(new Date(now));
+        const y = parseInt(parts.find(p => p.type === 'year')!.value, 10);
+        const m = parseInt(parts.find(p => p.type === 'month')!.value, 10) - 1;
+        const d = parseInt(parts.find(p => p.type === 'day')!.value, 10);
+
+        const targetTimeToday = getUtcTimestamp(y, m, d, targetHour, targetMinute, userTz);
+        let targetTime = targetTimeToday;
+
+        // If target time has already passed today OR it is too close to the last sync (within 12 hours)
+        if (targetTime <= now || (lastSyncTime > 0 && targetTime - lastSyncTime < 12 * 60 * 60 * 1000)) {
+          // Schedule for tomorrow instead
+          const tomorrow = new Date(now + 24 * 60 * 60 * 1000);
+          const partsTomorrow = formatter.formatToParts(tomorrow);
+          const yt = parseInt(partsTomorrow.find(p => p.type === 'year')!.value, 10);
+          const mt = parseInt(partsTomorrow.find(p => p.type === 'month')!.value, 10) - 1;
+          const dt = parseInt(partsTomorrow.find(p => p.type === 'day')!.value, 10);
+          targetTime = getUtcTimestamp(yt, mt, dt, targetHour, targetMinute, userTz);
+        }
+
+        delay = Math.max(0, targetTime - now);
+      } else {
+        // Fallback if userId cannot be found
+        const nextSyncTime = lastSyncTime + interval;
+        delay = Math.max(0, nextSyncTime - now);
+      }
+    } else {
+      // Non-daily intervals (hourly, weekly, monthly)
+      const nextSyncTime = lastSyncTime + interval;
+      delay = Math.max(0, nextSyncTime - now);
+    }
 
     const timer = setTimeout(() => this.execute(id), delay);
     this.timers.set(id, timer);
@@ -142,7 +253,7 @@ class SyncScheduler {
     const all = [...sfConnections, ...pConnections];
 
     for (const conn of all) {
-      this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt);
+      await this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt, userId);
     }
   }
 
@@ -153,6 +264,7 @@ class SyncScheduler {
     let dekUnavailable = false;
     let isSimplefin = true;
     let logId = '';
+    let userId = '';
 
     try {
       // Find the connection type
@@ -176,6 +288,8 @@ class SyncScheduler {
         logger.info(`${LOG_TAG} Connection deleted, skipping reschedule`, { connectionId: id });
         return;
       }
+
+      userId = connection.userId;
 
       logId = await logJobStart(
         isSimplefin ? 'simplefin-sync' : 'plaid-sync',
@@ -251,7 +365,7 @@ class SyncScheduler {
       if (dekUnavailable) return;
 
       if (syncSuccess) {
-        this.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt);
+        await this.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt, userId);
       } else {
         const timer = setTimeout(() => this.execute(id), RETRY_DELAY_MS);
         this.timers.set(id, timer);

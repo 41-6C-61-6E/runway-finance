@@ -84,7 +84,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   if (refreshed) {
-    syncScheduler.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt);
+    await syncScheduler.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt, connection.userId);
   }
 
   return NextResponse.json({

@@ -633,6 +633,17 @@ export async function PATCH(request: Request) {
     });
   }
 
+  if (timezone !== undefined || dailyNetWorthAlertTime !== undefined) {
+    try {
+      const { syncScheduler } = await import('@/lib/services/sync-scheduler');
+      if (syncScheduler.isRunning) {
+        await syncScheduler.scheduleForUser(session.user.id);
+      }
+    } catch (err) {
+      console.error('Failed to reschedule syncs after updating alert time/timezone:', err);
+    }
+  }
+
   let updatedApiKeys: Record<string, string> = {};
   if (updated.apiKeys) {
     try {

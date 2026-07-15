@@ -123,7 +123,7 @@ export async function POST(request: Request) {
             .limit(1);
 
           if (refreshed) {
-            syncScheduler.schedule(conn.id, refreshed.syncFrequency, refreshed.lastSyncAt);
+            await syncScheduler.schedule(conn.id, refreshed.syncFrequency, refreshed.lastSyncAt, userId);
           }
 
           return {
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
             .limit(1);
 
           if (refreshed) {
-            syncScheduler.schedule(conn.id, refreshed.syncFrequency, refreshed.lastSyncAt);
+            await syncScheduler.schedule(conn.id, refreshed.syncFrequency, refreshed.lastSyncAt, userId);
           }
 
           return {
