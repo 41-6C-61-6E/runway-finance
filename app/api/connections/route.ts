@@ -152,7 +152,7 @@ export async function POST(request: Request) {
     .returning();
 
   logger.info('Connection created', { connectionId: connection.id, label: connection.label, syncFrequency });
-  syncScheduler.schedule(connection.id, connection.syncFrequency, connection.lastSyncAt);
+  await syncScheduler.schedule(connection.id, connection.syncFrequency, connection.lastSyncAt, userId);
   return NextResponse.json(connection, { status: 201 });
 }
 

@@ -518,18 +518,23 @@ export default function NotificationsTab() {
               />
             </div>
             {notifyDailyNetWorthChange && (
-              <div className="flex items-center gap-3 pl-1 -mt-2 pb-2">
-                <Label htmlFor="daily-networth-time" className="text-xs text-muted-foreground whitespace-nowrap">Alert time</Label>
-                <Input
-                  id="daily-networth-time"
-                  type="time"
-                  value={dailyNetWorthAlertTime}
-                  onChange={(e) => handleUpdateSetting('dailyNetWorthAlertTime', e.target.value)}
-                  className="w-[120px] h-8 text-xs"
-                />
-                <span className="text-xs text-muted-foreground">
-                  Sent daily at this time (<span className="font-mono">{userTimezone}</span>)
-                </span>
+              <div className="flex flex-col gap-1.5 pl-1 -mt-2 pb-2">
+                <div className="flex items-center gap-3">
+                  <Label htmlFor="daily-networth-time" className="text-xs text-muted-foreground whitespace-nowrap">Alert time</Label>
+                  <Input
+                    id="daily-networth-time"
+                    type="time"
+                    value={dailyNetWorthAlertTime}
+                    onChange={(e) => handleUpdateSetting('dailyNetWorthAlertTime', e.target.value)}
+                    className="w-[120px] h-8 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Sent daily at this time (<span className="font-mono">{userTimezone}</span>)
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed max-w-md">
+                  Note: Daily connection syncs are automatically scheduled to run 1 hour before this alert time to ensure you receive fresh, updated data.
+                </p>
               </div>
             )}
 

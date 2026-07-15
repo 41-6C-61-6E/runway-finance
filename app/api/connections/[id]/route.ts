@@ -126,7 +126,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   logger.info('Connection updated', { connectionId: id, updateData, isSimplefin });
-  syncScheduler.schedule(id, updated.syncFrequency, updated.lastSyncAt);
+  await syncScheduler.schedule(id, updated.syncFrequency, updated.lastSyncAt, connection.userId);
   return NextResponse.json(updated);
 }
 
