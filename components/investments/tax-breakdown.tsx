@@ -12,6 +12,7 @@ interface Account {
   balance: number;
   institution: string | null;
   type: string;
+  metadata?: any;
 }
 
 interface TaxBreakdownProps {
@@ -60,8 +61,31 @@ export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
   const wrapperTotals = useMemo(() => {
     const totals: Partial<Record<TaxWrapper, number>> = {};
     for (const acc of accounts) {
-      const wrapper = TAX_WRAPPER_MAP[acc.type.toLowerCase()] ?? 'Other';
-      totals[wrapper] = (totals[wrapper] ?? 0) + (acc.balance || 0);
+      const balance = acc.balance || 0;
+      let rothPct: number | null = null;
+      if (acc.metadata) {
+        const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
+        if (typeof meta.rothPercentage === 'number') {
+          rothPct = meta.rothPercentage;
+        }
+      }
+
+      if (rothPct !== null) {
+        // Split the balance: Roth portion is Tax-Free
+        const rothVal = balance * (rothPct / 100);
+        const nonRothVal = balance * (1 - rothPct / 100);
+
+        totals['Tax-Free'] = (totals['Tax-Free'] ?? 0) + rothVal;
+
+        // Non-Roth gets the default wrapper
+        const defaultWrapper = TAX_WRAPPER_MAP[acc.type.toLowerCase()] ?? 'Other';
+        // Note: if the default wrapper is already Tax-Free (e.g. rothira), then the remaining portion should go to Tax-Deferred
+        const nonRothWrapper = defaultWrapper === 'Tax-Free' ? 'Tax-Deferred' : defaultWrapper;
+        totals[nonRothWrapper] = (totals[nonRothWrapper] ?? 0) + nonRothVal;
+      } else {
+        const wrapper = TAX_WRAPPER_MAP[acc.type.toLowerCase()] ?? 'Other';
+        totals[wrapper] = (totals[wrapper] ?? 0) + balance;
+      }
     }
     return totals;
   }, [accounts]);

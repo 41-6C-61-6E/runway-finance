@@ -174,6 +174,9 @@ export async function GET(request: Request) {
         type: acc.type,
         currency: acc.currency,
         updatedAt: acc.updatedAt,
+        metadata: typeof acc.metadata === 'string'
+          ? (acc.metadata.trim() !== '' ? JSON.parse(acc.metadata) : null)
+          : (acc.metadata || null),
       })),
       holdings: holdingsWithWeights,
       summary: {
