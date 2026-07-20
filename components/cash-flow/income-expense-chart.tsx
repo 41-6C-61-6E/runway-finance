@@ -27,7 +27,9 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
-import { ArrowRightLeft, TrendingUp, Info, ChevronDown } from 'lucide-react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { Switch } from '@/components/ui/switch';
+import { ArrowRightLeft, TrendingUp, Info, ChevronDown, ChevronUp, Settings2, CheckSquare, Square, RefreshCw } from 'lucide-react';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -74,11 +76,66 @@ export function IncomeExpenseChart() {
   const [selectedCashFlowPoint, setSelectedCashFlowPoint] = useState<any | null>(null);
   const [expandedBucket, setExpandedBucket] = useState<'retirement' | 'hsa' | 'brokerage' | 'savingsAccount' | 'cash' | 'income' | 'expenses' | null>(null);
 
+  // Customization States
+  const [excludedAccounts, setExcludedAccounts] = usePersistentState<string[]>('cf-chart:excluded-accounts', []);
+  const [excludedCategories, setExcludedCategories] = usePersistentState<string[]>('cf-chart:excluded-categories', []);
+  const [savingsComponents, setSavingsComponents] = usePersistentState<string[]>('cf-chart:savings-components', ['retirement', 'hsa', 'brokerage', 'savingsAccount', 'cash']);
+  const [includePaystubRetirement, setIncludePaystubRetirement] = usePersistentState<boolean>('cf-chart:include-paystub-retirement', true);
+  const [includePaystubHsa, setIncludePaystubHsa] = usePersistentState<boolean>('cf-chart:include-paystub-hsa', true);
+  const [adjustIncomeDenominator, setAdjustIncomeDenominator] = usePersistentState<boolean>('cf-chart:adjust-income-denominator', false);
+
+  const [showCustomizer, setShowCustomizer] = useState(false);
+  const [activeTab, setActiveTab] = useState<'accounts' | 'categories' | 'formula'>('accounts');
+  const [categorySearch, setCategorySearch] = useState('');
+
+  // Fetch all user accounts
+  const { data: accountsData = [] } = useQuery<any[]>({
+    queryKey: ['accounts-all'],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts?includeHidden=true&includeVirtual=true');
+      if (!res.ok) throw new Error('Failed to fetch accounts');
+      return res.json();
+    },
+  });
+
+  // Fetch all user categories
+  const { data: categoriesData = [] } = useQuery<any[]>({
+    queryKey: ['categories-all'],
+    queryFn: async () => {
+      const res = await fetch('/api/categories');
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+  });
+
   // Unified Query: Fetch monthly savings and standard cash flow data
   const { data: savingsData = [], isLoading, error: queryError } = useQuery<SavingsRatePoint[]>({
-    queryKey: ['savings-rate-monthly'],
+    queryKey: [
+      'savings-rate-monthly',
+      excludedAccounts,
+      excludedCategories,
+      savingsComponents,
+      includePaystubRetirement,
+      includePaystubHsa,
+      adjustIncomeDenominator,
+    ],
     queryFn: async () => {
-      const res = await fetch('/api/cash-flow/savings-rate?months=120');
+      const params = new URLSearchParams();
+      params.append('months', '120');
+      if (excludedAccounts.length > 0) {
+        params.append('excludedAccounts', excludedAccounts.join(','));
+      }
+      if (excludedCategories.length > 0) {
+        params.append('excludedCategories', excludedCategories.join(','));
+      }
+      if (savingsComponents.length > 0) {
+        params.append('savingsComponents', savingsComponents.join(','));
+      }
+      params.append('includePaystubRetirement', String(includePaystubRetirement));
+      params.append('includePaystubHsa', String(includePaystubHsa));
+      params.append('adjustIncomeDenominator', String(adjustIncomeDenominator));
+
+      const res = await fetch(`/api/cash-flow/savings-rate?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch monthly savings rate data');
       return res.json();
     },
@@ -98,6 +155,27 @@ export function IncomeExpenseChart() {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Active accounts and categorized helper data structures
+  const activeDbAccounts = useMemo(() => {
+    return accountsData.filter((a: any) => (!a.isHidden && !a.isExcludedFromNetWorth) || a.type === 'paystub');
+  }, [accountsData]);
+
+  const parentCategories = useMemo(() => {
+    return categoriesData.filter((c: any) => !c.parentId);
+  }, [categoriesData]);
+
+  const subCategoriesMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const cat of categoriesData) {
+      if (cat.parentId) {
+        const list = map.get(cat.parentId) || [];
+        list.push(cat);
+        map.set(cat.parentId, list);
+      }
+    }
+    return map;
+  }, [categoriesData]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -407,6 +485,25 @@ export function IncomeExpenseChart() {
           <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
+            actions={
+              <button
+                type="button"
+                onClick={() => setShowCustomizer(!showCustomizer)}
+                className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 border rounded-lg text-[11px] font-semibold transition-all cursor-pointer shadow-sm select-none shrink-0 ${
+                  showCustomizer
+                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
+                    : 'bg-background hover:bg-muted border-border/80 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Settings2 size={12} className="text-primary shrink-0" />
+                <span className="hidden sm:inline">Customize Data</span>
+                {showCustomizer ? (
+                  <ChevronUp size={12} className="text-muted-foreground/60 shrink-0" />
+                ) : (
+                  <ChevronDown size={12} className="text-muted-foreground/60 shrink-0" />
+                )}
+              </button>
+            }
             feedbackItems={[
               <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
@@ -440,6 +537,258 @@ export function IncomeExpenseChart() {
               </div>
             </div>
           </CollapsibleFilterPanel>
+
+          {showCustomizer && (
+            <div className="border-b border-border bg-muted/5 px-5 py-4 space-y-4 animate-in slide-in-from-top-2 duration-250">
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-border/30 pb-2 overflow-x-auto scrollbar-none">
+                {(['accounts', 'categories', 'formula'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                      activeTab === tab
+                        ? 'bg-background border-border text-primary shadow-sm font-bold'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab === 'accounts' && 'Included Accounts'}
+                    {tab === 'categories' && 'Excluded Categories'}
+                    {tab === 'formula' && 'Savings Formula'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content: Accounts */}
+              {activeTab === 'accounts' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                    <span className="text-muted-foreground">Select which accounts supply data to the income, expenses, and savings rate calculations.</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setExcludedAccounts([])}
+                        className="text-primary hover:underline font-semibold"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-muted-foreground/30">|</span>
+                      <button
+                        onClick={() => setExcludedAccounts(activeDbAccounts.map((a: any) => a.id))}
+                        className="text-muted-foreground hover:text-foreground font-semibold"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+                    {activeDbAccounts.map((acc: any) => {
+                      const isIncluded = !excludedAccounts.includes(acc.id);
+                      return (
+                        <label
+                          key={acc.id}
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer hover:bg-muted/20 transition-all ${
+                            isIncluded ? 'border-primary/20 bg-primary/5' : 'border-border/65 bg-background opacity-60'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isIncluded}
+                            onChange={() => {
+                              if (isIncluded) {
+                                setExcludedAccounts((prev) => [...prev, acc.id]);
+                              } else {
+                                setExcludedAccounts((prev) => prev.filter((id) => id !== acc.id));
+                              }
+                            }}
+                            className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold text-foreground truncate">{acc.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{acc.type}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Categories */}
+              {activeTab === 'categories' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Select spend/income categories to exclude from standard Cash Flow charts.</span>
+                    <input
+                      type="text"
+                      placeholder="Search categories..."
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      className="h-8 max-w-[200px] text-xs px-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground/60 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="border border-border/40 rounded-lg max-h-[220px] overflow-y-auto divide-y divide-border/20 bg-background/50">
+                    {parentCategories
+                      .filter((p: any) => {
+                        if (!categorySearch) return true;
+                        const nameMatch = p.name.toLowerCase().includes(categorySearch.toLowerCase());
+                        const subs = subCategoriesMap.get(p.id) || [];
+                        const subMatch = subs.some((s: any) => s.name.toLowerCase().includes(categorySearch.toLowerCase()));
+                        return nameMatch || subMatch;
+                      })
+                      .map((parent: any) => {
+                        const subs = subCategoriesMap.get(parent.id) || [];
+                        const isParentExcluded = excludedCategories.includes(parent.id);
+                        const matchingSubs = subs.filter((s: any) =>
+                          !categorySearch || s.name.toLowerCase().includes(categorySearch.toLowerCase())
+                        );
+
+                        return (
+                          <div key={parent.id} className="p-2.5 space-y-2">
+                            {/* Parent Category Row */}
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={!isParentExcluded}
+                                  onChange={() => {
+                                    if (!isParentExcluded) {
+                                      // Exclude parent and all its subcategories
+                                      setExcludedCategories((prev) => {
+                                        const next = new Set([...prev, parent.id, ...subs.map((s) => s.id)]);
+                                        return Array.from(next);
+                                      });
+                                    } else {
+                                      // Include parent and all its subcategories
+                                      setExcludedCategories((prev) =>
+                                        prev.filter((id) => id !== parent.id && !subs.some((s) => s.id === id))
+                                      );
+                                    }
+                                  }}
+                                  className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                                  />
+                                <span className="text-xs font-bold text-foreground">{parent.name}</span>
+                              </label>
+                            </div>
+
+                            {/* Subcategories (Indented Grid) */}
+                            {matchingSubs.length > 0 && (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pl-5">
+                                {matchingSubs.map((sub: any) => {
+                                  const isSubExcluded = excludedCategories.includes(sub.id);
+                                  return (
+                                    <label key={sub.id} className="flex items-center gap-2 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={!isSubExcluded}
+                                        onChange={() => {
+                                          if (!isSubExcluded) {
+                                            setExcludedCategories((prev) => [...prev, sub.id]);
+                                          } else {
+                                            setExcludedCategories((prev) => prev.filter((id) => id !== sub.id));
+                                          }
+                                        }}
+                                        className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                                      />
+                                      <span className="text-xs text-muted-foreground truncate">{sub.name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Formula */}
+              {activeTab === 'formula' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs text-foreground">
+                  {/* Paycheck Deductions & Denominator */}
+                  <div className="space-y-4 bg-background/30 p-3.5 rounded-xl border border-border/40">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground pb-1.5 border-b border-border/20">Paycheck Contributions</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-foreground">Include Pre-tax 401(k) / Retirement</span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">Include pre-tax retirement deductions from your paystubs as tracked savings.</span>
+                        </div>
+                        <Switch
+                          checked={includePaystubRetirement}
+                          onCheckedChange={setIncludePaystubRetirement}
+                        />
+                      </div>
+
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-foreground">Include Pre-tax HSA Deductions</span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">Include pre-tax HSA contributions from your paystubs as tracked savings.</span>
+                        </div>
+                        <Switch
+                          checked={includePaystubHsa}
+                          onCheckedChange={setIncludePaystubHsa}
+                        />
+                      </div>
+
+                      <div className="border-t border-border/20 pt-3 flex items-start justify-between gap-4">
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-foreground">Adjust Denominator (Gross Income)</span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">Add included pre-tax paystub deductions to the savings rate denominator (gross salary vs net paycheck).</span>
+                        </div>
+                        <Switch
+                          checked={adjustIncomeDenominator}
+                          onCheckedChange={setAdjustIncomeDenominator}
+                          disabled={!includePaystubRetirement && !includePaystubHsa}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tracked Savings Components */}
+                  <div className="space-y-3 bg-background/30 p-3.5 rounded-xl border border-border/40">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground pb-1.5 border-b border-border/20">Tracked Savings Components</h4>
+                    <p className="text-[10px] text-muted-foreground">Select which categories of transfers count as savings in your Savings Rate calculation.</p>
+                    
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto">
+                      {[
+                        { key: 'retirement', label: 'Retirement Accounts', desc: '401(k), IRA, pension accounts' },
+                        { key: 'hsa', label: 'Health Savings Accounts (HSA)', desc: 'Health savings asset transfers' },
+                        { key: 'brokerage', label: 'Brokerage / Investments', desc: 'Brokerages, metals, crypto' },
+                        { key: 'savingsAccount', label: 'Savings Accounts', desc: 'High-yield and standard savings transfers' },
+                        { key: 'cash', label: 'Leftover Cash (Surplus)', desc: 'Remaining unspent cash flow of the month' },
+                      ].map((item) => {
+                        const isIncluded = savingsComponents.includes(item.key);
+                        return (
+                          <label key={item.key} className="flex items-center justify-between p-2 rounded-lg border bg-background/40 hover:bg-muted/10 cursor-pointer transition-all">
+                            <div className="flex flex-col pr-3">
+                              <span className="font-semibold text-foreground">{item.label}</span>
+                              <span className="text-[9px] text-muted-foreground mt-0.5">{item.desc}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isIncluded}
+                              onChange={() => {
+                                if (isIncluded) {
+                                  setSavingsComponents((prev) => prev.filter((k) => k !== item.key));
+                                } else {
+                                  setSavingsComponents((prev) => [...prev, item.key]);
+                                }
+                              }}
+                              className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
             {/* ── Left Column: Income vs Expenses ── */}

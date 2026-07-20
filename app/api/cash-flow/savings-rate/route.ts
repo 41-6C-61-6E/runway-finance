@@ -19,6 +19,14 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '12', 10);
+  const excludedAccounts = new Set((searchParams.get('excludedAccounts') || '').split(',').filter(Boolean));
+  const excludedCategories = new Set((searchParams.get('excludedCategories') || '').split(',').filter(Boolean));
+  const savingsComponents = new Set(
+    (searchParams.get('savingsComponents') || 'retirement,hsa,brokerage,savingsAccount,cash').split(',').filter(Boolean)
+  );
+  const includePaystubRetirement = searchParams.get('includePaystubRetirement') !== 'false';
+  const includePaystubHsa = searchParams.get('includePaystubHsa') !== 'false';
+  const adjustIncomeDenominator = searchParams.get('adjustIncomeDenominator') === 'true';
 
   const now = new Date();
   const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
@@ -57,9 +65,9 @@ export async function GET(request: Request) {
       .limit(1);
     const isPaystubEnabled = settings?.paystubEnabled ?? false;
 
-    // Filter active (reportable or paystub) accounts
+    // Filter active (reportable or paystub) accounts, applying user exclusions
     const activeAccounts = decryptedAccounts.filter(
-      (a: any) => (!a.isHidden && !a.isExcludedFromNetWorth) || a.type === 'paystub'
+      (a: any) => ((!a.isHidden && !a.isExcludedFromNetWorth) || a.type === 'paystub') && !excludedAccounts.has(a.id)
     );
     const activeAccountIds = new Set(activeAccounts.map(a => a.id));
 
@@ -159,7 +167,10 @@ export async function GET(request: Request) {
       const category = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined;
 
       // Skip report-excluded categories only for standard income/expenses cash flows
-      let excluded = category?.excludeFromReports ?? false;
+      let excluded = (category?.excludeFromReports ?? false) || (category && excludedCategories.has(category.id)) || false;
+      if (category?.parentId && excludedCategories.has(category.parentId)) {
+        excluded = true;
+      }
       if (!excluded && category?.parentId) {
         const parent = categoryMap.get(category.parentId);
         if (parent?.excludeFromReports) excluded = true;
@@ -233,13 +244,17 @@ export async function GET(request: Request) {
       if (tx.source === 'paystub' && amount < 0) {
         const absAmt = Math.abs(amount);
         if (isRetirementCategory) {
-          stats.retirement += absAmt;
-          stats.paystubRetirement += absAmt;
-          addDetail(stats, 'retirement', categoryName || tx.description || 'Pre-tax Retirement Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
+          if (includePaystubRetirement) {
+            stats.retirement += absAmt;
+            stats.paystubRetirement += absAmt;
+            addDetail(stats, 'retirement', categoryName || tx.description || 'Pre-tax Retirement Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
+          }
         } else if (isHsaCategory) {
-          stats.hsa += absAmt;
-          stats.paystubHsa += absAmt;
-          addDetail(stats, 'hsa', categoryName || tx.description || 'Pre-tax HSA Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
+          if (includePaystubHsa) {
+            stats.hsa += absAmt;
+            stats.paystubHsa += absAmt;
+            addDetail(stats, 'hsa', categoryName || tx.description || 'Pre-tax HSA Deduction', tx.date, absAmt, acc?.name || 'Paycheck');
+          }
         }
       }
       // Case 2: Standard Bank/Asset Accounts
@@ -342,7 +357,23 @@ export async function GET(request: Request) {
         // Leftover cash is total savings minus all specific tracked savings categories
         const leftoverCash = totalSavings - stats.retirement - stats.hsa - stats.brokerage - stats.savingsAccount;
 
-        const savingsRate = stats.income > 0 ? totalSavings / stats.income : 0;
+        // Apply filters: components not in savingsComponents are zeroed out
+        const retirementVal = savingsComponents.has('retirement') ? stats.retirement : 0;
+        const hsaVal = savingsComponents.has('hsa') ? stats.hsa : 0;
+        const brokerageVal = savingsComponents.has('brokerage') ? stats.brokerage : 0;
+        const savingsAccountVal = savingsComponents.has('savingsAccount') ? stats.savingsAccount : 0;
+        const cashVal = savingsComponents.has('cash') ? leftoverCash : 0;
+
+        const selectedSavings = retirementVal + hsaVal + brokerageVal + savingsAccountVal + cashVal;
+
+        // Calculate adjusted income denominator if requested
+        let denominator = stats.income;
+        if (adjustIncomeDenominator) {
+          if (includePaystubRetirement) denominator += stats.paystubRetirement;
+          if (includePaystubHsa) denominator += stats.paystubHsa;
+        }
+
+        const savingsRate = denominator > 0 ? selectedSavings / denominator : 0;
 
         return {
           yearMonth,
@@ -351,11 +382,11 @@ export async function GET(request: Request) {
           netCashFlow: Math.round((stats.income - stats.expenses) * 100) / 100,
           savingsRate: Math.round(savingsRate * 10000) / 10000, // 4 decimal precision
           savings: {
-            retirement: Math.round(stats.retirement * 100) / 100,
-            hsa: Math.round(stats.hsa * 100) / 100,
-            brokerage: Math.round(stats.brokerage * 100) / 100,
-            savingsAccount: Math.round(stats.savingsAccount * 100) / 100,
-            cash: Math.round(leftoverCash * 100) / 100,
+            retirement: Math.round(retirementVal * 100) / 100,
+            hsa: Math.round(hsaVal * 100) / 100,
+            brokerage: Math.round(brokerageVal * 100) / 100,
+            savingsAccount: Math.round(savingsAccountVal * 100) / 100,
+            cash: Math.round(cashVal * 100) / 100,
           },
           details: {
             retirement: stats.details.retirement,
