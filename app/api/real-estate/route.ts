@@ -73,10 +73,16 @@ export async function GET(request: Request) {
 
     const isImportRealEstateEnabled = importSettings.global !== false && importSettings.realEstate !== false;
 
+    const REAL_ESTATE_TYPES = [
+      'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty',
+      'commercial', 'land', 'otherrealestate', 'single-family',
+      'condo', 'townhouse', 'multi-family'
+    ];
+
     const realEstateAccounts = decryptedAccounts.filter((a: any) => {
       const isImported = a.externalId?.startsWith('imported-');
       if (isImported && !isImportRealEstateEnabled) return false;
-      return a.type === 'realestate';
+      return REAL_ESTATE_TYPES.includes(a.type);
     });
     const mortgageAccounts = decryptedAccounts.filter((a: any) => {
       const isImported = a.externalId?.startsWith('imported-');
