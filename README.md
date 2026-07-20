@@ -18,6 +18,121 @@
 
 ---
 
+## 📸 Visual Tour
+
+All screenshots show the dashboard with the **Accounts Sidebar** expanded on the left.
+
+### 🎨 Themes & Customization
+
+The app features a gorgeous, dark-by-default interface with customizable themes and accent colors (like Moonlight or Sapphire) and complete theme flexibility.
+
+<table>
+  <tr>
+    <td width="50%">
+      <p align="center"><b>Dashboard (Moonlight Theme + Violet Accent)</b></p>
+      <a href="public/screenshots/dashboard-dark.png">
+        <img src="public/screenshots/dashboard-dark.png" alt="Dashboard Moonlight Theme" width="100%">
+      </a>
+    </td>
+    <td width="50%">
+      <p align="center"><b>Dashboard (Daylight Theme + Sapphire Accent)</b></p>
+      <a href="public/screenshots/dashboard-light.png">
+        <img src="public/screenshots/dashboard-light.png" alt="Dashboard Daylight Theme" width="100%">
+      </a>
+    </td>
+  </tr>
+</table>
+
+### 💰 Cash Flows & Investments
+
+Visualize wealth movements with interactive Sankey diagrams and track investment holdings, crypto, and stock quotes with live cost basis and gains.
+
+<table>
+  <tr>
+    <td width="50%">
+      <p align="center"><b>Wealth & Cash Flows (Sankey Diagram)</b></p>
+      <a href="public/screenshots/cashflow-sankey.png">
+        <img src="public/screenshots/cashflow-sankey.png" alt="Cash Flow Sankey" width="100%">
+      </a>
+    </td>
+    <td width="50%">
+      <p align="center"><b>Investments & Holdings</b></p>
+      <a href="public/screenshots/investments.png" alt="Investments Tracker" width="100%">
+      </a>
+    </td>
+  </tr>
+</table>
+
+### 🏢 Real Estate & Budgets
+
+Track property portfolios with RentCast/FRED integrations and manage monthly budgets using detailed period forecasts and allocation views.
+
+<table>
+  <tr>
+    <td width="50%">
+      <p align="center"><b>Real Estate Valuation & Equity</b></p>
+      <a href="public/screenshots/real-estate.png">
+        <img src="public/screenshots/real-estate.png" alt="Real Estate Portfolio" width="100%">
+      </a>
+    </td>
+    <td width="50%">
+      <p align="center"><b>Budgets & Projections</b></p>
+      <a href="public/screenshots/budgets.png" alt="Budgets & Projections" width="100%">
+      </a>
+    </td>
+  </tr>
+</table>
+
+### 🔍 Transactions Ledger
+
+Explore transaction ledgers with categorizations and tags.
+
+<p align="center"><b>Full Ledger & Details Drawer</b></p>
+<a href="public/screenshots/transactions.png">
+  <img src="public/screenshots/transactions.png" alt="Transactions Ledger" width="100%">
+</a>
+
+### 📱 Responsive Mobile Views & Color Schemes
+
+Manage your personal finance on the go with a fully optimized mobile responsive view, showing Moonlight, Daylight, and Starlight themes with different accent colors:
+
+<table>
+  <tr>
+    <td width="20%">
+      <p align="center"><b>Moonlight + Violet</b></p>
+      <a href="public/screenshots/mobile-moonlight.png">
+        <img src="public/screenshots/mobile-moonlight.png" alt="Mobile Moonlight" width="100%">
+      </a>
+    </td>
+    <td width="20%">
+      <p align="center"><b>Daylight + Teal</b></p>
+      <a href="public/screenshots/mobile-daylight.png">
+        <img src="public/screenshots/mobile-daylight.png" alt="Mobile Daylight" width="100%">
+      </a>
+    </td>
+    <td width="20%">
+      <p align="center"><b>Starlight + Rose</b></p>
+      <a href="public/screenshots/mobile-starlight.png">
+        <img src="public/screenshots/mobile-starlight.png" alt="Mobile Starlight" width="100%">
+      </a>
+    </td>
+    <td width="20%">
+      <p align="center"><b>Transactions</b></p>
+      <a href="public/screenshots/mobile-transactions.png">
+        <img src="public/screenshots/mobile-transactions.png" alt="Mobile Transactions" width="100%">
+      </a>
+    </td>
+    <td width="20%">
+      <p align="center"><b>Budgets</b></p>
+      <a href="public/screenshots/mobile-budgets.png">
+        <img src="public/screenshots/mobile-budgets.png" alt="Mobile Budgets" width="100%">
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 ### 💰 Financial Tracking
