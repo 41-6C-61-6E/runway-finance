@@ -201,32 +201,31 @@ body,
 }
 
 /* ── Privacy Mode ─────────────────────────────────────────────────────────── */
+/* HTML text: hidden via -webkit-text-fill-color so getComputedStyle('color')
+   still returns the original color for canvas-based pixelation rendering.
+   SVG text: hidden via JS (not CSS) so the JS can read the original fill
+   color before making it transparent — see privacy-mode-provider.tsx. */
 .privacy-mode-active .financial-value {
-  filter: blur(8px);
+  position: relative;
+  -webkit-text-fill-color: transparent;
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.privacy-mode-active .blur-number {
-  filter: blur(8px);
+.privacy-mode-active .blur-number:not(text) {
+  position: relative;
+  -webkit-text-fill-color: transparent;
   pointer-events: none;
   user-select: none;
 }
 
-/* Charts: blur axis tick labels & legends, keep lines/bars/areas visible */
-.privacy-mode-active .recharts-xAxis-axis .recharts-cartesian-axis-tick-value,
-.privacy-mode-active .recharts-yAxis-axis .recharts-cartesian-axis-tick-value,
-.privacy-mode-active .recharts-cartesian-axis-tick-value {
-  filter: blur(6px) !important;
-  opacity: 0.2 !important;
+/* Recharts legend text (HTML, not SVG) */
+.privacy-mode-active .recharts-legend-item-text {
+  position: relative;
+  -webkit-text-fill-color: transparent;
   user-select: none !important;
   -webkit-user-select: none !important;
-}
-.privacy-mode-active .recharts-legend-item-text {
-  filter: blur(6px);
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 

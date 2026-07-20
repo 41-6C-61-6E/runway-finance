@@ -1304,7 +1304,7 @@ function SettingsPageBody() {
               <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-foreground">Privacy Mode</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Blur financial data when showing the app to others</p>
+                  <p className="text-xs text-muted-foreground mt-1">Pixelate financial data when showing the app to others</p>
                 </div>
                 <Switch
                   checked={privacyMode ?? false}

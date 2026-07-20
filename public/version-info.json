@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784074092598",
+  "buildNumber": "26.07.1784512457549",
   "commits": [
-    "feat: add responsive mobile layout to filter panel, update build version, and correct Next.js type reference path",
-    "feat: add 1d_discrete timeframe support and drill-down navigation for daily chart data",
-    "feat: add percentage toggle to net worth chart, update Sankey tooltip positioning, and bump build version",
-    "feat: add percentage-based change toggle to net worth chart and improve axis formatting logic",
-    "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic."
+    "feat: add Best auto-calculated option to frequency select for real estate accounts",
+    "refactor: update chart date formatting and improve responsiveness for account page components",
+    "feat: introduce dynamic best sync frequency for real estate accounts with interval auto-calculation",
+    "feat: align daily sync schedule to run one hour before user-configured alert time",
+    "feat: migrate filter panel toggles to Switch components and modernize account filter UI in Cash Flow chart"
   ]
 }

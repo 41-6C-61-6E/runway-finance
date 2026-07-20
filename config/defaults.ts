@@ -193,7 +193,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'locale', label: 'Locale', description: 'Locale string for date/number formatting', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.locale },
   { key: 'timezone', label: 'Timezone', description: 'IANA timezone identifier', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.timezone },
   { key: 'dateFormat', label: 'Date Format', description: 'Date display format string', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.dateFormat },
-  { key: 'privacyMode', label: 'Privacy Mode', description: 'Blur financial data when showing the app to others', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.privacyMode },
+  { key: 'privacyMode', label: 'Privacy Mode', description: 'Pixelate financial data when showing the app to others', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.privacyMode },
   { key: 'reduceTransparency', label: 'Reduce Transparency', description: 'Use solid backgrounds instead of glass/transparent', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.reduceTransparency },
   { key: 'hideAccountSubheadings', label: 'Hide Account Subheadings', description: 'Group accounts by major category only', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.hideAccountSubheadings },
   { key: 'hideAccountsSidebarByDefault', label: 'Hide Accounts Sidebar by Default', description: 'Start with the accounts sidebar collapsed on all pages', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.hideAccountsSidebarByDefault },
