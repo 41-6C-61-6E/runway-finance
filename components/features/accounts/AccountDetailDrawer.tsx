@@ -119,6 +119,8 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [majorType, setMajorType] = useState('banking');
   const [isHidden, setIsHidden] = useState(account?.isHidden ?? false);
   const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account?.isExcludedFromNetWorth ?? false);
+  const [splitRoth, setSplitRoth] = useState(false);
+  const [rothPercentage, setRothPercentage] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [mortgageMeta, setMortgageMeta] = useState<Record<string, string>>({});
@@ -318,10 +320,14 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     }
 
     if (isInvestmentAccount(account.type)) {
-      const meta = (account.metadata ?? {}) as any;
-      setIgnoreSettlementTransactions(!!meta.ignoreSettlementTransactions);
+      setIgnoreSettlementTransactions(!!mObj.ignoreSettlementTransactions);
+      const hasRothSplit = typeof mObj.rothPercentage === 'number';
+      setSplitRoth(hasRothSplit);
+      setRothPercentage(hasRothSplit ? mObj.rothPercentage : 50);
     } else {
       setIgnoreSettlementTransactions(false);
+      setSplitRoth(false);
+      setRothPercentage(0);
     }
   }, [account, open]);
 
@@ -384,10 +390,16 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           payload.balance = '0';
         }
       } else if (isInvestmentAccount(type)) {
-        payload.metadata = {
+        const metadata: Record<string, any> = {
           ...baseMetadata,
           ignoreSettlementTransactions,
         };
+        if (splitRoth) {
+          metadata.rothPercentage = Math.max(0, Math.min(100, Number(rothPercentage) || 0));
+        } else {
+          delete metadata.rothPercentage;
+        }
+        payload.metadata = metadata;
       } else {
         payload.metadata = baseMetadata;
       }
@@ -408,7 +420,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, muteSyncWarnings, onSuccess, queryClient]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, muteSyncWarnings, onSuccess, queryClient, splitRoth, rothPercentage]);
 
   if (!account || !open) return null;
 
@@ -718,6 +730,82 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                     <span className="text-foreground font-mono text-xs">{String(value)}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Tax Wrapper Split (for Investment Accounts) */}
+            {isInvestmentAccount(type) && (
+              <div className="p-4 bg-muted/20 border border-border rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tax Status Splitting</span>
+                    <p className="text-[11px] text-muted-foreground">
+                      Does this account contain both Roth and Non-Roth contributions?
+                    </p>
+                  </div>
+                  <Switch
+                    checked={splitRoth}
+                    onCheckedChange={(checked) => {
+                      setSplitRoth(checked);
+                      if (checked && !rothPercentage) {
+                        setRothPercentage(50);
+                      }
+                    }}
+                  />
+                </div>
+
+                {splitRoth && (
+                  <div className="space-y-3 pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">Roth Portion</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={rothPercentage}
+                          onChange={(e) => {
+                            const val = Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
+                            setRothPercentage(val);
+                          }}
+                          className="w-16 px-2 py-1 bg-background border border-input rounded text-right font-mono text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={rothPercentage}
+                      onChange={(e) => setRothPercentage(parseInt(e.target.value, 10))}
+                      className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+
+                    {/* Split preview */}
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                      <div className="p-2 bg-background border border-border rounded-lg text-center">
+                        <div className="text-[10px] text-muted-foreground font-sans">Roth (Tax-Free)</div>
+                        <div className="font-bold text-chart-1 mt-0.5">
+                          {rothPercentage}%
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatBalance(String((parseFloat(account.balance) * rothPercentage) / 100), account.currency).text}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-background border border-border rounded-lg text-center">
+                        <div className="text-[10px] text-muted-foreground font-sans">Non-Roth (Traditional)</div>
+                        <div className="font-bold text-chart-2 mt-0.5">
+                          {100 - rothPercentage}%
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatBalance(String((parseFloat(account.balance) * (100 - rothPercentage)) / 100), account.currency).text}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
