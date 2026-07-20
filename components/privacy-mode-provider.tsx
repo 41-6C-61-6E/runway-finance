@@ -65,6 +65,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
   // Canvas-based pixelation: renders text on a tiny canvas and scales up
   // with nearest-neighbor interpolation to create blocky pixel blocks.
+  // Trivial change to trigger workflow run.
   useEffect(() => {
     if (loading) return;
 
