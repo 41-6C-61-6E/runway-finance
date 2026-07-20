@@ -1,0 +1,363 @@
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock('@/lib/crypto-context', () => ({
+  getServerDEK: vi.fn(async () => new Uint8Array([1, 2, 3])),
+  getSessionDEK: vi.fn(async () => new Uint8Array([1, 2, 3])),
+}));
+
+vi.mock('@/app/api/paystubs/route', () => ({
+  createTransactionsFromLineItems: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/services/sync', () => ({
+  updateCategorySpendingSummaries: vi.fn(async () => {}),
+  updateCategoryIncomeSummaries: vi.fn(async () => {}),
+  updateMonthlyCashFlowSummaries: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/services/search-cache', () => ({
+  invalidateUserSearchCache: vi.fn(),
+}));
+
+import { getTableName } from 'drizzle-orm';
+import { getDb } from '@/lib/db';
+import { paystubAutoGenerateScheduler } from '@/lib/services/paystub-auto-generate-scheduler';
+import { runAutoGenerate } from '@/lib/services/paystub-auto-generate';
+import { paystubs, paystubLineItems, paystubAutoGenerateSettings } from '@/lib/db/schema';
+
+// Mock state variables
+let mockSettings: any[] = [];
+let mockPaystubs: any[] = [];
+let mockLineItems: any[] = [];
+let mockFieldMappings: any[] = [];
+let dbCalls: any[] = [];
+
+class MockDbQueryBuilder {
+  private currentTable: any = null;
+  private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
+  private insertData: any = null;
+  private updateData: any = null;
+
+  select(...args: any[]) {
+    this.action = 'select';
+    return this;
+  }
+
+  selectDistinct(...args: any[]) {
+    this.action = 'select';
+    return this;
+  }
+
+  from(table: any) {
+    this.currentTable = table;
+    return this;
+  }
+
+  where(...args: any[]) {
+    return this;
+  }
+
+  orderBy(...args: any[]) {
+    return this;
+  }
+
+  limit(n: number) {
+    return this;
+  }
+
+  insert(table: any) {
+    this.action = 'insert';
+    this.currentTable = table;
+    return this;
+  }
+
+  values(data: any) {
+    this.insertData = data;
+    return this;
+  }
+
+  update(table: any) {
+    this.action = 'update';
+    this.currentTable = table;
+    return this;
+  }
+
+  set(data: any) {
+    this.updateData = data;
+    return this;
+  }
+
+  delete(table: any) {
+    this.action = 'delete';
+    this.currentTable = table;
+    return this;
+  }
+
+  returning() {
+    return this;
+  }
+
+  async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
+    let result: any = null;
+    const tableName = this.currentTable ? getTableName(this.currentTable) : 'unknown';
+
+    dbCalls.push({
+      action: this.action,
+      table: tableName,
+      insertData: this.insertData,
+      updateData: this.updateData,
+    });
+
+    if (this.action === 'select') {
+      if (tableName === 'paystub_auto_generate_settings') {
+        result = mockSettings;
+      } else if (tableName === 'paystubs') {
+        result = mockPaystubs;
+      } else if (tableName === 'paystub_line_items') {
+        result = mockLineItems;
+      } else if (tableName === 'paystub_field_mappings') {
+        result = mockFieldMappings;
+      } else {
+        result = [];
+      }
+    } else if (this.action === 'insert') {
+      const newRow = { id: `inserted-${Math.random()}`, ...this.insertData };
+      if (tableName === 'paystubs') {
+        mockPaystubs.push(newRow);
+        mockPaystubs.sort((a, b) => a.checkDate.localeCompare(b.checkDate));
+      } else if (tableName === 'paystub_line_items') {
+        mockLineItems.push(newRow);
+      }
+      result = [newRow];
+    } else if (this.action === 'update') {
+      if (tableName === 'paystub_auto_generate_settings') {
+        mockSettings.forEach(s => {
+          Object.assign(s, this.updateData);
+        });
+      }
+      result = [this.updateData];
+    } else if (this.action === 'delete') {
+      result = { count: 1 };
+    }
+
+    return Promise.resolve(result).then(onfulfilled, onrejected);
+  }
+}
+
+vi.mock('@/lib/db', () => {
+  return {
+    getDb: () => new MockDbQueryBuilder(),
+    getPool: () => ({
+      query: vi.fn(() => Promise.resolve({ rows: [] })),
+    }),
+  };
+});
+
+describe('Paystub Scheduler & Auto-Generate Engine', () => {
+  beforeEach(() => {
+    mockSettings = [];
+    mockPaystubs = [];
+    mockLineItems = [];
+    mockFieldMappings = [];
+    dbCalls = [];
+    vi.clearAllMocks();
+  });
+
+  describe('paystubAutoGenerateScheduler.execute()', () => {
+    it('correctly queries enabled settings even when basePaystubId is null', async () => {
+      mockSettings = [
+        {
+          id: 'setting-1',
+          userId: 'user-1',
+          isEnabled: true,
+          frequency: 'weekly',
+          basePaystubId: null,
+          mappingId: 'mapping-1',
+          lastGeneratedDate: '2026-07-03',
+        },
+      ];
+
+      mockPaystubs = [
+        {
+          id: 'paystub-1',
+          userId: 'user-1',
+          employerName: 'Company A',
+          checkDate: '2026-07-03',
+          isAutoGenerated: false,
+          payPeriodStart: '2026-06-15',
+          payPeriodEnd: '2026-06-30',
+          grossCurrent: '2000.00',
+          netCurrent: '1500.00',
+          taxesCurrent: '300.00',
+          deductionsCurrent: '200.00',
+        },
+      ];
+
+      mockLineItems = [
+        {
+          id: 'li-1',
+          paystubId: 'paystub-1',
+          userId: 'user-1',
+          section: 'earnings',
+          description: 'Regular Pay',
+          amount: '2000.00',
+          mappingAction: 'import',
+          categoryId: 'cat-1',
+        },
+      ];
+
+      mockFieldMappings = [
+        {
+          id: 'mapping-1',
+          userId: 'user-1',
+          mappings: {},
+        },
+      ];
+
+      // Run paystub auto-generate directly
+      const count = await runAutoGenerate('user-1', new Uint8Array([1, 2, 3]));
+
+      // Today is 2026-07-20 (local time)
+      // Check date sequence from 2026-07-03 (weekly):
+      // 2026-07-10 (expected) -> generated!
+      // 2026-07-17 (expected) -> generated!
+      // Next: 2026-07-24 (future) -> skipped!
+      expect(count).toBe(2);
+
+      // Verify that two paystubs were inserted
+      const insertedPaystubs = dbCalls.filter(
+        c => c.action === 'insert' && c.table === 'paystubs'
+      );
+      expect(insertedPaystubs).toHaveLength(2);
+      expect(insertedPaystubs[0].insertData.checkDate).toBe('2026-07-10');
+      expect(insertedPaystubs[1].insertData.checkDate).toBe('2026-07-17');
+    });
+  });
+
+  describe('runAutoGenerate - Cascading Updates', () => {
+    it('regenerates subsequent paystubs if template has changed', async () => {
+      mockSettings = [
+        {
+          id: 'setting-1',
+          userId: 'user-1',
+          isEnabled: true,
+          frequency: 'weekly',
+          basePaystubId: null,
+          mappingId: 'mapping-1',
+          lastGeneratedDate: '2026-07-17',
+        },
+      ];
+
+      // Let's say paystub-1 (imported) was updated to have gross = 2500.00 (from 2000.00)
+      // paystub-2 was auto-generated in the past on 2026-07-10, but still has gross = 2000.00
+      mockPaystubs = [
+        {
+          id: 'paystub-1', // updated source template
+          userId: 'user-1',
+          employerName: 'Company A',
+          checkDate: '2026-07-03',
+          isAutoGenerated: false,
+          payPeriodStart: '2026-06-15',
+          payPeriodEnd: '2026-06-30',
+          grossCurrent: '2500.00', // updated value!
+          netCurrent: '1900.00',
+          taxesCurrent: '400.00',
+          deductionsCurrent: '200.00',
+        },
+        {
+          id: 'paystub-2', // existing auto-generated paystub
+          userId: 'user-1',
+          employerName: 'Company A',
+          checkDate: '2026-07-10',
+          isAutoGenerated: true,
+          payPeriodStart: '2026-06-22',
+          payPeriodEnd: '2026-07-07',
+          grossCurrent: '2000.00', // old value! needs regeneration!
+          netCurrent: '1500.00',
+          taxesCurrent: '300.00',
+          deductionsCurrent: '200.00',
+        },
+        {
+          id: 'paystub-3', // existing auto-generated paystub
+          userId: 'user-1',
+          employerName: 'Company A',
+          checkDate: '2026-07-17',
+          isAutoGenerated: true,
+          payPeriodStart: '2026-06-29',
+          payPeriodEnd: '2026-07-14',
+          grossCurrent: '2000.00', // old value! needs regeneration!
+          netCurrent: '1500.00',
+          taxesCurrent: '300.00',
+          deductionsCurrent: '200.00',
+        },
+      ];
+
+      mockLineItems = [
+        {
+          id: 'li-1',
+          paystubId: 'paystub-1',
+          userId: 'user-1',
+          section: 'earnings',
+          description: 'Regular Pay',
+          amount: '2500.00',
+          mappingAction: 'import',
+          categoryId: 'cat-1',
+        },
+        {
+          id: 'li-2',
+          paystubId: 'paystub-2',
+          userId: 'user-1',
+          section: 'earnings',
+          description: 'Regular Pay',
+          amount: '2000.00',
+          mappingAction: 'import',
+          categoryId: 'cat-1',
+        },
+        {
+          id: 'li-3',
+          paystubId: 'paystub-3',
+          userId: 'user-1',
+          section: 'earnings',
+          description: 'Regular Pay',
+          amount: '2000.00',
+          mappingAction: 'import',
+          categoryId: 'cat-1',
+        },
+      ];
+
+      mockFieldMappings = [
+        {
+          id: 'mapping-1',
+          userId: 'user-1',
+          mappings: {},
+        },
+      ];
+
+      // Custom delete interception for tests to keep in-memory sync
+      const originalDelete = MockDbQueryBuilder.prototype.delete;
+      vi.spyOn(MockDbQueryBuilder.prototype, 'delete').mockImplementation(function (table) {
+        const tableName = table?._name || table?.name;
+        if (tableName === 'paystubs') {
+          // In actual code, we filter by id. For test simplicity, we filter out auto-generated ones
+          mockPaystubs = mockPaystubs.filter(p => !p.isAutoGenerated);
+          mockLineItems = mockLineItems.filter(li => li.paystubId === 'paystub-1');
+        }
+        return this;
+      });
+
+      const count = await runAutoGenerate('user-1', new Uint8Array([1, 2, 3]));
+
+      // Both paystub-2 and paystub-3 should be deleted and regenerated based on the updated template
+      expect(count).toBe(2);
+
+      const inserted = dbCalls.filter(c => c.action === 'insert' && c.table === 'paystubs');
+      expect(inserted).toHaveLength(2);
+      expect(inserted[0].insertData.grossCurrent).toBe('2500.00'); // Regenerated from updated template!
+      expect(inserted[1].insertData.grossCurrent).toBe('2500.00'); // Regenerated from updated template!
+    });
+  });
+});

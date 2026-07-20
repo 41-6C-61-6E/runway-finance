@@ -33,16 +33,11 @@ class PaystubAutoGenerateScheduler {
     try {
       const db = getDb();
 
-      // Find all users with enabled auto-generate settings that have a base paystub
+      // Find all users with enabled auto-generate settings
       const userIds = await db
         .selectDistinct({ userId: paystubAutoGenerateSettings.userId })
         .from(paystubAutoGenerateSettings)
-        .where(
-          and(
-            eq(paystubAutoGenerateSettings.isEnabled, true),
-            isNotNull(paystubAutoGenerateSettings.basePaystubId),
-          )
-        )
+        .where(eq(paystubAutoGenerateSettings.isEnabled, true))
         .then(rows => rows.map(r => r.userId));
 
       if (userIds.length === 0) {
