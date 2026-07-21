@@ -1,4 +1,4 @@
-import { EnginePlan, runRetirementSimulation } from './retirement-engine';
+import { EnginePlan, EngineAccount, runRetirementSimulation } from './retirement-engine';
 import { HISTORICAL_RETURNS_DATA } from '@/lib/constants/retirement-defaults';
 
 export interface MonteCarloOptions {
@@ -50,30 +50,37 @@ export function runMonteCarloSimulation(
   const trials: MonteCarloTrialResult[] = [];
 
   for (let t = 0; t < trialsCount; t++) {
-    // Clone plan and apply randomized returns to accounts
     const trialPlan: EnginePlan = JSON.parse(JSON.stringify(basePlan));
 
-    if (model === 'normal_distribution') {
-      for (const acc of trialPlan.accounts) {
-        // Box-muller transform for normal distribution
+    // Generate random yearly return sequence for this trial
+    const totalYears = Math.max(1, (basePlan.lifeExpectancyAge || 100) - ((new Date().getFullYear()) - (basePlan.primaryBirthYear || 1985)));
+    
+    // Sample a random historical year per yearOffset or normal return per yearOffset
+    const yearlyMarketData: Array<{ growth: number; dividend: number }> = [];
+    for (let y = 0; y < totalYears; y++) {
+      if (model === 'normal_distribution') {
         const u1 = Math.random();
         const u2 = Math.random();
         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        const randomReturn = (meanReturn + stdDev * z) * 100;
-        acc.expectedGrowthRate = Math.max(-30, Math.min(50, randomReturn));
-      }
-    } else if (model === 'historical_bootstrap') {
-      const randomIndex = Math.floor(Math.random() * HISTORICAL_RETURNS_DATA.length);
-      const histData = HISTORICAL_RETURNS_DATA[randomIndex];
-      for (const acc of trialPlan.accounts) {
-        if (acc.type === 'taxable' || acc.type === 'crypto' || acc.type.includes('ira') || acc.type.includes('401k')) {
-          acc.expectedGrowthRate = histData.stocksGrowth * 100;
-          acc.dividendYield = histData.stocksYield * 100;
-        }
+        const randomReturn = meanReturn + stdDev * z;
+        yearlyMarketData.push({ growth: Math.max(-0.35, Math.min(0.45, randomReturn)), dividend: 0.015 });
+      } else {
+        const randomIndex = Math.floor(Math.random() * HISTORICAL_RETURNS_DATA.length);
+        const histData = HISTORICAL_RETURNS_DATA[randomIndex];
+        yearlyMarketData.push({ growth: histData.stocksGrowth, dividend: histData.stocksYield });
       }
     }
 
-    const simRes = runRetirementSimulation(trialPlan);
+    const yearGrowthFn = (yearOffset: number, acc: EngineAccount) => {
+      const isMarketAsset = acc.type === 'taxable' || acc.type === 'crypto' || acc.type.includes('ira') || acc.type.includes('401k');
+      if (isMarketAsset) {
+        const m = yearlyMarketData[yearOffset % yearlyMarketData.length] || { growth: 0.07, dividend: 0.02 };
+        return { growth: m.growth, dividend: m.dividend };
+      }
+      return { growth: (acc.expectedGrowthRate || 2.0) / 100, dividend: (acc.dividendYield || 0.0) / 100 };
+    };
+
+    const simRes = runRetirementSimulation(trialPlan, yearGrowthFn);
     trials.push({
       trialIndex: t,
       yearlyNetWorth: simRes.yearlyResults.map((y) => y.netWorth),
@@ -90,13 +97,12 @@ export function runMonteCarloSimulation(
   const endingNetWorths = trials.map((t) => t.endingNetWorth).sort((a, b) => a - b);
   const medianLegacy = endingNetWorths[Math.floor(trialsCount * 0.5)] ?? 0;
   const averageLegacy = endingNetWorths.reduce((a, b) => a + b, 0) / trialsCount;
-  const worstCaseLegacy = endingNetWorths[0] ?? 0;
-  const bestCaseLegacy = endingNetWorths[endingNetWorths.length - 1] ?? 0;
+  const worstCaseLegacy = endingNetWorths[Math.floor(trialsCount * 0.1)] ?? 0;
+  const bestCaseLegacy = endingNetWorths[Math.floor(trialsCount * 0.9)] ?? 0;
 
   const depletionAges = trials.map((t) => t.depletionAge).filter((a): a is number => a !== undefined).sort((a, b) => a - b);
   const medianDepletionAge = depletionAges.length > 0 ? depletionAges[Math.floor(depletionAges.length / 2)] : undefined;
 
-  // Calculate percentiles per year
   const numYears = trials[0]?.yearlyNetWorth.length ?? 0;
   const years = Array.from({ length: numYears }, (_, i) => (basePlan.primaryBirthYear + (new Date().getFullYear() - basePlan.primaryBirthYear) + i));
 
