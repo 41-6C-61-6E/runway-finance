@@ -20,6 +20,7 @@ import {
   CandlestickChart,
   Minus,
   ArrowLeftRight,
+  Flame,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 
@@ -45,7 +46,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic', category: 'finances' },
   { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'finances' },
   { id: 'ai-suggestions', href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings', category: 'finances' },
-  { id: 'plans', href: '/plans', label: 'Plans', icon: LayoutDashboard, pageKey: 'plans', category: 'planning' },
+  { id: 'plans', href: '/plans', label: 'FIRE', icon: Flame, pageKey: 'plans', category: 'planning' },
 ];
 
 export function MobileNav() {
