@@ -47,6 +47,7 @@ export const planAccounts = pgTable('plan_accounts', {
   reinvestDividends: boolean('reinvest_dividends').notNull().default(true),
   qualifiedDividendRatio: text('qualified_dividend_ratio').notNull().default('1.0'),
   rothPercentage: integer('roth_percentage'), // For mixed 401(k)s
+  isIncluded: boolean('is_included').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

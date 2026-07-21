@@ -27,20 +27,23 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decFlows = await Promise.all(rawFlows.map((f) => decryptRow('plan_flows', f, dek)));
   const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
 
+  // Filter only included accounts for the retirement simulation engine
+  const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
+
   const enginePlan: EnginePlan = {
     id: decPlan.id,
     name: decPlan.name,
-    hasSpouse: decPlan.hasSpouse,
-    primaryBirthYear: decPlan.primaryBirthYear,
-    primaryBirthMonth: decPlan.primaryBirthMonth,
-    spouseBirthYear: decPlan.spouseBirthYear,
-    spouseBirthMonth: decPlan.spouseBirthMonth,
-    filingStatus: decPlan.filingStatus,
-    retirementAge: decPlan.retirementAge,
-    lifeExpectancyAge: decPlan.lifeExpectancyAge,
-    withdrawalMethod: decPlan.withdrawalMethod,
+    hasSpouse: Boolean(decPlan.hasSpouse),
+    primaryBirthYear: Number(decPlan.primaryBirthYear) || 1985,
+    primaryBirthMonth: Number(decPlan.primaryBirthMonth) || 1,
+    spouseBirthYear: decPlan.spouseBirthYear ? Number(decPlan.spouseBirthYear) : undefined,
+    spouseBirthMonth: decPlan.spouseBirthMonth ? Number(decPlan.spouseBirthMonth) : undefined,
+    filingStatus: decPlan.filingStatus || 'single',
+    retirementAge: Number(decPlan.retirementAge) || 60,
+    lifeExpectancyAge: Number(decPlan.lifeExpectancyAge) || 100,
+    withdrawalMethod: decPlan.withdrawalMethod || 'textbook',
     customWithdrawalOrder: Array.isArray(decPlan.customWithdrawalOrder) ? decPlan.customWithdrawalOrder : undefined,
-    accounts: decAccounts.map((a) => ({
+    accounts: activeAccounts.map((a) => ({
       id: a.id,
       name: a.name,
       type: a.type,
@@ -97,7 +100,10 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
 
   return {
     ...decPlan,
-    accounts: decAccounts,
+    accounts: decAccounts.map((a) => ({
+      ...a,
+      isIncluded: a.isIncluded !== false,
+    })),
     events: decEvents,
     flows: decFlows,
     settings: decSettings,
@@ -114,7 +120,29 @@ export async function GET(req: NextRequest) {
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
     // Fetch user plans
-    const dbPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId));
+    let dbPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId));
+
+    // If user has no plans, auto-create a Default Plan populated with user finances
+    if (dbPlans.length === 0) {
+      const encryptedValues = await encryptRow('plans', {
+        userId: dataUserId,
+        name: 'Default Plan',
+        hasSpouse: false,
+        primaryBirthYear: 1985,
+        primaryBirthMonth: 1,
+        country: 'US',
+        filingStatus: 'single',
+        retirementAge: 60,
+        lifeExpectancyAge: 100,
+        fiTargetMultiplier: 25,
+        withdrawalMethod: 'textbook',
+        isDefault: true,
+      }, dek);
+
+      const inserted = await getDb().insert(plans).values(encryptedValues).returning();
+      await populatePlanWithUserFinances(inserted[0].id, dataUserId, dek);
+      dbPlans = inserted;
+    }
 
     const decryptedPlans = await Promise.all(
       dbPlans.map((p) => hydratePlan(p, dek))
@@ -140,7 +168,7 @@ export async function POST(req: NextRequest) {
 
     const encryptedValues = await encryptRow('plans', {
       userId: dataUserId,
-      name: name || 'Primary Plan',
+      name: name || 'Default Plan',
       hasSpouse: false,
       primaryBirthYear: 1985,
       primaryBirthMonth: 1,
@@ -208,9 +236,29 @@ export async function PUT(req: NextRequest) {
     if (Object.keys(planUpdates).length > 0) {
       planUpdates.updatedAt = new Date();
       const encrypted = await encryptRow('plans', { ...planUpdates, userId: dataUserId }, dek);
-      // Remove userId from encrypted since it's not being updated
       delete encrypted.userId;
       await getDb().update(plans).set(encrypted).where(eq(plans.id, planId));
+    }
+
+    // Handle toggling account inclusion
+    if (updates.toggleAccountId) {
+      const targetAcc = await getDb().select().from(planAccounts)
+        .where(and(eq(planAccounts.id, updates.toggleAccountId), eq(planAccounts.planId, planId)))
+        .limit(1);
+
+      if (targetAcc[0]) {
+        const decAcc = await decryptRow('plan_accounts', targetAcc[0], dek);
+        const newIncluded = updates.isIncluded !== undefined ? updates.isIncluded : !decAcc.isIncluded;
+        const encAcc = await encryptRow('plan_accounts', {
+          ...decAcc,
+          isIncluded: newIncluded,
+          userId: dataUserId,
+          planId,
+        }, dek);
+        delete encAcc.userId;
+        delete encAcc.planId;
+        await getDb().update(planAccounts).set(encAcc).where(eq(planAccounts.id, updates.toggleAccountId));
+      }
     }
 
     // Handle settings updates
@@ -224,6 +272,65 @@ export async function PUT(req: NextRequest) {
         delete encSettings.userId;
         delete encSettings.planId;
         await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, planId));
+      }
+    }
+
+    // Handle updating an existing event (income or expense)
+    if (updates.updateEvent) {
+      const ev = updates.updateEvent;
+      const existingEv = await getDb().select().from(planEvents)
+        .where(and(eq(planEvents.id, ev.id), eq(planEvents.planId, planId)))
+        .limit(1);
+
+      if (existingEv[0]) {
+        const decEv = await decryptRow('plan_events', existingEv[0], dek);
+        const updatedValues = {
+          ...decEv,
+          name: ev.name !== undefined ? ev.name : decEv.name,
+          amount: ev.amount !== undefined ? String(ev.amount) : decEv.amount,
+          category: ev.category !== undefined ? ev.category : decEv.category,
+          type: ev.type !== undefined ? ev.type : decEv.type,
+          growthRate: ev.growthRate !== undefined ? String(ev.growthRate) : decEv.growthRate,
+          adjustForInflation: ev.adjustForInflation !== undefined ? ev.adjustForInflation : decEv.adjustForInflation,
+          startTriggerType: ev.startTriggerType !== undefined ? ev.startTriggerType : decEv.startTriggerType,
+          startTriggerValue: ev.startTriggerValue !== undefined ? String(ev.startTriggerValue) : decEv.startTriggerValue,
+          endTriggerType: ev.endTriggerType !== undefined ? ev.endTriggerType : decEv.endTriggerType,
+          endTriggerValue: ev.endTriggerValue !== undefined ? String(ev.endTriggerValue) : decEv.endTriggerValue,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId,
+        };
+        const encEv = await encryptRow('plan_events', updatedValues, dek);
+        delete encEv.userId;
+        delete encEv.planId;
+        await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, ev.id));
+      }
+    }
+
+    // Handle updating an existing flow (savings rule)
+    if (updates.updateFlow) {
+      const fl = updates.updateFlow;
+      const existingFl = await getDb().select().from(planFlows)
+        .where(and(eq(planFlows.id, fl.id), eq(planFlows.planId, planId)))
+        .limit(1);
+
+      if (existingFl[0]) {
+        const decFl = await decryptRow('plan_flows', existingFl[0], dek);
+        const updatedValues = {
+          ...decFl,
+          name: fl.name !== undefined ? fl.name : decFl.name,
+          type: fl.type !== undefined ? fl.type : decFl.type,
+          rank: fl.rank !== undefined ? fl.rank : decFl.rank,
+          ruleType: fl.ruleType !== undefined ? fl.ruleType : decFl.ruleType,
+          ruleValue: fl.ruleValue !== undefined ? String(fl.ruleValue) : decFl.ruleValue,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId,
+        };
+        const encFl = await encryptRow('plan_flows', updatedValues, dek);
+        delete encFl.userId;
+        delete encFl.planId;
+        await getDb().update(planFlows).set(encFl).where(eq(planFlows.id, fl.id));
       }
     }
 
