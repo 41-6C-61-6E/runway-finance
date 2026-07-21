@@ -178,11 +178,35 @@ export default function PlansPage() {
                 The engine will auto-populate your data and run a full simulation.
               </p>
               <button
-                onClick={openNewPlanModal}
-                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                onClick={async () => {
+                  setCreating(true);
+                  try {
+                    const res = await fetch('/api/retirement/plans', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        name: 'Default Plan',
+                        retirementAge: 60,
+                      }),
+                    });
+                    if (res.ok) {
+                      const newPlan = await res.json();
+                      setPlansList((prev) => [...prev, newPlan]);
+                      setSelectedPlanId(newPlan.id);
+                      setActiveTab('projection');
+                      setShowCreateModal(false);
+                    }
+                  } catch (err) {
+                    console.error('Failed to create default plan', err);
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+                disabled={creating}
+                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                Create Default Plan
+                {creating ? 'Creating Default Plan...' : 'Create Default Plan'}
               </button>
             </div>
           </div>

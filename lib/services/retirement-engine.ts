@@ -74,7 +74,7 @@ export interface EnginePlan {
   filingStatus: string;
   retirementAge: number;
   lifeExpectancyAge: number;
-  withdrawalMethod: string; // 'textbook' | 'proportional' | 'custom_order'
+  withdrawalMethod: string; // 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order'
   customWithdrawalOrder?: string[];
   accounts: EngineAccount[];
   liabilities: EngineLiability[];
@@ -91,8 +91,19 @@ export interface EnginePlan {
     realEstateLiquidationRate: number;
     administrativeCostRate: number;
     charitableGiving: number;
+    withdrawalMethod?: 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order';
+    enableRothConversions?: boolean;
+    rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'irmaa_tier1';
+    avoidIrmaaCliffs?: boolean;
   };
   rules?: typeof DEFAULT_2026_RULES;
+}
+
+export interface AccountDrawdownDetail {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  amount: number;
 }
 
 export interface YearlySimulationResult {
@@ -128,6 +139,18 @@ export interface YearlySimulationResult {
     hsa: number;
     cash: number;
   };
+  accountDrawdowns: AccountDrawdownDetail[];
+  drawdownsByType: {
+    cash: number;
+    taxable: number;
+    traditional: number;
+    roth: number;
+    hsa: number;
+  };
+  rothConversionAmount: number;
+  magi: number;
+  irmaaTier: number;
+  irmaaSurchargeAnnual: number;
   milestonesReached: string[];
 }
 
@@ -140,74 +163,63 @@ export interface SimulationOutput {
   depletionAge?: number;
 }
 
-export type YearGrowthFn = (yearOffset: number, acc: EngineAccount) => { growth: number; dividend: number };
+export function runRetirementSimulation(
+  plan: EnginePlan,
+  yearGrowthFn?: (yearIndex: number, acc: EngineAccount) => { growth: number; dividend: number }
+): SimulationOutput {
+  const currentYear = new Date().getFullYear();
+  const primaryBirthYear = plan.primaryBirthYear || 1985;
+  const startAge = currentYear - primaryBirthYear;
+  const maxYears = Math.max(1, (plan.lifeExpectancyAge || 100) - startAge);
 
-function getSsClaimingMultiplier(claimingAge: number): number {
-  if (claimingAge <= 62) return 0.70;
-  if (claimingAge === 63) return 0.75;
-  if (claimingAge === 64) return 0.80;
-  if (claimingAge === 65) return 0.8667;
-  if (claimingAge === 66) return 0.9333;
-  if (claimingAge === 67) return 1.00;
-  if (claimingAge === 68) return 1.08;
-  if (claimingAge === 69) return 1.16;
-  return 1.24; // Age 70+
-}
-
-export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGrowthFn): SimulationOutput {
-  const currentCalendarYear = new Date().getFullYear();
-  const primaryBirthYear = Number(plan.primaryBirthYear) || 1985;
-  const currentAge = currentCalendarYear - primaryBirthYear;
-  const lifeExpectancyAge = Number(plan.lifeExpectancyAge) || 100;
-  const isMfj = plan.filingStatus === 'married_joint' || Boolean(plan.hasSpouse);
-  const spouseRetirementAge = Number(plan.spouseRetirementAge) || Number(plan.retirementAge) || 60;
-  const spouseLifeExpectancyAge = Number(plan.spouseLifeExpectancyAge) || 100;
-
-  const totalYears = Math.max(1, lifeExpectancyAge - currentAge);
+  const isMfj = plan.filingStatus === 'married_joint';
   const rules = plan.rules || DEFAULT_2026_RULES;
-  const inflationRate = (plan.settings?.fixedInflationRate ?? 3.0) / 100;
 
-  // Initialize account state balances
+  // Mutable deep clones of state for simulation loop
   const accountsState: Record<string, EngineAccount> = {};
   for (const acc of plan.accounts) {
     accountsState[acc.id] = { ...acc };
   }
 
-  // Initialize liabilities
   const liabilitiesState: Record<string, EngineLiability> = {};
   for (const liab of plan.liabilities) {
     liabilitiesState[liab.id] = { ...liab };
   }
 
   const yearlyResults: YearlySimulationResult[] = [];
-  let depletionAge: number | undefined = undefined;
+  let depletionAge: number | undefined;
 
-  for (let yearOffset = 0; yearOffset < totalYears; yearOffset++) {
-    const simYear = currentCalendarYear + yearOffset;
-    const primaryAge = currentAge + yearOffset;
+  // Track IRMAA surcharges queue (2-year lookback)
+  const irmaaSurchargeQueue: Record<number, number> = {};
+
+  for (let yearOffset = 0; yearOffset < maxYears; yearOffset++) {
+    const simYear = currentYear + yearOffset;
+    const primaryAge = startAge + yearOffset;
     const spouseAge = plan.spouseBirthYear ? simYear - plan.spouseBirthYear : undefined;
 
     const milestonesReached: string[] = [];
-    if (primaryAge === plan.retirementAge) milestonesReached.push('Primary Retirement Age');
-    if (spouseAge && spouseAge === spouseRetirementAge) milestonesReached.push('Spouse Retirement Age');
-    if (primaryAge === 50) milestonesReached.push('Primary Age 50 Catch-up Limits');
-    if (primaryAge === 62) milestonesReached.push('Primary Age 62 Early SS');
-    if (primaryAge === 67) milestonesReached.push('Primary Age 67 Full SS');
-    if (primaryAge === 70) milestonesReached.push('Primary Age 70 Max SS');
-    if (primaryAge === 73) milestonesReached.push('Primary Age 73 RMD');
+    if (primaryAge === plan.retirementAge) milestonesReached.push('Primary Target Retirement Age');
+    if (spouseAge !== undefined && plan.spouseRetirementAge && spouseAge === plan.spouseRetirementAge) {
+      milestonesReached.push(`${plan.spouseName || 'Spouse'} Target Retirement Age`);
+    }
 
+    const inflationRate = (plan.settings?.fixedInflationRate ?? 3.0) / 100;
     const compoundInflation = Math.pow(1 + inflationRate, yearOffset);
 
-    // 1. Calculate Gross Inflows & Social Security
+    // 0. Check IRMAA surcharges triggered from 2 years prior (age 65+)
+    const irmaaSurchargeAnnual = primaryAge >= 65 ? irmaaSurchargeQueue[simYear] || 0 : 0;
+
+    // 1. Income Events Calculation
     let salaryIncome = 0;
-    let ssIncomeFromEvents = 0;
+    let primarySsIncome = 0;
+    let spouseSsIncome = 0;
     let pensionIncome = 0;
     let otherIncome = 0;
 
-    const ssEvents = plan.events.filter((e) => e.category === 'income' && e.type === 'social_security');
+    for (const ev of plan.events) {
+      if (ev.category !== 'income') continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge)) continue;
 
-    for (const ev of plan.events.filter((e) => e.category === 'income')) {
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) continue;
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
       const inflMult = ev.adjustForInflation ? compoundInflation : 1;
@@ -215,69 +227,46 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
       if (ev.growthCap && val > ev.growthCap) val = ev.growthCap;
 
       if (ev.type === 'salary') salaryIncome += val;
-      else if (ev.type === 'social_security') ssIncomeFromEvents += val;
       else if (ev.type === 'pension') pensionIncome += val;
-      else otherIncome += val;
+      else if (ev.type === 'social_security') {
+        if (ev.owner === 'spouse') spouseSsIncome += val;
+        else primarySsIncome += val;
+      } else otherIncome += val;
     }
 
-    // Dynamic Social Security engine calculation for Primary & Spouse
-    let primarySsIncome = 0;
-    let spouseSsIncome = 0;
+    // Dynamic Social Security Start Age Overrides if configured in Plan
+    if (plan.primarySsMonthlyAmount && primaryAge >= (plan.primarySsStartAge || 67)) {
+      const baseMonthly = plan.primarySsMonthlyAmount;
+      const startAgeOpt = plan.primarySsStartAge || 67;
+      const claimingMult = getSsClaimingMultiplier(startAgeOpt);
+      primarySsIncome = baseMonthly * 12 * claimingMult * compoundInflation;
+    }
 
-    if (ssEvents.length > 0) {
-      ssIncomeFromEvents = ssEvents.reduce((sum, ev) => {
-        if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) return sum;
-        const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
-        const inflMult = ev.adjustForInflation ? compoundInflation : 1;
-        return sum + baseAmt * inflMult;
-      }, 0);
-    } else {
-      // Primary Social Security calculation
-      const primaryMonthly = plan.primarySsMonthlyAmount ?? 2500;
-      const primaryStartAge = plan.primarySsStartAge ?? 67;
-      const primaryPiaAnnual = primaryMonthly * 12 * compoundInflation;
+    if (isMfj && plan.spouseSsMonthlyAmount && spouseAge !== undefined && spouseAge >= (plan.spouseSsStartAge || 67)) {
+      const spouseMonthly = plan.spouseSsMonthlyAmount;
+      const spouseStartOpt = plan.spouseSsStartAge || 67;
+      let spouseMult = getSsClaimingMultiplier(spouseStartOpt);
 
-      if (primaryAge >= primaryStartAge && primaryAge <= lifeExpectancyAge) {
-        primarySsIncome = primaryPiaAnnual * getSsClaimingMultiplier(primaryStartAge);
-      }
-
-      // Spouse Social Security calculation
-      if (isMfj && spouseAge !== undefined && spouseAge <= spouseLifeExpectancyAge) {
-        const spouseMonthly = plan.spouseSsMonthlyAmount ?? 2000;
-        const spouseStartAge = plan.spouseSsStartAge ?? 67;
-        const spousePiaAnnual = spouseMonthly * 12 * compoundInflation;
-
-        if (spouseAge >= spouseStartAge) {
-          const ownSpouseSs = spousePiaAnnual * getSsClaimingMultiplier(spouseStartAge);
-          let spousalTopUp = 0;
-          if (plan.enableSpousalSsBenefit !== false && primaryAge >= primaryStartAge) {
-            const spousalCapMult = spouseStartAge >= 67 ? 0.50 : 0.35 + (spouseStartAge - 62) * 0.03;
-            const maxSpousalBenefit = primaryPiaAnnual * spousalCapMult;
-            spousalTopUp = Math.max(0, maxSpousalBenefit - ownSpouseSs);
-          }
-          spouseSsIncome = ownSpouseSs + spousalTopUp;
+      if (plan.enableSpousalSsBenefit !== false && plan.primarySsMonthlyAmount) {
+        const halfPrimary = plan.primarySsMonthlyAmount * 0.5;
+        if (halfPrimary > spouseMonthly) {
+          spouseSsIncome = halfPrimary * 12 * compoundInflation;
+        } else {
+          spouseSsIncome = spouseMonthly * 12 * spouseMult * compoundInflation;
         }
-      }
-
-      // Survivor Protection: If one spouse dies, survivor gets highest SS benefit
-      if (isMfj && spouseAge !== undefined) {
-        if (primaryAge > lifeExpectancyAge && spouseAge <= spouseLifeExpectancyAge) {
-          spouseSsIncome = Math.max(primarySsIncome, spouseSsIncome);
-          primarySsIncome = 0;
-        } else if (spouseAge > spouseLifeExpectancyAge && primaryAge <= lifeExpectancyAge) {
-          primarySsIncome = Math.max(primarySsIncome, spouseSsIncome);
-          spouseSsIncome = 0;
-        }
+      } else {
+        spouseSsIncome = spouseMonthly * 12 * spouseMult * compoundInflation;
       }
     }
 
-    const totalSsIncome = ssEvents.length > 0 ? ssIncomeFromEvents : (primarySsIncome + spouseSsIncome);
-    const grossIncome = salaryIncome + totalSsIncome + pensionIncome + otherIncome;
+    const totalSsIncome = primarySsIncome + spouseSsIncome;
+    const grossIncome = salaryIncome + pensionIncome + totalSsIncome + otherIncome;
 
-    // 2. Calculate Scheduled Outflows
-    let livingExpenses = 0;
-    for (const ev of plan.events.filter((e) => e.category === 'expense')) {
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) continue;
+    // 2. Expense Events Calculation
+    let livingExpenses = irmaaSurchargeAnnual;
+    for (const ev of plan.events) {
+      if (ev.category !== 'expense') continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge)) continue;
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
       const inflMult = ev.adjustForInflation ? compoundInflation : 1;
@@ -340,8 +329,11 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
 
     let surplusSaved = 0;
     let deficitWithdrawn = 0;
+    const accountDrawdowns: AccountDrawdownDetail[] = [];
+    const drawdownsByType = { cash: 0, taxable: 0, traditional: 0, roth: 0, hsa: 0 };
+    let rothConversionAmount = 0;
 
-    // 4. Surplus Savings Routing or Deficit Drawdown (MFJ Limit Aware)
+    // 4. Surplus Savings Routing or Deficit Drawdown
     if (netCashFlow > 0) {
       let surplus = netCashFlow;
       const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
@@ -367,7 +359,6 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
         surplusSaved += alloc;
       }
 
-      // Default leftover surplus to taxable account or cash
       if (surplus > 0) {
         const taxableAcc = Object.values(accountsState).find((a) => a.type === 'taxable' || a.type === 'cash');
         if (taxableAcc) taxableAcc.balance += surplus;
@@ -377,31 +368,152 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
       let deficit = Math.abs(netCashFlow);
       deficitWithdrawn = deficit;
 
-      const accountsList = Object.values(accountsState);
-      const getDrawdownOrder = () => {
-        if (plan.withdrawalMethod === 'custom_order' && plan.customWithdrawalOrder?.length) {
-          return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
-        }
-        const orderMap: Record<string, number> = {
-          cash: 1,
-          taxable: 2,
-          traditional_ira: 3,
-          traditional_401k: 3,
-          roth_ira: 4,
-          roth_401k: 4,
-          hsa: 5,
-        };
-        return accountsList.sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
+      const withdrawFromAcc = (acc: EngineAccount, amt: number) => {
+        const actual = Math.min(acc.balance, amt);
+        if (actual <= 0) return 0;
+        acc.balance -= actual;
+        accountDrawdowns.push({
+          accountId: acc.id,
+          accountName: acc.name,
+          accountType: acc.type,
+          amount: actual,
+        });
+        if (acc.type === 'cash') drawdownsByType.cash += actual;
+        else if (acc.type === 'taxable' || acc.type === 'crypto') drawdownsByType.taxable += actual;
+        else if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') drawdownsByType.traditional += actual;
+        else if (acc.type === 'roth_ira' || acc.type === 'roth_401k') drawdownsByType.roth += actual;
+        else if (acc.type === 'hsa') drawdownsByType.hsa += actual;
+        return actual;
       };
 
-      const orderedAccounts = getDrawdownOrder();
-      for (const acc of orderedAccounts) {
-        if (deficit <= 0) break;
-        if (acc.balance <= 0) continue;
+      const method = plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook';
 
-        const withdrawal = Math.min(acc.balance, deficit);
-        acc.balance -= withdrawal;
-        deficit -= withdrawal;
+      if (method === 'proportional') {
+        const eligibleAccs = Object.values(accountsState).filter((a) => a.balance > 0);
+        const totalBal = eligibleAccs.reduce((s, a) => s + a.balance, 0);
+        if (totalBal > 0) {
+          let remDeficit = deficit;
+          for (const acc of eligibleAccs) {
+            if (remDeficit <= 0) break;
+            const propShare = (acc.balance / totalBal) * deficit;
+            const w = withdrawFromAcc(acc, propShare);
+            remDeficit -= w;
+          }
+          if (remDeficit > 0) {
+            for (const acc of eligibleAccs) {
+              if (remDeficit <= 0) break;
+              const w = withdrawFromAcc(acc, remDeficit);
+              remDeficit -= w;
+            }
+          }
+        }
+      } else if (method === 'tax_optimized') {
+        // Tax-Bracket Shielding: Fill 12% bracket with Traditional first, then remaining from Taxable / Roth
+        const target12Limit = 48475 * (isMfj ? 2 : 1) * compoundInflation;
+        const currentTaxable = taxableOrdinaryIncome;
+        const bracketRoom = Math.max(0, target12Limit - currentTaxable);
+
+        if (bracketRoom > 0 && deficit > 0) {
+          const tradAccs = Object.values(accountsState).filter(
+            (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+          );
+          let tradNeeded = Math.min(deficit, bracketRoom);
+          for (const acc of tradAccs) {
+            if (tradNeeded <= 0) break;
+            const w = withdrawFromAcc(acc, tradNeeded);
+            tradNeeded -= w;
+            deficit -= w;
+          }
+        }
+
+        if (deficit > 0) {
+          const remOrder = ['cash', 'taxable', 'crypto', 'roth_ira', 'roth_401k', 'hsa'];
+          const sortedAccs = Object.values(accountsState)
+            .filter((a) => a.balance > 0 && remOrder.includes(a.type))
+            .sort((a, b) => remOrder.indexOf(a.type) - remOrder.indexOf(b.type));
+          for (const acc of sortedAccs) {
+            if (deficit <= 0) break;
+            const w = withdrawFromAcc(acc, deficit);
+            deficit -= w;
+          }
+        }
+      } else {
+        // 'textbook' or 'custom_order'
+        const accountsList = Object.values(accountsState);
+        const getDrawdownOrder = () => {
+          if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
+            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
+          }
+          const orderMap: Record<string, number> = {
+            cash: 1,
+            taxable: 2,
+            traditional_ira: 3,
+            traditional_401k: 3,
+            roth_ira: 4,
+            roth_401k: 4,
+            hsa: 5,
+          };
+          return accountsList.sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
+        };
+
+        const orderedAccounts = getDrawdownOrder();
+        for (const acc of orderedAccounts) {
+          if (deficit <= 0) break;
+          if (acc.balance <= 0) continue;
+          const w = withdrawFromAcc(acc, deficit);
+          deficit -= w;
+        }
+      }
+    }
+
+    // 4b. Roth Conversion Ladder Engine (Retired, before RMD age 73)
+    const isRetired = primaryAge >= plan.retirementAge;
+    const rmdStartAge = rules.secureActRules?.rmdAge || 73;
+    if (plan.settings?.enableRothConversions && isRetired && primaryAge < rmdStartAge) {
+      let targetCeilingRate = 0.12;
+      if (plan.settings.rothConversionTargetCeiling === 'top_of_10') targetCeilingRate = 0.10;
+      else if (plan.settings.rothConversionTargetCeiling === 'top_of_22') targetCeilingRate = 0.22;
+
+      const targetBracketObj =
+        rules.ordinaryTaxBrackets.find((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01) ||
+        rules.ordinaryTaxBrackets[1];
+      const targetCeilingDollars = (targetBracketObj ? targetBracketObj.threshold : 48475) * (isMfj ? 2 : 1) * compoundInflation;
+
+      const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
+      const convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
+
+      if (convHeadroom > 500) {
+        const tradAccs = Object.values(accountsState).filter(
+          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+        );
+        const rothAcc = Object.values(accountsState).find((a) => a.type === 'roth_ira' || a.type === 'roth_401k');
+
+        if (tradAccs.length > 0 && rothAcc) {
+          let remRoom = convHeadroom;
+          for (const tradAcc of tradAccs) {
+            if (remRoom <= 0) break;
+            const convAmt = Math.min(tradAcc.balance, remRoom);
+            tradAcc.balance -= convAmt;
+            rothAcc.balance += convAmt;
+            remRoom -= convAmt;
+            rothConversionAmount += convAmt;
+          }
+        }
+      }
+    }
+
+    // 4c. Compute MAGI & Queue IRMAA Surcharges for Year Y+2
+    const magi = salaryIncome + pensionIncome + taxableSs + drawdownsByType.traditional + rothConversionAmount;
+    let irmaaTier = 0;
+    const irmaaList = rules.irmaaThresholds || [];
+    for (let idx = irmaaList.length - 1; idx >= 0; idx--) {
+      const tierObj = irmaaList[idx];
+      const limit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
+      if (magi >= limit && limit > 0) {
+        irmaaTier = idx;
+        const annualSurcharge = (tierObj.partBMonthly + tierObj.partDMonthly) * 12 * (isMfj ? 2 : 1);
+        irmaaSurchargeQueue[simYear + 2] = annualSurcharge;
+        break;
       }
     }
 
@@ -479,12 +591,18 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
         hsa: hsaTotal,
         cash: cashTotal,
       },
+      accountDrawdowns,
+      drawdownsByType,
+      rothConversionAmount,
+      magi,
+      irmaaTier,
+      irmaaSurchargeAnnual,
       milestonesReached,
     });
   }
 
   const endingNetWorth = yearlyResults.length > 0 ? yearlyResults[yearlyResults.length - 1].netWorth : 0;
-  
+
   const heirTaxRate = (plan.settings?.heirFlatIncomeTaxRate ?? 25.0) / 100;
   const adminCostRate = (plan.settings?.administrativeCostRate ?? 1.0) / 100;
   const finalResult = yearlyResults[yearlyResults.length - 1];
@@ -530,4 +648,16 @@ function isEventActive(
   }
 
   return true;
+}
+
+function getSsClaimingMultiplier(age: number): number {
+  if (age <= 62) return 0.70;
+  if (age === 63) return 0.75;
+  if (age === 64) return 0.80;
+  if (age === 65) return 0.8667;
+  if (age === 66) return 0.9333;
+  if (age === 67) return 1.00;
+  if (age === 68) return 1.08;
+  if (age === 69) return 1.16;
+  return 1.24;
 }
