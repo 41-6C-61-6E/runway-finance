@@ -484,6 +484,13 @@
       "when": 1783529142515,
       "tag": "0068_material_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1784648473097,
+      "tag": "0069_kind_sabretooth",
+      "breakpoints": true
     }
   ]
 }
