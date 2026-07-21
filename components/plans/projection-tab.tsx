@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -20,18 +20,28 @@ interface ProjectionTabProps {
 
 export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabProps) {
   const [showYearlyTable, setShowYearlyTable] = useState(false);
-  const [localRetirementAge, setLocalRetirementAge] = useState(plan?.retirementAge || 60);
+  const [localRetirementAge, setLocalRetirementAge] = useState(Number(plan?.retirementAge) || 60);
   const [localReturnRate, setLocalReturnRate] = useState(7);
-  const [sliderDirty, setSliderDirty] = useState(false);
+
+  // Sync local retirement age state when plan changes
+  useEffect(() => {
+    if (plan?.retirementAge) {
+      setLocalRetirementAge(Number(plan.retirementAge));
+    }
+  }, [plan?.retirementAge]);
 
   const simulation = plan?.simulation;
-  const yearlyResults = simulation?.yearlyResults || [];
-  const birthYear = plan?.primaryBirthYear || 1985;
+  const birthYear = Number(plan?.primaryBirthYear) || 1985;
   const currentYear = new Date().getFullYear();
   const currentAge = currentYear - birthYear;
 
-  // Compute current net worth from actual accounts
+  // Compute current net worth from included plan accounts
   const currentNetWorth = useMemo(() => {
+    if (Array.isArray(plan?.accounts) && plan.accounts.length > 0) {
+      return plan.accounts
+        .filter((acc: any) => acc.isIncluded !== false)
+        .reduce((sum: number, acc: any) => sum + (parseFloat(acc.balance) || 0), 0);
+    }
     let assets = 0;
     let liabilities = 0;
     for (const acc of accounts) {
@@ -43,53 +53,60 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       }
     }
     return assets - liabilities;
-  }, [accounts]);
+  }, [plan, accounts]);
 
-  // Chart data from simulation
+  // Real-time dynamic chart projection reacting instantly to slider changes
   const chartData = useMemo(() => {
-    if (yearlyResults.length > 0) {
-      return yearlyResults.map((y: any) => ({
-        year: y.year,
-        age: y.primaryAge,
-        label: `${y.year}`,
-        netWorth: Math.round(y.netWorth),
-        income: Math.round(y.grossIncome),
-        expenses: Math.round(y.totalExpenses + y.taxesPaid),
-        isRetired: y.primaryAge >= localRetirementAge,
-      }));
-    }
-
-    // Fallback: generate projection from current data
     const data = [];
-    let nw = Math.max(50000, currentNetWorth || 100000);
-    const annualIncome = plan?.events?.find((e: any) => e.category === 'income' && e.type === 'salary')?.amount || 85000;
-    const annualExpenses = plan?.events?.find((e: any) => e.category === 'expense')?.amount || 42500;
-    const savingsRate = Math.max(0, parseFloat(String(annualIncome)) - parseFloat(String(annualExpenses)));
+    const startNw = currentNetWorth || 100000;
+    let nw = startNw;
     const growthRate = localReturnRate / 100;
     const retAge = localRetirementAge;
-    const endAge = plan?.lifeExpectancyAge || 100;
+    const endAge = Number(plan?.lifeExpectancyAge) || 100;
+
+    // Extract income streams and living expenses from plan
+    const salaryEvent = plan?.events?.find((e: any) => e.category === 'income' && e.type === 'salary');
+    const ssEvent = plan?.events?.find((e: any) => e.category === 'income' && e.type === 'social_security');
+    const otherIncomeEvents = plan?.events?.filter((e: any) => e.category === 'income' && !['salary', 'social_security'].includes(e.type)) || [];
+    const expenseEvents = plan?.events?.filter((e: any) => e.category === 'expense') || [];
+
+    const annualSalary = parseFloat(salaryEvent?.amount || '85000');
+    const annualSS = parseFloat(ssEvent?.amount || '32000');
+    const annualOtherIncome = otherIncomeEvents.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
+    const annualExpenses = expenseEvents.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0) || 42500;
 
     for (let age = currentAge; age <= endAge; age++) {
       const year = currentYear + (age - currentAge);
+      const isRetired = age >= retAge;
+
+      let income = 0;
+      if (!isRetired) {
+        income += annualSalary;
+      }
+      if (age >= 67) {
+        income += annualSS;
+      }
+      income += annualOtherIncome;
+
       data.push({
         year,
         age,
         label: `${year}`,
         netWorth: Math.round(nw),
-        income: age < retAge ? Math.round(parseFloat(String(annualIncome))) : 32000,
-        expenses: Math.round(parseFloat(String(annualExpenses))),
-        isRetired: age >= retAge,
+        income: Math.round(income),
+        expenses: Math.round(annualExpenses),
+        isRetired,
       });
 
-      if (age < retAge) {
-        nw = nw * (1 + growthRate) + savingsRate;
-      } else {
-        const ss = age >= 67 ? 32000 : 0;
-        nw = nw * (1 + growthRate * 0.7) - (parseFloat(String(annualExpenses)) - ss);
-      }
+      // Compound net worth for next year
+      const netCashFlow = income - annualExpenses;
+      const investmentGrowth = nw * growthRate;
+      nw = nw + investmentGrowth + netCashFlow;
+      if (nw < 0) nw = 0; // Depletion floor
     }
+
     return data;
-  }, [yearlyResults, currentNetWorth, plan, localRetirementAge, localReturnRate, currentAge, currentYear]);
+  }, [currentNetWorth, plan, localRetirementAge, localReturnRate, currentAge, currentYear]);
 
   // Key metrics
   const retirementDataPoint = chartData.find((d) => d.age === localRetirementAge);
@@ -181,13 +198,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         };
       });
   }, [birthYear, localRetirementAge, currentAge, chartData]);
-
-  const handleRetirementAgeCommit = useCallback(() => {
-    if (sliderDirty) {
-      onUpdatePlan({ retirementAge: localRetirementAge });
-      setSliderDirty(false);
-    }
-  }, [localRetirementAge, sliderDirty, onUpdatePlan]);
 
   // Fully Opaque, High-Contrast Custom Tooltip
   const CustomTooltip = ({ active, payload }: any) => {
@@ -296,24 +306,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {chartData.length} years projected
             </p>
           </div>
-
-          {/* Clean Top Milestone Badges Bar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {milestoneCallouts.map((m) => {
-              const Icon = m.icon;
-              return (
-                <div
-                  key={m.age}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${m.borderColor} ${m.bgColor} transition-all`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${m.color}`} />
-                  <span className="text-[11px] font-bold text-foreground">
-                    {m.title} <span className="text-muted-foreground">({m.age})</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
         {/* Clean Chart Area */}
@@ -363,7 +355,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 const Icon = m.icon;
                 return (
                   <ReferenceDot
-                    key={m.age}
+                    key={`${m.title}-${m.age}`}
                     x={m.age}
                     y={m.projectedNW}
                     shape={(props: any) => {
@@ -421,7 +413,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             const isRetirement = m.age === localRetirementAge;
             return (
               <div
-                key={m.age}
+                key={`${m.title}-${m.age}`}
                 className={`bg-card border rounded-xl p-4 shadow-sm space-y-2 transition-all hover:border-primary/50 ${
                   isRetirement ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border'
                 }`}
@@ -474,12 +466,11 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               step="1"
               value={localRetirementAge}
               onChange={(e) => {
-                setLocalRetirementAge(parseInt(e.target.value, 10));
-                setSliderDirty(true);
+                const newAge = parseInt(e.target.value, 10);
+                setLocalRetirementAge(newAge);
+                onUpdatePlan({ retirementAge: newAge });
               }}
-              onMouseUp={handleRetirementAgeCommit}
-              onTouchEnd={handleRetirementAgeCommit}
-              className="w-full accent-primary h-2"
+              className="w-full accent-primary h-2 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground">
               <span>40</span>
@@ -493,22 +484,25 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Expected Annual Return</span>
-              <span className="font-mono font-bold text-primary text-sm">{localReturnRate}%</span>
+              <span className={`font-mono font-bold text-sm ${localReturnRate < 0 ? 'text-rose-500' : 'text-primary'}`}>
+                {localReturnRate > 0 ? `+${localReturnRate}%` : `${localReturnRate}%`}
+              </span>
             </div>
             <input
               type="range"
-              min="2"
-              max="12"
+              min="-10"
+              max="15"
               step="0.5"
               value={localReturnRate}
               onChange={(e) => setLocalReturnRate(parseFloat(e.target.value))}
-              className="w-full accent-primary h-2"
+              className="w-full accent-primary h-2 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>2%</span>
-              <span>5%</span>
-              <span>8%</span>
-              <span>12%</span>
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+              <span className="text-rose-500/80">-10%</span>
+              <span>-5%</span>
+              <span>0%</span>
+              <span>7%</span>
+              <span>15%</span>
             </div>
           </div>
         </div>
@@ -540,37 +534,33 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   <th className="p-2.5">Net Worth</th>
                   <th className="p-2.5">Income</th>
                   <th className="p-2.5">Expenses</th>
-                  <th className="p-2.5">Taxes</th>
                   <th className="p-2.5">Cash Flow</th>
                   <th className="p-2.5">Phase</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {(yearlyResults.length > 0 ? yearlyResults : chartData).map((y: any) => {
-                  const age = y.primaryAge || y.age;
-                  const isRetired = age >= localRetirementAge;
-                  const isRetirementYear = age === localRetirementAge;
+                {chartData.map((y: any) => {
+                  const isRetired = y.isRetired;
+                  const isRetirementYear = y.age === localRetirementAge;
+                  const cashFlow = y.income - y.expenses;
                   return (
                     <tr
                       key={y.year}
                       className={`hover:bg-muted/20 ${isRetirementYear ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500' : ''}`}
                     >
                       <td className="p-2.5 font-medium">{y.year}</td>
-                      <td className="p-2.5">{age}</td>
+                      <td className="p-2.5">{y.age}</td>
                       <td className="p-2.5 font-mono font-bold text-foreground">
                         {formatCurrency(y.netWorth)}
                       </td>
                       <td className="p-2.5 font-mono text-emerald-500">
-                        {formatCurrency(y.grossIncome || y.income || 0)}
+                        {formatCurrency(y.income)}
                       </td>
                       <td className="p-2.5 font-mono text-rose-500">
-                        {formatCurrency(y.totalExpenses || y.expenses || 0)}
+                        {formatCurrency(y.expenses)}
                       </td>
-                      <td className="p-2.5 font-mono text-rose-400">
-                        {formatCurrency(y.taxesPaid || 0)}
-                      </td>
-                      <td className={`p-2.5 font-mono font-bold ${(y.netCashFlow || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {formatCurrency(y.netCashFlow || 0)}
+                      <td className={`p-2.5 font-mono font-bold ${cashFlow >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {formatCurrency(cashFlow)}
                       </td>
                       <td className="p-2.5">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
