@@ -130,7 +130,9 @@ export interface SimulationOutput {
   depletionAge?: number;
 }
 
-export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
+export type YearGrowthFn = (yearOffset: number, acc: EngineAccount) => { growth: number; dividend: number };
+
+export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGrowthFn): SimulationOutput {
   const currentCalendarYear = new Date().getFullYear();
   const primaryBirthYear = plan.primaryBirthYear || 1985;
   const currentAge = currentCalendarYear - primaryBirthYear;
@@ -226,7 +228,6 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
     const taxableOrdinaryIncome = Math.max(0, salaryIncome + pensionIncome + otherIncome + ssIncome * 0.5 - stdDeduction);
 
     let ordinaryTax = 0;
-    let prevThresh = 0;
     for (const b of rules.ordinaryTaxBrackets) {
       const thresh = b.threshold * compoundInflation;
       if (taxableOrdinaryIncome > thresh) {
@@ -237,7 +238,7 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
       }
     }
 
-    const capGainsTax = 0; // calculated on withdrawals
+    const capGainsTax = 0;
     const taxesPaid = ficaTax + ordinaryTax + capGainsTax;
     const effectiveTaxRate = grossIncome > 0 ? (taxesPaid / grossIncome) * 100 : 0;
 
@@ -282,7 +283,6 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
       let deficit = Math.abs(netCashFlow);
       deficitWithdrawn = deficit;
 
-      // Drawdown logic: Textbook Order (Cash -> Taxable -> Traditional -> Roth -> HSA)
       const accountsList = Object.values(accountsState);
       const getDrawdownOrder = () => {
         if (plan.withdrawalMethod === 'custom_order' && plan.customWithdrawalOrder?.length) {
@@ -321,8 +321,18 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
     for (const accId in accountsState) {
       const acc = accountsState[accId];
       if (acc.balance > 0) {
-        const growth = acc.expectedGrowthRate / 100;
-        const divYield = acc.dividendYield / 100;
+        let growth: number;
+        let divYield: number;
+
+        if (yearGrowthFn) {
+          const res = yearGrowthFn(yearOffset, acc);
+          growth = res.growth;
+          divYield = res.dividend;
+        } else {
+          growth = acc.expectedGrowthRate / 100;
+          divYield = acc.dividendYield / 100;
+        }
+
         acc.balance = acc.balance * (1 + growth + divYield);
 
         if (acc.type === 'taxable' || acc.type === 'crypto') taxableTotal += acc.balance;
@@ -379,7 +389,6 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
 
   const endingNetWorth = yearlyResults.length > 0 ? yearlyResults[yearlyResults.length - 1].netWorth : 0;
   
-  // Calculate Net Legacy (applying estate drags)
   const heirTaxRate = (plan.settings?.heirFlatIncomeTaxRate ?? 25.0) / 100;
   const adminCostRate = (plan.settings?.administrativeCostRate ?? 1.0) / 100;
   const finalResult = yearlyResults[yearlyResults.length - 1];
@@ -399,14 +408,12 @@ export function runRetirementSimulation(plan: EnginePlan): SimulationOutput {
 }
 
 function isEventActive(ev: EngineEvent, simYear: number, primaryAge: number, retirementAge: number): boolean {
-  // Check start trigger
   if (ev.startTriggerType === 'age' && ev.startTriggerValue) {
     if (primaryAge < parseInt(ev.startTriggerValue, 10)) return false;
   } else if (ev.startTriggerType === 'year' && ev.startTriggerValue) {
     if (simYear < parseInt(ev.startTriggerValue, 10)) return false;
   }
 
-  // Check end trigger
   if (ev.endTriggerType === 'age' && ev.endTriggerValue) {
     if (primaryAge > parseInt(ev.endTriggerValue, 10)) return false;
   } else if (ev.endTriggerType === 'year' && ev.endTriggerValue) {

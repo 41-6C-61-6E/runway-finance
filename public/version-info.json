@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784512457549",
+  "buildNumber": "26.07.1784651713121",
   "commits": [
-    "feat: add Best auto-calculated option to frequency select for real estate accounts",
-    "refactor: update chart date formatting and improve responsiveness for account page components",
-    "feat: introduce dynamic best sync frequency for real estate accounts with interval auto-calculation",
-    "feat: align daily sync schedule to run one hour before user-configured alert time",
-    "feat: migrate filter panel toggles to Switch components and modernize account filter UI in Cash Flow chart"
+    "feat: implement comprehensive retirement planning engine v1, calculation services, and multi-tab interface for financial projections.",
+    "feat: implement tax wrapper splitting with account metadata and add corresponding unit tests",
+    "feat: add customizable savings rate calculation settings including account/category exclusions and income adjustments",
+    "refactor: implement automated paystub regeneration logic with state reconciliation and deletion support",
+    "docs: add visual tour to README and expand real estate account type filtering in API route"
   ]
 }
