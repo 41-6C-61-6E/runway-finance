@@ -25,18 +25,50 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
 
   let estimatedExpenses = Math.round(estimatedSalary * 0.5); // 50% default
 
-  // 3. Mirror active decrypted accounts into plan_accounts
+  // 3. Clear existing plan accounts & mirror active Savings, Investments, and Assets into plan_accounts
+  await db.delete(planAccounts).where(eq(planAccounts.planId, planId));
+
   const createdPlanAccs: Array<{ id: string; type: string }> = [];
 
   for (const acc of userAccs) {
-    let type = 'taxable';
-    const accType = (acc.type || '').toLowerCase();
+    const accAny = acc as any;
+    const accType = (accAny.type || '').toLowerCase();
+    const accSubtype = (accAny.subtype || '').toLowerCase();
+    const accCategory = (accAny.category || '').toLowerCase();
 
-    if (['checking', 'savings', 'cash', 'bank', 'depository'].includes(accType)) type = 'cash';
+    // 1. Banking > Savings
+    const isSavings =
+      accType === 'savings' ||
+      accSubtype === 'savings' ||
+      accType === 'cd' ||
+      accSubtype === 'cd' ||
+      accType === 'money_market' ||
+      accSubtype === 'money_market';
+
+    // 2. All types of Investments
+    const isInvestment =
+      ['investment', 'brokerage', 'taxable', '401k', '403b', 'ira', 'roth_ira', 'rothira', 'traditional_ira', 'traditionalira', 'sepira', 'simpleira', 'retirement', 'hsa', 'crypto', '529', 'pension', 'stock_option'].includes(accType) ||
+      ['investment', 'brokerage', 'retirement'].includes(accCategory);
+
+    // 3. All types of Assets
+    const isAsset =
+      ['asset', 'real_estate', 'realestate', 'primaryhome', 'vehicle', 'valuable', 'metals', 'other_asset'].includes(accType) ||
+      accCategory === 'asset';
+
+    // Exclude checking, credit cards, mortgages, loans
+    const isExcluded = ['checking', 'credit_card', 'credit', 'mortgage', 'loan', 'car_loan', 'auto_loan', 'student_loan', 'personal_loan', 'liability', 'hsachecking'].includes(accType);
+
+    if (isExcluded || (!isSavings && !isInvestment && !isAsset)) {
+      continue; // Skip checking accounts, credit cards, loans, and mortgages
+    }
+
+    let type = 'taxable';
+    if (isSavings) type = 'cash';
     else if (['rothira', 'roth_ira'].includes(accType)) type = 'roth_ira';
     else if (['traditionalira', '401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(accType)) type = 'traditional_401k';
     else if (accType === 'hsa') type = 'hsa';
     else if (accType === 'crypto') type = 'crypto';
+    else if (isAsset || isInvestment) type = 'taxable';
 
     let rothPct: number | undefined = undefined;
     if (acc.metadata) {
@@ -247,5 +279,8 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
     charitableAllocationStrategy: 'tax_inefficient_first',
   }, dek);
 
-  await db.insert(planSettings).values(encryptedSettings);
+  const existingSettings = await db.select().from(planSettings).where(eq(planSettings.planId, planId)).limit(1);
+  if (existingSettings.length === 0) {
+    await db.insert(planSettings).values(encryptedSettings);
+  }
 }
