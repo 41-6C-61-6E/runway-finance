@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { plans, planAccounts, planEvents, planFlows, planSettings } from '@/lib/db/schema';
+import { plans, planAccounts, planEvents, planFlows, planSettings, retirementRules } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
@@ -14,21 +14,29 @@ import { populatePlanWithUserFinances } from '@/lib/services/plan-auto-populator
 async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decPlan = await decryptRow('plans', planRow, dek);
 
-  // Fetch accounts, events, flows, settings for this plan
-  const [rawAccounts, rawEvents, rawFlows, rawSettings] = await Promise.all([
+  // Fetch accounts, events, flows, settings, and user rules for this plan
+  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawRules] = await Promise.all([
     getDb().select().from(planAccounts).where(eq(planAccounts.planId, planRow.id)),
     getDb().select().from(planEvents).where(eq(planEvents.planId, planRow.id)),
     getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
     getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
+    getDb().select().from(retirementRules).where(eq(retirementRules.userId, planRow.userId)).limit(1),
   ]);
 
   const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
   const decEvents = await Promise.all(rawEvents.map((e) => decryptRow('plan_events', e, dek)));
   const decFlows = await Promise.all(rawFlows.map((f) => decryptRow('plan_flows', f, dek)));
   const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
+  const decRules = rawRules[0] ? await decryptRow('retirement_rules', rawRules[0], dek) : null;
+
+  const activeRules = decRules ? {
+    ...DEFAULT_2026_RULES,
+    ...decRules,
+  } : DEFAULT_2026_RULES;
 
   // Filter only included accounts for the retirement simulation engine
   const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
+
 
   const enginePlan: EnginePlan = {
     id: decPlan.id,
@@ -38,6 +46,14 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
     primaryBirthMonth: Number(decPlan.primaryBirthMonth) || 1,
     spouseBirthYear: decPlan.spouseBirthYear ? Number(decPlan.spouseBirthYear) : undefined,
     spouseBirthMonth: decPlan.spouseBirthMonth ? Number(decPlan.spouseBirthMonth) : undefined,
+    spouseName: decPlan.spouseName || 'Spouse / Partner',
+    spouseRetirementAge: decPlan.spouseRetirementAge ? Number(decPlan.spouseRetirementAge) : 60,
+    spouseLifeExpectancyAge: decPlan.spouseLifeExpectancyAge ? Number(decPlan.spouseLifeExpectancyAge) : 100,
+    primarySsMonthlyAmount: decPlan.primarySsMonthlyAmount ? parseFloat(decPlan.primarySsMonthlyAmount) : 2500,
+    primarySsStartAge: decPlan.primarySsStartAge ? Number(decPlan.primarySsStartAge) : 67,
+    spouseSsMonthlyAmount: decPlan.spouseSsMonthlyAmount ? parseFloat(decPlan.spouseSsMonthlyAmount) : 2000,
+    spouseSsStartAge: decPlan.spouseSsStartAge ? Number(decPlan.spouseSsStartAge) : 67,
+    enableSpousalSsBenefit: decPlan.enableSpousalSsBenefit !== false,
     filingStatus: decPlan.filingStatus || 'single',
     retirementAge: Number(decPlan.retirementAge) || 60,
     lifeExpectancyAge: Number(decPlan.lifeExpectancyAge) || 100,
@@ -93,7 +109,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       administrativeCostRate: parseFloat(decSettings?.administrativeCostRate || '1.0'),
       charitableGiving: parseFloat(decSettings?.charitableGiving || '0.0'),
     },
-    rules: DEFAULT_2026_RULES,
+    rules: activeRules,
   };
 
   const simulation = runRetirementSimulation(enginePlan);
@@ -224,6 +240,9 @@ export async function PUT(req: NextRequest) {
       'name', 'retirementAge', 'lifeExpectancyAge', 'filingStatus',
       'withdrawalMethod', 'hasSpouse', 'primaryBirthYear', 'primaryBirthMonth',
       'spouseBirthYear', 'spouseBirthMonth', 'customWithdrawalOrder',
+      'spouseName', 'spouseRetirementAge', 'spouseLifeExpectancyAge',
+      'primarySsMonthlyAmount', 'primarySsStartAge', 'spouseSsMonthlyAmount',
+      'spouseSsStartAge', 'enableSpousalSsBenefit',
     ];
 
     const planUpdates: Record<string, any> = {};
