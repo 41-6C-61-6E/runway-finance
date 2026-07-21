@@ -63,6 +63,14 @@ export interface EnginePlan {
   primaryBirthMonth: number;
   spouseBirthYear?: number;
   spouseBirthMonth?: number;
+  spouseName?: string;
+  spouseRetirementAge?: number;
+  spouseLifeExpectancyAge?: number;
+  primarySsMonthlyAmount?: number;
+  primarySsStartAge?: number;
+  spouseSsMonthlyAmount?: number;
+  spouseSsStartAge?: number;
+  enableSpousalSsBenefit?: boolean;
   filingStatus: string;
   retirementAge: number;
   lifeExpectancyAge: number;
@@ -98,6 +106,8 @@ export interface YearlySimulationResult {
   grossIncome: number;
   salaryIncome: number;
   ssIncome: number;
+  primarySsIncome?: number;
+  spouseSsIncome?: number;
   pensionIncome: number;
   otherIncome: number;
   totalExpenses: number;
@@ -132,13 +142,28 @@ export interface SimulationOutput {
 
 export type YearGrowthFn = (yearOffset: number, acc: EngineAccount) => { growth: number; dividend: number };
 
+function getSsClaimingMultiplier(claimingAge: number): number {
+  if (claimingAge <= 62) return 0.70;
+  if (claimingAge === 63) return 0.75;
+  if (claimingAge === 64) return 0.80;
+  if (claimingAge === 65) return 0.8667;
+  if (claimingAge === 66) return 0.9333;
+  if (claimingAge === 67) return 1.00;
+  if (claimingAge === 68) return 1.08;
+  if (claimingAge === 69) return 1.16;
+  return 1.24; // Age 70+
+}
+
 export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGrowthFn): SimulationOutput {
   const currentCalendarYear = new Date().getFullYear();
   const primaryBirthYear = Number(plan.primaryBirthYear) || 1985;
   const currentAge = currentCalendarYear - primaryBirthYear;
   const lifeExpectancyAge = Number(plan.lifeExpectancyAge) || 100;
-  const totalYears = Math.max(1, lifeExpectancyAge - currentAge);
+  const isMfj = plan.filingStatus === 'married_joint' || Boolean(plan.hasSpouse);
+  const spouseRetirementAge = Number(plan.spouseRetirementAge) || Number(plan.retirementAge) || 60;
+  const spouseLifeExpectancyAge = Number(plan.spouseLifeExpectancyAge) || 100;
 
+  const totalYears = Math.max(1, lifeExpectancyAge - currentAge);
   const rules = plan.rules || DEFAULT_2026_RULES;
   const inflationRate = (plan.settings?.fixedInflationRate ?? 3.0) / 100;
 
@@ -163,26 +188,26 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
     const spouseAge = plan.spouseBirthYear ? simYear - plan.spouseBirthYear : undefined;
 
     const milestonesReached: string[] = [];
-    if (primaryAge === plan.retirementAge) milestonesReached.push('Retirement Age');
-    if (primaryAge === 50) milestonesReached.push('Age 50 Catch-up Limits');
-    if (primaryAge === 55) milestonesReached.push('Age 55 Rule of 55');
-    if (primaryAge === 59) milestonesReached.push('Age 59.5 Penalty Free');
-    if (primaryAge === 62) milestonesReached.push('Age 62 Early Social Security');
-    if (primaryAge === 65) milestonesReached.push('Age 65 Medicare Eligibility');
-    if (primaryAge === 67) milestonesReached.push('Age 67 Full SS Retirement Age');
-    if (primaryAge === 70) milestonesReached.push('Age 70 Max Social Security');
-    if (primaryAge === 73) milestonesReached.push('Age 73 RMD Age');
+    if (primaryAge === plan.retirementAge) milestonesReached.push('Primary Retirement Age');
+    if (spouseAge && spouseAge === spouseRetirementAge) milestonesReached.push('Spouse Retirement Age');
+    if (primaryAge === 50) milestonesReached.push('Primary Age 50 Catch-up Limits');
+    if (primaryAge === 62) milestonesReached.push('Primary Age 62 Early SS');
+    if (primaryAge === 67) milestonesReached.push('Primary Age 67 Full SS');
+    if (primaryAge === 70) milestonesReached.push('Primary Age 70 Max SS');
+    if (primaryAge === 73) milestonesReached.push('Primary Age 73 RMD');
 
     const compoundInflation = Math.pow(1 + inflationRate, yearOffset);
 
-    // 1. Calculate Gross Inflows
+    // 1. Calculate Gross Inflows & Social Security
     let salaryIncome = 0;
-    let ssIncome = 0;
+    let ssIncomeFromEvents = 0;
     let pensionIncome = 0;
     let otherIncome = 0;
 
+    const ssEvents = plan.events.filter((e) => e.category === 'income' && e.type === 'social_security');
+
     for (const ev of plan.events.filter((e) => e.category === 'income')) {
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge)) continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) continue;
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
       const inflMult = ev.adjustForInflation ? compoundInflation : 1;
@@ -190,17 +215,69 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
       if (ev.growthCap && val > ev.growthCap) val = ev.growthCap;
 
       if (ev.type === 'salary') salaryIncome += val;
-      else if (ev.type === 'social_security') ssIncome += val;
+      else if (ev.type === 'social_security') ssIncomeFromEvents += val;
       else if (ev.type === 'pension') pensionIncome += val;
       else otherIncome += val;
     }
 
-    const grossIncome = salaryIncome + ssIncome + pensionIncome + otherIncome;
+    // Dynamic Social Security engine calculation for Primary & Spouse
+    let primarySsIncome = 0;
+    let spouseSsIncome = 0;
+
+    if (ssEvents.length > 0) {
+      ssIncomeFromEvents = ssEvents.reduce((sum, ev) => {
+        if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) return sum;
+        const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
+        const inflMult = ev.adjustForInflation ? compoundInflation : 1;
+        return sum + baseAmt * inflMult;
+      }, 0);
+    } else {
+      // Primary Social Security calculation
+      const primaryMonthly = plan.primarySsMonthlyAmount ?? 2500;
+      const primaryStartAge = plan.primarySsStartAge ?? 67;
+      const primaryPiaAnnual = primaryMonthly * 12 * compoundInflation;
+
+      if (primaryAge >= primaryStartAge && primaryAge <= lifeExpectancyAge) {
+        primarySsIncome = primaryPiaAnnual * getSsClaimingMultiplier(primaryStartAge);
+      }
+
+      // Spouse Social Security calculation
+      if (isMfj && spouseAge !== undefined && spouseAge <= spouseLifeExpectancyAge) {
+        const spouseMonthly = plan.spouseSsMonthlyAmount ?? 2000;
+        const spouseStartAge = plan.spouseSsStartAge ?? 67;
+        const spousePiaAnnual = spouseMonthly * 12 * compoundInflation;
+
+        if (spouseAge >= spouseStartAge) {
+          const ownSpouseSs = spousePiaAnnual * getSsClaimingMultiplier(spouseStartAge);
+          let spousalTopUp = 0;
+          if (plan.enableSpousalSsBenefit !== false && primaryAge >= primaryStartAge) {
+            const spousalCapMult = spouseStartAge >= 67 ? 0.50 : 0.35 + (spouseStartAge - 62) * 0.03;
+            const maxSpousalBenefit = primaryPiaAnnual * spousalCapMult;
+            spousalTopUp = Math.max(0, maxSpousalBenefit - ownSpouseSs);
+          }
+          spouseSsIncome = ownSpouseSs + spousalTopUp;
+        }
+      }
+
+      // Survivor Protection: If one spouse dies, survivor gets highest SS benefit
+      if (isMfj && spouseAge !== undefined) {
+        if (primaryAge > lifeExpectancyAge && spouseAge <= spouseLifeExpectancyAge) {
+          spouseSsIncome = Math.max(primarySsIncome, spouseSsIncome);
+          primarySsIncome = 0;
+        } else if (spouseAge > spouseLifeExpectancyAge && primaryAge <= lifeExpectancyAge) {
+          primarySsIncome = Math.max(primarySsIncome, spouseSsIncome);
+          spouseSsIncome = 0;
+        }
+      }
+    }
+
+    const totalSsIncome = ssEvents.length > 0 ? ssIncomeFromEvents : (primarySsIncome + spouseSsIncome);
+    const grossIncome = salaryIncome + totalSsIncome + pensionIncome + otherIncome;
 
     // 2. Calculate Scheduled Outflows
     let livingExpenses = 0;
     for (const ev of plan.events.filter((e) => e.category === 'expense')) {
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge)) continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, spouseRetirementAge)) continue;
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
       const inflMult = ev.adjustForInflation ? compoundInflation : 1;
@@ -223,18 +300,34 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
 
     const totalExpenses = livingExpenses + debtPayments;
 
-    // 3. Tax Estimation
-    const stdDeduction = parseFloat(rules.standardDeduction || '15000') * compoundInflation;
-    const ficaTax = salaryIncome * 0.0765; // 6.2% SS + 1.45% Medicare
-    const taxableOrdinaryIncome = Math.max(0, salaryIncome + pensionIncome + otherIncome + ssIncome * 0.5 - stdDeduction);
+    // 3. Tax Estimation (MFJ Aware)
+    const stdDeductionBase = parseFloat(rules.standardDeduction || '15000');
+    const stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
+    const ficaTax = salaryIncome * 0.0765;
+
+    // IRS Provisional Income & SS Taxation Formula
+    const provisionalIncome = salaryIncome + pensionIncome + otherIncome + totalSsIncome * 0.5;
+    const ssTier1 = (isMfj ? 32000 : 25000) * compoundInflation;
+    const ssTier2 = (isMfj ? 44000 : 34000) * compoundInflation;
+
+    let taxableSs = 0;
+    if (provisionalIncome > ssTier2) {
+      taxableSs = Math.min(0.85 * totalSsIncome, 0.50 * (ssTier2 - ssTier1) + 0.85 * (provisionalIncome - ssTier2));
+    } else if (provisionalIncome > ssTier1) {
+      taxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (provisionalIncome - ssTier1));
+    }
+
+    const taxableOrdinaryIncome = Math.max(0, salaryIncome + pensionIncome + otherIncome + taxableSs - stdDeduction);
 
     let ordinaryTax = 0;
-    for (const b of rules.ordinaryTaxBrackets) {
-      const thresh = b.threshold * compoundInflation;
+    const bracketMult = isMfj ? 2 : 1;
+    for (let i = 0; i < rules.ordinaryTaxBrackets.length; i++) {
+      const b = rules.ordinaryTaxBrackets[i];
+      const thresh = b.threshold * bracketMult * compoundInflation;
       if (taxableOrdinaryIncome > thresh) {
-        const taxableChunk = (b.threshold === rules.ordinaryTaxBrackets[rules.ordinaryTaxBrackets.length - 1].threshold)
-          ? taxableOrdinaryIncome - thresh
-          : Math.min(taxableOrdinaryIncome - thresh, (rules.ordinaryTaxBrackets[rules.ordinaryTaxBrackets.indexOf(b) + 1]?.threshold ?? thresh) * compoundInflation - thresh);
+        const nextB = rules.ordinaryTaxBrackets[i + 1];
+        const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+        const taxableChunk = Math.min(taxableOrdinaryIncome - thresh, nextThresh - thresh);
         ordinaryTax += taxableChunk * b.rate;
       }
     }
@@ -248,7 +341,7 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
     let surplusSaved = 0;
     let deficitWithdrawn = 0;
 
-    // 4. Surplus Savings Routing or Deficit Drawdown
+    // 4. Surplus Savings Routing or Deficit Drawdown (MFJ Limit Aware)
     if (netCashFlow > 0) {
       let surplus = netCashFlow;
       const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
@@ -261,10 +354,10 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
         if (flow.ruleType === 'percentage' && flow.ruleValue) {
           limit = salaryIncome * (flow.ruleValue / 100);
         } else if (flow.ruleType === 'maximize') {
-          const isAge50 = primaryAge >= 50;
-          let maxLimit = 7000 + (isAge50 ? 1000 : 0);
-          if (targetAcc.type.includes('401k')) maxLimit = 23000 + (isAge50 ? 7500 : 0);
-          else if (targetAcc.type === 'hsa') maxLimit = 4150 + (primaryAge >= 55 ? 1000 : 0);
+          const isAge50 = primaryAge >= 50 || (spouseAge !== undefined && spouseAge >= 50);
+          let maxLimit = (isMfj ? 14000 : 7000) + (isAge50 ? 1000 : 0);
+          if (targetAcc.type.includes('401k')) maxLimit = (isMfj ? 46000 : 23000) + (isAge50 ? 7500 : 0);
+          else if (targetAcc.type === 'hsa') maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (primaryAge >= 55 ? 1000 : 0);
           limit = Math.min(surplus, maxLimit);
         }
 
@@ -363,7 +456,9 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
       liquidNetWorth,
       grossIncome,
       salaryIncome,
-      ssIncome,
+      ssIncome: totalSsIncome,
+      primarySsIncome,
+      spouseSsIncome,
       pensionIncome,
       otherIncome,
       totalExpenses,
@@ -408,19 +503,30 @@ export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGro
   };
 }
 
-function isEventActive(ev: EngineEvent, simYear: number, primaryAge: number, retirementAge: number): boolean {
+function isEventActive(
+  ev: EngineEvent,
+  simYear: number,
+  primaryAge: number,
+  primaryRetirementAge: number,
+  spouseAge?: number,
+  spouseRetirementAge?: number
+): boolean {
+  const isSpouseEvent = ev.owner === 'spouse';
+  const evalAge = isSpouseEvent && spouseAge !== undefined ? spouseAge : primaryAge;
+  const evalRetirementAge = isSpouseEvent && spouseRetirementAge !== undefined ? spouseRetirementAge : primaryRetirementAge;
+
   if (ev.startTriggerType === 'age' && ev.startTriggerValue) {
-    if (primaryAge < parseInt(ev.startTriggerValue, 10)) return false;
+    if (evalAge < parseInt(ev.startTriggerValue, 10)) return false;
   } else if (ev.startTriggerType === 'year' && ev.startTriggerValue) {
     if (simYear < parseInt(ev.startTriggerValue, 10)) return false;
   }
 
   if (ev.endTriggerType === 'age' && ev.endTriggerValue) {
-    if (primaryAge > parseInt(ev.endTriggerValue, 10)) return false;
+    if (evalAge > parseInt(ev.endTriggerValue, 10)) return false;
   } else if (ev.endTriggerType === 'year' && ev.endTriggerValue) {
     if (simYear > parseInt(ev.endTriggerValue, 10)) return false;
   } else if (ev.endTriggerType === 'retirement') {
-    if (primaryAge >= retirementAge) return false;
+    if (evalAge >= evalRetirementAge) return false;
   }
 
   return true;

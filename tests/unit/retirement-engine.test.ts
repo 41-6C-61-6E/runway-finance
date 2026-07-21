@@ -101,4 +101,123 @@ describe('Retirement Projection Engine', () => {
     expect(output.success).toBe(true);
     expect(output.netLegacy).toBeGreaterThan(0);
   });
+
+  it('correctly calculates Married Filing Jointly (MFJ) tax, spouse events, and dual Social Security', () => {
+    const mfjPlan: EnginePlan = {
+      id: 'plan_mfj',
+      name: 'Couple FIRE Plan',
+      hasSpouse: true,
+      primaryBirthYear: 1985,
+      primaryBirthMonth: 1,
+      spouseBirthYear: 1987,
+      spouseBirthMonth: 6,
+      spouseName: 'Jane',
+      spouseRetirementAge: 62,
+      spouseLifeExpectancyAge: 95,
+      primarySsMonthlyAmount: 3000,
+      primarySsStartAge: 70,
+      spouseSsMonthlyAmount: 2000,
+      spouseSsStartAge: 67,
+      enableSpousalSsBenefit: true,
+      filingStatus: 'married_joint',
+      retirementAge: 60,
+      lifeExpectancyAge: 90,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_1',
+          name: 'Joint Taxable Brokerage',
+          type: 'taxable',
+          owner: 'joint',
+          balance: 200000,
+          costBasis: 150000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 2.0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_primary_sal',
+          name: 'Primary Salary',
+          category: 'income',
+          type: 'salary',
+          owner: 'primary',
+          amount: 120000,
+          frequency: 'yearly',
+          growthRate: 3.0,
+          adjustForInflation: true,
+          startTriggerType: 'now',
+          endTriggerType: 'retirement',
+        },
+        {
+          id: 'ev_spouse_sal',
+          name: 'Spouse Salary',
+          category: 'income',
+          type: 'salary',
+          owner: 'spouse',
+          amount: 80000,
+          frequency: 'yearly',
+          growthRate: 3.0,
+          adjustForInflation: true,
+          startTriggerType: 'now',
+          endTriggerType: 'retirement',
+        },
+        {
+          id: 'ev_living',
+          name: 'Joint Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'joint',
+          amount: 70000,
+          frequency: 'yearly',
+          growthRate: 2.5,
+          adjustForInflation: true,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [
+        {
+          id: 'fl_1',
+          name: 'Save Leftover Surplus',
+          type: 'invest',
+          rank: 1,
+          targetAccountId: 'acc_1',
+          ruleType: 'save_leftover',
+        },
+      ],
+      settings: {
+        fixedInflationRate: 2.5,
+        withholdingDeferred: 20.0,
+        withholdingTaxable: 10.0,
+        incomeTaxModifier: 0.0,
+        capGainsTaxModifier: 0.0,
+        heirFlatIncomeTaxRate: 25.0,
+        stepUpBasis: true,
+        realEstateLiquidationRate: 6.0,
+        administrativeCostRate: 1.0,
+        charitableGiving: 0.0,
+      },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(mfjPlan);
+    expect(output.yearlyResults.length).toBeGreaterThan(0);
+    
+    // Check first year result (ages: Primary 41, Spouse 39)
+    const firstYear = output.yearlyResults[0];
+    expect(firstYear.primaryAge).toBe(41);
+    expect(firstYear.spouseAge).toBe(39);
+    expect(firstYear.grossIncome).toBeGreaterThan(190000);
+
+    // Verify dual Social Security streams kick in at designated claiming ages
+    const ssActiveYear = output.yearlyResults.find((r) => r.primaryAge >= 70);
+    expect(ssActiveYear).toBeDefined();
+    expect(ssActiveYear?.ssIncome).toBeGreaterThan(0);
+    expect(ssActiveYear?.primarySsIncome).toBeGreaterThan(0);
+    expect(ssActiveYear?.spouseSsIncome).toBeGreaterThan(0);
+  });
 });

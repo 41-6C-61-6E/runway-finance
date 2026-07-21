@@ -91,6 +91,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       data.push({
         year,
         age,
+        spouseAge: plan?.spouseBirthYear ? year - Number(plan.spouseBirthYear) : undefined,
         label: `${year}`,
         netWorth: Math.round(nw),
         income: Math.round(income),
@@ -530,7 +531,10 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <thead className="bg-muted/40 text-muted-foreground font-semibold sticky top-0">
                 <tr>
                   <th className="p-2.5">Year</th>
-                  <th className="p-2.5">Age</th>
+                  <th className="p-2.5">Primary Age</th>
+                  {(plan?.filingStatus === 'married_joint' || plan?.hasSpouse) && (
+                    <th className="p-2.5">Partner Age</th>
+                  )}
                   <th className="p-2.5">Net Worth</th>
                   <th className="p-2.5">Income</th>
                   <th className="p-2.5">Expenses</th>
@@ -550,6 +554,9 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                     >
                       <td className="p-2.5 font-medium">{y.year}</td>
                       <td className="p-2.5">{y.age}</td>
+                      {(plan?.filingStatus === 'married_joint' || plan?.hasSpouse) && (
+                        <td className="p-2.5 text-muted-foreground">{y.spouseAge ?? '—'}</td>
+                      )}
                       <td className="p-2.5 font-mono font-bold text-foreground">
                         {formatCurrency(y.netWorth)}
                       </td>

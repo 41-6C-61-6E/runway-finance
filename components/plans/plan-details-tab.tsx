@@ -30,6 +30,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   // Income Form State
   const [incName, setIncName] = useState('');
   const [incType, setIncType] = useState('salary');
+  const [incOwner, setIncOwner] = useState('primary');
   const [incAmount, setIncAmount] = useState('50000');
   const [incGrowth, setIncGrowth] = useState('3.0');
   const [incStart, setIncStart] = useState('now');
@@ -40,6 +41,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   // Expense Form State
   const [expName, setExpName] = useState('');
   const [expType, setExpType] = useState('living_expense');
+  const [expOwner, setExpOwner] = useState('primary');
   const [expAmount, setExpAmount] = useState('30000');
   const [expGrowth, setExpGrowth] = useState('2.5');
 
@@ -79,6 +81,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setEditingItem(null);
     setIncName('');
     setIncType('salary');
+    setIncOwner('primary');
     setIncAmount('50000');
     setIncGrowth('3.0');
     setIncStart('now');
@@ -92,6 +95,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setEditingItem({ type: 'income', data: inc });
     setIncName(safeString(inc.name));
     setIncType(safeString(inc.type, 'salary'));
+    setIncOwner(safeString(inc.owner, 'primary'));
     setIncAmount(String(inc.amount || '50000'));
     setIncGrowth(String(inc.growthRate || '3.0'));
     setIncStart(safeString(inc.startTriggerType, 'now'));
@@ -105,6 +109,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setEditingItem(null);
     setExpName('');
     setExpType('living_expense');
+    setExpOwner('primary');
     setExpAmount('30000');
     setExpGrowth('2.5');
     setModalType('expense');
@@ -114,6 +119,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setEditingItem({ type: 'expense', data: exp });
     setExpName(safeString(exp.name));
     setExpType(safeString(exp.type, 'living_expense'));
+    setExpOwner(safeString(exp.owner, 'primary'));
     setExpAmount(String(exp.amount || '30000'));
     setExpGrowth(String(exp.growthRate || '2.5'));
     setModalType('expense');
@@ -144,6 +150,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           name: finalName,
           category: 'income',
           type: incType,
+          owner: incOwner,
           amount: parseFloat(incAmount) || 0,
           growthRate: parseFloat(incGrowth) || 0,
           startTriggerType: incStart,
@@ -158,7 +165,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           name: finalName,
           category: 'income',
           type: incType,
-          owner: 'primary',
+          owner: incOwner,
           amount: parseFloat(incAmount) || 0,
           frequency: 'yearly',
           growthRate: parseFloat(incGrowth) || 0,
@@ -185,6 +192,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           name: finalName,
           category: 'expense',
           type: expType,
+          owner: expOwner,
           amount: parseFloat(expAmount) || 0,
           growthRate: parseFloat(expGrowth) || 0,
         },
@@ -195,7 +203,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           name: finalName,
           category: 'expense',
           type: expType,
-          owner: 'primary',
+          owner: expOwner,
           amount: parseFloat(expAmount) || 0,
           frequency: 'yearly',
           growthRate: parseFloat(expGrowth) || 0,
@@ -621,18 +629,32 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-300">Category Type</label>
-                  <select
-                    value={incType}
-                    onChange={(e) => setIncType(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
-                  >
-                    <option value="salary">Salary / Wages</option>
-                    <option value="passive">Passive / Business</option>
-                    <option value="pension">Pension</option>
-                    <option value="social_security">Social Security</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Category Type</label>
+                    <select
+                      value={incType}
+                      onChange={(e) => setIncType(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="salary">Salary / Wages</option>
+                      <option value="passive">Passive / Business</option>
+                      <option value="pension">Pension</option>
+                      <option value="social_security">Social Security</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Owner</label>
+                    <select
+                      value={incOwner}
+                      onChange={(e) => setIncOwner(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
+                      <option value="joint">Joint</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -733,18 +755,32 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-300">Category</label>
-                  <select
-                    value={expType}
-                    onChange={(e) => setExpType(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
-                  >
-                    <option value="living_expense">General Living Expense</option>
-                    <option value="healthcare">Healthcare & Insurance</option>
-                    <option value="child_related">Education & Childcare</option>
-                    <option value="lump_sum">Lump Sum Discretionary</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Category</label>
+                    <select
+                      value={expType}
+                      onChange={(e) => setExpType(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="living_expense">General Living Expense</option>
+                      <option value="healthcare">Healthcare & Insurance</option>
+                      <option value="child_related">Education & Childcare</option>
+                      <option value="lump_sum">Lump Sum Discretionary</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Owner</label>
+                    <select
+                      value={expOwner}
+                      onChange={(e) => setExpOwner(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
+                      <option value="joint">Joint / Shared</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button
