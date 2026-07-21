@@ -4,11 +4,12 @@ import { useState, useMemo, useCallback } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, CartesianGrid, ComposedChart, Bar,
+  ReferenceLine, ReferenceDot, CartesianGrid,
 } from 'recharts';
 import {
   TrendingUp, Flame, Target, Calendar, Clock, Palmtree,
-  ShieldCheck, ChevronDown, ChevronUp, DollarSign,
+  ShieldCheck, ChevronDown, ChevronUp, DollarSign, Award,
+  Landmark, Flag, Activity,
 } from 'lucide-react';
 
 interface ProjectionTabProps {
@@ -99,15 +100,87 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const yearsToFire = chartData.findIndex((d) => d.netWorth >= fireNumber);
   const yearsToFireDisplay = yearsToFire >= 0 ? yearsToFire : '—';
 
-  // Milestones (computed from birth year)
-  const milestones = useMemo(() => [
-    { age: 50, label: 'Catch-up Limits', color: '#3b82f6' },
-    { age: 55, label: 'Rule of 55', color: '#f59e0b' },
-    { age: localRetirementAge, label: 'Retirement', color: '#10b981' },
-    { age: 65, label: 'Medicare', color: '#6366f1' },
-    { age: 67, label: 'Full SS', color: '#14b8a6' },
-    { age: 73, label: 'RMD Start', color: '#f97316' },
-  ].filter((m) => m.age >= currentAge), [currentAge, localRetirementAge]);
+  // Rich Milestone Callouts Data (Monocolor Vector Icons Only)
+  const milestoneCallouts = useMemo(() => {
+    const list = [
+      {
+        age: 50,
+        title: 'Catch-up Limits',
+        year: birthYear + 50,
+        icon: Award,
+        color: 'text-blue-500',
+        borderColor: 'border-blue-500/30',
+        bgColor: 'bg-blue-500/10',
+        stroke: '#3b82f6',
+        note: 'IRA +$1k & 401(k) +$7.5k annual catch-up limits unlocked',
+      },
+      {
+        age: 55,
+        title: 'Rule of 55 Access',
+        year: birthYear + 55,
+        icon: Clock,
+        color: 'text-amber-500',
+        borderColor: 'border-amber-500/30',
+        bgColor: 'bg-amber-500/10',
+        stroke: '#f59e0b',
+        note: 'Penalty-free 401(k) separations allowed if separated from service',
+      },
+      {
+        age: localRetirementAge,
+        title: 'Retirement Transition',
+        year: birthYear + localRetirementAge,
+        icon: Palmtree,
+        color: 'text-emerald-500',
+        borderColor: 'border-emerald-500/30',
+        bgColor: 'bg-emerald-500/10',
+        stroke: '#10b981',
+        note: 'Primary career end • Distribution phase begins',
+      },
+      {
+        age: 65,
+        title: 'Medicare Eligibility',
+        year: birthYear + 65,
+        icon: ShieldCheck,
+        color: 'text-purple-500',
+        borderColor: 'border-purple-500/30',
+        bgColor: 'bg-purple-500/10',
+        stroke: '#a855f7',
+        note: 'Transition to Medicare Part B/D • ACA subsidies end',
+      },
+      {
+        age: 67,
+        title: 'Full Social Security',
+        year: birthYear + 67,
+        icon: Landmark,
+        color: 'text-cyan-500',
+        borderColor: 'border-cyan-500/30',
+        bgColor: 'bg-cyan-500/10',
+        stroke: '#06b6d4',
+        note: '100% Full Retirement Age SS benefit payout',
+      },
+      {
+        age: 73,
+        title: 'Mandatory RMD Start',
+        year: birthYear + 73,
+        icon: Flag,
+        color: 'text-orange-500',
+        borderColor: 'border-orange-500/30',
+        bgColor: 'bg-orange-500/10',
+        stroke: '#f97316',
+        note: 'IRS Table III required minimum traditional distributions',
+      },
+    ];
+
+    return list
+      .filter((m) => m.age >= currentAge)
+      .map((m) => {
+        const point = chartData.find((d) => d.age === m.age);
+        return {
+          ...m,
+          projectedNW: point?.netWorth || 0,
+        };
+      });
+  }, [birthYear, localRetirementAge, currentAge, chartData]);
 
   const handleRetirementAgeCommit = useCallback(() => {
     if (sliderDirty) {
@@ -116,34 +189,41 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     }
   }, [localRetirementAge, sliderDirty, onUpdatePlan]);
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Fully Opaque, High-Contrast Custom Tooltip
+  const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const data = payload[0]?.payload;
+    const activeMilestone = milestoneCallouts.find((m) => m.age === data?.age);
+
     return (
-      <div className="bg-card border border-border rounded-xl p-3 shadow-xl text-xs space-y-1.5 min-w-[180px]">
-        <div className="flex items-center justify-between font-bold text-foreground">
-          <span>Age {data?.age}</span>
-          <span className="text-muted-foreground">{data?.year}</span>
+      <div className="!bg-slate-900 !text-slate-100 border-2 border-slate-700/80 rounded-xl p-3.5 shadow-2xl text-xs space-y-2 min-w-[210px] z-50">
+        <div className="flex items-center justify-between font-bold text-slate-100">
+          <span className="text-sm">Age {data?.age}</span>
+          <span className="text-slate-400 font-mono">{data?.year}</span>
         </div>
-        <div className="border-t border-border pt-1.5 space-y-1">
+
+        <div className="border-t border-slate-800 pt-2 space-y-1">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Net Worth</span>
-            <span className="font-mono font-bold text-foreground">{formatCurrency(data?.netWorth || 0)}</span>
+            <span className="text-slate-400">Projected Net Worth</span>
+            <span className="font-mono font-bold text-emerald-400">{formatCurrency(data?.netWorth || 0)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Income</span>
-            <span className="font-mono text-emerald-500">{formatCurrency(data?.income || 0)}</span>
+            <span className="text-slate-400">Gross Income</span>
+            <span className="font-mono text-slate-200">{formatCurrency(data?.income || 0)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Expenses + Tax</span>
-            <span className="font-mono text-rose-500">{formatCurrency(data?.expenses || 0)}</span>
+            <span className="text-slate-400">Total Outflows</span>
+            <span className="font-mono text-rose-400">{formatCurrency(data?.expenses || 0)}</span>
           </div>
         </div>
-        {data?.isRetired && (
-          <div className="flex items-center gap-1 text-amber-500 font-semibold border-t border-border pt-1.5">
-            <Palmtree className="w-3 h-3" />
-            <span>Retirement Phase</span>
+
+        {activeMilestone && (
+          <div className={`mt-1 p-2 rounded-lg ${activeMilestone.bgColor} border ${activeMilestone.borderColor} space-y-0.5`}>
+            <div className="flex items-center gap-1.5 font-bold text-slate-100">
+              <activeMilestone.icon className={`w-3.5 h-3.5 ${activeMilestone.color}`} />
+              <span>{activeMilestone.title}</span>
+            </div>
+            <p className="text-[10px] text-slate-300 leading-tight">{activeMilestone.note}</p>
           </div>
         )}
       </div>
@@ -173,7 +253,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Target className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">FIRE Number (25×)</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">FIRE Target (25×)</span>
           </div>
           <p className="text-xl font-extrabold text-primary font-mono">{formatCurrency(fireNumber)}</p>
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
@@ -204,7 +284,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
       </div>
 
-      {/* Main Projection Chart */}
+      {/* Main Projection Chart Container */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -217,28 +297,38 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </p>
           </div>
 
-          {/* Milestone Legend */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {milestones.filter((m) => [localRetirementAge, 65, 73].includes(m.age)).map((m) => (
-              <div key={m.age} className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: m.color }}>
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
-                {m.label} ({m.age})
-              </div>
-            ))}
+          {/* Clean Top Milestone Badges Bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {milestoneCallouts.map((m) => {
+              const Icon = m.icon;
+              return (
+                <div
+                  key={m.age}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${m.borderColor} ${m.bgColor} transition-all`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${m.color}`} />
+                  <span className="text-[11px] font-bold text-foreground">
+                    {m.title} <span className="text-muted-foreground">({m.age})</span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Chart */}
+        {/* Clean Chart Area */}
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="accumulationGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.4} />
+
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+              
               <XAxis
                 dataKey="age"
                 stroke="currentColor"
@@ -255,7 +345,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 tickLine={false}
                 tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`}
               />
-              <Tooltip content={<CustomTooltip />} />
+
+              <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
 
               <Area
                 type="monotone"
@@ -266,49 +357,96 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 fill="url(#accumulationGrad)"
               />
 
-              {/* Retirement Reference Line */}
-              <ReferenceLine
-                x={localRetirementAge}
-                stroke="#10b981"
-                strokeDasharray="6 4"
-                strokeWidth={2}
-                label={{
-                  value: `🌴 Retire ${localRetirementAge}`,
-                  position: 'top',
-                  fill: '#10b981',
-                  fontSize: 11,
-                  fontWeight: 'bold',
-                }}
-              />
+              {/* Milestone Monocolor Lucide Vector Icons rendered RIGHT ON THE TIMELINE CURVE */}
+              {milestoneCallouts.map((m) => {
+                if (!m.projectedNW) return null;
+                const Icon = m.icon;
+                return (
+                  <ReferenceDot
+                    key={m.age}
+                    x={m.age}
+                    y={m.projectedNW}
+                    shape={(props: any) => {
+                      const { cx, cy } = props;
+                      if (!cx || !cy) return null;
+                      return (
+                        <g transform={`translate(${cx},${cy})`} className="cursor-pointer">
+                          <circle r="14" fill={m.stroke} fillOpacity="0.25" />
+                          <circle r="11" fill="var(--color-card)" stroke={m.stroke} strokeWidth="2" />
+                          <foreignObject x={-6.5} y={-6.5} width={13} height={13}>
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Icon className={`w-3.5 h-3.5 ${m.color}`} />
+                            </div>
+                          </foreignObject>
+                        </g>
+                      );
+                    }}
+                  />
+                );
+              })}
 
-              {/* FIRE Number Reference Line */}
+              {/* Subtle Horizontal FIRE Goal Line */}
               <ReferenceLine
                 y={fireNumber}
                 stroke="var(--color-primary)"
                 strokeDasharray="4 4"
                 strokeWidth={1}
+                strokeOpacity={0.7}
                 label={{
-                  value: `FIRE: ${formatCurrency(fireNumber)}`,
+                  value: `FIRE Goal (${formatCurrency(fireNumber)})`,
                   position: 'right',
                   fill: 'var(--color-primary)',
                   fontSize: 10,
                   fontWeight: 'bold',
                 }}
               />
-
-              {/* Medicare & RMD markers */}
-              {milestones.filter((m) => m.age !== localRetirementAge && m.age >= currentAge + 5).map((m) => (
-                <ReferenceLine
-                  key={m.age}
-                  x={m.age}
-                  stroke={m.color}
-                  strokeDasharray="3 3"
-                  strokeWidth={1}
-                  strokeOpacity={0.5}
-                />
-              ))}
             </AreaChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Milestone Callout Cards Grid (Monocolor Vector Icons) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Timeline Milestone Callouts & Impact Gates
+          </h3>
+          <span className="text-xs text-muted-foreground">US Tax, Medicare, SS, and RMD Gates</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {milestoneCallouts.map((m) => {
+            const Icon = m.icon;
+            const isRetirement = m.age === localRetirementAge;
+            return (
+              <div
+                key={m.age}
+                className={`bg-card border rounded-xl p-4 shadow-sm space-y-2 transition-all hover:border-primary/50 ${
+                  isRetirement ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-lg ${m.bgColor}`}>
+                      <Icon className={`w-4 h-4 ${m.color}`} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
+                      <p className="text-[10px] text-muted-foreground font-mono">Age {m.age} • {m.year}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-extrabold text-foreground">
+                    {formatCurrency(m.projectedNW)}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-snug border-t border-border/50 pt-2">
+                  {m.note}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
