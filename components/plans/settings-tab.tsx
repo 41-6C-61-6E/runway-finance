@@ -60,6 +60,12 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [liquidationRate, setLiquidationRate] = useState(plan?.settings?.realEstateLiquidationRate || '6.0');
   const [adminRate, setAdminRate] = useState(plan?.settings?.administrativeCostRate || '1.0');
 
+  // Withdrawal Strategy & Roth Conversion State
+  const [withdrawalMethod, setWithdrawalMethod] = useState(plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook');
+  const [enableRothConversions, setEnableRothConversions] = useState(Boolean(plan?.settings?.enableRothConversions));
+  const [rothConversionTargetCeiling, setRothConversionTargetCeiling] = useState(plan?.settings?.rothConversionTargetCeiling || 'top_of_12');
+  const [avoidIrmaaCliffs, setAvoidIrmaaCliffs] = useState(Boolean(plan?.settings?.avoidIrmaaCliffs));
+
   // Engine Rules State
   const [rules, setRules] = useState<any>(DEFAULT_2026_RULES);
   const [loadingRules, setLoadingRules] = useState(false);
@@ -512,74 +518,173 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
 
       {/* Sub-Tab: Rates, Inflation & Estate */}
       {subTab === 'rates_estate' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Rates & Inflation Card */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              Growth Rates & Inflation
-            </h3>
-            <div className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Fixed Annual Inflation Rate (%)</label>
-                <input
-                  type="text"
-                  value={inflationRate}
-                  onChange={(e) => {
-                    setInflationRate(e.target.value);
-                    onUpdatePlan({ settings: { fixedInflationRate: e.target.value } });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                />
-                <p className="text-[11px] text-muted-foreground">Applies to expense growth and tax bracket inflation adjustments.</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Rates & Inflation Card */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                Growth Rates & Inflation
+              </h3>
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-muted-foreground">Fixed Annual Inflation Rate (%)</label>
+                  <input
+                    type="text"
+                    value={inflationRate}
+                    onChange={(e) => {
+                      setInflationRate(e.target.value);
+                      onUpdatePlan({ settings: { fixedInflationRate: e.target.value } });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Applies to expense growth and tax bracket inflation adjustments.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Estate & Tax Settlement Assumptions Card */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 text-xs">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-500" />
+                Estate & Tax Settlement Assumptions
+              </h3>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-muted-foreground">Heir Flat Income Tax Rate (%)</label>
+                  <input
+                    type="text"
+                    value={heirTaxRate}
+                    onChange={(e) => {
+                      setHeirTaxRate(e.target.value);
+                      onUpdatePlan({ settings: { heirFlatIncomeTaxRate: e.target.value } });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-muted-foreground">Real Estate Liquidation Fee (%)</label>
+                  <input
+                    type="text"
+                    value={liquidationRate}
+                    onChange={(e) => {
+                      setLiquidationRate(e.target.value);
+                      onUpdatePlan({ settings: { realEstateLiquidationRate: e.target.value } });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-muted-foreground">Probate & Admin Drag (%)</label>
+                  <input
+                    type="text"
+                    value={adminRate}
+                    onChange={(e) => {
+                      setAdminRate(e.target.value);
+                      onUpdatePlan({ settings: { administrativeCostRate: e.target.value } });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Estate & Tax Settlement Assumptions Card */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 text-xs">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-500" />
-              Estate & Tax Settlement Assumptions
-            </h3>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Heir Flat Income Tax Rate (%)</label>
-                <input
-                  type="text"
-                  value={heirTaxRate}
-                  onChange={(e) => {
-                    setHeirTaxRate(e.target.value);
-                    onUpdatePlan({ settings: { heirFlatIncomeTaxRate: e.target.value } });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                />
+          {/* Card 2: Withdrawal Sequencing & Roth Conversions */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5 text-xs">
+            <div className="border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-500" />
+                Retirement Withdrawal Sequencing & Roth Conversion Strategy
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Configure how the engine draws down accounts during retirement deficit years and executes Roth conversion ladders.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Withdrawal Strategy Selector */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-foreground">Withdrawal Sequencing Strategy</label>
+                  <select
+                    value={withdrawalMethod}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setWithdrawalMethod(val);
+                      onUpdatePlan({ withdrawalMethod: val, settings: { withdrawalMethod: val } });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-medium text-foreground focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="textbook">Textbook Waterfall (Cash → Taxable → Traditional → Roth → HSA)</option>
+                    <option value="tax_optimized">Tax-Bracket Shielding (Fill 12% Bracket with Traditional, remainder from Taxable/Roth)</option>
+                    <option value="proportional">Proportional Drawdown (Spread across accounts proportional to balance)</option>
+                    <option value="custom_order">Custom Priority Order</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  <strong>Tax-Bracket Shielding</strong> utilizes lower 10%/12% ordinary tax brackets with Pre-Tax Traditional IRA/401(k) withdrawals up to the bracket ceiling, drawing any remaining deficit from Taxable Brokerage or Roth accounts so you avoid jumping into higher tax brackets.
+                </p>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Real Estate Liquidation Fee (%)</label>
-                <input
-                  type="text"
-                  value={liquidationRate}
-                  onChange={(e) => {
-                    setLiquidationRate(e.target.value);
-                    onUpdatePlan({ settings: { realEstateLiquidationRate: e.target.value } });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                />
-              </div>
+              {/* Roth Conversion Controls */}
+              <div className="space-y-3 bg-muted/30 border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-foreground block">Roth Conversion Ladder Simulation</span>
+                    <span className="text-[11px] text-muted-foreground">Convert Pre-Tax Traditional → Roth during early retirement</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={enableRothConversions}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEnableRothConversions(checked);
+                      onUpdatePlan({ settings: { enableRothConversions: checked } });
+                    }}
+                    className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Probate & Admin Drag (%)</label>
-                <input
-                  type="text"
-                  value={adminRate}
-                  onChange={(e) => {
-                    setAdminRate(e.target.value);
-                    onUpdatePlan({ settings: { administrativeCostRate: e.target.value } });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                />
+                {enableRothConversions && (
+                  <div className="space-y-3 pt-2 border-t border-border animate-in fade-in">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Target Conversion Bracket Ceiling</label>
+                      <select
+                        value={rothConversionTargetCeiling}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRothConversionTargetCeiling(val);
+                          onUpdatePlan({ settings: { rothConversionTargetCeiling: val } });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 font-medium text-foreground focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="top_of_10">Top of 10% Ordinary Bracket</option>
+                        <option value="top_of_12">Top of 12% Ordinary Bracket (Recommended)</option>
+                        <option value="top_of_22">Top of 22% Ordinary Bracket</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <span className="font-semibold text-foreground block">IRMAA Cliff Guard</span>
+                        <span className="text-[11px] text-muted-foreground">Prevent conversions from triggering Medicare Part B/D surcharges</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={avoidIrmaaCliffs}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAvoidIrmaaCliffs(checked);
+                          onUpdatePlan({ settings: { avoidIrmaaCliffs: checked } });
+                        }}
+                        className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -29,14 +29,14 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
   const decRules = rawRules[0] ? await decryptRow('retirement_rules', rawRules[0], dek) : null;
 
-  const activeRules = decRules ? {
+  const activeRules: any = decRules ? {
     ...DEFAULT_2026_RULES,
     ...decRules,
   } : DEFAULT_2026_RULES;
 
   // Filter only included accounts for the retirement simulation engine
   const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
-
+  const sAny = decSettings as any;
 
   const enginePlan: EnginePlan = {
     id: decPlan.id,
@@ -108,6 +108,10 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       realEstateLiquidationRate: parseFloat(decSettings?.realEstateLiquidationRate || '6.0'),
       administrativeCostRate: parseFloat(decSettings?.administrativeCostRate || '1.0'),
       charitableGiving: parseFloat(decSettings?.charitableGiving || '0.0'),
+      withdrawalMethod: sAny?.withdrawalMethod || decPlan.withdrawalMethod || 'textbook',
+      enableRothConversions: Boolean(sAny?.enableRothConversions),
+      rothConversionTargetCeiling: sAny?.rothConversionTargetCeiling || 'top_of_12',
+      avoidIrmaaCliffs: Boolean(sAny?.avoidIrmaaCliffs),
     },
     rules: activeRules,
   };
