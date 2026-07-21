@@ -2,17 +2,23 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
+import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import {
   AreaChart,
   Area,
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  ReferenceLine,
+  ReferenceDot,
 } from 'recharts';
 import {
   TrendingUp,
@@ -53,8 +59,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     }
   }, [plan?.retirementAge]);
 
-  const simulation = plan?.simulation;
-  const yearlySimResults = useMemo(() => simulation?.yearlyResults || [], [simulation]);
   const birthYear = Number(plan?.primaryBirthYear) || 1985;
   const currentYear = new Date().getFullYear();
   const currentAge = currentYear - birthYear;
@@ -79,7 +83,181 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     return assets - liabilities;
   }, [plan, accounts]);
 
-  // Dynamic chart projection reacting instantly to slider changes
+  // Real-time dynamic retirement simulation reacting instantly to Retirement Age & Return Rate sliders
+  const simulation = useMemo(() => {
+    if (!plan) return null;
+
+    const planAccountsList = Array.isArray(plan.accounts) ? plan.accounts : [];
+    const planEventsList = Array.isArray(plan.events) ? plan.events : [];
+    const planFlowsList = Array.isArray(plan.flows) ? plan.flows : [];
+
+    const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
+
+    const enginePlan: EnginePlan = {
+      id: plan.id || 'plan_dynamic',
+      name: plan.name || 'FIRE Plan',
+      hasSpouse: Boolean(plan.hasSpouse),
+      primaryBirthYear: Number(plan.primaryBirthYear) || 1985,
+      primaryBirthMonth: Number(plan.primaryBirthMonth) || 1,
+      spouseBirthYear: plan.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
+      spouseBirthMonth: plan.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
+      spouseName: plan.spouseName || 'Spouse / Partner',
+      spouseRetirementAge: plan.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
+      spouseLifeExpectancyAge: plan.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
+      primarySsMonthlyAmount: plan.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500,
+      primarySsStartAge: plan.primarySsStartAge ? Number(plan.primarySsStartAge) : 67,
+      spouseSsMonthlyAmount: plan.spouseSsMonthlyAmount ? parseFloat(plan.spouseSsMonthlyAmount) : 2000,
+      spouseSsStartAge: plan.spouseSsStartAge ? Number(plan.spouseSsStartAge) : 67,
+      enableSpousalSsBenefit: plan.enableSpousalSsBenefit !== false,
+      filingStatus: plan.filingStatus || 'single',
+      retirementAge: localRetirementAge, // Dynamic slider override
+      lifeExpectancyAge: Number(plan.lifeExpectancyAge) || 100,
+      withdrawalMethod: plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook',
+      customWithdrawalOrder: Array.isArray(plan.customWithdrawalOrder) ? plan.customWithdrawalOrder : undefined,
+      accounts: activeAccounts.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        owner: a.owner || 'primary',
+        balance: parseFloat(a.balance) || 0,
+        costBasis: parseFloat(a.costBasis) || 0,
+        expectedGrowthRate: localReturnRate, // Dynamic slider override
+        dividendYield: parseFloat(a.dividendYield) || 2.0,
+        reinvestDividends: a.reinvestDividends !== false,
+        qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
+        rothPercentage: a.rothPercentage,
+      })),
+      liabilities: [],
+      events: planEventsList.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        category: e.category as any,
+        type: e.type,
+        owner: e.owner || 'primary',
+        amount: parseFloat(e.amount) || 0,
+        frequency: e.frequency as any,
+        growthRate: parseFloat(e.growthRate) || 0,
+        adjustForInflation: e.adjustForInflation !== false,
+        startTriggerType: e.startTriggerType || 'now',
+        startTriggerValue: e.startTriggerValue,
+        endTriggerType: e.endTriggerType || 'retirement',
+        endTriggerValue: e.endTriggerValue,
+      })),
+      flows: planFlowsList.map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        type: f.type as any,
+        rank: f.rank || 1,
+        targetAccountId: f.targetAccountId,
+        ruleType: f.ruleType as any,
+        ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
+      })),
+      settings: {
+        fixedInflationRate: parseFloat(plan.settings?.fixedInflationRate || '3.0'),
+        withholdingDeferred: parseFloat(plan.settings?.withholdingDeferred || '20.0'),
+        withholdingTaxable: parseFloat(plan.settings?.withholdingTaxable || '10.0'),
+        incomeTaxModifier: parseFloat(plan.settings?.incomeTaxModifier || '0.0'),
+        capGainsTaxModifier: parseFloat(plan.settings?.capGainsTaxModifier || '0.0'),
+        heirFlatIncomeTaxRate: parseFloat(plan.settings?.heirFlatIncomeTaxRate || '25.0'),
+        stepUpBasis: plan.settings?.stepUpBasis ?? true,
+        realEstateLiquidationRate: parseFloat(plan.settings?.realEstateLiquidationRate || '6.0'),
+        administrativeCostRate: parseFloat(plan.settings?.administrativeCostRate || '1.0'),
+        charitableGiving: parseFloat(plan.settings?.charitableGiving || '0.0'),
+        withdrawalMethod: plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook',
+        enableRothConversions: Boolean(plan.settings?.enableRothConversions),
+        rothConversionTargetCeiling: plan.settings?.rothConversionTargetCeiling || 'top_of_12',
+        avoidIrmaaCliffs: Boolean(plan.settings?.avoidIrmaaCliffs),
+      },
+      rules: plan.rules || DEFAULT_2026_RULES,
+    };
+
+    return runRetirementSimulation(enginePlan);
+  }, [plan, localRetirementAge, localReturnRate]);
+
+  const yearlySimResults = useMemo(() => simulation?.yearlyResults || [], [simulation]);
+
+  // Rich Milestone Callouts Data (with stroke colors for chart markers)
+  const milestoneCallouts = useMemo(() => {
+    const list = [
+      {
+        age: 50,
+        title: 'Catch-up Limits',
+        year: birthYear + 50,
+        icon: Award,
+        color: 'text-blue-500',
+        borderColor: 'border-blue-500/30',
+        bgColor: 'bg-blue-500/10',
+        stroke: '#3b82f6',
+        note: 'IRA +$1k & 401(k) +$7.5k annual catch-up limits unlocked',
+      },
+      {
+        age: 55,
+        title: 'Rule of 55 Access',
+        year: birthYear + 55,
+        icon: Clock,
+        color: 'text-amber-500',
+        borderColor: 'border-amber-500/30',
+        bgColor: 'bg-amber-500/10',
+        stroke: '#f59e0b',
+        note: 'Penalty-free 401(k) separations allowed if separated from service',
+      },
+      {
+        age: localRetirementAge,
+        title: 'Retirement Transition',
+        year: birthYear + localRetirementAge,
+        icon: Palmtree,
+        color: 'text-emerald-500',
+        borderColor: 'border-emerald-500/30',
+        bgColor: 'bg-emerald-500/10',
+        stroke: '#10b981',
+        note: 'Primary career end • Distribution phase begins',
+      },
+      {
+        age: 65,
+        title: 'Medicare Eligibility',
+        year: birthYear + 65,
+        icon: ShieldCheck,
+        color: 'text-purple-500',
+        borderColor: 'border-purple-500/30',
+        bgColor: 'bg-purple-500/10',
+        stroke: '#a855f7',
+        note: 'Transition to Medicare Part B/D • ACA subsidies end',
+      },
+      {
+        age: 67,
+        title: 'Full Social Security',
+        year: birthYear + 67,
+        icon: Landmark,
+        color: 'text-cyan-500',
+        borderColor: 'border-cyan-500/30',
+        bgColor: 'bg-cyan-500/10',
+        stroke: '#06b6d4',
+        note: '100% Full Retirement Age SS benefit payout',
+      },
+      {
+        age: 73,
+        title: 'RMD Mandatory Start',
+        year: birthYear + 73,
+        icon: Flag,
+        color: 'text-rose-500',
+        borderColor: 'border-rose-500/30',
+        bgColor: 'bg-rose-500/10',
+        stroke: '#f43f5e',
+        note: 'Required Minimum Distributions start for tax-deferred accounts',
+      },
+    ];
+    return list.filter((m) => m.age >= currentAge && m.age <= (plan?.lifeExpectancyAge || 100));
+  }, [birthYear, localRetirementAge, currentAge, plan?.lifeExpectancyAge]);
+
+  const milestoneMap = useMemo(() => {
+    const map: Record<number, any> = {};
+    for (const m of milestoneCallouts) {
+      map[m.age] = m;
+    }
+    return map;
+  }, [milestoneCallouts]);
+
+  // Chart data series mapped dynamically
   const chartData = useMemo(() => {
     if (yearlySimResults.length > 0) {
       return yearlySimResults.map((y: any) => ({
@@ -89,7 +267,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         label: `${y.year}`,
         netWorth: Math.round(y.netWorth),
         income: Math.round(y.grossIncome),
-        expenses: Math.round(y.totalExpenses),
+        expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses) : null,
         isRetired: y.primaryAge >= localRetirementAge,
         salaryIncome: Math.round(y.salaryIncome || 0),
         ssIncome: Math.round(y.ssIncome || 0),
@@ -105,70 +283,11 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         magi: Math.round(y.magi || 0),
         irmaaSurchargeAnnual: Math.round(y.irmaaSurchargeAnnual || 0),
         accountDrawdowns: y.accountDrawdowns || [],
+        milestone: milestoneMap[y.primaryAge],
       }));
     }
-
-    // Fallback client calculation if backend simulation not present
-    const data = [];
-    const startNw = currentNetWorth || 100000;
-    let nw = startNw;
-    const growthRate = localReturnRate / 100;
-    const retAge = localRetirementAge;
-    const endAge = Number(plan?.lifeExpectancyAge) || 100;
-
-    const salaryEvent = plan?.events?.find((e: any) => e.category === 'income' && e.type === 'salary');
-    const ssEvent = plan?.events?.find((e: any) => e.category === 'income' && e.type === 'social_security');
-    const otherIncomeEvents =
-      plan?.events?.filter((e: any) => e.category === 'income' && !['salary', 'social_security'].includes(e.type)) || [];
-    const expenseEvents = plan?.events?.filter((e: any) => e.category === 'expense') || [];
-
-    const annualSalary = parseFloat(salaryEvent?.amount || '85000');
-    const annualSS = parseFloat(ssEvent?.amount || '32000');
-    const annualOtherIncome = otherIncomeEvents.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
-    const annualExpenses = expenseEvents.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0) || 42500;
-
-    for (let age = currentAge; age <= endAge; age++) {
-      const year = currentYear + (age - currentAge);
-      const isRetired = age >= retAge;
-
-      let income = 0;
-      if (!isRetired) income += annualSalary;
-      if (age >= 67) income += annualSS;
-      income += annualOtherIncome;
-
-      data.push({
-        year,
-        age,
-        spouseAge: plan?.spouseBirthYear ? year - Number(plan.spouseBirthYear) : undefined,
-        label: `${year}`,
-        netWorth: Math.round(nw),
-        income: Math.round(income),
-        expenses: Math.round(annualExpenses),
-        isRetired,
-        salaryIncome: isRetired ? 0 : annualSalary,
-        ssIncome: age >= 67 ? annualSS : 0,
-        pensionIncome: 0,
-        otherIncome: annualOtherIncome,
-        cashDrawdown: isRetired && income < annualExpenses ? Math.min(nw, annualExpenses - income) * 0.1 : 0,
-        taxableDrawdown: isRetired && income < annualExpenses ? Math.min(nw, annualExpenses - income) * 0.4 : 0,
-        traditionalDrawdown: isRetired && income < annualExpenses ? Math.min(nw, annualExpenses - income) * 0.3 : 0,
-        rothDrawdown: isRetired && income < annualExpenses ? Math.min(nw, annualExpenses - income) * 0.2 : 0,
-        hsaDrawdown: 0,
-        totalDrawdown: isRetired && income < annualExpenses ? annualExpenses - income : 0,
-        rothConversionAmount: 0,
-        magi: income,
-        irmaaSurchargeAnnual: 0,
-        accountDrawdowns: [],
-      });
-
-      const netCashFlow = income - annualExpenses;
-      const investmentGrowth = nw * growthRate;
-      nw = nw + investmentGrowth + netCashFlow;
-      if (nw < 0) nw = 0;
-    }
-
-    return data;
-  }, [currentNetWorth, plan, localRetirementAge, localReturnRate, currentAge, currentYear, yearlySimResults]);
+    return [];
+  }, [yearlySimResults, localRetirementAge, milestoneMap]);
 
   // Key metrics
   const retirementDataPoint = chartData.find((d) => d.age === localRetirementAge);
@@ -187,73 +306,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     if (method === 'custom_order') return 'Custom Priority Order';
     return 'Textbook Waterfall (Cash → Taxable → Traditional → Roth)';
   }, [plan]);
-
-  // Rich Milestone Callouts Data
-  const milestoneCallouts = useMemo(() => {
-    const list = [
-      {
-        age: 50,
-        title: 'Catch-up Limits',
-        year: birthYear + 50,
-        icon: Award,
-        color: 'text-blue-500',
-        borderColor: 'border-blue-500/30',
-        bgColor: 'bg-blue-500/10',
-        note: 'IRA +$1k & 401(k) +$7.5k annual catch-up limits unlocked',
-      },
-      {
-        age: 55,
-        title: 'Rule of 55 Access',
-        year: birthYear + 55,
-        icon: Clock,
-        color: 'text-amber-500',
-        borderColor: 'border-amber-500/30',
-        bgColor: 'bg-amber-500/10',
-        note: 'Penalty-free 401(k) separations allowed if separated from service',
-      },
-      {
-        age: localRetirementAge,
-        title: 'Retirement Transition',
-        year: birthYear + localRetirementAge,
-        icon: Palmtree,
-        color: 'text-emerald-500',
-        borderColor: 'border-emerald-500/30',
-        bgColor: 'bg-emerald-500/10',
-        note: 'Primary career end • Distribution phase begins',
-      },
-      {
-        age: 65,
-        title: 'Medicare Eligibility',
-        year: birthYear + 65,
-        icon: ShieldCheck,
-        color: 'text-purple-500',
-        borderColor: 'border-purple-500/30',
-        bgColor: 'bg-purple-500/10',
-        note: 'Transition to Medicare Part B/D • ACA subsidies end',
-      },
-      {
-        age: 67,
-        title: 'Full Social Security',
-        year: birthYear + 67,
-        icon: Landmark,
-        color: 'text-cyan-500',
-        borderColor: 'border-cyan-500/30',
-        bgColor: 'bg-cyan-500/10',
-        note: '100% Full Retirement Age SS benefit payout',
-      },
-      {
-        age: 73,
-        title: 'RMD Mandatory Start',
-        year: birthYear + 73,
-        icon: Flag,
-        color: 'text-rose-500',
-        borderColor: 'border-rose-500/30',
-        bgColor: 'bg-rose-500/10',
-        note: 'Required Minimum Distributions start for tax-deferred accounts',
-      },
-    ];
-    return list.filter((m) => m.age >= currentAge && m.age <= (plan?.lifeExpectancyAge || 100));
-  }, [birthYear, localRetirementAge, currentAge, plan?.lifeExpectancyAge]);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -325,10 +377,10 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           </div>
         </div>
 
-        {/* Chart Area */}
+        {/* Dynamic Chart Area with On-Graph Milestone Reference Markers */}
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="accumulationGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
@@ -365,6 +417,56 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 fillOpacity={1}
                 fill="url(#accumulationGrad)"
               />
+
+              {/* Retirement Age Vertical Line Marker */}
+              <ReferenceLine
+                x={localRetirementAge}
+                stroke="#10b981"
+                strokeDasharray="4 4"
+                strokeWidth={2}
+                label={{
+                  value: `🌴 Retirement (Age ${localRetirementAge})`,
+                  position: 'top',
+                  fill: '#10b981',
+                  fontSize: 11,
+                  fontWeight: 'bold',
+                }}
+              />
+
+              {/* Milestone Icons on Graph Trajectory Curve */}
+              {milestoneCallouts.map((m, idx) => {
+                const pt = chartData.find((d) => d.age === m.age);
+                if (!pt) return null;
+                const IconComponent = m.icon;
+                return (
+                  <ReferenceDot
+                    key={idx}
+                    x={m.age}
+                    y={pt.netWorth}
+                    shape={(dotProps: any) => {
+                      const { cx, cy } = dotProps;
+                      if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
+                      return (
+                        <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
+                          <title>{`${m.title} (Age ${m.age}, Year ${m.year})\n${m.note}\nProjected Net Worth: ${formatCurrency(pt.netWorth)}`}</title>
+                          <circle
+                            cx={14}
+                            cy={14}
+                            r={13}
+                            fill="var(--card, #ffffff)"
+                            stroke={m.stroke || '#10b981'}
+                            strokeWidth={2.5}
+                            className="shadow-sm transition-transform group-hover:scale-125"
+                          />
+                          <g transform="translate(6, 6)">
+                            <IconComponent size={16} color={m.stroke || '#10b981'} />
+                          </g>
+                        </g>
+                      );
+                    }}
+                  />
+                );
+              })}
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -414,7 +516,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
       </div>
 
-      {/* NEW SECTION: Retirement Income Streams & Account Drawdowns Chart */}
+      {/* Retirement Income Streams & Account Drawdown Sources Chart */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border pb-3">
           <div>
@@ -438,9 +540,9 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         {showDrawdownDetails && (
           <div className="space-y-5 animate-in fade-in">
             {/* Stacked Bar Chart for Income Streams & Drawdowns */}
-            <div className="h-72 w-full">
+            <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
                   <XAxis
                     dataKey="age"
@@ -458,20 +560,49 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                     tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
                   />
                   <Tooltip content={<DrawdownTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Legend content={<GroupedLegend />} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+
+                  {/* Retirement Age Vertical Line */}
+                  <ReferenceLine
+                    x={localRetirementAge}
+                    stroke="#10b981"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                    label={{
+                      value: `Retirement`,
+                      position: 'top',
+                      fill: '#10b981',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  />
 
                   {/* Income Bars */}
                   <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="income" fill="#10b981" />
                   <Bar dataKey="ssIncome" name="Social Security" stackId="income" fill="#06b6d4" />
                   <Bar dataKey="pensionIncome" name="Pension" stackId="income" fill="#3b82f6" />
+                  <Bar dataKey="otherIncome" name="Other Income" stackId="income" fill="#8b5cf6" />
 
                   {/* Account Drawdown Bars */}
                   <Bar dataKey="cashDrawdown" name="Cash Drawdown" stackId="drawdown" fill="#64748b" />
                   <Bar dataKey="taxableDrawdown" name="Taxable Brokerage" stackId="drawdown" fill="#f59e0b" />
                   <Bar dataKey="traditionalDrawdown" name="Traditional IRA/401k" stackId="drawdown" fill="#a855f7" />
-                  <Bar dataKey="rothDrawdown" name="Tax-Free Roth IRA/401k" stackId="drawdown" fill="#ec4899" />
-                  <Bar dataKey="hsaDrawdown" name="HSA Medical Drawdown" stackId="drawdown" fill="#14b8a6" />
-                </BarChart>
+                  <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="drawdown" fill="#ec4899" />
+                  <Bar dataKey="rothConversionAmount" name="Roth Conversion" stackId="drawdown" fill="#f97316" />
+                  <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="drawdown" fill="#14b8a6" />
+
+                  {/* Dynamic Expenses Line — follows inflation/growth per year */}
+                  <Line
+                    type="monotone"
+                    dataKey="expenses"
+                    name="Annual Expenses"
+                    stroke="#f43f5e"
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#f43f5e', strokeWidth: 0 }}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -623,8 +754,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
+  const MilestoneIcon = data.milestone?.icon;
+  const incomeTotal = (data.income || 0);
+  const incomeGap = Math.max(0, (data.expenses || 0) - incomeTotal);
+
   return (
-    <div className="bg-card/95 backdrop-blur border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[200px]">
+    <div className="bg-background border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[210px] z-50">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
         <span>Year {data.year} (Age {data.age})</span>
         <span className={data.isRetired ? 'text-amber-500' : 'text-emerald-500'}>
@@ -640,10 +775,18 @@ function CustomTooltip({ active, payload }: any) {
           <span className="text-muted-foreground">Income:</span>
           <span className="text-foreground">{formatCurrency(data.income)}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Expenses:</span>
-          <span className="text-rose-500">{formatCurrency(data.expenses)}</span>
-        </div>
+        {data.expenses != null && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Expenses:</span>
+            <span className="text-rose-500">{formatCurrency(data.expenses)}</span>
+          </div>
+        )}
+        {incomeGap > 0 && (
+          <div className="flex justify-between text-amber-500 font-bold">
+            <span>Income Gap:</span>
+            <span>{formatCurrency(incomeGap)}</span>
+          </div>
+        )}
         {data.totalDrawdown > 0 && (
           <div className="flex justify-between pt-1 border-t border-border/50 text-amber-500 font-bold">
             <span>Portfolio Drawdown:</span>
@@ -651,6 +794,62 @@ function CustomTooltip({ active, payload }: any) {
           </div>
         )}
       </div>
+
+      {data.milestone && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-2.5 mt-2 space-y-1 text-left">
+          <div className="flex items-center gap-1.5 font-bold text-primary text-[11px]">
+            {MilestoneIcon && <MilestoneIcon className="w-3.5 h-3.5 shrink-0" />}
+            <span>{data.milestone.title}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-snug">{data.milestone.note}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GroupedLegend({ payload }: any) {
+  if (!payload) return null;
+  const incomeItems = payload.filter((p: any) =>
+    ['Salary / Earned', 'Social Security', 'Pension', 'Other Income'].includes(p.value)
+  );
+  const drawdownItems = payload.filter((p: any) =>
+    ['Cash Drawdown', 'Taxable Brokerage', 'Traditional IRA/401k', 'Roth IRA/401k', 'Roth Conversion', 'HSA Drawdown'].includes(p.value)
+  );
+  const lineItems = payload.filter((p: any) => p.value === 'Annual Expenses');
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] pt-1">
+      <div className="flex items-center gap-0.5 font-bold text-muted-foreground uppercase tracking-wider">
+        Income:
+      </div>
+      {incomeItems.map((item: any, i: number) => (
+        <div key={i} className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+          <span className="text-muted-foreground">{item.value}</span>
+        </div>
+      ))}
+      <div className="flex items-center gap-0.5 font-bold text-muted-foreground uppercase tracking-wider ml-2">
+        Drawdowns:
+      </div>
+      {drawdownItems.map((item: any, i: number) => (
+        <div key={i} className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+          <span className="text-muted-foreground">{item.value}</span>
+        </div>
+      ))}
+      {lineItems.length > 0 && (
+        <>
+          <div className="flex items-center gap-0.5 font-bold text-muted-foreground uppercase tracking-wider ml-2">
+            Reference:
+          </div>
+          {lineItems.map((item: any, i: number) => (
+            <div key={i} className="flex items-center gap-1">
+              <span className="inline-block w-4 h-0 border-t-2 border-dashed" style={{ borderColor: item.color }} />
+              <span className="text-muted-foreground">{item.value}</span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -658,13 +857,16 @@ function CustomTooltip({ active, payload }: any) {
 function DrawdownTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
+  const incomeTotal = (data.salaryIncome || 0) + (data.ssIncome || 0) + (data.pensionIncome || 0) + (data.otherIncome || 0);
+  const incomeGap = Math.max(0, (data.expenses || 0) - incomeTotal);
   return (
-    <div className="bg-card/95 backdrop-blur border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[220px]">
+    <div className="bg-background border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[240px]">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
         <span>Year {data.year} (Age {data.age})</span>
         <span className="text-primary">{data.isRetired ? 'Retirement Phase' : 'Accumulation'}</span>
       </div>
       <div className="space-y-1 font-mono">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pt-0.5">Income Sources</p>
         {data.salaryIncome > 0 && (
           <div className="flex justify-between text-emerald-500">
             <span>Salary:</span>
@@ -681,6 +883,23 @@ function DrawdownTooltip({ active, payload }: any) {
           <div className="flex justify-between text-blue-500">
             <span>Pension:</span>
             <span>{formatCurrency(data.pensionIncome)}</span>
+          </div>
+        )}
+        {data.otherIncome > 0 && (
+          <div className="flex justify-between text-violet-500">
+            <span>Other Income:</span>
+            <span>{formatCurrency(data.otherIncome)}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-bold text-foreground border-t border-border/40 pt-1">
+          <span>Total Income:</span>
+          <span>{formatCurrency(incomeTotal)}</span>
+        </div>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pt-1 border-t border-border/40">Portfolio Drawdowns</p>
+        {data.cashDrawdown > 0 && (
+          <div className="flex justify-between text-slate-400">
+            <span>Cash:</span>
+            <span>{formatCurrency(data.cashDrawdown)}</span>
           </div>
         )}
         {data.taxableDrawdown > 0 && (
@@ -701,10 +920,36 @@ function DrawdownTooltip({ active, payload }: any) {
             <span>{formatCurrency(data.rothDrawdown)}</span>
           </div>
         )}
+        {data.hsaDrawdown > 0 && (
+          <div className="flex justify-between text-teal-500">
+            <span>HSA:</span>
+            <span>{formatCurrency(data.hsaDrawdown)}</span>
+          </div>
+        )}
         {data.rothConversionAmount > 0 && (
-          <div className="flex justify-between text-cyan-400 font-bold border-t border-border/40 pt-1">
+          <div className="flex justify-between text-orange-400 font-bold border-t border-border/40 pt-1">
             <span>Roth Conversion:</span>
             <span>{formatCurrency(data.rothConversionAmount)}</span>
+          </div>
+        )}
+        {data.expenses != null && (
+          <div className="border-t border-border/40 pt-1 space-y-1">
+            <div className="flex justify-between text-rose-500">
+              <span>Expenses:</span>
+              <span>{formatCurrency(data.expenses)}</span>
+            </div>
+            {incomeGap > 0 && (
+              <div className="flex justify-between font-bold text-amber-500">
+                <span>Income Gap:</span>
+                <span>{formatCurrency(incomeGap)}</span>
+              </div>
+            )}
+            {incomeGap <= 0 && incomeTotal > 0 && (
+              <div className="flex justify-between font-bold text-emerald-500">
+                <span>Surplus:</span>
+                <span>{formatCurrency(incomeTotal - (data.expenses || 0))}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
