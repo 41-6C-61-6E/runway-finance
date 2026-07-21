@@ -134,9 +134,10 @@ export type YearGrowthFn = (yearOffset: number, acc: EngineAccount) => { growth:
 
 export function runRetirementSimulation(plan: EnginePlan, yearGrowthFn?: YearGrowthFn): SimulationOutput {
   const currentCalendarYear = new Date().getFullYear();
-  const primaryBirthYear = plan.primaryBirthYear || 1985;
+  const primaryBirthYear = Number(plan.primaryBirthYear) || 1985;
   const currentAge = currentCalendarYear - primaryBirthYear;
-  const totalYears = Math.max(1, plan.lifeExpectancyAge - currentAge);
+  const lifeExpectancyAge = Number(plan.lifeExpectancyAge) || 100;
+  const totalYears = Math.max(1, lifeExpectancyAge - currentAge);
 
   const rules = plan.rules || DEFAULT_2026_RULES;
   const inflationRate = (plan.settings?.fixedInflationRate ?? 3.0) / 100;

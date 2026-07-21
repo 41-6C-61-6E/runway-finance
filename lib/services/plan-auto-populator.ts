@@ -1,16 +1,18 @@
 import { getDb } from '@/lib/db';
 import { accounts, paystubs, plans, planAccounts, planEvents, planFlows, planSettings } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { encryptRow } from '@/lib/crypto';
+import { eq } from 'drizzle-orm';
+import { encryptRow, decryptRow } from '@/lib/crypto';
 
 export async function populatePlanWithUserFinances(planId: string, dataUserId: string, dek: Uint8Array) {
   const db = getDb();
 
-  // 1. Fetch user accounts
-  const userAccs = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+  // 1. Fetch & decrypt user accounts
+  const rawUserAccs = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+  const userAccs = await Promise.all(rawUserAccs.map((a) => decryptRow('accounts', a, dek)));
 
-  // 2. Fetch recent paystubs for salary estimate
-  const userPaystubs = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId)).limit(5);
+  // 2. Fetch & decrypt recent paystubs for salary estimate
+  const rawPaystubs = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId)).limit(5);
+  const userPaystubs = await Promise.all(rawPaystubs.map((p) => decryptRow('paystubs', p, dek)));
 
   let estimatedSalary = 85000; // default benchmark
   if (userPaystubs.length > 0) {
@@ -23,14 +25,14 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
 
   let estimatedExpenses = Math.round(estimatedSalary * 0.5); // 50% default
 
-  // 3. Mirror active accounts into plan_accounts
+  // 3. Mirror active decrypted accounts into plan_accounts
   const createdPlanAccs: Array<{ id: string; type: string }> = [];
 
   for (const acc of userAccs) {
     let type = 'taxable';
     const accType = (acc.type || '').toLowerCase();
 
-    if (['checking', 'savings', 'cash'].includes(accType)) type = 'cash';
+    if (['checking', 'savings', 'cash', 'bank', 'depository'].includes(accType)) type = 'cash';
     else if (['rothira', 'roth_ira'].includes(accType)) type = 'roth_ira';
     else if (['traditionalira', '401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(accType)) type = 'traditional_401k';
     else if (accType === 'hsa') type = 'hsa';
@@ -44,19 +46,22 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
       } catch {}
     }
 
+    const balStr = String(parseFloat(acc.balance) || 0);
+
     const encryptedAcc = await encryptRow('plan_accounts', {
       planId,
       userId: dataUserId,
       name: acc.name || 'Account',
       owner: 'primary',
       type,
-      balance: acc.balance || '0',
-      costBasis: acc.balance || '0',
+      balance: balStr,
+      costBasis: balStr,
       expectedGrowthRate: type === 'cash' ? '2.0' : '7.0',
-      dividendYield: type === 'cash' ? '0.0' : '2.0',
+      dividendYield: type === 'cash' ? '0.0' : '2.5',
       reinvestDividends: true,
       qualifiedDividendRatio: '1.0',
       rothPercentage: rothPct,
+      isIncluded: true,
     }, dek);
 
     const inserted = await db.insert(planAccounts).values(encryptedAcc).returning();
@@ -82,9 +87,10 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
         balance: dAcc.balance,
         costBasis: dAcc.balance,
         expectedGrowthRate: dAcc.type === 'cash' ? '2.0' : '7.0',
-        dividendYield: dAcc.type === 'cash' ? '0.0' : '2.0',
+        dividendYield: dAcc.type === 'cash' ? '0.0' : '2.5',
         reinvestDividends: true,
         qualifiedDividendRatio: '1.0',
+        isIncluded: true,
       }, dek);
 
       const inserted = await db.insert(planAccounts).values(encryptedAcc).returning();
@@ -112,6 +118,17 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
       amount: String(Math.round(estimatedExpenses)),
       frequency: 'yearly',
       growthRate: '2.5',
+      adjustForInflation: true,
+      startTriggerType: 'now',
+      endTriggerType: 'end_of_plan',
+    },
+    {
+      name: 'Healthcare & Insurance',
+      category: 'expense',
+      type: 'healthcare',
+      amount: '8400',
+      frequency: 'yearly',
+      growthRate: '4.5',
       adjustForInflation: true,
       startTriggerType: 'now',
       endTriggerType: 'end_of_plan',
