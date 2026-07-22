@@ -801,9 +801,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Expected Annual Return</span>
-              <span className={`font-mono font-bold text-sm ${localReturnRate < 0 ? 'text-rose-500' : 'text-primary'}`}>
-                {localReturnRate > 0 ? `+${localReturnRate}%` : `${localReturnRate}%`}
-              </span>
+              <span className="font-mono font-bold text-primary text-sm">{localReturnRate > 0 ? `+${localReturnRate}%` : `${localReturnRate}%`}</span>
             </div>
             <input
               type="range"
@@ -826,7 +824,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Inflation Rate</span>
-              <span className="font-mono font-bold text-amber-500 text-sm">{localInflationRate.toFixed(1)}%</span>
+              <span className="font-mono font-bold text-primary text-sm">{localInflationRate.toFixed(1)}%</span>
             </div>
             <input
               type="range"
@@ -835,7 +833,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               step="0.25"
               value={localInflationRate}
               onChange={(e) => setLocalInflationRate(parseFloat(e.target.value))}
-              className="w-full accent-amber-500 h-2 cursor-pointer"
+              className="w-full accent-primary h-2 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>1.0%</span>
@@ -848,9 +846,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Expense Adjustment</span>
-              <span className={`font-mono font-bold text-sm ${localExpenseModifier > 0 ? 'text-rose-500' : localExpenseModifier < 0 ? 'text-emerald-500' : 'text-primary'}`}>
-                {localExpenseModifier > 0 ? `+${localExpenseModifier}%` : `${localExpenseModifier}%`}
-              </span>
+              <span className="font-mono font-bold text-primary text-sm">{localExpenseModifier > 0 ? `+${localExpenseModifier}%` : `${localExpenseModifier}%`}</span>
             </div>
             <input
               type="range"
