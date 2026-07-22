@@ -55,6 +55,10 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [spouseRetirementAge, setSpouseRetirementAge] = useState(plan?.spouseRetirementAge || 60);
   const [spouseLifeExpectancy, setSpouseLifeExpectancy] = useState(plan?.spouseLifeExpectancyAge || 100);
 
+  // Salary State (for contribution calculations)
+  const [primarySalary, setPrimarySalary] = useState(plan?.primarySalary || '0');
+  const [spouseSalary, setSpouseSalary] = useState(plan?.spouseSalary || '0');
+
   // Social Security State
   const [primarySsMonthly, setPrimarySsMonthly] = useState(plan?.primarySsMonthlyAmount || '2500');
   const [primarySsStartAge, setPrimarySsStartAge] = useState(plan?.primarySsStartAge || 67);
@@ -91,6 +95,8 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
       setSpouseBirthYear(plan.spouseBirthYear || 1987);
       setSpouseRetirementAge(plan.spouseRetirementAge || 60);
       setSpouseLifeExpectancy(plan.spouseLifeExpectancyAge || 100);
+      setPrimarySalary(plan.primarySalary || '0');
+      setSpouseSalary(plan.spouseSalary || '0');
       setPrimarySsMonthly(plan.primarySsMonthlyAmount || '2500');
       setPrimarySsStartAge(plan.primarySsStartAge || 67);
       setSpouseSsMonthly(plan.spouseSsMonthlyAmount || '2000');
@@ -307,6 +313,24 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                       className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                     />
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground">Gross Annual Salary</label>
+                    <p className="text-[10px] text-muted-foreground/70 -mt-0.5">Used to calculate account contribution amounts (% of salary)</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">$</span>
+                      <input
+                        type="number"
+                        value={primarySalary}
+                        onChange={(e) => {
+                          setPrimarySalary(e.target.value);
+                          onUpdatePlan({ primarySalary: e.target.value });
+                        }}
+                        placeholder="e.g. 120000"
+                        className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -386,6 +410,24 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                       />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Gross Annual Salary</label>
+                      <p className="text-[10px] text-muted-foreground/70 -mt-0.5">Used to calculate {spouseName}'s account contribution amounts</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">$</span>
+                        <input
+                          type="number"
+                          value={spouseSalary}
+                          onChange={(e) => {
+                            setSpouseSalary(e.target.value);
+                            onUpdatePlan({ spouseSalary: e.target.value });
+                          }}
+                          placeholder="e.g. 85000"
+                          className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -55,6 +55,10 @@ export function PlanWizardModal({
   const [spouseSsStartAge, setSpouseSsStartAge] = useState(67);
   const [enableSpousalSsBenefit, setEnableSpousalSsBenefit] = useState(true);
 
+  // Salary State
+  const [primarySalary, setPrimarySalary] = useState(0);
+  const [spouseSalary, setSpouseSalary] = useState(0);
+
   // SS & FI Target State
   const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState(2500);
   const [primarySsStartAge, setPrimarySsStartAge] = useState(67);
@@ -89,6 +93,8 @@ export function PlanWizardModal({
       setSpouseSsStartAge(Number(initialPlan.spouseSsStartAge) || 67);
       setEnableSpousalSsBenefit(initialPlan.enableSpousalSsBenefit !== false);
 
+      setPrimarySalary(parseFloat(initialPlan.primarySalary) || 0);
+      setSpouseSalary(parseFloat(initialPlan.spouseSalary) || 0);
       setPrimarySsMonthlyAmount(parseFloat(initialPlan.primarySsMonthlyAmount) || 2500);
       setPrimarySsStartAge(Number(initialPlan.primarySsStartAge) || 67);
       setFiTargetMultiplier(Number(initialPlan.fiTargetMultiplier) || 25);
@@ -121,6 +127,8 @@ export function PlanWizardModal({
       setSpouseSsStartAge(Number(sourcePlan?.spouseSsStartAge) || 67);
       setEnableSpousalSsBenefit(sourcePlan?.enableSpousalSsBenefit !== false);
 
+      setPrimarySalary(parseFloat(sourcePlan?.primarySalary) || 0);
+      setSpouseSalary(parseFloat(sourcePlan?.spouseSalary) || 0);
       setPrimarySsMonthlyAmount(parseFloat(sourcePlan?.primarySsMonthlyAmount) || 2500);
       setPrimarySsStartAge(Number(sourcePlan?.primarySsStartAge) || 67);
       setFiTargetMultiplier(Number(sourcePlan?.fiTargetMultiplier) || 25);
@@ -194,6 +202,8 @@ export function PlanWizardModal({
         spouseSsMonthlyAmount,
         spouseSsStartAge,
         enableSpousalSsBenefit,
+        primarySalary,
+        spouseSalary,
         primarySsMonthlyAmount,
         primarySsStartAge,
         fiTargetMultiplier,
@@ -317,7 +327,7 @@ export function PlanWizardModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Primary Birth Year</label>
                   <input
@@ -353,6 +363,19 @@ export function PlanWizardModal({
                     max={110}
                     value={lifeExpectancyAge}
                     onChange={(e) => setLifeExpectancyAge(parseInt(e.target.value, 10) || 100)}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Gross Annual Salary ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    placeholder="e.g. 120000"
+                    value={primarySalary || ''}
+                    onChange={(e) => setPrimarySalary(parseFloat(e.target.value) || 0)}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -414,6 +437,19 @@ export function PlanWizardModal({
                     max={80}
                     value={spouseRetirementAge}
                     onChange={(e) => setSpouseRetirementAge(parseInt(e.target.value, 10) || 60)}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Partner Annual Salary ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    placeholder="e.g. 85000"
+                    value={spouseSalary || ''}
+                    onChange={(e) => setSpouseSalary(parseFloat(e.target.value) || 0)}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>

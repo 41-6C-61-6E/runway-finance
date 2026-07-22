@@ -59,6 +59,8 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
     lifeExpectancyAge: Number(decPlan.lifeExpectancyAge) || 100,
     withdrawalMethod: decPlan.withdrawalMethod || 'textbook',
     customWithdrawalOrder: Array.isArray(decPlan.customWithdrawalOrder) ? decPlan.customWithdrawalOrder : undefined,
+    primarySalary: parseFloat(decPlan.primarySalary) || 0,
+    spouseSalary: parseFloat(decPlan.spouseSalary) || 0,
     accounts: activeAccounts.map((a) => ({
       id: a.id,
       name: a.name,
@@ -71,6 +73,12 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       reinvestDividends: a.reinvestDividends,
       qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
       rothPercentage: a.rothPercentage,
+      contributionMode: (a.contributionMode as any) || 'none',
+      contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
+      contributionSalarySource: (a.contributionSalarySource as any) || undefined,
+      companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
+      companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
+      isSurplusDestination: Boolean(a.isSurplusDestination),
     })),
     liabilities: [],
     events: decEvents.map((e) => ({
@@ -96,6 +104,10 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       targetAccountId: f.targetAccountId,
       ruleType: f.ruleType as any,
       ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
+      matchRate: f.matchRate ? parseFloat(f.matchRate) : undefined,
+      matchLimit: f.matchLimit ? parseFloat(f.matchLimit) : undefined,
+      matchAccountId: f.matchAccountId || undefined,
+      salarySource: (f.salarySource as any) || undefined,
     })),
     settings: {
       fixedInflationRate: parseFloat(decSettings?.fixedInflationRate || '3.0'),
@@ -296,6 +308,7 @@ export async function PUT(req: NextRequest) {
       'spouseName', 'spouseRetirementAge', 'spouseLifeExpectancyAge',
       'primarySsMonthlyAmount', 'primarySsStartAge', 'spouseSsMonthlyAmount',
       'spouseSsStartAge', 'enableSpousalSsBenefit', 'fiTargetMultiplier', 'isDefault',
+      'primarySalary', 'spouseSalary',
     ];
 
     const planUpdates: Record<string, any> = {};
@@ -424,6 +437,55 @@ export async function PUT(req: NextRequest) {
         delete encFl.userId;
         delete encFl.planId;
         await getDb().update(planFlows).set(encFl).where(eq(planFlows.id, fl.id));
+      }
+    }
+
+    // Handle updating account contribution configuration
+    if (updates.updateAccountContribution) {
+      const contrib = updates.updateAccountContribution;
+      const existingAcc = await getDb().select().from(planAccounts)
+        .where(and(eq(planAccounts.id, contrib.accountId), eq(planAccounts.planId, planId)))
+        .limit(1);
+
+      if (existingAcc[0]) {
+        const decAcc = await decryptRow('plan_accounts', existingAcc[0], dek);
+        const updatedValues = {
+          ...decAcc,
+          contributionMode: contrib.contributionMode !== undefined ? contrib.contributionMode : decAcc.contributionMode,
+          contributionValue: contrib.contributionValue !== undefined ? (contrib.contributionValue != null ? String(contrib.contributionValue) : null) : decAcc.contributionValue,
+          contributionSalarySource: contrib.contributionSalarySource !== undefined ? contrib.contributionSalarySource : decAcc.contributionSalarySource,
+          companyMatchRate: contrib.companyMatchRate !== undefined ? (contrib.companyMatchRate != null ? String(contrib.companyMatchRate) : null) : decAcc.companyMatchRate,
+          companyMatchLimit: contrib.companyMatchLimit !== undefined ? (contrib.companyMatchLimit != null ? String(contrib.companyMatchLimit) : null) : decAcc.companyMatchLimit,
+          isSurplusDestination: contrib.isSurplusDestination !== undefined ? contrib.isSurplusDestination : decAcc.isSurplusDestination,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId,
+        };
+
+        // If setting as surplus destination, clear all other accounts
+        if (contrib.isSurplusDestination === true) {
+          const allAccs = await getDb().select().from(planAccounts).where(eq(planAccounts.planId, planId));
+          for (const otherAcc of allAccs) {
+            if (otherAcc.id === contrib.accountId) continue;
+            const decOther = await decryptRow('plan_accounts', otherAcc, dek);
+            if (decOther.isSurplusDestination) {
+              const encOther = await encryptRow('plan_accounts', {
+                ...decOther,
+                isSurplusDestination: false,
+                userId: dataUserId,
+                planId,
+              }, dek);
+              delete encOther.userId;
+              delete encOther.planId;
+              await getDb().update(planAccounts).set(encOther).where(eq(planAccounts.id, otherAcc.id));
+            }
+          }
+        }
+
+        const encAcc = await encryptRow('plan_accounts', updatedValues, dek);
+        delete encAcc.userId;
+        delete encAcc.planId;
+        await getDb().update(planAccounts).set(encAcc).where(eq(planAccounts.id, contrib.accountId));
       }
     }
 
