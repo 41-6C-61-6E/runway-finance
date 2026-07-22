@@ -355,10 +355,10 @@ export function runRetirementSimulation(
     const isSpouseWorking = isMfj && spouseAge !== undefined && spouseAge < (plan.spouseRetirementAge || plan.retirementAge);
 
     const adjustedPrimarySalary = isPrimaryWorking
-      ? getYearSalary(plan.primarySalary || 0, plan.primarySalaryYear || currentYear, plan.primarySalaryRaisePct || 0, plan.primarySalaryOverrides, simYear) * compoundInflation
+      ? getYearSalary(plan.primarySalary || 0, plan.primarySalaryYear || currentYear, plan.primarySalaryRaisePct || 0, plan.primarySalaryOverrides, simYear)
       : 0;
     const adjustedSpouseSalary = isSpouseWorking
-      ? getYearSalary(plan.spouseSalary || 0, plan.spouseSalaryYear || currentYear, plan.spouseSalaryRaisePct || 0, plan.spouseSalaryOverrides, simYear) * compoundInflation
+      ? getYearSalary(plan.spouseSalary || 0, plan.spouseSalaryYear || currentYear, plan.spouseSalaryRaisePct || 0, plan.spouseSalaryOverrides, simYear)
       : 0;
 
     let salaryIncome = adjustedPrimarySalary + adjustedSpouseSalary;
@@ -403,7 +403,7 @@ export function runRetirementSimulation(
       if (plan.enableSpousalSsBenefit !== false && plan.primarySsMonthlyAmount) {
         const halfPrimary = plan.primarySsMonthlyAmount * 0.5;
         if (halfPrimary > spouseMonthly) {
-          spouseSsIncome = halfPrimary * 12 * compoundInflation;
+          spouseSsIncome = halfPrimary * 12 * spouseMult * compoundInflation;
         } else {
           spouseSsIncome = spouseMonthly * 12 * spouseMult * compoundInflation;
         }
@@ -462,6 +462,7 @@ export function runRetirementSimulation(
     // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)
     let surplusSaved = 0;
     let totalPreTaxContrib = 0;
+    let hsaPreTaxContrib = 0;
     const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
 
     const isAccumulation = primaryAge < plan.retirementAge;
@@ -512,14 +513,18 @@ export function runRetirementSimulation(
           if (alloc > 0) {
             targetAcc.balance += alloc;
             totalPreTaxContrib += alloc;
+            if (targetAcc.type === 'hsa') hsaPreTaxContrib += alloc;
             surplusSaved += alloc;
 
-            // Company match
+            // Company match (pre-tax employer match goes to Traditional 401(k))
             if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
               const matchableContrib = Math.min(alloc, salaryBase * (origAcc.companyMatchLimit / 100));
               const matchAmount = matchableContrib * origAcc.companyMatchRate;
               if (matchAmount > 0) {
-                targetAcc.balance += matchAmount;
+                const matchTarget = targetAcc.type === 'roth_401k'
+                  ? (accountsState[`${origAcc.id}_trad`] || targetAcc)
+                  : targetAcc;
+                matchTarget.balance += matchAmount;
                 surplusSaved += matchAmount;
               }
             }
@@ -568,6 +573,7 @@ export function runRetirementSimulation(
           if (alloc > 0) {
             targetAcc.balance += alloc;
             totalPreTaxContrib += alloc;
+            if (targetAcc.type === 'hsa') hsaPreTaxContrib += alloc;
             surplusSaved += alloc;
 
             if (flow.matchRate != null && flow.matchLimit != null) {
@@ -585,16 +591,20 @@ export function runRetirementSimulation(
     }
 
     // 4. Tax Estimation (MFJ & Pre-Tax Deduction Aware)
+    // Federal & state ordinary income tax is reduced by total pre-tax contributions (401k, IRA, HSA)
     const taxableSalary = Math.max(0, salaryIncome - totalPreTaxContrib);
+    // Under IRC Section 3121, FICA tax (Social Security & Medicare) is reduced ONLY by HSA (cafeteria plan) contributions, NOT 401k/IRA contributions
+    const ficaTaxableSalary = Math.max(0, salaryIncome - hsaPreTaxContrib);
+
     const stdDeductionBase = parseFloat(rules.standardDeduction || '15000');
     const stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
 
     const ssWageBase = 168600 * compoundInflation;
-    const ssTaxableSalary = Math.min(taxableSalary, ssWageBase);
+    const ssTaxableSalary = Math.min(ficaTaxableSalary, ssWageBase);
     const ssFica = ssTaxableSalary * 0.062;
-    const medicareFica = taxableSalary * 0.0145;
+    const medicareFica = ficaTaxableSalary * 0.0145;
     const addMedicareThresh = isMfj ? 250000 : 200000;
-    const addMedicareFica = Math.max(0, taxableSalary - addMedicareThresh) * 0.009;
+    const addMedicareFica = Math.max(0, ficaTaxableSalary - addMedicareThresh) * 0.009;
     const ficaTax = ssFica + medicareFica + addMedicareFica;
 
     const provisionalIncome = taxableSalary + pensionIncome + otherIncome + totalSsIncome * 0.5;
@@ -642,6 +652,7 @@ export function runRetirementSimulation(
     const earlyPenaltyDetails: { age: number; accountId: string; accountName: string; accountType: string; amount: number; penalty: number }[] = [];
     let rothConversionAmount = 0;
     let totalTaxableGains = 0;
+    let totalNonQualifiedRothEarnings = 0;
 
     // Helper: check if an account would incur an early withdrawal penalty
     const wouldIncurPenalty = (acc: EngineAccount): boolean => {
@@ -650,6 +661,10 @@ export function runRetirementSimulation(
       if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
         const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
         return accOwnerAge < 59.5 && !isRuleOf55;
+      }
+      if (acc.type === 'roth_ira' || acc.type === 'roth_401k') {
+        // Direct contributions can be withdrawn penalty-free at any age, but earnings withdrawn before 59.5 incur a 10% penalty
+        return accOwnerAge < 59.5 && acc.balance > (acc.costBasis || 0);
       }
       if (acc.type === 'hsa') return accOwnerAge < 65;
       return false;
@@ -674,6 +689,25 @@ export function runRetirementSimulation(
           );
           earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: actual, penalty });
         }
+      }
+
+      // Roth IRA / Roth 401(k) Ordering Rules: Contributions (cost basis) come out tax & penalty free at any age.
+      // Non-qualified earnings withdrawn before age 59.5 incur a 10% IRS penalty AND ordinary income tax.
+      if ((acc.type === 'roth_ira' || acc.type === 'roth_401k') && accOwnerAge < 59.5) {
+        const availableBasis = Math.max(0, acc.costBasis || 0);
+        if (actual > availableBasis) {
+          const earningsWithdrawn = actual - availableBasis;
+          const penalty = earningsWithdrawn * 0.10;
+          earlyPenaltyTax += penalty;
+          totalNonQualifiedRothEarnings += earningsWithdrawn;
+          earlyWithdrawalWarnings.push(
+            `Age ${accOwnerAge}: Non-qualified Roth earnings withdrawal of $${Math.round(earningsWithdrawn).toLocaleString()} from ${acc.name} incurred a 10% early penalty ($${Math.round(penalty).toLocaleString()}).`
+          );
+          earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: earningsWithdrawn, penalty });
+        }
+        acc.costBasis = Math.max(0, availableBasis - actual);
+      } else if (acc.costBasis > 0) {
+        acc.costBasis = Math.max(0, acc.costBasis - actual);
       }
 
       // 20% Penalty for non-medical HSA withdrawals before age 65
@@ -1012,8 +1046,19 @@ export function runRetirementSimulation(
     }
 
     // 5c. Tax Reconciliation — ordinary tax, capital gains tax, and 3.8% NIIT tax
-    const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount;
+    const post65HsaOrdinary = primaryAge >= 65 ? drawdownsByType.hsa : 0;
+    const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount + totalNonQualifiedRothEarnings + post65HsaOrdinary;
     if (additionalOrdinaryIncome > 0 || totalTaxableGains > 0) {
+      // Recalculate provisional income & taxable Social Security incorporating traditional drawdowns & conversions (IRS Pub 915)
+      const updatedProvisional = taxableSalary + pensionIncome + otherIncome + additionalOrdinaryIncome + totalTaxableGains + totalSsIncome * 0.5;
+      if (updatedProvisional > ssTier2) {
+        taxableSs = Math.min(0.85 * totalSsIncome, 0.50 * (ssTier2 - ssTier1) + 0.85 * (updatedProvisional - ssTier2));
+      } else if (updatedProvisional > ssTier1) {
+        taxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (updatedProvisional - ssTier1));
+      } else {
+        taxableSs = 0;
+      }
+
       const fullTaxableOrdinary = Math.max(0,
         taxableSalary + pensionIncome + otherIncome + taxableSs + additionalOrdinaryIncome - stdDeduction
       );
@@ -1140,6 +1185,8 @@ export function runRetirementSimulation(
             acc.costBasis += Math.max(0, divAmount - divTax);
           } else {
             acc.balance = acc.balance * (1 + growth);
+            const netDiv = Math.max(0, divAmount - divTax);
+            cashTotal += netDiv;
           }
         } else {
           acc.balance = acc.balance * (1 + growth + divYield);
