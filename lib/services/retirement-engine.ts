@@ -17,6 +17,7 @@ export interface EngineAccount {
 export interface EngineLiability {
   id: string;
   name: string;
+  owner?: string;
   balance: number;
   interestRate: number;
   monthlyPayment: number;
@@ -80,17 +81,17 @@ export interface EnginePlan {
   liabilities: EngineLiability[];
   events: EngineEvent[];
   flows: EngineFlow[];
-  settings: {
+  settings?: {
     fixedInflationRate: number;
-    withholdingDeferred: number;
-    withholdingTaxable: number;
-    incomeTaxModifier: number;
-    capGainsTaxModifier: number;
-    heirFlatIncomeTaxRate: number;
-    stepUpBasis: boolean;
-    realEstateLiquidationRate: number;
-    administrativeCostRate: number;
-    charitableGiving: number;
+    withholdingDeferred?: number;
+    withholdingTaxable?: number;
+    incomeTaxModifier?: number;
+    capGainsTaxModifier?: number;
+    heirFlatIncomeTaxRate?: number;
+    stepUpBasis?: boolean;
+    realEstateLiquidationRate?: number;
+    administrativeCostRate?: number;
+    charitableGiving?: number;
     withdrawalMethod?: 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order';
     enableRothConversions?: boolean;
     rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'irmaa_tier1';
