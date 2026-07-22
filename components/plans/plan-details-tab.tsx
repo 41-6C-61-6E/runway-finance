@@ -7,6 +7,8 @@ import {
   Trash2, X, PiggyBank, CheckSquare, Square, EyeOff,
   Pencil, Save, Sparkles,
 } from 'lucide-react';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 interface PlanDetailsTabProps {
   plan: any;
@@ -51,6 +53,13 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   const [flowRuleType, setFlowRuleType] = useState('percentage');
   const [flowRuleValue, setFlowRuleValue] = useState('10.0');
   const [flowRank, setFlowRank] = useState('1');
+  const [flowSalarySource, setFlowSalarySource] = useState<'primary' | 'spouse' | 'combined'>('combined');
+
+  // Section collapsed states
+  const [isAccountsCollapsed, setIsAccountsCollapsed] = useCardCollapsed('plan_details_accounts');
+  const [isIncomesCollapsed, setIsIncomesCollapsed] = useCardCollapsed('plan_details_incomes');
+  const [isExpensesCollapsed, setIsExpensesCollapsed] = useCardCollapsed('plan_details_expenses');
+  const [isFlowsCollapsed, setIsFlowsCollapsed] = useCardCollapsed('plan_details_flows');
 
   if (!plan) {
     return (
@@ -102,9 +111,9 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setIncAmount(String(inc.amount || '50000'));
     setIncGrowth(String(inc.growthRate || '3.0'));
     setIncStart(safeString(inc.startTriggerType, 'now'));
-    setIncStartVal(safeString(inc.startTriggerValue, ''));
+    setIncStartVal(String(inc.startTriggerValue || ''));
     setIncEnd(safeString(inc.endTriggerType, 'retirement'));
-    setIncEndVal(safeString(inc.endTriggerValue, ''));
+    setIncEndVal(String(inc.endTriggerValue || ''));
     setModalType('income');
   };
 
@@ -135,6 +144,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setFlowRuleType('percentage');
     setFlowRuleValue('10.0');
     setFlowRank(String(flows.length + 1));
+    setFlowSalarySource('combined');
     setModalType('flow');
   };
 
@@ -145,6 +155,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setFlowRuleType(safeString(fl.ruleType, 'percentage'));
     setFlowRuleValue(fl.ruleValue !== undefined ? String(fl.ruleValue) : '10.0');
     setFlowRank(String(fl.rank || flows.length + 1));
+    setFlowSalarySource(fl.salarySource || 'combined');
     setModalType('flow');
   };
 
@@ -192,7 +203,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
   const handleSaveExpense = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const finalName = expName.trim() || (expType === 'healthcare' ? 'Healthcare & Medical' : expType === 'child_related' ? 'Education & Childcare' : 'Living Expenses');
+    const finalName = expName.trim() || 'Annual Expense';
 
     if (editingItem) {
       await onUpdatePlan({
@@ -216,9 +227,6 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           amount: parseFloat(expAmount) || 0,
           frequency: 'yearly',
           growthRate: parseFloat(expGrowth) || 0,
-          adjustForInflation: true,
-          startTriggerType: 'now',
-          endTriggerType: 'end_of_plan',
         },
       });
     }
@@ -246,6 +254,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           targetAccountId: flowTargetAccId,
           ruleType: flowRuleType,
           ruleValue: flowRuleType === 'percentage' ? parseFloat(flowRuleValue) || 0 : undefined,
+          salarySource: flowRuleType === 'percentage' ? flowSalarySource : undefined,
           rank: parseInt(flowRank, 10) || 1,
         },
       });
@@ -258,6 +267,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           targetAccountId: flowTargetAccId,
           ruleType: flowRuleType,
           ruleValue: flowRuleType === 'percentage' ? parseFloat(flowRuleValue) || 0 : undefined,
+          salarySource: flowRuleType === 'percentage' ? flowSalarySource : undefined,
         },
       });
     }
@@ -283,43 +293,45 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
       roth_ira: 'Roth IRA',
       roth_401k: 'Roth 401(k)',
       hsa: 'HSA',
-      crypto: 'Crypto',
+      529: '529 Plan',
+      crypto: 'Crypto Assets',
     };
-    return labels[type] || type || 'Account';
+    return labels[type] || type.replace(/_/g, ' ');
   };
 
   const getAccountTypeColor = (typeVal: any) => {
     const type = safeString(typeVal);
-    if (type.includes('roth')) return 'text-emerald-500';
-    if (type.includes('traditional') || type.includes('401k')) return 'text-blue-500';
-    if (type === 'hsa') return 'text-purple-500';
-    if (type === 'cash') return 'text-amber-500';
-    return 'text-foreground';
+    if (type.includes('roth')) return 'text-pink-500';
+    if (type.includes('traditional')) return 'text-purple-500';
+    if (type.includes('taxable')) return 'text-amber-500';
+    if (type.includes('hsa')) return 'text-teal-500';
+    return 'text-muted-foreground';
   };
 
   return (
     <div className="space-y-6">
-      {/* Summary Header */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Top Details Summary Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Active Portfolio</span>
-          <p className="text-lg font-extrabold text-foreground font-mono">{formatCurrency(totalPortfolio)}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {includedAccounts.length} of {planAccounts.length} accounts included
-          </p>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Included Portfolio</span>
+          <p className="text-xl font-extrabold text-foreground font-mono">{formatCurrency(totalPortfolio)}</p>
+          <p className="text-[10px] text-muted-foreground">{includedAccounts.length} of {planAccounts.length} accounts enabled</p>
         </div>
+
         <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Annual Income</span>
-          <p className="text-lg font-extrabold text-emerald-500 font-mono">{formatCurrency(totalAnnualIncome)}</p>
-          <p className="text-[10px] text-muted-foreground">{incomes.length} streams</p>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Income Streams</span>
+          <p className="text-xl font-extrabold text-emerald-500 font-mono">{formatCurrency(totalAnnualIncome)}</p>
+          <p className="text-[10px] text-muted-foreground">{incomes.length} active streams</p>
         </div>
+
         <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Annual Expenses</span>
-          <p className="text-lg font-extrabold text-rose-500 font-mono">{formatCurrency(totalAnnualExpenses)}</p>
-          <p className="text-[10px] text-muted-foreground">{expenses.length} categories</p>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Expenses</span>
+          <p className="text-xl font-extrabold text-rose-500 font-mono">{formatCurrency(totalAnnualExpenses)}</p>
+          <p className="text-[10px] text-muted-foreground">{expenses.length} defined outflows</p>
         </div>
+
         <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Savings Rate</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Baseline Savings Rate</span>
           <p className={`text-lg font-extrabold font-mono ${savingsRate >= 20 ? 'text-emerald-500' : savingsRate >= 10 ? 'text-amber-500' : 'text-rose-500'}`}>
             {savingsRate.toFixed(1)}%
           </p>
@@ -328,310 +340,339 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
       </div>
 
       {/* Accounts Section with Inclusion Checkboxes */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Landmark className="w-5 h-5 text-primary" />
-            <h3 className="text-sm font-bold text-foreground">Plan Accounts</h3>
-            <span className="text-xs text-muted-foreground">
-              ({includedAccounts.length}/{planAccounts.length} accounts selected)
-            </span>
-          </div>
-          <span className="text-[11px] text-muted-foreground italic">
-            Check or uncheck accounts to include/exclude them from projections
-          </span>
-        </div>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isAccountsCollapsed}
+          onToggle={setIsAccountsCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-primary" />
+              <h3 className="text-sm font-bold text-foreground">Plan Accounts</h3>
+              <span className="text-xs text-muted-foreground">
+                ({includedAccounts.length}/{planAccounts.length} selected)
+              </span>
+            </div>
+          }
+        />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {planAccounts.map((acc: any, i: number) => {
-            const accName = safeString(acc.name, 'Account');
-            const accId = safeString(acc.id, `acc_${i}`);
-            const isIncluded = acc.isIncluded !== false;
+        {!isAccountsCollapsed && (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {planAccounts.map((acc: any, i: number) => {
+                const accName = safeString(acc.name, 'Account');
+                const accId = safeString(acc.id, `acc_${i}`);
+                const isIncluded = acc.isIncluded !== false;
 
-            return (
-              <div
-                key={accId}
-                className={`flex items-center justify-between p-3 rounded-xl border text-xs transition-all ${
-                  isIncluded
-                    ? 'bg-muted/30 border-border hover:border-primary/40'
-                    : 'bg-muted/10 border-border/40 opacity-60'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAccount(accId, isIncluded)}
-                    className="text-primary hover:scale-110 transition-transform shrink-0 cursor-pointer"
-                    title={isIncluded ? 'Uncheck to exclude from plan' : 'Check to include in plan'}
+                return (
+                  <div
+                    key={accId}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs transition-all ${
+                      isIncluded
+                        ? 'bg-muted/30 border-border hover:border-primary/40'
+                        : 'bg-muted/10 border-border/40 opacity-60'
+                    }`}
                   >
-                    {isIncluded ? (
-                      <CheckSquare className="w-4 h-4 text-primary" />
-                    ) : (
-                      <Square className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAccount(accId, isIncluded)}
+                        className="text-primary hover:scale-110 transition-transform shrink-0 cursor-pointer"
+                        title={isIncluded ? 'Uncheck to exclude from plan' : 'Check to include in plan'}
+                      >
+                        {isIncluded ? (
+                          <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Square className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
 
-                  <div className="min-w-0">
-                    <span className={`font-bold block truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
-                      {accName}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <p className={`text-[11px] font-medium ${getAccountTypeColor(acc.type)}`}>
-                        {getAccountTypeLabel(acc.type)}
-                      </p>
-                      {!isIncluded && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500">
-                          <EyeOff className="w-2.5 h-2.5" /> Excluded
+                      <div className="min-w-0">
+                        <span className={`font-bold block truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                          {accName}
                         </span>
-                      )}
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-[11px] font-medium ${getAccountTypeColor(acc.type)}`}>
+                            {getAccountTypeLabel(acc.type)}
+                          </p>
+                          {!isIncluded && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500">
+                              <EyeOff className="w-2.5 h-2.5" /> Excluded
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
+
+                    <span className={`font-mono font-bold ml-2 shrink-0 ${isIncluded ? 'text-foreground' : 'text-muted-foreground/60 line-through'}`}>
+                      {formatCurrency(parseFloat(acc.balance) || 0)}
+                    </span>
                   </div>
-                </div>
+                );
+              })}
 
-                <span className={`font-mono font-bold ml-2 shrink-0 ${isIncluded ? 'text-foreground' : 'text-muted-foreground/60 line-through'}`}>
-                  {formatCurrency(parseFloat(acc.balance) || 0)}
-                </span>
-              </div>
-            );
-          })}
-
-          {planAccounts.length === 0 && (
-            <p className="text-xs text-muted-foreground italic col-span-full py-3 text-center border border-dashed border-border rounded-lg">
-              No accounts. Create a new plan to auto-populate from your linked accounts.
-            </p>
-          )}
-        </div>
+              {planAccounts.length === 0 && (
+                <p className="text-xs text-muted-foreground italic col-span-full py-3 text-center border border-dashed border-border rounded-lg">
+                  No accounts. Create a new plan to auto-populate from your linked accounts.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Incomes Section */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
-            <h3 className="text-sm font-bold text-foreground">Income Streams</h3>
-            <span className="text-xs text-muted-foreground">({incomes.length} active)</span>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isIncomesCollapsed}
+          onToggle={setIsIncomesCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
+              <h3 className="text-sm font-bold text-foreground">Income Streams</h3>
+              <span className="text-xs text-muted-foreground">({incomes.length} active)</span>
+            </div>
+          }
+          actions={
+            <button
+              onClick={openAddIncomeModal}
+              className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Income
+            </button>
+          }
+        />
+
+        {!isIncomesCollapsed && (
+          <div className="p-5 space-y-2">
+            {incomes.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
+                No income streams defined yet.
+              </p>
+            ) : (
+              incomes.map((inc: any, i: number) => {
+                const incName = safeString(inc.name, 'Income Stream');
+                const incId = safeString(inc.id, `inc_${i}`);
+                const incTypeStr = safeString(inc.type);
+                const startType = safeString(inc.startTriggerType);
+                const startVal = safeString(inc.startTriggerValue);
+                const endType = safeString(inc.endTriggerType);
+                const endVal = safeString(inc.endTriggerValue);
+
+                return (
+                  <div key={incId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-emerald-500/40 transition-all">
+                    <div>
+                      <span className="font-bold text-foreground">{incName}</span>
+                      <p className="text-[11px] text-muted-foreground capitalize">
+                        {incTypeStr.replace(/_/g, ' ')}
+                        {inc.growthRate ? ` • ${inc.growthRate}% annual growth` : ''}
+                        {startType === 'age' && startVal ? ` • Starts Age ${startVal}` : ''}
+                        {endType === 'retirement' ? ' • Until Retirement' : ''}
+                        {endType === 'age' && endVal ? ` • Until Age ${endVal}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-bold text-emerald-500">
+                        {formatCurrency(parseFloat(inc.amount) || 0)}/yr
+                      </span>
+                      <button
+                        onClick={() => openEditIncomeModal(inc)}
+                        className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
+                        title="Edit Income Stream"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(incId)}
+                        className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
+                        title="Delete Income Stream"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-          <button
-            onClick={openAddIncomeModal}
-            className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Income
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {incomes.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-              No income streams defined yet.
-            </p>
-          ) : (
-            incomes.map((inc: any, i: number) => {
-              const incName = safeString(inc.name, 'Income Stream');
-              const incId = safeString(inc.id, `inc_${i}`);
-              const incTypeStr = safeString(inc.type);
-              const startType = safeString(inc.startTriggerType);
-              const startVal = safeString(inc.startTriggerValue);
-              const endType = safeString(inc.endTriggerType);
-              const endVal = safeString(inc.endTriggerValue);
-
-              return (
-                <div key={incId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-emerald-500/40 transition-all">
-                  <div>
-                    <span className="font-bold text-foreground">{incName}</span>
-                    <p className="text-[11px] text-muted-foreground capitalize">
-                      {incTypeStr.replace(/_/g, ' ')}
-                      {inc.growthRate ? ` • ${inc.growthRate}% annual growth` : ''}
-                      {startType === 'age' && startVal ? ` • Starts Age ${startVal}` : ''}
-                      {endType === 'retirement' ? ' • Until Retirement' : ''}
-                      {endType === 'age' && endVal ? ` • Until Age ${endVal}` : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-emerald-500">
-                      {formatCurrency(parseFloat(inc.amount) || 0)}/yr
-                    </span>
-                    <button
-                      onClick={() => openEditIncomeModal(inc)}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                      title="Edit Income Stream"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEvent(incId)}
-                      className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                      title="Delete Income Stream"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        )}
       </div>
 
       {/* Expenses Section */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ArrowDownCircle className="w-5 h-5 text-rose-500" />
-            <h3 className="text-sm font-bold text-foreground">Expenses</h3>
-            <span className="text-xs text-muted-foreground">({expenses.length} active)</span>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isExpensesCollapsed}
+          onToggle={setIsExpensesCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <ArrowDownCircle className="w-5 h-5 text-rose-500" />
+              <h3 className="text-sm font-bold text-foreground">Expenses</h3>
+              <span className="text-xs text-muted-foreground">({expenses.length} active)</span>
+            </div>
+          }
+          actions={
+            <button
+              onClick={openAddExpenseModal}
+              className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Expense
+            </button>
+          }
+        />
+
+        {!isExpensesCollapsed && (
+          <div className="p-5 space-y-2">
+            {expenses.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
+                No expenses defined yet.
+              </p>
+            ) : (
+              expenses.map((exp: any, i: number) => {
+                const expName = safeString(exp.name, 'Expense');
+                const expId = safeString(exp.id, `exp_${i}`);
+                const expTypeStr = safeString(exp.type);
+
+                return (
+                  <div key={expId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-rose-500/40 transition-all">
+                    <div>
+                      <span className="font-bold text-foreground">{expName}</span>
+                      <p className="text-[11px] text-muted-foreground capitalize">
+                        {expTypeStr.replace(/_/g, ' ')}
+                        {exp.growthRate ? ` • ${exp.growthRate}% annual inflation` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-bold text-rose-500">
+                        {formatCurrency(parseFloat(exp.amount) || 0)}/yr
+                      </span>
+                      <button
+                        onClick={() => openEditExpenseModal(exp)}
+                        className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
+                        title="Edit Expense"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(expId)}
+                        className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
+                        title="Delete Expense"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-          <button
-            onClick={openAddExpenseModal}
-            className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Expense
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {expenses.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-              No expenses defined yet.
-            </p>
-          ) : (
-            expenses.map((exp: any, i: number) => {
-              const expName = safeString(exp.name, 'Expense');
-              const expId = safeString(exp.id, `exp_${i}`);
-              const expTypeStr = safeString(exp.type);
-
-              return (
-                <div key={expId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-rose-500/40 transition-all">
-                  <div>
-                    <span className="font-bold text-foreground">{expName}</span>
-                    <p className="text-[11px] text-muted-foreground capitalize">
-                      {expTypeStr.replace(/_/g, ' ')}
-                      {exp.growthRate ? ` • ${exp.growthRate}% annual inflation` : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-rose-500">
-                      {formatCurrency(parseFloat(exp.amount) || 0)}/yr
-                    </span>
-                    <button
-                      onClick={() => openEditExpenseModal(exp)}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                      title="Edit Expense"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEvent(expId)}
-                      className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                      title="Delete Expense"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        )}
       </div>
 
       {/* Prioritized Flows Section */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PiggyBank className="w-5 h-5 text-primary" />
-            <div>
-              <h3 className="text-sm font-bold text-foreground">Savings Priority Waterfall</h3>
-              <p className="text-[11px] text-muted-foreground">Designate percentage of salary or rules to fund plan accounts during accumulation phase.</p>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isFlowsCollapsed}
+          onToggle={setIsFlowsCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <PiggyBank className="w-5 h-5 text-primary" />
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Savings Priority Waterfall</h3>
+                <p className="text-[11px] text-muted-foreground">Designate percentage of salary or rules to fund plan accounts during accumulation phase.</p>
+              </div>
             </div>
-          </div>
-          <button
-            onClick={openAddFlowModal}
-            className="flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Rule
-          </button>
-        </div>
+          }
+          actions={
+            <button
+              onClick={openAddFlowModal}
+              className="flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Rule
+            </button>
+          }
+        />
 
-        <div className="space-y-2">
-          {flows.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-              No savings rules set. Only designated salary percentages will fund accounts during accumulation.
-            </p>
-          ) : (
-            flows.map((fl: any, i: number) => {
-              const flName = safeString(fl.name, 'Savings Rule');
-              const flId = safeString(fl.id, `fl_${i}`);
-              const ruleType = safeString(fl.ruleType);
-              const targetAcc = planAccounts.find((a: any) => a.id === fl.targetAccountId);
-              const targetAccName = targetAcc ? safeString(targetAcc.name) : 'Unassigned Account';
-              const targetAccType = targetAcc ? safeString(targetAcc.type) : '';
+        {!isFlowsCollapsed && (
+          <div className="p-5 space-y-2">
+            {flows.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
+                No savings rules set. Only designated salary percentages will fund accounts during accumulation.
+              </p>
+            ) : (
+              flows.map((fl: any, i: number) => {
+                const flName = safeString(fl.name, 'Savings Rule');
+                const flId = safeString(fl.id, `fl_${i}`);
+                const ruleType = safeString(fl.ruleType);
+                const targetAcc = planAccounts.find((a: any) => a.id === fl.targetAccountId);
+                const targetAccName = targetAcc ? safeString(targetAcc.name) : 'Unassigned Account';
+                const targetAccType = targetAcc ? safeString(targetAcc.type) : '';
 
-              const isPreTax = targetAccType === 'traditional_401k' || targetAccType === 'traditional_ira' || targetAccType === 'hsa';
+                const isPreTax = targetAccType === 'traditional_401k' || targetAccType === 'traditional_ira' || targetAccType === 'hsa';
 
-              let detailText = `Rule: ${ruleType.replace(/_/g, ' ')}`;
-              let estAmtText = '';
+                let detailText = `Rule: ${ruleType.replace(/_/g, ' ')}`;
+                let estAmtText = '';
 
-              if (ruleType === 'percentage' && fl.ruleValue) {
-                const pct = parseFloat(fl.ruleValue) || 0;
-                detailText = `${pct}% of Salary`;
-                if (totalAnnualIncome > 0) {
-                  estAmtText = `${formatCurrency((totalAnnualIncome * pct) / 100)}/yr`;
+                if (ruleType === 'percentage' && fl.ruleValue) {
+                  const pct = parseFloat(fl.ruleValue) || 0;
+                  detailText = `${pct}% of Salary`;
+                  if (totalAnnualIncome > 0) {
+                    estAmtText = `${formatCurrency((totalAnnualIncome * pct) / 100)}/yr`;
+                  }
+                } else if (ruleType === 'maximize') {
+                  detailText = 'Maximize IRS Statutory Limit';
+                } else if (ruleType === 'save_leftover') {
+                  detailText = 'Save Surplus Unallocated Cash';
                 }
-              } else if (ruleType === 'maximize') {
-                detailText = 'Maximize IRS Statutory Limit';
-              } else if (ruleType === 'save_leftover') {
-                detailText = 'Save Surplus Unallocated Cash';
-              }
 
-              return (
-                <div key={flId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-primary/40 transition-all">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-mono font-bold flex items-center justify-center text-xs shrink-0">
-                      #{fl.rank || i + 1}
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-foreground">{flName}</span>
-                        {isPreTax ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 uppercase tracking-wider">Pre-Tax</span>
-                        ) : (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase tracking-wider">Post-Tax</span>
-                        )}
+                return (
+                  <div key={flId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-primary/40 transition-all">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-mono font-bold flex items-center justify-center text-xs shrink-0">
+                        #{fl.rank || i + 1}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-foreground">{flName}</span>
+                          {isPreTax ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 uppercase tracking-wider">Pre-Tax</span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase tracking-wider">Post-Tax</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Target: <span className="font-medium text-foreground">{targetAccName}</span> • {detailText}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Target: <span className="font-medium text-foreground">{targetAccName}</span> • {detailText}
-                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {estAmtText && (
+                        <span className="font-mono font-bold text-primary text-xs">
+                          {estAmtText}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => openEditFlowModal(fl)}
+                        className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
+                        title="Edit Rule"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFlow(flId)}
+                        className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {estAmtText && (
-                      <span className="font-mono font-bold text-primary text-xs">
-                        {estAmtText}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => openEditFlowModal(fl)}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                      title="Edit Rule"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFlow(flId)}
-                      className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                      title="Delete Rule"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
       {/* Fully Opaque Add / Edit Modals */}
@@ -914,16 +955,32 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   </div>
                 </div>
                 {flowRuleType === 'percentage' && (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300">Designated Salary Percentage (%)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      placeholder="e.g. 15.0"
-                      value={flowRuleValue}
-                      onChange={(e) => setFlowRuleValue(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-300">Salary Percentage (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="e.g. 15.0"
+                        value={flowRuleValue}
+                        onChange={(e) => setFlowRuleValue(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                      />
+                    </div>
+                    {Boolean(plan.hasSpouse) && (
+                      <div>
+                        <label className="text-xs font-semibold text-slate-300">Salary Base</label>
+                        <select
+                          value={flowSalarySource}
+                          onChange={(e: any) => setFlowSalarySource(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                        >
+                          <option value="combined">Combined Household Salary</option>
+                          <option value="primary">Primary Salary Only</option>
+                          <option value="spouse">{plan.spouseName || 'Spouse'} Salary Only</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex justify-end gap-2 pt-2">
