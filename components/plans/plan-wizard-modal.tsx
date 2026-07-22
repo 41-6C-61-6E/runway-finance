@@ -218,7 +218,7 @@ export function PlanWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl max-w-2xl w-full my-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-card z-50 border border-border rounded-2xl p-6 shadow-2xl max-w-2xl w-full my-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
         {/* Wizard Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-3">

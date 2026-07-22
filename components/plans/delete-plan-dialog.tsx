@@ -37,7 +37,7 @@ export function DeletePlanDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4">
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-card z-50 border border-border rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
