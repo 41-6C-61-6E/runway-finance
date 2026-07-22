@@ -598,7 +598,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           <div className="p-5 space-y-2">
             {flows.length === 0 ? (
               <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-                No savings rules set. Only designated salary percentages will fund accounts during accumulation.
+                No savings rules configured yet. Click "+ Add Rule" above to set salary contribution percentages or rules for your accounts during accumulation.
               </p>
             ) : (
               flows.map((fl: any, i: number) => {
