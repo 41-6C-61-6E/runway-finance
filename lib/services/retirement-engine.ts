@@ -482,7 +482,8 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
-          const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+          const cat = getAccountCategory(targetAcc.type);
+          const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
           if (!isPreTax) continue;
 
           const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
@@ -491,10 +492,11 @@ export function runRetirementSimulation(
           const salaryBase = getAccountSalaryBase(origAcc);
 
           let requestedAlloc = 0;
-          if (origAcc.contributionMode === 'percentage' && origAcc.contributionValue) {
-            requestedAlloc = salaryBase * (origAcc.contributionValue / 100);
-          } else if (origAcc.contributionMode === 'fixed_amount' && origAcc.contributionValue) {
-            requestedAlloc = origAcc.contributionValue * compoundInflation;
+          const contribVal = Number(origAcc.contributionValue || 0);
+          if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
+            requestedAlloc = salaryBase * (contribVal / 100);
+          } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
+            requestedAlloc = contribVal * compoundInflation;
           } else if (origAcc.contributionMode === 'maximize') {
             let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
             if (targetAcc.type.includes('401k')) {
@@ -751,8 +753,9 @@ export function runRetirementSimulation(
           // ── Per-Account Contribution Mode (new): Post-tax accounts ──
           for (const origAcc of plan.accounts) {
             if (surplus <= 0) break;
-            if (!origAcc.contributionMode || origAcc.contributionMode === 'none') continue;
-            if (origAcc.isSurplusDestination) continue; // Handle sweep last
+            if (!origAcc.contributionMode || origAcc.contributionMode === 'none') {
+              if (origAcc.isSurplusDestination) continue; // Pure sweep account handled at end
+            }
 
             let targetAcc = accountsState[origAcc.id];
             if (!targetAcc) {
@@ -760,15 +763,17 @@ export function runRetirementSimulation(
             }
             if (!targetAcc) continue;
 
-            const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+            const cat = getAccountCategory(targetAcc.type);
+            const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
             if (isPreTax) continue; // Already handled in Phase 1
 
             const salaryBase = getAccountSalaryBase(origAcc);
             let limit = surplus;
-            if (origAcc.contributionMode === 'percentage' && origAcc.contributionValue) {
-              limit = salaryBase * (origAcc.contributionValue / 100);
-            } else if (origAcc.contributionMode === 'fixed_amount' && origAcc.contributionValue) {
-              limit = origAcc.contributionValue * compoundInflation;
+            const contribVal = Number(origAcc.contributionValue || 0);
+            if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
+              limit = salaryBase * (contribVal / 100);
+            } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
+              limit = contribVal * compoundInflation;
             } else if (origAcc.contributionMode === 'maximize') {
               const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
               const ownerCatchUp50 = ownerAge >= 50;

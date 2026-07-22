@@ -1053,6 +1053,68 @@ describe('Retirement Projection Engine', () => {
     expect(yr1.earlyPenaltyDetails?.length).toBe(1);
     expect(yr1.earlyPenaltyDetails?.[0].amount).toBe(20000);
   });
+
+  it('correctly allocates 4% salary contribution to taxable brokerage when isSurplusDestination is true', () => {
+    const taxableContribPlan: EnginePlan = {
+      id: 'taxable_contrib_plan',
+      name: 'Taxable Contribution Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 190000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Vanguard Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 10000,
+          costBasis: 10000,
+          expectedGrowthRate: 0, // 0% growth to isolate contribution
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'percentage',
+          contributionValue: 4.0, // 4% of $190k = $7,600/yr
+          isSurplusDestination: true,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(taxableContribPlan);
+    const yr1 = output.yearlyResults[0];
+    const taxableAcc = yr1.accountBalances.find(a => a.id === 'acc_taxable');
+
+    // 4% of $190,000 = $7,600 contribution. Starting balance $10,000.
+    // Plus leftover net cash surplus sweep (salary $190k - $50k exp - ~$43k tax = ~$97k surplus).
+    // The taxable brokerage balance should be at least starting $10,000 + $7,600 = $17,600.
+    expect(taxableAcc?.balance).toBeGreaterThanOrEqual(17600);
+  });
 });
 
 
