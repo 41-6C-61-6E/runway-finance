@@ -272,4 +272,358 @@ describe('FIRE Open Issues Fixes', () => {
     expect(firstYear.irmaaNotice).toBeDefined();
     expect(firstYear.irmaaNotice?.tier).toBeGreaterThan(0);
   });
+
+  it('Textbook mode avoids traditional accounts before 59.5 — draws from Roth first', () => {
+    const plan: EnginePlan = {
+      id: 'test-textbook-reorder',
+      name: 'Textbook Reorder Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+        {
+          id: 'acc-roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Roth should be drawn first, traditional should have no penalty
+    expect(firstYear.drawdownsByType.roth).toBeGreaterThan(0);
+    expect(firstYear.earlyPenaltyTax).toBe(0);
+    expect(firstYear.earlyPenaltyDetails?.length ?? 0).toBe(0);
+  });
+
+  it('Tax-optimized mode skips trad bracket-fill when under 59.5', () => {
+    const plan: EnginePlan = {
+      id: 'test-taxopt-skip',
+      name: 'Tax Optimized Skip Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'tax_optimized',
+      accounts: [
+        {
+          id: 'acc-trad',
+          name: 'Traditional 401k',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+        {
+          id: 'acc-taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Taxable should be drawn, not trad (no penalty)
+    expect(firstYear.drawdownsByType.traditional).toBe(0);
+    expect(firstYear.earlyPenaltyTax).toBe(0);
+  });
+
+  it('Penalties only applied as last resort when no other accounts have funds', () => {
+    const plan: EnginePlan = {
+      id: 'test-penalty-last-resort',
+      name: 'Penalty Last Resort',
+      hasSpouse: false,
+      primaryBirthYear: 1980,
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 80000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Only trad account exists, so penalty is unavoidable
+    expect(firstYear.drawdownsByType.traditional).toBeGreaterThan(0);
+    expect(firstYear.earlyPenaltyTax).toBeGreaterThan(0);
+    expect(firstYear.earlyPenaltyDetails?.length).toBeGreaterThan(0);
+  });
+
+  it('earlyPenaltyDetails includes per-account breakdown', () => {
+    const plan: EnginePlan = {
+      id: 'test-penalty-details',
+      name: 'Penalty Details Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980,
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad-ira',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+        {
+          id: 'acc-trad-401k',
+          name: 'Old 401k',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 80000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    expect(firstYear.earlyPenaltyDetails?.length).toBeGreaterThan(0);
+    for (const detail of firstYear.earlyPenaltyDetails!) {
+      expect(detail.age).toBe(46);
+      expect(detail.penalty).toBe(detail.amount * 0.10);
+      expect(detail.accountType).toMatch(/traditional/);
+    }
+  });
+
+  it('Rule of 55 exception: no penalty for 401k when retiring at 55+', () => {
+    const plan: EnginePlan = {
+      id: 'test-rule-of-55',
+      name: 'Rule of 55 Test',
+      hasSpouse: false,
+      primaryBirthYear: 1971, // Age 55 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 55,
+      lifeExpectancyAge: 60,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad-401k',
+          name: 'Company 401k',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Rule of 55: no penalty for 401k at 55+ when retirement age >= 55
+    expect(firstYear.drawdownsByType.traditional).toBeGreaterThan(0);
+    expect(firstYear.earlyPenaltyTax).toBe(0);
+    expect(firstYear.earlyPenaltyDetails?.length ?? 0).toBe(0);
+  });
+
+  it('Rule of 55 does NOT apply to Traditional IRA — penalty still applies', () => {
+    const plan: EnginePlan = {
+      id: 'test-rule-of-55-ira',
+      name: 'Rule of 55 IRA Test',
+      hasSpouse: false,
+      primaryBirthYear: 1971, // Age 55 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 55,
+      lifeExpectancyAge: 60,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad-ira',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Rule of 55 only applies to 401k, not IRA
+    expect(firstYear.drawdownsByType.traditional).toBeGreaterThan(0);
+    expect(firstYear.earlyPenaltyTax).toBeGreaterThan(0);
+  });
 });
