@@ -217,6 +217,7 @@ export interface YearlySimulationResult {
   irmaaSurchargeAnnual: number;
   irmaaNotice?: { tier: number; surcharge: number; magi: number; threshold: number };
   earlyWithdrawalWarnings?: string[];
+  earlyPenaltyDetails?: { age: number; accountId: string; accountName: string; accountType: string; amount: number; penalty: number }[];
   milestonesReached: string[];
 }
 
@@ -354,10 +355,10 @@ export function runRetirementSimulation(
     const isSpouseWorking = isMfj && spouseAge !== undefined && spouseAge < (plan.spouseRetirementAge || plan.retirementAge);
 
     const adjustedPrimarySalary = isPrimaryWorking
-      ? getYearSalary(plan.primarySalary || 0, plan.primarySalaryYear || currentYear, plan.primarySalaryRaisePct || 0, plan.primarySalaryOverrides, simYear)
+      ? getYearSalary(plan.primarySalary || 0, plan.primarySalaryYear || currentYear, plan.primarySalaryRaisePct || 0, plan.primarySalaryOverrides, simYear) * compoundInflation
       : 0;
     const adjustedSpouseSalary = isSpouseWorking
-      ? getYearSalary(plan.spouseSalary || 0, plan.spouseSalaryYear || currentYear, plan.spouseSalaryRaisePct || 0, plan.spouseSalaryOverrides, simYear)
+      ? getYearSalary(plan.spouseSalary || 0, plan.spouseSalaryYear || currentYear, plan.spouseSalaryRaisePct || 0, plan.spouseSalaryOverrides, simYear) * compoundInflation
       : 0;
 
     let salaryIncome = adjustedPrimarySalary + adjustedSpouseSalary;
@@ -638,8 +639,21 @@ export function runRetirementSimulation(
     const accountDrawdowns: AccountDrawdownDetail[] = [];
     const drawdownsByType = { cash: 0, taxable: 0, traditional: 0, roth: 0, hsa: 0 };
     const earlyWithdrawalWarnings: string[] = [];
+    const earlyPenaltyDetails: { age: number; accountId: string; accountName: string; accountType: string; amount: number; penalty: number }[] = [];
     let rothConversionAmount = 0;
     let totalTaxableGains = 0;
+
+    // Helper: check if an account would incur an early withdrawal penalty
+    const wouldIncurPenalty = (acc: EngineAccount): boolean => {
+      const accOwnerAge = acc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+      const accOwnerRetirementAge = acc.owner === 'spouse' && plan.spouseRetirementAge ? plan.spouseRetirementAge : plan.retirementAge;
+      if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
+        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
+        return accOwnerAge < 59.5 && !isRuleOf55;
+      }
+      if (acc.type === 'hsa') return accOwnerAge < 65;
+      return false;
+    };
 
     // Helper for withdrawing from an account with penalty tracking
     const withdrawFromAcc = (acc: EngineAccount, amt: number) => {
@@ -658,6 +672,7 @@ export function runRetirementSimulation(
           earlyWithdrawalWarnings.push(
             `Age ${accOwnerAge}: Withdrawal of $${Math.round(actual).toLocaleString()} from ${acc.name} incurred a 10% early withdrawal penalty ($${Math.round(penalty).toLocaleString()}).`
           );
+          earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: actual, penalty });
         }
       }
 
@@ -668,6 +683,7 @@ export function runRetirementSimulation(
         earlyWithdrawalWarnings.push(
           `Age ${accOwnerAge}: Non-qualified withdrawal of $${Math.round(actual).toLocaleString()} from HSA incurred a 20% early penalty ($${Math.round(penalty).toLocaleString()}).`
         );
+        earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: actual, penalty });
       }
 
       // Track capital gains for taxable account withdrawals
@@ -811,18 +827,40 @@ export function runRetirementSimulation(
       const method = plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook';
 
       if (method === 'proportional') {
-        const eligibleAccs = Object.values(accountsState).filter((a) => a.balance > 0);
-        const totalBal = eligibleAccs.reduce((s, a) => s + a.balance, 0);
-        if (totalBal > 0) {
-          let remDeficit = deficit;
-          for (const acc of eligibleAccs) {
+        // Prefer non-penalized accounts first; fall back to penalized only if deficit remains
+        const safeAccs = Object.values(accountsState).filter((a) => a.balance > 0 && !wouldIncurPenalty(a));
+        const penaltyAccs = Object.values(accountsState).filter((a) => a.balance > 0 && wouldIncurPenalty(a));
+        const totalSafeBal = safeAccs.reduce((s, a) => s + a.balance, 0);
+
+        let remDeficit = deficit;
+
+        // First pass: proportional draw from non-penalized accounts
+        if (totalSafeBal > 0) {
+          for (const acc of safeAccs) {
             if (remDeficit <= 0) break;
-            const propShare = (acc.balance / totalBal) * deficit;
+            const propShare = (acc.balance / totalSafeBal) * deficit;
             const w = withdrawFromAcc(acc, propShare);
             remDeficit -= w;
           }
-          if (remDeficit > 0) {
-            for (const acc of eligibleAccs) {
+          // Catch-up pass for rounding gaps
+          for (const acc of safeAccs) {
+            if (remDeficit <= 0) break;
+            const w = withdrawFromAcc(acc, remDeficit);
+            remDeficit -= w;
+          }
+        }
+
+        // Second pass: proportional from penalized accounts only if safe accounts couldn't cover deficit
+        if (remDeficit > 0 && penaltyAccs.length > 0) {
+          const totalPenaltyBal = penaltyAccs.reduce((s, a) => s + a.balance, 0);
+          if (totalPenaltyBal > 0) {
+            for (const acc of penaltyAccs) {
+              if (remDeficit <= 0) break;
+              const propShare = (acc.balance / totalPenaltyBal) * remDeficit;
+              const w = withdrawFromAcc(acc, propShare);
+              remDeficit -= w;
+            }
+            for (const acc of penaltyAccs) {
               if (remDeficit <= 0) break;
               const w = withdrawFromAcc(acc, remDeficit);
               remDeficit -= w;
@@ -834,10 +872,13 @@ export function runRetirementSimulation(
         const currentTaxable = taxableOrdinaryIncome;
         const bracketRoom = Math.max(0, target12Limit - currentTaxable);
 
-        if (bracketRoom > 0 && deficit > 0) {
-          const tradAccs = Object.values(accountsState).filter(
-            (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
-          );
+        // Only fill 12% bracket with traditional accounts if none would incur penalties
+        const tradAccs = Object.values(accountsState).filter(
+          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+        );
+        const tradHasPenaltyRisk = tradAccs.some((a) => wouldIncurPenalty(a));
+
+        if (bracketRoom > 0 && deficit > 0 && !tradHasPenaltyRisk) {
           let tradNeeded = Math.min(deficit, bracketRoom);
           for (const acc of tradAccs) {
             if (tradNeeded <= 0) break;
@@ -864,11 +905,13 @@ export function runRetirementSimulation(
           if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
             return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
           }
+          // Check if any traditional/hsa accounts would incur penalties
+          const hasPenaltyAccounts = accountsList.some((a) => wouldIncurPenalty(a));
           const orderMap: Record<string, number> = {
             cash: 1,
             taxable: 2,
-            traditional_ira: 3,
-            traditional_401k: 3,
+            traditional_ira: hasPenaltyAccounts ? 7 : 3,
+            traditional_401k: hasPenaltyAccounts ? 7 : 3,
             roth_ira: 4,
             roth_401k: 4,
             hsa: 5,
@@ -1187,6 +1230,7 @@ export function runRetirementSimulation(
       irmaaSurchargeAnnual,
       irmaaNotice,
       earlyWithdrawalWarnings,
+      earlyPenaltyDetails,
       milestonesReached,
     });
   }

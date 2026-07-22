@@ -46,6 +46,7 @@ import {
   Activity,
   Percent,
   ShieldAlert,
+  AlertTriangle,
   Scale,
   Eye,
   EyeOff,
@@ -156,6 +157,14 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       lifeExpectancyAge: Number(plan.lifeExpectancyAge) || 100,
       withdrawalMethod: plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook',
       customWithdrawalOrder: Array.isArray(plan.customWithdrawalOrder) ? plan.customWithdrawalOrder : undefined,
+      primarySalary: parseFloat(plan.primarySalary) || 0,
+      primarySalaryYear: Number(plan.primarySalaryYear) || new Date().getFullYear(),
+      primarySalaryRaisePct: parseFloat(plan.primarySalaryRaisePct) || 0,
+      primarySalaryOverrides: plan.primarySalaryOverrides && typeof plan.primarySalaryOverrides === 'object' ? plan.primarySalaryOverrides : undefined,
+      spouseSalary: parseFloat(plan.spouseSalary) || 0,
+      spouseSalaryYear: Number(plan.spouseSalaryYear) || new Date().getFullYear(),
+      spouseSalaryRaisePct: parseFloat(plan.spouseSalaryRaisePct) || 0,
+      spouseSalaryOverrides: plan.spouseSalaryOverrides && typeof plan.spouseSalaryOverrides === 'object' ? plan.spouseSalaryOverrides : undefined,
       accounts: activeAccounts.map((a: any) => ({
         id: a.id,
         name: a.name,
@@ -430,6 +439,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           earlyPenaltyTax: Math.round((y.earlyPenaltyTax || 0) / discountFactor),
           irmaaNotice: y.irmaaNotice,
           earlyWithdrawalWarnings: y.earlyWithdrawalWarnings || [],
+          earlyPenaltyDetails: y.earlyPenaltyDetails || [],
           irmaaSurchargeAnnual: Math.round((y.irmaaSurchargeAnnual || 0) / discountFactor),
           accountDrawdowns: y.accountDrawdowns || [],
           milestone: milestoneMap[y.primaryAge],
@@ -898,7 +908,31 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-                <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+              <XAxis
+                dataKey="age"
+                stroke="currentColor"
+                className="text-xs text-muted-foreground"
+                tickLine={false}
+                tick={(props: any) => {
+                  const { x, y, payload } = props;
+                  const dataPoint = chartData.find((d: any) => d.age === payload.value);
+                  const hasPenalty = dataPoint && dataPoint.earlyPenaltyTax > 0;
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text x={0} y={0} dy={14} textAnchor="middle" fill="currentColor" fontSize={10} className="text-muted-foreground">
+                        {payload.value}
+                      </text>
+                      {hasPenalty && (
+                        <g transform="translate(-5, 18)">
+                          <title>{`${dataPoint.earlyWithdrawalWarnings?.join('\n') || 'Early withdrawal penalty'}`}</title>
+                          <polygon points="5,0 10,8 0,8" fill="#f59e0b" opacity={0.9} />
+                          <text x={5} y={7} textAnchor="middle" fill="#000" fontSize={6} fontWeight="bold">!</text>
+                        </g>
+                      )}
+                    </g>
+                  );
+                }}
+              />
                 <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
                 <Tooltip />
                 <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile" />
@@ -972,9 +1006,22 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </div>
           }
           actions={
-            <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
-              {activeStrategyLabel}
-            </span>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const totalPenalties = chartData.reduce((sum: number, y: any) => sum + (y.earlyPenaltyTax || 0), 0);
+                const penaltyYearCount = chartData.filter((y: any) => y.earlyPenaltyTax > 0).length;
+                if (totalPenalties <= 0) return null;
+                return (
+                  <span className="text-[10px] font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1" title={`Early withdrawal penalties in ${penaltyYearCount} year(s)`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    {penaltyYearCount} yr{penaltyYearCount !== 1 ? 's' : ''} w/ penalties
+                  </span>
+                );
+              })()}
+              <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+                {activeStrategyLabel}
+              </span>
+            </div>
           }
         />
 
@@ -1189,6 +1236,32 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           }
         />
 
+        {/* Early Withdrawal Penalty Alert Banner */}
+        {!isYearlyTableCollapsed && (() => {
+          const totalPenalties = chartData.reduce((sum: number, y: any) => sum + (y.earlyPenaltyTax || 0), 0);
+          const penaltyYears = chartData.filter((y: any) => y.earlyPenaltyTax > 0);
+          if (totalPenalties <= 0) return null;
+          return (
+            <div className="mx-4 mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                    Early withdrawal penalties detected in {penaltyYears.length} year{penaltyYears.length !== 1 ? 's' : ''}, totaling {formatCurrency(totalPenalties)}
+                  </p>
+                  <div className="mt-1.5 space-y-0.5">
+                    {penaltyYears.map((y: any) => (
+                      <div key={y.year} className="text-[10px] text-amber-700 dark:text-amber-300 font-mono">
+                        Age {y.age} ({y.year}): {y.earlyWithdrawalWarnings?.map((w: string) => w).join(' ') || formatCurrency(y.earlyPenaltyTax) + ' penalty'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {!isYearlyTableCollapsed && (
           <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
             <table className="w-full text-xs text-left">
@@ -1200,6 +1273,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   <th className="p-2.5">Gross Income</th>
                   <th className="p-2.5">Expenses</th>
                   <th className="p-2.5">Taxes Paid</th>
+                  <th className="p-2.5">Penalty</th>
                   <th className="p-2.5">ETR %</th>
                   <th className="p-2.5">Taxable Draw</th>
                   <th className="p-2.5">Trad Draw</th>
@@ -1225,6 +1299,13 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                       <td className="p-2.5 text-emerald-500">{formatCurrency(y.income)}</td>
                       <td className="p-2.5 text-rose-500">{formatCurrency(y.expenses)}</td>
                       <td className="p-2.5 text-rose-400 font-bold">{formatCurrency(y.taxesPaid)}</td>
+                      <td className="p-2.5" title={y.earlyWithdrawalWarnings?.join('\n') || ''}>
+                        {y.earlyPenaltyTax > 0 ? (
+                          <span className="text-amber-500 font-bold font-mono">{formatCurrency(y.earlyPenaltyTax)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="p-2.5 text-muted-foreground">{y.effectiveTaxRate ? `${y.effectiveTaxRate.toFixed(1)}%` : '0%'}</td>
                       <td className="p-2.5 text-amber-500">{formatCurrency(y.taxableDrawdown)}</td>
                       <td className="p-2.5 text-purple-500">{formatCurrency(y.traditionalDrawdown)}</td>
@@ -1532,6 +1613,19 @@ function DrawdownTooltip({ active, payload }: any) {
           <div className="flex justify-between text-orange-400 font-bold border-t border-border/40 pt-1">
             <span>Roth Conversion:</span>
             <span>{formatCurrency(data.rothConversionAmount)}</span>
+          </div>
+        )}
+        {data.earlyPenaltyTax > 0 && (
+          <div className="border-t border-amber-500/30 pt-1 space-y-0.5">
+            <div className="flex justify-between text-amber-500 font-bold">
+              <span>⚠ Early Withdrawal Penalty:</span>
+              <span>{formatCurrency(data.earlyPenaltyTax)}</span>
+            </div>
+            {data.earlyPenaltyDetails?.map((d: any, i: number) => (
+              <div key={i} className="text-[10px] text-amber-600 dark:text-amber-400 font-mono pl-2">
+                Age {d.age}: {formatCurrency(d.amount)} from {d.accountName} → {d.accountType.includes('hsa') ? '20%' : '10%'} penalty ({formatCurrency(d.penalty)})
+              </div>
+            ))}
           </div>
         )}
         {data.actualDrawdowns > 0 && (
