@@ -118,6 +118,7 @@ export const planFlows = pgTable('plan_flows', {
   startTriggerValue: text('start_trigger_value'),
   endTriggerType: text('end_trigger_type').notNull().default('end_of_plan'),
   endTriggerValue: text('end_trigger_value'),
+  salarySource: text('salary_source'), // 'primary' | 'spouse' | 'combined'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

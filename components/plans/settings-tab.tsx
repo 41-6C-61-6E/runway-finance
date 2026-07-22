@@ -26,6 +26,8 @@ import {
   IRS_UNIFORM_LIFETIME_TABLE,
   HISTORICAL_RETURNS_DATA,
 } from '@/lib/constants/retirement-defaults';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 interface SettingsTabProps {
   plan: any;
@@ -36,6 +38,10 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [subTab, setSubTab] = useState<
     'milestones' | 'social_security' | 'rates_estate' | 'engine_rules'
   >('milestones');
+
+  // Collapsible card states
+  const [isPrimaryProfileCollapsed, setIsPrimaryProfileCollapsed] = useCardCollapsed('settings_primary_profile');
+  const [isSpouseProfileCollapsed, setIsSpouseProfileCollapsed] = useCardCollapsed('settings_spouse_profile');
 
   const [retirementAge, setRetirementAge] = useState(plan?.retirementAge || 60);
   const [lifeExpectancy, setLifeExpectancy] = useState(plan?.lifeExpectancyAge || 100);
@@ -222,147 +228,167 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
       {subTab === 'milestones' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Primary Profile */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Flag className="w-4 h-4 text-primary" />
-                Primary Profile
-              </h3>
-              <span className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-0.5 bg-muted rounded">Primary</span>
-            </div>
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+            <CollapsibleCardHeader
+              isCollapsed={isPrimaryProfileCollapsed}
+              onToggle={setIsPrimaryProfileCollapsed}
+              title={
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Flag className="w-4 h-4 text-primary" />
+                  Primary Profile
+                </h3>
+              }
+              actions={
+                <span className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-0.5 bg-muted rounded">Primary</span>
+              }
+            />
 
-            <div className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Tax Filing Status</label>
-                <select
-                  value={filingStatus}
-                  onChange={(e) => {
-                    const status = e.target.value;
-                    setFilingStatus(status);
-                    const hasSpouseUpdate = status === 'married_joint';
-                    onUpdatePlan({ filingStatus: status, hasSpouse: hasSpouseUpdate });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
-                >
-                  <option value="single">Single</option>
-                  <option value="married_joint">Married Filing Jointly (MFJ)</option>
-                  <option value="married_separate">Married Filing Separately</option>
-                  <option value="head_of_household">Head of Household</option>
-                </select>
-              </div>
+            {!isPrimaryProfileCollapsed && (
+              <div className="p-5 space-y-4">
+                <div className="space-y-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground">Tax Filing Status</label>
+                    <select
+                      value={filingStatus}
+                      onChange={(e) => {
+                        const status = e.target.value;
+                        setFilingStatus(status);
+                        const hasSpouseUpdate = status === 'married_joint';
+                        onUpdatePlan({ filingStatus: status, hasSpouse: hasSpouseUpdate });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
+                    >
+                      <option value="single">Single</option>
+                      <option value="married_joint">Married Filing Jointly (MFJ)</option>
+                      <option value="married_separate">Married Filing Separately</option>
+                      <option value="head_of_household">Head of Household</option>
+                    </select>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground">Primary Birth Year</label>
-                <input
-                  type="number"
-                  value={birthYear}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setBirthYear(val);
-                    onUpdatePlan({ primaryBirthYear: val });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                />
-              </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground">Primary Birth Year</label>
+                    <input
+                      type="number"
+                      value={birthYear}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setBirthYear(val);
+                        onUpdatePlan({ primaryBirthYear: val });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground font-mono font-normal">Retirement Age Target</label>
-                <input
-                  type="number"
-                  value={retirementAge}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setRetirementAge(val);
-                    onUpdatePlan({ retirementAge: val });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                />
-              </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground font-mono font-normal">Retirement Age Target</label>
+                    <input
+                      type="number"
+                      value={retirementAge}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setRetirementAge(val);
+                        onUpdatePlan({ retirementAge: val });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-muted-foreground font-mono font-normal">Life Expectancy Target</label>
-                <input
-                  type="number"
-                  value={lifeExpectancy}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setLifeExpectancy(val);
-                    onUpdatePlan({ lifeExpectancyAge: val });
-                  }}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                />
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground font-mono font-normal">Life Expectancy Target</label>
+                    <input
+                      type="number"
+                      value={lifeExpectancy}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setLifeExpectancy(val);
+                        onUpdatePlan({ lifeExpectancyAge: val });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Partner / Spouse Profile (Visible if MFJ) */}
           {isMfj ? (
-            <div className="bg-card border border-primary/30 rounded-xl p-5 shadow-sm space-y-4 bg-primary/[0.02]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-500" />
-                  Partner / Spouse Profile
-                </h3>
-                <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">MFJ Active</span>
-              </div>
+            <div className="bg-card border border-primary/30 rounded-xl shadow-sm overflow-hidden space-y-0 bg-primary/[0.02]">
+              <CollapsibleCardHeader
+                isCollapsed={isSpouseProfileCollapsed}
+                onToggle={setIsSpouseProfileCollapsed}
+                title={
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-500" />
+                    Partner / Spouse Profile
+                  </h3>
+                }
+                actions={
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">MFJ Active</span>
+                }
+              />
 
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <label className="font-semibold text-muted-foreground">Partner Name / Label</label>
-                  <input
-                    type="text"
-                    value={spouseName}
-                    onChange={(e) => {
-                      setSpouseName(e.target.value);
-                      onUpdatePlan({ spouseName: e.target.value });
-                    }}
-                    placeholder="Spouse / Partner"
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
-                  />
-                </div>
+              {!isSpouseProfileCollapsed && (
+                <div className="p-5 space-y-4">
+                  <div className="space-y-3 text-xs">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Partner Name / Label</label>
+                      <input
+                        type="text"
+                        value={spouseName}
+                        onChange={(e) => {
+                          setSpouseName(e.target.value);
+                          onUpdatePlan({ spouseName: e.target.value });
+                        }}
+                        placeholder="Spouse / Partner"
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
+                      />
+                    </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-muted-foreground">Partner Birth Year</label>
-                  <input
-                    type="number"
-                    value={spouseBirthYear}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setSpouseBirthYear(val);
-                      onUpdatePlan({ spouseBirthYear: val });
-                    }}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Partner Birth Year</label>
+                      <input
+                        type="number"
+                        value={spouseBirthYear}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setSpouseBirthYear(val);
+                          onUpdatePlan({ spouseBirthYear: val });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-muted-foreground">Partner Retirement Age Target</label>
-                  <input
-                    type="number"
-                    value={spouseRetirementAge}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setSpouseRetirementAge(val);
-                      onUpdatePlan({ spouseRetirementAge: val });
-                    }}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Partner Retirement Age Target</label>
+                      <input
+                        type="number"
+                        value={spouseRetirementAge}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setSpouseRetirementAge(val);
+                          onUpdatePlan({ spouseRetirementAge: val });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-muted-foreground">Partner Life Expectancy Target</label>
-                  <input
-                    type="number"
-                    value={spouseLifeExpectancy}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setSpouseLifeExpectancy(val);
-                      onUpdatePlan({ spouseLifeExpectancyAge: val });
-                    }}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
-                  />
+                    <div className="space-y-1">
+                      <label className="font-semibold text-muted-foreground">Partner Life Expectancy Target</label>
+                      <input
+                        type="number"
+                        value={spouseLifeExpectancy}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setSpouseLifeExpectancy(val);
+                          onUpdatePlan({ spouseLifeExpectancyAge: val });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="bg-card border border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-2 text-muted-foreground">

@@ -7,6 +7,8 @@ import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { formatCurrency } from '@/lib/utils/format';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { Play, Zap, Star, GitCompare, Sparkles, CheckCircle2, ShieldAlert, ArrowRight, Layers, Award } from 'lucide-react';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 interface ScenariosTabProps {
   plan: any;
@@ -16,6 +18,12 @@ interface ScenariosTabProps {
 
 export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'compare' | 'matrix' | 'optimizer'>('compare');
+
+  // Collapsible card states
+  const [isCompareCardCollapsed, setIsCompareCardCollapsed] = useCardCollapsed('scenarios_compare_card');
+  const [isTrajectoryChartCollapsed, setIsTrajectoryChartCollapsed] = useCardCollapsed('scenarios_trajectory_chart');
+  const [isMatrixCollapsed, setIsMatrixCollapsed] = useCardCollapsed('scenarios_matrix');
+  const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useCardCollapsed('scenarios_optimizer');
 
   // Scenario Comparison mode: 'saved_plans' vs 'custom_params'
   const [compareMode, setCompareMode] = useState<'saved_plans' | 'custom_params'>('saved_plans');
@@ -297,96 +305,104 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
       {activeSubTab === 'compare' && (
         <div className="space-y-6">
           {/* Controls to pick mode & select plans */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <GitCompare className="w-5 h-5 text-primary" />
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Scenario Comparison Engine</h3>
-                  <p className="text-xs text-muted-foreground">Compare saved FIRE plans side-by-side or model custom hypotheses</p>
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+            <CollapsibleCardHeader
+              isCollapsed={isCompareCardCollapsed}
+              onToggle={setIsCompareCardCollapsed}
+              title={
+                <div className="flex items-center gap-2">
+                  <GitCompare className="w-5 h-5 text-primary" />
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Scenario Comparison Engine</h3>
+                    <p className="text-xs text-muted-foreground">Compare saved FIRE plans side-by-side or model custom hypotheses</p>
+                  </div>
                 </div>
-              </div>
-
-              {/* Mode Toggle: Saved Plans vs Custom Parameters */}
-              <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border text-xs">
-                <button
-                  onClick={() => setCompareMode('saved_plans')}
-                  className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
-                    compareMode === 'saved_plans' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Compare Saved Plans ({allPlans.length})
-                </button>
-                <button
-                  onClick={() => setCompareMode('custom_params')}
-                  className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
-                    compareMode === 'custom_params' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Custom What-If Parameters
-                </button>
-              </div>
-            </div>
-
-            {compareMode === 'saved_plans' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
-                  <span className="font-bold text-emerald-500 uppercase tracking-wider text-[10px]">Plan A (Active Plan)</span>
-                  <p className="text-sm font-extrabold text-foreground font-mono">{plan?.name || 'Primary Plan'}</p>
-                  <p className="text-[11px] text-muted-foreground">Retirement Age {plan?.retirementAge || 60} • {plan?.filingStatus === 'married_joint' ? 'Married Filing Jointly' : 'Single'}</p>
-                </div>
-
-                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
-                  <label className="font-bold text-amber-500 uppercase tracking-wider text-[10px] block">Select Plan B to Compare</label>
-                  <select
-                    value={selectedPlanBId}
-                    onChange={(e) => setSelectedPlanBId(e.target.value)}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
+              }
+              actions={
+                <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border text-xs">
+                  <button
+                    onClick={() => setCompareMode('saved_plans')}
+                    className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                      compareMode === 'saved_plans' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    {allPlans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.id === plan?.id ? '(Current Active)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-muted-foreground">Choose any saved plan to compare trajectories</p>
+                    Compare Saved Plans ({allPlans.length})
+                  </button>
+                  <button
+                    onClick={() => setCompareMode('custom_params')}
+                    className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                      compareMode === 'custom_params' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Custom What-If Parameters
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
-                  <input
-                    type="number"
-                    min="40"
-                    max="75"
-                    value={scenarioBRetirementAge}
-                    onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
-                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                  />
-                </div>
+              }
+            />
 
-                <div className="space-y-1.5">
-                  <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={scenarioBReturnRate}
-                    onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
-                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                  />
-                </div>
+            {!isCompareCardCollapsed && (
+              <div className="p-5 space-y-4">
+                {compareMode === 'saved_plans' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
+                      <span className="font-bold text-emerald-500 uppercase tracking-wider text-[10px]">Plan A (Active Plan)</span>
+                      <p className="text-sm font-extrabold text-foreground font-mono">{plan?.name || 'Primary Plan'}</p>
+                      <p className="text-[11px] text-muted-foreground">Retirement Age {plan?.retirementAge || 60} • {plan?.filingStatus === 'married_joint' ? 'Married Filing Jointly' : 'Single'}</p>
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={scenarioBStateTaxRate}
-                    onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
-                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                  />
-                </div>
+                    <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
+                      <label className="font-bold text-amber-500 uppercase tracking-wider text-[10px] block">Select Plan B to Compare</label>
+                      <select
+                        value={selectedPlanBId}
+                        onChange={(e) => setSelectedPlanBId(e.target.value)}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
+                      >
+                        {allPlans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} {p.id === plan?.id ? '(Current Active)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-muted-foreground">Choose any saved plan to compare trajectories</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
+                      <input
+                        type="number"
+                        min="40"
+                        max="75"
+                        value={scenarioBRetirementAge}
+                        onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={scenarioBReturnRate}
+                        onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={scenarioBStateTaxRate}
+                        onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -394,19 +410,19 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
           {/* Metric Comparison Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-emerald-500 uppercase">Plan A ({plan?.name}) Net Worth</span>
+              <span className="text-xs font-bold text-emerald-500 uppercase">Plan A ({plan?.name}) Portfolio</span>
               <p className="text-xl font-extrabold text-emerald-500 font-mono">{formatCurrency(comparisonSims.simA.endingNetWorth)}</p>
               <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesA)} | ETR: {comparisonSims.etrA.toFixed(1)}%</p>
             </div>
 
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-amber-500 uppercase">Plan B ({comparisonSims.planBName}) Net Worth</span>
+              <span className="text-xs font-bold text-amber-500 uppercase">Plan B ({comparisonSims.planBName}) Portfolio</span>
               <p className="text-xl font-extrabold text-amber-500 font-mono">{formatCurrency(comparisonSims.simB.endingNetWorth)}</p>
               <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesB)} | ETR: {comparisonSims.etrB.toFixed(1)}%</p>
             </div>
 
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Net Worth Delta</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase">Portfolio Delta</span>
               <p className={`text-xl font-extrabold font-mono ${comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? 'text-emerald-500' : 'text-rose-500'}`}>
                 {comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? '+' : ''}{formatCurrency(comparisonSims.simB.endingNetWorth - comparisonSims.simA.endingNetWorth)}
               </p>
@@ -423,41 +439,59 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
           </div>
 
           {/* Overlaid Trajectory Chart */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground">Overlaid Net Worth Trajectories</h3>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={comparisonSims.chartComparison}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-                  <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
-                  <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Net Worth']} />
-                  <Legend />
-                  <Line type="monotone" dataKey="netWorthA" name={`Plan A: ${plan?.name}`} stroke="#10b981" strokeWidth={2.5} dot={false} />
-                  <Line type="monotone" dataKey="netWorthB" name={`Plan B: ${comparisonSims.planBName}`} stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+            <CollapsibleCardHeader
+              isCollapsed={isTrajectoryChartCollapsed}
+              onToggle={setIsTrajectoryChartCollapsed}
+              title={<h3 className="text-sm font-bold text-foreground">Overlaid Retirement Portfolio Trajectories</h3>}
+            />
+
+            {!isTrajectoryChartCollapsed && (
+              <div className="p-5">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={comparisonSims.chartComparison}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+                      <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+                      <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Retirement Portfolio']} />
+                      <Legend />
+                      <Line type="monotone" dataKey="netWorthA" name={`Plan A: ${plan?.name}`} stroke="#10b981" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="netWorthB" name={`Plan B: ${comparisonSims.planBName}`} stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Sub-Tab 2: Live Dynamic Strategy Matrix */}
       {activeSubTab === 'matrix' && (
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                Live Engine Strategy Matrix
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Real-time simulation results comparing tax & withdrawal strategies on your active plan</p>
-            </div>
-            <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              <Award className="w-3.5 h-3.5" />
-              Engine Recommended
-            </span>
-          </div>
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+          <CollapsibleCardHeader
+            isCollapsed={isMatrixCollapsed}
+            onToggle={setIsMatrixCollapsed}
+            title={
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  Live Engine Strategy Matrix
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Real-time simulation results comparing tax & withdrawal strategies on your active plan</p>
+              </div>
+            }
+            actions={
+              <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                <Award className="w-3.5 h-3.5" />
+                Engine Recommended
+              </span>
+            }
+          />
+
+          {!isMatrixCollapsed && (
+            <div className="p-5">
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
@@ -466,7 +500,7 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
                   <th className="p-3">Strategy Name</th>
                   <th className="p-3">Lifetime Taxes</th>
                   <th className="p-3">Average ETR</th>
-                  <th className="p-3">Ending Net Worth</th>
+                  <th className="p-3">Ending Portfolio</th>
                   <th className="p-3">Peak Draw %</th>
                   <th className="p-3">Plan Status</th>
                 </tr>
@@ -503,23 +537,34 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
               </tbody>
             </table>
           </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Sub-Tab 3: Beam Search Optimizer */}
       {activeSubTab === 'optimizer' && (
         <div className="space-y-6">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5">
-            <div className="flex items-center gap-2 border-b border-border pb-3">
-              <Zap className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-bold text-foreground">Optimization Objective</h3>
-            </div>
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+            <CollapsibleCardHeader
+              isCollapsed={isOptimizerCollapsed}
+              onToggle={setIsOptimizerCollapsed}
+              title={
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-bold text-foreground">Optimization Objective</h3>
+                </div>
+              }
+            />
+
+            {!isOptimizerCollapsed && (
+              <div className="p-5 space-y-5">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
               {[
                 { id: 'legacy' as const, label: 'Higher Net Legacy', desc: 'Maximize estate passed to heirs' },
                 { id: 'taxes' as const, label: 'Lower Lifetime Taxes', desc: 'Minimize cumulative taxes paid' },
-                { id: 'networth' as const, label: 'Higher Net Worth', desc: 'Maximize final ending portfolio' },
+                { id: 'networth' as const, label: 'Higher Portfolio Balance', desc: 'Maximize final ending portfolio' },
                 { id: 'etr' as const, label: 'Lower Effective Tax Rate', desc: 'Minimize average annual ETR' },
                 { id: 'rmds' as const, label: 'Lower RMD Distributions', desc: 'Reduce mandatory traditional withdrawals' },
               ].map((obj) => (
@@ -565,6 +610,8 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
                 {optLoading ? 'Optimizing...' : 'Run Beam Search'}
               </button>
             </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
