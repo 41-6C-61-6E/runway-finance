@@ -260,6 +260,12 @@ export async function POST(req: NextRequest) {
       fiTargetMultiplier,
       isDefault,
       accountInclusions,
+      primarySalary,
+      spouseSalary,
+      primarySalaryRaisePct,
+      spouseSalaryRaisePct,
+      primarySalaryYear,
+      spouseSalaryYear,
     } = body;
 
     // If setting as default, clear default status on other plans
@@ -290,6 +296,12 @@ export async function POST(req: NextRequest) {
       fiTargetMultiplier: Number(fiTargetMultiplier) || 25,
       withdrawalMethod: 'textbook',
       isDefault: Boolean(isDefault),
+      primarySalary: primarySalary !== undefined ? String(primarySalary) : '0',
+      spouseSalary: spouseSalary !== undefined ? String(spouseSalary) : '0',
+      primarySalaryYear: Number(primarySalaryYear) || new Date().getFullYear(),
+      spouseSalaryYear: Number(spouseSalaryYear) || new Date().getFullYear(),
+      primarySalaryRaisePct: primarySalaryRaisePct !== undefined ? String(primarySalaryRaisePct) : '0',
+      spouseSalaryRaisePct: spouseSalaryRaisePct !== undefined ? String(spouseSalaryRaisePct) : '0',
     }, dek);
 
     const inserted = await getDb().insert(plans).values(encryptedValues).returning();
