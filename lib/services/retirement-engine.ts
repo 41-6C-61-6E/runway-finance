@@ -447,16 +447,59 @@ export function runRetirementSimulation(
     // Helper to get applicable salary base for a flow (Primary vs Spouse vs Combined)
     const getFlowSalaryBase = (flow: EngineFlow, targetAcc: EngineAccount) => {
       const source = flow.salarySource || (targetAcc.owner === 'spouse' ? 'spouse' : targetAcc.owner === 'primary' ? 'primary' : 'combined');
-      if (source === 'spouse') return adjustedSpouseSalary > 0 ? adjustedSpouseSalary : adjustedPrimarySalary;
-      if (source === 'primary') return adjustedPrimarySalary > 0 ? adjustedPrimarySalary : adjustedSpouseSalary;
-      return adjustedPrimarySalary + adjustedSpouseSalary;
+      if (source === 'spouse') {
+        if (adjustedSpouseSalary > 0) return adjustedSpouseSalary;
+        if (adjustedPrimarySalary > 0) return adjustedPrimarySalary;
+        return salaryIncome > 0 ? salaryIncome : grossIncome;
+      }
+      if (source === 'primary') {
+        if (adjustedPrimarySalary > 0) return adjustedPrimarySalary;
+        if (adjustedSpouseSalary > 0) return adjustedSpouseSalary;
+        return salaryIncome > 0 ? salaryIncome : grossIncome;
+      }
+      const combined = adjustedPrimarySalary + adjustedSpouseSalary;
+      if (combined > 0) return combined;
+      return salaryIncome > 0 ? salaryIncome : grossIncome;
     };
 
-    // Helper to get salary base for per-account contributions (uses plan-level salary fields)
+    // Helper to get salary base for per-account contributions
     const getAccountSalaryBase = (acc: EngineAccount) => {
-      const source = acc.contributionSalarySource || (acc.owner === 'spouse' ? 'spouse' : 'primary');
-      if (source === 'spouse') return adjustedSpouseSalary > 0 ? adjustedSpouseSalary : adjustedPrimarySalary;
-      return adjustedPrimarySalary;
+      const source = acc.contributionSalarySource || (acc.owner === 'spouse' ? 'spouse' : acc.owner === 'joint' || acc.owner === 'combined' ? 'combined' : 'primary');
+      if (source === 'spouse') {
+        if (adjustedSpouseSalary > 0) return adjustedSpouseSalary;
+        if (adjustedPrimarySalary > 0) return adjustedPrimarySalary;
+        return salaryIncome > 0 ? salaryIncome : grossIncome;
+      }
+      if (source === 'combined') {
+        const combined = adjustedPrimarySalary + adjustedSpouseSalary;
+        if (combined > 0) return combined;
+        return salaryIncome > 0 ? salaryIncome : grossIncome;
+      }
+      if (adjustedPrimarySalary > 0) return adjustedPrimarySalary;
+      if (adjustedSpouseSalary > 0) return adjustedSpouseSalary;
+      return salaryIncome > 0 ? salaryIncome : grossIncome;
+    };
+
+    // Helper to get match target account (redirects Roth 401k employer match to Traditional 401k)
+    const getMatchTarget = (origAcc: EngineAccount, targetAcc: EngineAccount): EngineAccount => {
+      if (targetAcc.type !== 'roth_401k') return targetAcc;
+      const tradId = `${origAcc.id}_trad`;
+      if (accountsState[tradId]) return accountsState[tradId];
+      const existingTrad = Object.values(accountsState).find(a => a.type === 'traditional_401k' && a.owner === targetAcc.owner);
+      if (existingTrad) return existingTrad;
+      accountsState[tradId] = {
+        id: tradId,
+        name: `${origAcc.name} (Pre-Tax Employer Match)`,
+        type: 'traditional_401k',
+        owner: targetAcc.owner || 'primary',
+        balance: 0,
+        costBasis: 0,
+        expectedGrowthRate: targetAcc.expectedGrowthRate,
+        dividendYield: targetAcc.dividendYield,
+        reinvestDividends: targetAcc.reinvestDividends,
+        qualifiedDividendRatio: targetAcc.qualifiedDividendRatio,
+      };
+      return accountsState[tradId];
     };
 
     // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)
@@ -494,7 +537,8 @@ export function runRetirementSimulation(
           let requestedAlloc = 0;
           const contribVal = Number(origAcc.contributionValue || 0);
           if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
-            requestedAlloc = salaryBase * (contribVal / 100);
+            const pct = contribVal <= 1 ? contribVal * 100 : contribVal;
+            requestedAlloc = salaryBase * (pct / 100);
           } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
             requestedAlloc = contribVal * compoundInflation;
           } else if (origAcc.contributionMode === 'maximize') {
@@ -520,12 +564,11 @@ export function runRetirementSimulation(
 
             // Company match (pre-tax employer match goes to Traditional 401(k))
             if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
-              const matchableContrib = Math.min(alloc, salaryBase * (origAcc.companyMatchLimit / 100));
+              const matchLimitPct = origAcc.companyMatchLimit <= 1 ? origAcc.companyMatchLimit * 100 : origAcc.companyMatchLimit;
+              const matchableContrib = Math.min(alloc, salaryBase * (matchLimitPct / 100));
               const matchAmount = matchableContrib * origAcc.companyMatchRate;
               if (matchAmount > 0) {
-                const matchTarget = targetAcc.type === 'roth_401k'
-                  ? (accountsState[`${origAcc.id}_trad`] || targetAcc)
-                  : targetAcc;
+                const matchTarget = getMatchTarget(origAcc, targetAcc);
                 matchTarget.balance += matchAmount;
                 surplusSaved += matchAmount;
               }
@@ -551,7 +594,8 @@ export function runRetirementSimulation(
 
           let requestedAlloc = 0;
           if (flow.ruleType === 'percentage' && flow.ruleValue) {
-            requestedAlloc = salaryBase * (flow.ruleValue / 100);
+            const pct = flow.ruleValue <= 1 ? flow.ruleValue * 100 : flow.ruleValue;
+            requestedAlloc = salaryBase * (pct / 100);
           } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
             requestedAlloc = flow.ruleValue * compoundInflation;
           } else if (flow.ruleType === 'save_maintain') {
@@ -754,7 +798,7 @@ export function runRetirementSimulation(
           for (const origAcc of plan.accounts) {
             if (surplus <= 0) break;
             if (!origAcc.contributionMode || origAcc.contributionMode === 'none') {
-              if (origAcc.isSurplusDestination) continue; // Pure sweep account handled at end
+              continue;
             }
 
             let targetAcc = accountsState[origAcc.id];
@@ -771,7 +815,8 @@ export function runRetirementSimulation(
             let limit = surplus;
             const contribVal = Number(origAcc.contributionValue || 0);
             if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
-              limit = salaryBase * (contribVal / 100);
+              const pct = contribVal <= 1 ? contribVal * 100 : contribVal;
+              limit = salaryBase * (pct / 100);
             } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
               limit = contribVal * compoundInflation;
             } else if (origAcc.contributionMode === 'maximize') {
@@ -781,24 +826,33 @@ export function runRetirementSimulation(
               if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
               if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
               limit = Math.min(surplus, maxLimit);
+            } else {
+              continue;
             }
 
             const alloc = Math.min(surplus, limit);
             if (alloc > 0) {
               targetAcc.balance += alloc;
+              if (cat === 'taxable') {
+                targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
+              }
               surplus -= alloc;
               surplusSaved += alloc;
 
-              // Company match for post-tax accounts (e.g. Roth 401k)
-              if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
-                const matchableContrib = Math.min(alloc, salaryBase * (origAcc.companyMatchLimit / 100));
-                const matchAmount = matchableContrib * origAcc.companyMatchRate;
-                if (matchAmount > 0) {
-                  targetAcc.balance += matchAmount;
-                  surplusSaved += matchAmount;
+            if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
+              const matchLimitPct = origAcc.companyMatchLimit <= 1 ? origAcc.companyMatchLimit * 100 : origAcc.companyMatchLimit;
+              const matchableContrib = Math.min(alloc, salaryBase * (matchLimitPct / 100));
+              const matchAmount = matchableContrib * origAcc.companyMatchRate;
+              if (matchAmount > 0) {
+                const matchTarget = getMatchTarget(origAcc, targetAcc);
+                matchTarget.balance += matchAmount;
+                if (getAccountCategory(matchTarget.type) === 'taxable') {
+                  matchTarget.costBasis = (matchTarget.costBasis || 0) + matchAmount;
                 }
+                surplusSaved += matchAmount;
               }
             }
+          }
           }
 
           // Sweep remaining surplus to designated surplus destination account
@@ -811,6 +865,9 @@ export function runRetirementSimulation(
               }
               if (targetAcc) {
                 targetAcc.balance += surplus;
+                if (getAccountCategory(targetAcc.type) === 'taxable') {
+                  targetAcc.costBasis = (targetAcc.costBasis || 0) + surplus;
+                }
                 surplusSaved += surplus;
                 surplus = 0;
               }
@@ -852,6 +909,9 @@ export function runRetirementSimulation(
             const alloc = Math.min(surplus, limit);
             if (alloc > 0) {
               targetAcc.balance += alloc;
+              if (getAccountCategory(targetAcc.type) === 'taxable') {
+                targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
+              }
               surplus -= alloc;
               surplusSaved += alloc;
             }
