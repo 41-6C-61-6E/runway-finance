@@ -13,6 +13,9 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'single',
       retirementAge: 60,
       lifeExpectancyAge: 80,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 3.0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -42,19 +45,6 @@ describe('Retirement Projection Engine', () => {
       ],
       liabilities: [],
       events: [
-        {
-          id: 'ev_1',
-          name: 'Salary Job',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 100000,
-          frequency: 'yearly',
-          growthRate: 3.0,
-          adjustForInflation: true,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
         {
           id: 'ev_2',
           name: 'Living Expenses',
@@ -122,6 +112,12 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'married_joint',
       retirementAge: 60,
       lifeExpectancyAge: 90,
+      primarySalary: 120000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 3.0,
+      spouseSalary: 80000,
+      spouseSalaryYear: 2026,
+      spouseSalaryRaisePct: 3.0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -139,32 +135,6 @@ describe('Retirement Projection Engine', () => {
       ],
       liabilities: [],
       events: [
-        {
-          id: 'ev_primary_sal',
-          name: 'Primary Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 120000,
-          frequency: 'yearly',
-          growthRate: 3.0,
-          adjustForInflation: true,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-        {
-          id: 'ev_spouse_sal',
-          name: 'Spouse Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'spouse',
-          amount: 80000,
-          frequency: 'yearly',
-          growthRate: 3.0,
-          adjustForInflation: true,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
         {
           id: 'ev_living',
           name: 'Joint Living Expenses',
@@ -403,6 +373,9 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'single',
       retirementAge: 65,
       lifeExpectancyAge: 67,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -419,21 +392,7 @@ describe('Retirement Projection Engine', () => {
         },
       ],
       liabilities: [],
-      events: [
-        {
-          id: 'ev_sal',
-          name: 'Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 100000,
-          frequency: 'yearly',
-          growthRate: 0.0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [
         {
           id: 'fl_match',
@@ -468,6 +427,9 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'single',
       retirementAge: 65,
       lifeExpectancyAge: 67,
+      primarySalary: 300000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -484,21 +446,7 @@ describe('Retirement Projection Engine', () => {
         },
       ],
       liabilities: [],
-      events: [
-        {
-          id: 'ev_sal',
-          name: 'High Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 300000, // $300k salary -> exceeds $168,600 SS wage base & $200k Addl Medicare threshold
-          frequency: 'yearly',
-          growthRate: 0.0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [],
       settings: { fixedInflationRate: 0.0 },
       rules: DEFAULT_2026_RULES,
@@ -524,6 +472,9 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'single',
       retirementAge: 65,
       lifeExpectancyAge: 67,
+      primarySalary: 80000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -552,21 +503,7 @@ describe('Retirement Projection Engine', () => {
         },
       ],
       liabilities: [],
-      events: [
-        {
-          id: 'ev_sal',
-          name: 'Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 80000,
-          frequency: 'yearly',
-          growthRate: 0.0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [
         {
           id: 'fl_maint',
@@ -609,24 +546,13 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'single',
       retirementAge: 65,
       lifeExpectancyAge: 67,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [],
       liabilities: [],
-      events: [
-        {
-          id: 'ev_sal',
-          name: 'Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 100000,
-          frequency: 'yearly',
-          growthRate: 0.0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [],
       settings: { fixedInflationRate: 0.0, incomeTaxModifier: 5.0 }, // 5% state tax
       rules: DEFAULT_2026_RULES,
@@ -700,6 +626,9 @@ describe('Retirement Projection Engine', () => {
       filingStatus: 'married_joint',
       retirementAge: 60,
       lifeExpectancyAge: 85,
+      primarySalary: 120000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -728,21 +657,7 @@ describe('Retirement Projection Engine', () => {
         },
       ],
       liabilities: [],
-      events: [
-        {
-          id: 'ev_sal',
-          name: 'Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 120000,
-          frequency: 'yearly',
-          growthRate: 0.0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [
         {
           id: 'fl_spouse_max',

@@ -13,6 +13,7 @@ import { populatePlanWithUserFinances } from '@/lib/services/plan-auto-populator
 /** Shared helper: hydrate a plan row with all sub-entities + run simulation */
 async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decPlan = await decryptRow('plans', planRow, dek);
+  const currentYear = new Date().getFullYear();
 
   // Fetch accounts, events, flows, settings, and user rules for this plan
   const [rawAccounts, rawEvents, rawFlows, rawSettings, rawRules] = await Promise.all([
@@ -38,6 +39,60 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
   const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
   const sAny = decSettings as any;
 
+  // ── Migration: If plan-level salary is '0', seed from existing salary events ──
+  // This ensures existing plans (which only had salary events) continue to work
+  // now that salary income is driven by plan-level fields.
+  let migratedPrimarySalary = parseFloat(decPlan.primarySalary) || 0;
+  let migratedPrimarySalaryYear = Number(decPlan.primarySalaryYear) || currentYear;
+  let migratedSpouseSalary = parseFloat(decPlan.spouseSalary) || 0;
+  let migratedSpouseSalaryYear = Number(decPlan.spouseSalaryYear) || currentYear;
+  let needsSalaryMigration = false;
+
+  if (migratedPrimarySalary === 0) {
+    const primarySalaryEv = decEvents.find((e: any) => e.type === 'salary' && e.owner !== 'spouse');
+    if (primarySalaryEv) {
+      migratedPrimarySalary = parseFloat(primarySalaryEv.amount) || 0;
+      if (primarySalaryEv.startTriggerType === 'year' && primarySalaryEv.startTriggerValue) {
+        migratedPrimarySalaryYear = parseInt(primarySalaryEv.startTriggerValue, 10) || currentYear;
+      } else {
+        migratedPrimarySalaryYear = currentYear;
+      }
+      needsSalaryMigration = true;
+    }
+  }
+  if (migratedSpouseSalary === 0) {
+    const spouseSalaryEv = decEvents.find((e: any) => e.type === 'salary' && e.owner === 'spouse');
+    if (spouseSalaryEv) {
+      migratedSpouseSalary = parseFloat(spouseSalaryEv.amount) || 0;
+      if (spouseSalaryEv.startTriggerType === 'year' && spouseSalaryEv.startTriggerValue) {
+        migratedSpouseSalaryYear = parseInt(spouseSalaryEv.startTriggerValue, 10) || currentYear;
+      } else {
+        migratedSpouseSalaryYear = currentYear;
+      }
+      needsSalaryMigration = true;
+    }
+  }
+
+  // Persist the migrated salary fields back to the DB (one-time write)
+  if (needsSalaryMigration) {
+    try {
+      const salaryUpdate: Record<string, any> = { userId: planRow.userId };
+      if (migratedPrimarySalary > 0) {
+        salaryUpdate.primarySalary = String(Math.round(migratedPrimarySalary));
+        salaryUpdate.primarySalaryYear = migratedPrimarySalaryYear;
+      }
+      if (migratedSpouseSalary > 0) {
+        salaryUpdate.spouseSalary = String(Math.round(migratedSpouseSalary));
+        salaryUpdate.spouseSalaryYear = migratedSpouseSalaryYear;
+      }
+      const encSalary = await encryptRow('plans', salaryUpdate, dek);
+      delete encSalary.userId;
+      await getDb().update(plans).set(encSalary).where(eq(plans.id, planRow.id));
+    } catch {
+      // Non-critical: if migration write fails, the engine still works via in-memory fallback
+    }
+  }
+
   const enginePlan: EnginePlan = {
     id: decPlan.id,
     name: decPlan.name,
@@ -59,8 +114,14 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
     lifeExpectancyAge: Number(decPlan.lifeExpectancyAge) || 100,
     withdrawalMethod: decPlan.withdrawalMethod || 'textbook',
     customWithdrawalOrder: Array.isArray(decPlan.customWithdrawalOrder) ? decPlan.customWithdrawalOrder : undefined,
-    primarySalary: parseFloat(decPlan.primarySalary) || 0,
-    spouseSalary: parseFloat(decPlan.spouseSalary) || 0,
+    primarySalary: migratedPrimarySalary || parseFloat(decPlan.primarySalary) || 0,
+    spouseSalary: migratedSpouseSalary || parseFloat(decPlan.spouseSalary) || 0,
+    primarySalaryYear: migratedPrimarySalaryYear || Number(decPlan.primarySalaryYear) || currentYear,
+    primarySalaryRaisePct: parseFloat(decPlan.primarySalaryRaisePct) || 0,
+    primarySalaryOverrides: decPlan.primarySalaryOverrides && typeof decPlan.primarySalaryOverrides === 'object' ? decPlan.primarySalaryOverrides : undefined,
+    spouseSalaryYear: Number(decPlan.spouseSalaryYear) || currentYear,
+    spouseSalaryRaisePct: parseFloat(decPlan.spouseSalaryRaisePct) || 0,
+    spouseSalaryOverrides: decPlan.spouseSalaryOverrides && typeof decPlan.spouseSalaryOverrides === 'object' ? decPlan.spouseSalaryOverrides : undefined,
     accounts: activeAccounts.map((a) => ({
       id: a.id,
       name: a.name,
@@ -309,6 +370,8 @@ export async function PUT(req: NextRequest) {
       'primarySsMonthlyAmount', 'primarySsStartAge', 'spouseSsMonthlyAmount',
       'spouseSsStartAge', 'enableSpousalSsBenefit', 'fiTargetMultiplier', 'isDefault',
       'primarySalary', 'spouseSalary',
+      'primarySalaryYear', 'primarySalaryRaisePct', 'primarySalaryOverrides',
+      'spouseSalaryYear', 'spouseSalaryRaisePct', 'spouseSalaryOverrides',
     ];
 
     const planUpdates: Record<string, any> = {};

@@ -26,6 +26,7 @@ import {
   IRS_UNIFORM_LIFETIME_TABLE,
   HISTORICAL_RETURNS_DATA,
 } from '@/lib/constants/retirement-defaults';
+import { getYearSalary } from '@/lib/services/retirement-engine';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { EngineRulesView } from './engine-rules-view';
@@ -58,6 +59,16 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   // Salary State (for contribution calculations)
   const [primarySalary, setPrimarySalary] = useState(plan?.primarySalary || '0');
   const [spouseSalary, setSpouseSalary] = useState(plan?.spouseSalary || '0');
+  const [primarySalaryYear, setPrimarySalaryYear] = useState(plan?.primarySalaryYear || new Date().getFullYear());
+  const [primarySalaryRaisePct, setPrimarySalaryRaisePct] = useState(plan?.primarySalaryRaisePct || '0');
+  const [primarySalaryOverrides, setPrimarySalaryOverrides] = useState<Record<number, number>>(plan?.primarySalaryOverrides || {});
+  const [spouseSalaryYear, setSpouseSalaryYear] = useState(plan?.spouseSalaryYear || new Date().getFullYear());
+  const [spouseSalaryRaisePct, setSpouseSalaryRaisePct] = useState(plan?.spouseSalaryRaisePct || '0');
+  const [spouseSalaryOverrides, setSpouseSalaryOverrides] = useState<Record<number, number>>(plan?.spouseSalaryOverrides || {});
+  const [showPrimarySchedule, setShowPrimarySchedule] = useState(false);
+  const [showSpouseSchedule, setShowSpouseSchedule] = useState(false);
+  const [editingScheduleYear, setEditingScheduleYear] = useState<number | null>(null);
+  const [scheduleYearValue, setScheduleYearValue] = useState('');
 
   // Social Security State
   const [primarySsMonthly, setPrimarySsMonthly] = useState(plan?.primarySsMonthlyAmount || '2500');
@@ -97,6 +108,12 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
       setSpouseLifeExpectancy(plan.spouseLifeExpectancyAge || 100);
       setPrimarySalary(plan.primarySalary || '0');
       setSpouseSalary(plan.spouseSalary || '0');
+      setPrimarySalaryYear(plan.primarySalaryYear || new Date().getFullYear());
+      setPrimarySalaryRaisePct(plan.primarySalaryRaisePct || '0');
+      setPrimarySalaryOverrides(plan.primarySalaryOverrides || {});
+      setSpouseSalaryYear(plan.spouseSalaryYear || new Date().getFullYear());
+      setSpouseSalaryRaisePct(plan.spouseSalaryRaisePct || '0');
+      setSpouseSalaryOverrides(plan.spouseSalaryOverrides || {});
       setPrimarySsMonthly(plan.primarySsMonthlyAmount || '2500');
       setPrimarySsStartAge(plan.primarySsStartAge || 67);
       setSpouseSsMonthly(plan.spouseSsMonthlyAmount || '2000');
@@ -330,6 +347,139 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                         className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                       />
                     </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Base Year</label>
+                        <input
+                          type="number"
+                          value={primarySalaryYear}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setPrimarySalaryYear(val);
+                            onUpdatePlan({ primarySalaryYear: val });
+                          }}
+                          className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Yearly Raise (%)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={primarySalaryRaisePct}
+                            onChange={(e) => {
+                              setPrimarySalaryRaisePct(e.target.value);
+                              onUpdatePlan({ primarySalaryRaisePct: e.target.value });
+                            }}
+                            placeholder="e.g. 3.0"
+                            className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">%</span>
+                        </div>
+                      </div>
+                    </div>
+                    {(parseFloat(primarySalaryRaisePct) > 0 || Object.keys(primarySalaryOverrides).length > 0) && (
+                      <div className="mt-2 border border-border rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => setShowPrimarySchedule(!showPrimarySchedule)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted/50 transition-colors"
+                        >
+                          <span>Salary Schedule Preview</span>
+                          <span className="text-[10px]">{showPrimarySchedule ? '▲' : '▼'}</span>
+                        </button>
+                        {showPrimarySchedule && (
+                          <div className="border-t border-border max-h-48 overflow-y-auto">
+                            <table className="w-full text-[10px]">
+                              <thead className="sticky top-0 bg-muted/80">
+                                <tr>
+                                  <th className="px-2 py-1 text-left font-semibold text-muted-foreground">Year</th>
+                                  <th className="px-2 py-1 text-right font-semibold text-muted-foreground">Projected Salary</th>
+                                  <th className="px-2 py-1 text-right font-semibold text-muted-foreground w-16"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Array.from({ length: 10 }, (_, i) => {
+                                  const yr = primarySalaryYear + i;
+                                  const projected = getYearSalary(
+                                    parseFloat(primarySalary) || 0,
+                                    primarySalaryYear,
+                                    parseFloat(primarySalaryRaisePct) || 0,
+                                    Object.keys(primarySalaryOverrides).length > 0 ? primarySalaryOverrides : undefined,
+                                    yr
+                                  );
+                                  const isOverridden = yr in primarySalaryOverrides;
+                                  const isCurrentYear = yr === new Date().getFullYear();
+                                  return (
+                                    <tr key={yr} className={`border-t border-border/50 ${isCurrentYear ? 'bg-primary/5' : ''}`}>
+                                      <td className="px-2 py-1 font-mono font-bold">
+                                        {yr}
+                                        {isCurrentYear && <span className="ml-1 text-primary">(now)</span>}
+                                      </td>
+                                      <td className={`px-2 py-1 text-right font-mono ${isOverridden ? 'text-amber-500 font-bold' : ''}`}>
+                                        {editingScheduleYear === yr ? (
+                                          <div className="flex items-center gap-1 justify-end">
+                                            <span className="text-muted-foreground">$</span>
+                                            <input
+                                              type="number"
+                                              value={scheduleYearValue}
+                                              onChange={(e) => setScheduleYearValue(e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  const val = parseFloat(scheduleYearValue) || 0;
+                                                  const newOverrides = { ...primarySalaryOverrides, [yr]: val };
+                                                  setPrimarySalaryOverrides(newOverrides);
+                                                  onUpdatePlan({ primarySalaryOverrides: newOverrides });
+                                                  setEditingScheduleYear(null);
+                                                } else if (e.key === 'Escape') {
+                                                  setEditingScheduleYear(null);
+                                                }
+                                              }}
+                                              className="w-24 bg-background border border-primary rounded px-1 py-0.5 font-mono text-foreground text-[10px] text-right focus:outline-none"
+                                              autoFocus
+                                            />
+                                          </div>
+                                        ) : (
+                                          formatCurrency(projected)
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-1 text-right">
+                                        {editingScheduleYear !== yr && (
+                                          <button
+                                            onClick={() => {
+                                              setEditingScheduleYear(yr);
+                                              setScheduleYearValue(String(Math.round(projected)));
+                                            }}
+                                            className="text-muted-foreground hover:text-primary transition-colors"
+                                            title={isOverridden ? 'Edit override' : 'Override this year'}
+                                          >
+                                            <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                          </button>
+                                        )}
+                                        {isOverridden && editingScheduleYear !== yr && (
+                                          <button
+                                            onClick={() => {
+                                              const newOverrides = { ...primarySalaryOverrides };
+                                              delete newOverrides[yr];
+                                              setPrimarySalaryOverrides(Object.keys(newOverrides).length > 0 ? newOverrides : {});
+                                              onUpdatePlan({ primarySalaryOverrides: Object.keys(newOverrides).length > 0 ? newOverrides : null });
+                                            }}
+                                            className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                                            title="Remove override"
+                                          >
+                                            <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -428,6 +578,139 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                         />
                       </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Base Year</label>
+                          <input
+                            type="number"
+                            value={spouseSalaryYear}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setSpouseSalaryYear(val);
+                              onUpdatePlan({ spouseSalaryYear: val });
+                            }}
+                            className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Yearly Raise (%)</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={spouseSalaryRaisePct}
+                              onChange={(e) => {
+                                setSpouseSalaryRaisePct(e.target.value);
+                                onUpdatePlan({ spouseSalaryRaisePct: e.target.value });
+                              }}
+                              placeholder="e.g. 3.0"
+                              className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">%</span>
+                          </div>
+                        </div>
+                      </div>
+                      {(parseFloat(spouseSalaryRaisePct) > 0 || Object.keys(spouseSalaryOverrides).length > 0) && (
+                        <div className="mt-2 border border-border rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => setShowSpouseSchedule(!showSpouseSchedule)}
+                            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted/50 transition-colors"
+                          >
+                            <span>Salary Schedule Preview</span>
+                            <span className="text-[10px]">{showSpouseSchedule ? '▲' : '▼'}</span>
+                          </button>
+                          {showSpouseSchedule && (
+                            <div className="border-t border-border max-h-48 overflow-y-auto">
+                              <table className="w-full text-[10px]">
+                                <thead className="sticky top-0 bg-muted/80">
+                                  <tr>
+                                    <th className="px-2 py-1 text-left font-semibold text-muted-foreground">Year</th>
+                                    <th className="px-2 py-1 text-right font-semibold text-muted-foreground">Projected Salary</th>
+                                    <th className="px-2 py-1 text-right font-semibold text-muted-foreground w-16"></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {Array.from({ length: 10 }, (_, i) => {
+                                    const yr = spouseSalaryYear + i;
+                                    const projected = getYearSalary(
+                                      parseFloat(spouseSalary) || 0,
+                                      spouseSalaryYear,
+                                      parseFloat(spouseSalaryRaisePct) || 0,
+                                      Object.keys(spouseSalaryOverrides).length > 0 ? spouseSalaryOverrides : undefined,
+                                      yr
+                                    );
+                                    const isOverridden = yr in spouseSalaryOverrides;
+                                    const isCurrentYear = yr === new Date().getFullYear();
+                                    return (
+                                      <tr key={yr} className={`border-t border-border/50 ${isCurrentYear ? 'bg-primary/5' : ''}`}>
+                                        <td className="px-2 py-1 font-mono font-bold">
+                                          {yr}
+                                          {isCurrentYear && <span className="ml-1 text-primary">(now)</span>}
+                                        </td>
+                                        <td className={`px-2 py-1 text-right font-mono ${isOverridden ? 'text-amber-500 font-bold' : ''}`}>
+                                          {editingScheduleYear === yr ? (
+                                            <div className="flex items-center gap-1 justify-end">
+                                              <span className="text-muted-foreground">$</span>
+                                              <input
+                                                type="number"
+                                                value={scheduleYearValue}
+                                                onChange={(e) => setScheduleYearValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') {
+                                                    const val = parseFloat(scheduleYearValue) || 0;
+                                                    const newOverrides = { ...spouseSalaryOverrides, [yr]: val };
+                                                    setSpouseSalaryOverrides(newOverrides);
+                                                    onUpdatePlan({ spouseSalaryOverrides: newOverrides });
+                                                    setEditingScheduleYear(null);
+                                                  } else if (e.key === 'Escape') {
+                                                    setEditingScheduleYear(null);
+                                                  }
+                                                }}
+                                                className="w-24 bg-background border border-primary rounded px-1 py-0.5 font-mono text-foreground text-[10px] text-right focus:outline-none"
+                                                autoFocus
+                                              />
+                                            </div>
+                                          ) : (
+                                            formatCurrency(projected)
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-1 text-right">
+                                          {editingScheduleYear !== yr && (
+                                            <button
+                                              onClick={() => {
+                                                setEditingScheduleYear(yr);
+                                                setScheduleYearValue(String(Math.round(projected)));
+                                              }}
+                                              className="text-muted-foreground hover:text-primary transition-colors"
+                                              title={isOverridden ? 'Edit override' : 'Override this year'}
+                                            >
+                                              <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
+                                          )}
+                                          {isOverridden && editingScheduleYear !== yr && (
+                                            <button
+                                              onClick={() => {
+                                                const newOverrides = { ...spouseSalaryOverrides };
+                                                delete newOverrides[yr];
+                                                setSpouseSalaryOverrides(Object.keys(newOverrides).length > 0 ? newOverrides : {});
+                                                onUpdatePlan({ spouseSalaryOverrides: Object.keys(newOverrides).length > 0 ? newOverrides : null });
+                                              }}
+                                              className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                                              title="Remove override"
+                                            >
+                                              <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

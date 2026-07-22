@@ -38,6 +38,12 @@ export const plans = pgTable('plans', {
   customWithdrawalOrder: jsonb('custom_withdrawal_order'), // Array of account ids/types
   primarySalary: text('primary_salary').notNull().default('0'),
   spouseSalary: text('spouse_salary').notNull().default('0'),
+  primarySalaryYear: integer('primary_salary_year').notNull().default(2026),
+  primarySalaryRaisePct: text('primary_salary_raise_pct').notNull().default('0'),
+  primarySalaryOverrides: jsonb('primary_salary_overrides'), // { [year: number]: number }
+  spouseSalaryYear: integer('spouse_salary_year').notNull().default(2026),
+  spouseSalaryRaisePct: text('spouse_salary_raise_pct').notNull().default('0'),
+  spouseSalaryOverrides: jsonb('spouse_salary_overrides'), // { [year: number]: number }
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

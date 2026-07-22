@@ -285,6 +285,31 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       }
     }
 
+    // 9e. Add salary progression columns to plans table
+    const plansTableCheck = await client.query(`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'plans'
+    `);
+    if (plansTableCheck.rows.length > 0) {
+      const salaryProgressionCols = [
+        { name: 'primary_salary_year', type: "INTEGER NOT NULL DEFAULT 2026" },
+        { name: 'primary_salary_raise_pct', type: "TEXT NOT NULL DEFAULT '0'" },
+        { name: 'primary_salary_overrides', type: 'JSONB' },
+        { name: 'spouse_salary_year', type: "INTEGER NOT NULL DEFAULT 2026" },
+        { name: 'spouse_salary_raise_pct', type: "TEXT NOT NULL DEFAULT '0'" },
+        { name: 'spouse_salary_overrides', type: 'JSONB' },
+      ];
+      for (const col of salaryProgressionCols) {
+        const colCheck = await client.query(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_name = 'plans' AND column_name = '${col.name}'
+        `);
+        if (colCheck.rows.length === 0) {
+          logger.info(`[migrate] [self-heal] Adding missing ${col.name} column to plans...`);
+          await client.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+        }
+      }
+    }
+
     // Mark unapplied migrations as applied if their artifacts already exist.
     // The self-heal above may create tables/columns that later migrations expect
     // to create, causing "already exists" failures that block subsequent migrations.
