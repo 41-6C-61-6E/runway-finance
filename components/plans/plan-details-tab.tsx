@@ -47,7 +47,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
   // Flow Form State
   const [flowName, setFlowName] = useState('');
-  const [flowRuleType, setFlowRuleType] = useState('save_leftover');
+  const [flowTargetAccId, setFlowTargetAccId] = useState('');
+  const [flowRuleType, setFlowRuleType] = useState('percentage');
+  const [flowRuleValue, setFlowRuleValue] = useState('10.0');
+  const [flowRank, setFlowRank] = useState('1');
 
   if (!plan) {
     return (
@@ -128,14 +131,20 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   const openAddFlowModal = () => {
     setEditingItem(null);
     setFlowName('');
-    setFlowRuleType('save_leftover');
+    setFlowTargetAccId(planAccounts[0]?.id || '');
+    setFlowRuleType('percentage');
+    setFlowRuleValue('10.0');
+    setFlowRank(String(flows.length + 1));
     setModalType('flow');
   };
 
   const openEditFlowModal = (fl: any) => {
     setEditingItem({ type: 'flow', data: fl });
     setFlowName(safeString(fl.name));
-    setFlowRuleType(safeString(fl.ruleType, 'save_leftover'));
+    setFlowTargetAccId(safeString(fl.targetAccountId, planAccounts[0]?.id || ''));
+    setFlowRuleType(safeString(fl.ruleType, 'percentage'));
+    setFlowRuleValue(fl.ruleValue !== undefined ? String(fl.ruleValue) : '10.0');
+    setFlowRank(String(fl.rank || flows.length + 1));
     setModalType('flow');
   };
 
@@ -219,14 +228,25 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
   const handleSaveFlow = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const finalName = flowName.trim() || (flowRuleType === 'maximize' ? 'Maximize Account Limit' : flowRuleType === 'percentage' ? 'Income Percentage Savings' : 'Save Surplus Cash');
+    const targetAcc = planAccounts.find((a: any) => a.id === flowTargetAccId);
+    const accName = targetAcc ? safeString(targetAcc.name) : '';
+    const defaultName = flowRuleType === 'maximize'
+      ? `Max out ${accName || 'Account'}`
+      : flowRuleType === 'percentage'
+      ? `${flowRuleValue}% Salary to ${accName || 'Account'}`
+      : `Save Surplus to ${accName || 'Account'}`;
+
+    const finalName = flowName.trim() || defaultName;
 
     if (editingItem) {
       await onUpdatePlan({
         updateFlow: {
           id: editingItem.data.id,
           name: finalName,
+          targetAccountId: flowTargetAccId,
           ruleType: flowRuleType,
+          ruleValue: flowRuleType === 'percentage' ? parseFloat(flowRuleValue) || 0 : undefined,
+          rank: parseInt(flowRank, 10) || 1,
         },
       });
     } else {
@@ -234,8 +254,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         newFlow: {
           name: finalName,
           type: 'invest',
-          rank: flows.length + 1,
+          rank: parseInt(flowRank, 10) || flows.length + 1,
+          targetAccountId: flowTargetAccId,
           ruleType: flowRuleType,
+          ruleValue: flowRuleType === 'percentage' ? parseFloat(flowRuleValue) || 0 : undefined,
         },
       });
     }
@@ -519,8 +541,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PiggyBank className="w-5 h-5 text-primary" />
-            <h3 className="text-sm font-bold text-foreground">Savings Priority Waterfall</h3>
-            <span className="text-xs text-muted-foreground">({flows.length} prioritized rules)</span>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Savings Priority Waterfall</h3>
+              <p className="text-[11px] text-muted-foreground">Designate percentage of salary or rules to fund plan accounts during accumulation phase.</p>
+            </div>
           </div>
           <button
             onClick={openAddFlowModal}
@@ -534,26 +558,60 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         <div className="space-y-2">
           {flows.length === 0 ? (
             <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-              No savings rules set. Surplus cash will remain unallocated.
+              No savings rules set. Only designated salary percentages will fund accounts during accumulation.
             </p>
           ) : (
             flows.map((fl: any, i: number) => {
               const flName = safeString(fl.name, 'Savings Rule');
               const flId = safeString(fl.id, `fl_${i}`);
               const ruleType = safeString(fl.ruleType);
+              const targetAcc = planAccounts.find((a: any) => a.id === fl.targetAccountId);
+              const targetAccName = targetAcc ? safeString(targetAcc.name) : 'Unassigned Account';
+              const targetAccType = targetAcc ? safeString(targetAcc.type) : '';
+
+              const isPreTax = targetAccType === 'traditional_401k' || targetAccType === 'traditional_ira' || targetAccType === 'hsa';
+
+              let detailText = `Rule: ${ruleType.replace(/_/g, ' ')}`;
+              let estAmtText = '';
+
+              if (ruleType === 'percentage' && fl.ruleValue) {
+                const pct = parseFloat(fl.ruleValue) || 0;
+                detailText = `${pct}% of Salary`;
+                if (totalAnnualIncome > 0) {
+                  estAmtText = `${formatCurrency((totalAnnualIncome * pct) / 100)}/yr`;
+                }
+              } else if (ruleType === 'maximize') {
+                detailText = 'Maximize IRS Statutory Limit';
+              } else if (ruleType === 'save_leftover') {
+                detailText = 'Save Surplus Unallocated Cash';
+              }
 
               return (
                 <div key={flId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-primary/40 transition-all">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold flex items-center justify-center text-[10px]">
-                      {fl.rank || i + 1}
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-mono font-bold flex items-center justify-center text-xs shrink-0">
+                      #{fl.rank || i + 1}
                     </span>
                     <div>
-                      <span className="font-bold text-foreground">{flName}</span>
-                      <p className="text-[11px] text-muted-foreground capitalize">Rule: {ruleType.replace(/_/g, ' ')}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground">{flName}</span>
+                        {isPreTax ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 uppercase tracking-wider">Pre-Tax</span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase tracking-wider">Post-Tax</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Target: <span className="font-medium text-foreground">{targetAccName}</span> • {detailText}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {estAmtText && (
+                      <span className="font-mono font-bold text-primary text-xs">
+                        {estAmtText}
+                      </span>
+                    )}
                     <button
                       onClick={() => openEditFlowModal(fl)}
                       className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
@@ -810,7 +868,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   <label className="text-xs font-semibold text-slate-300">Rule Name</label>
                   <input
                     type="text"
-                    placeholder="e.g. Max Out HSA, Max 401(k)"
+                    placeholder="e.g. 15% Salary to 401(k), Max Out Roth IRA"
                     value={flowName}
                     onChange={(e) => setFlowName(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
@@ -818,17 +876,56 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-300">Rule Strategy</label>
+                  <label className="text-xs font-semibold text-slate-300">Target Plan Account</label>
                   <select
-                    value={flowRuleType}
-                    onChange={(e) => setFlowRuleType(e.target.value)}
+                    value={flowTargetAccId}
+                    onChange={(e) => setFlowTargetAccId(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
                   >
-                    <option value="maximize">Maximize Annual Limit</option>
-                    <option value="percentage">Percentage of Income</option>
-                    <option value="save_leftover">Save Leftover Cash Surplus</option>
+                    {planAccounts.map((acc: any) => (
+                      <option key={acc.id} value={acc.id}>
+                        {safeString(acc.name)} ({getAccountTypeLabel(acc.type)})
+                      </option>
+                    ))}
                   </select>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Rule Strategy</label>
+                    <select
+                      value={flowRuleType}
+                      onChange={(e) => setFlowRuleType(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="percentage">Percentage of Salary</option>
+                      <option value="maximize">Maximize Annual Limit</option>
+                      <option value="save_leftover">Save Leftover Surplus</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Priority Waterfall Rank</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={flowRank}
+                      onChange={(e) => setFlowRank(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                </div>
+                {flowRuleType === 'percentage' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Designated Salary Percentage (%)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="e.g. 15.0"
+                      value={flowRuleValue}
+                      onChange={(e) => setFlowRuleValue(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
