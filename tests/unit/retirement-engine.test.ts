@@ -1115,6 +1115,320 @@ describe('Retirement Projection Engine', () => {
     // The taxable brokerage balance should be at least starting $10,000 + $7,600 = $17,600.
     expect(taxableAcc?.balance).toBeGreaterThanOrEqual(17600);
   });
+
+  it('correctly allocates fixed taxable contribution when a non-contributing cash account precedes it', () => {
+    const plan: EnginePlan = {
+      id: 'plan_multi_acc',
+      name: 'Multi Account Taxable Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 100000,
+      accounts: [
+        {
+          id: 'acc_cash',
+          name: 'Emergency Cash',
+          type: 'cash',
+          balance: 5000,
+          costBasis: 5000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'none',
+          isSurplusDestination: false,
+        },
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          balance: 20000,
+          costBasis: 20000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'fixed_amount',
+          contributionValue: 12000,
+          isSurplusDestination: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+    const yr1 = output.yearlyResults[0];
+
+    const cashAcc = yr1.accountBalances.find((a) => a.id === 'acc_cash');
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable');
+
+    // Cash account balance should remain $5,000 (no surplus stolen)
+    expect(cashAcc?.balance).toBe(5000);
+    // Taxable brokerage balance should increase by $12,000 to $32,000
+    expect(taxableAcc?.balance).toBe(32000);
+  });
+
+  it('updates cost basis for taxable brokerage contributions during accumulation phase', () => {
+    const plan: EnginePlan = {
+      id: 'plan_cost_basis',
+      name: 'Cost Basis Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 100000,
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          balance: 10000,
+          costBasis: 10000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'fixed_amount',
+          contributionValue: 5000,
+          isSurplusDestination: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+
+    // After 1 year, balance is $15,000 ($10,000 + $5,000 contribution)
+    expect(output.yearlyResults[0].accountBalances.find(a => a.id === 'acc_taxable')?.balance).toBe(15000);
+  });
+
+  it('correctly accumulates percentage contributions for brokerage accounts', () => {
+    const plan: EnginePlan = {
+      id: 'plan_pct_taxable',
+      name: 'Percentage Taxable Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 150000,
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'percentage',
+          contributionValue: 10.0, // 10% of $150,000 = $15,000
+          isSurplusDestination: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 40000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+    const yr1 = output.yearlyResults[0];
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable');
+
+    // 10% of $150,000 = $15,000. Balance should be $50,000 + $15,000 = $65,000.
+    expect(taxableAcc?.balance).toBe(65000);
+  });
+
+  it('calculates percentage brokerage contributions using fallback income when primarySalary is zero', () => {
+    const plan: EnginePlan = {
+      id: 'plan_fallback_salary',
+      name: 'Fallback Income Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 0, // primarySalary is 0
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          balance: 10000,
+          costBasis: 10000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'percentage',
+          contributionValue: 15.0, // 15% of $100,000 income event = $15,000
+          isSurplusDestination: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_inc',
+          name: 'Consulting Income',
+          category: 'income',
+          type: 'passive',
+          owner: 'primary',
+          amount: 100000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+    const yr1 = output.yearlyResults[0];
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable');
+
+    // 15% of $100,000 fallback income = $15,000. Balance should be $10,000 + $15,000 = $25,000.
+    expect(taxableAcc?.balance).toBe(25000);
+  });
+
+  it('routes employer match on post-tax Roth 401(k) contributions to pre-tax Traditional 401(k)', () => {
+    const plan: EnginePlan = {
+      id: 'plan_roth_match',
+      name: 'Roth 401k Match Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 100000,
+      accounts: [
+        {
+          id: 'acc_401k',
+          name: 'Workplace 401(k)',
+          type: 'roth_401k',
+          balance: 10000,
+          costBasis: 10000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'percentage',
+          contributionValue: 5.0, // 5% = $5,000 into Roth 401k
+          companyMatchRate: 1.0, // 100% match
+          companyMatchLimit: 5.0, // up to 5% ($5,000 match)
+          isSurplusDestination: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+    const yr1 = output.yearlyResults[0];
+
+    const rothAcc = yr1.accountBalances.find((a) => a.type === 'roth_401k');
+    const tradAcc = yr1.accountBalances.find((a) => a.type === 'traditional_401k');
+
+    // Roth 401(k) gets employee contribution ($10,000 + $5,000 = $15,000)
+    expect(rothAcc?.balance).toBe(15000);
+    // Pre-tax employer match ($5,000) goes to Traditional 401(k)
+    expect(tradAcc?.balance).toBe(5000);
+  });
 });
 
 
