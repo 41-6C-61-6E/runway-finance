@@ -6,8 +6,9 @@ export interface MonteCarloOptions {
   numberOfTrials: number; // e.g. 250
   meanAnnualReturn: number; // e.g. 0.07 (7%)
   returnStdDev: number; // e.g. 0.12 (12%)
-  inflationMean: number; // e.g. 0.03
-  inflationStdDev: number; // e.g. 0.015
+  equityAllocation: number; // e.g. 80 for 80% Stocks / 20% Bonds
+  adjustForInflation: boolean; // true = Real Today's Dollars, false = Nominal
+  fixedInflationRate?: number; // e.g. 3.0 for 3%
 }
 
 export interface MonteCarloTrialResult {
@@ -28,6 +29,7 @@ export interface MonteCarloOutput {
   worstCaseLegacy: number;
   bestCaseLegacy: number;
   medianDepletionAge?: number;
+  isRealDollars: boolean;
   percentiles: {
     years: number[];
     p10: number[];
@@ -46,45 +48,78 @@ export function runMonteCarloSimulation(
   const model = options.model ?? 'historical_bootstrap';
   const meanReturn = options.meanAnnualReturn ?? 0.07;
   const stdDev = options.returnStdDev ?? 0.12;
+  const equityPct = Math.max(0, Math.min(100, options.equityAllocation ?? 80));
+  const equityRatio = equityPct / 100;
+  const bondRatio = 1 - equityRatio;
+  const adjustForInflation = options.adjustForInflation ?? true;
+  const inflationRate = ((options.fixedInflationRate ?? basePlan.settings?.fixedInflationRate ?? 3.0)) / 100;
 
   const trials: MonteCarloTrialResult[] = [];
+  const currentYear = new Date().getFullYear();
+  const primaryBirthYear = basePlan.primaryBirthYear || 1985;
+  const totalYears = Math.max(1, (basePlan.lifeExpectancyAge || 100) - (currentYear - primaryBirthYear));
 
   for (let t = 0; t < trialsCount; t++) {
     const trialPlan: EnginePlan = JSON.parse(JSON.stringify(basePlan));
 
-    // Generate random yearly return sequence for this trial
-    const totalYears = Math.max(1, (basePlan.lifeExpectancyAge || 100) - ((new Date().getFullYear()) - (basePlan.primaryBirthYear || 1985)));
-    
-    // Sample a random historical year per yearOffset or normal return per yearOffset
+    // Generate yearly return sequence for this trial
     const yearlyMarketData: Array<{ growth: number; dividend: number }> = [];
     for (let y = 0; y < totalYears; y++) {
       if (model === 'normal_distribution') {
-        const u1 = Math.random();
-        const u2 = Math.random();
+        const u1 = Math.random() || 0.0001;
+        const u2 = Math.random() || 0.0001;
         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
         const randomReturn = meanReturn + stdDev * z;
-        yearlyMarketData.push({ growth: Math.max(-0.35, Math.min(0.45, randomReturn)), dividend: 0.015 });
+        const boundedReturn = Math.max(-0.35, Math.min(0.45, randomReturn));
+        
+        // 1.5% dividend yield, price growth = boundedReturn - 1.5% (Total Return = boundedReturn)
+        const divYield = Math.min(0.015, Math.max(0, boundedReturn));
+        const priceGrowth = boundedReturn - divYield;
+        yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
       } else {
         const randomIndex = Math.floor(Math.random() * HISTORICAL_RETURNS_DATA.length);
         const histData = HISTORICAL_RETURNS_DATA[randomIndex];
-        yearlyMarketData.push({ growth: histData.stocksGrowth, dividend: histData.stocksYield });
+
+        // Stock Total Return = histData.stocksGrowth (price + dividend)
+        // Bond Total Return = histData.bondsGrowth + histData.bondsYield
+        const stockPriceGrowth = histData.stocksGrowth - histData.stocksYield;
+        const stockDivYield = histData.stocksYield;
+
+        const bondPriceGrowth = histData.bondsGrowth;
+        const bondYield = histData.bondsYield;
+
+        const blendedPriceGrowth = equityRatio * stockPriceGrowth + bondRatio * bondPriceGrowth;
+        const blendedDivYield = equityRatio * stockDivYield + bondRatio * bondYield;
+
+        yearlyMarketData.push({ growth: blendedPriceGrowth, dividend: blendedDivYield });
       }
     }
 
     const yearGrowthFn = (yearOffset: number, acc: EngineAccount) => {
-      const isMarketAsset = acc.type === 'taxable' || acc.type === 'crypto' || acc.type.includes('ira') || acc.type.includes('401k');
+      const isMarketAsset = acc.type === 'taxable' || acc.type === 'crypto' || acc.type.includes('ira') || acc.type.includes('401k') || acc.type === 'hsa';
       if (isMarketAsset) {
-        const m = yearlyMarketData[yearOffset % yearlyMarketData.length] || { growth: 0.07, dividend: 0.02 };
+        const m = yearlyMarketData[yearOffset % yearlyMarketData.length] || { growth: 0.05, dividend: 0.02 };
         return { growth: m.growth, dividend: m.dividend };
       }
       return { growth: (acc.expectedGrowthRate || 2.0) / 100, dividend: (acc.dividendYield || 0.0) / 100 };
     };
 
     const simRes = runRetirementSimulation(trialPlan, yearGrowthFn);
+
+    const yearlyNetWorthProcessed = simRes.yearlyResults.map((y, idx) => {
+      if (adjustForInflation) {
+        const discountFactor = Math.pow(1 + inflationRate, idx);
+        return y.netWorth / discountFactor;
+      }
+      return y.netWorth;
+    });
+
+    const endingNW = yearlyNetWorthProcessed[yearlyNetWorthProcessed.length - 1] ?? 0;
+
     trials.push({
       trialIndex: t,
-      yearlyNetWorth: simRes.yearlyResults.map((y) => y.netWorth),
-      endingNetWorth: simRes.endingNetWorth,
+      yearlyNetWorth: yearlyNetWorthProcessed,
+      endingNetWorth: endingNW,
       success: simRes.success,
       depletionAge: simRes.depletionAge,
     });
@@ -104,7 +139,8 @@ export function runMonteCarloSimulation(
   const medianDepletionAge = depletionAges.length > 0 ? depletionAges[Math.floor(depletionAges.length / 2)] : undefined;
 
   const numYears = trials[0]?.yearlyNetWorth.length ?? 0;
-  const years = Array.from({ length: numYears }, (_, i) => (basePlan.primaryBirthYear + (new Date().getFullYear() - basePlan.primaryBirthYear) + i));
+  const startAge = currentYear - primaryBirthYear;
+  const years = Array.from({ length: numYears }, (_, i) => primaryBirthYear + startAge + i);
 
   const p10: number[] = [];
   const p25: number[] = [];
@@ -131,6 +167,7 @@ export function runMonteCarloSimulation(
     worstCaseLegacy,
     bestCaseLegacy,
     medianDepletionAge,
+    isRealDollars: adjustForInflation,
     percentiles: {
       years,
       p10,

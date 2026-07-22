@@ -52,30 +52,23 @@ export function runBeamSearchOptimization(
   let bestScore = scoreSimulation(baselineSim, objective);
 
   // Test candidate withdrawal and conversion strategies
-  const strategies = ['textbook', 'proportional'];
+  const strategies = ['textbook', 'proportional', 'tax_optimized'];
+  const conversionTargetCeilings = ['none', 'top_of_10', 'top_of_12', 'top_of_22'];
 
   for (const strat of strategies) {
-    for (const convAmt of conversionSteps) {
+    for (const ceiling of conversionTargetCeilings) {
       const candidatePlan: EnginePlan = JSON.parse(JSON.stringify(basePlan));
       candidatePlan.withdrawalMethod = strat;
 
-      if (convAmt > 0) {
-        // Add Roth conversion event during gap years (age 60 to 72)
-        candidatePlan.events.push({
-          id: 'opt_conv_' + convAmt,
-          name: 'Roth Conversion Ladder',
-          category: 'income',
-          type: 'passive',
-          owner: 'primary',
-          amount: convAmt,
-          frequency: 'yearly',
-          growthRate: 0,
-          adjustForInflation: false,
-          startTriggerType: 'age',
-          startTriggerValue: '60',
-          endTriggerType: 'age',
-          endTriggerValue: '72',
-        });
+      if (!candidatePlan.settings) {
+        candidatePlan.settings = { ...basePlan.settings };
+      }
+
+      if (ceiling !== 'none') {
+        candidatePlan.settings.enableRothConversions = true;
+        candidatePlan.settings.rothConversionTargetCeiling = ceiling;
+      } else {
+        candidatePlan.settings.enableRothConversions = false;
       }
 
       const candSim = runRetirementSimulation(candidatePlan);
@@ -93,14 +86,22 @@ export function runBeamSearchOptimization(
   const taxesSaved = Math.max(0, baselineTaxes - optimizedTaxes);
   const legacyIncrease = Math.max(0, bestSim.netLegacy - baselineSim.netLegacy);
 
-  const recommendations: OptimizationRecommendation[] = bestSim.yearlyResults.map((y) => ({
-    year: y.year,
-    age: y.primaryAge,
-    withdrawalOrder: bestPlan.withdrawalMethod === 'proportional' ? 'Proportional Draw' : 'Textbook Sequence (Cash -> Taxable -> Traditional -> Roth)',
-    rothConversionAmount: y.primaryAge >= 60 && y.primaryAge <= 72 ? 10000 : 0,
-    estimatedTaxSavings: taxesSaved > 0 ? Math.round(taxesSaved / bestSim.yearlyResults.length) : 0,
-    notes: y.primaryAge >= 60 && y.primaryAge <= 72 ? 'Convert Traditional to Roth to fill lower brackets prior to RMD age 73' : 'Standard drawdown sequence',
-  }));
+  const recommendations: OptimizationRecommendation[] = bestSim.yearlyResults.map((y) => {
+    let orderDesc = 'Textbook Sequence (Cash -> Taxable -> Traditional -> Roth)';
+    if (bestPlan.withdrawalMethod === 'proportional') orderDesc = 'Proportional Draw';
+    else if (bestPlan.withdrawalMethod === 'tax_optimized') orderDesc = 'Tax-Optimized Bracket Filling';
+
+    return {
+      year: y.year,
+      age: y.primaryAge,
+      withdrawalOrder: orderDesc,
+      rothConversionAmount: y.rothConversionAmount || 0,
+      estimatedTaxSavings: taxesSaved > 0 ? Math.round(taxesSaved / bestSim.yearlyResults.length) : 0,
+      notes: y.rothConversionAmount > 0
+        ? `Converted $${Math.round(y.rothConversionAmount).toLocaleString()} from Traditional to Roth in target bracket prior to RMD age`
+        : 'Standard drawdown sequence',
+    };
+  });
 
   const baselineETR = baselineSim.yearlyResults.length > 0 ? baselineSim.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / baselineSim.yearlyResults.length : 0;
   const optimizedETR = bestSim.yearlyResults.length > 0 ? bestSim.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / bestSim.yearlyResults.length : 0;

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
+import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import {
   AreaChart,
@@ -38,6 +39,10 @@ import {
   ArrowDownCircle,
   HelpCircle,
   Flag,
+  Activity,
+  Percent,
+  ShieldAlert,
+  Scale,
 } from 'lucide-react';
 
 interface ProjectionTabProps {
@@ -51,6 +56,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const [showDrawdownDetails, setShowDrawdownDetails] = useState(true);
   const [localRetirementAge, setLocalRetirementAge] = useState(Number(plan?.retirementAge) || 60);
   const [localReturnRate, setLocalReturnRate] = useState(7);
+  const [localInflationRate, setLocalInflationRate] = useState(3.0);
+  const [localExpenseModifier, setLocalExpenseModifier] = useState(0);
+
+  // New Phase 3 UX toggles: Nominal vs Real dollars & Deterministic vs Monte Carlo
+  const [dollarMode, setDollarMode] = useState<'nominal' | 'real'>('nominal');
+  const [viewMode, setViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
 
   // Sync local retirement age state when plan changes
   useEffect(() => {
@@ -83,8 +94,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     return assets - liabilities;
   }, [plan, accounts]);
 
-  // Real-time dynamic retirement simulation reacting instantly to Retirement Age & Return Rate sliders
-  const simulation = useMemo(() => {
+  // Construct EnginePlan object dynamically reacting to sliders
+  const enginePlanObj = useMemo(() => {
     if (!plan) return null;
 
     const planAccountsList = Array.isArray(plan.accounts) ? plan.accounts : [];
@@ -93,7 +104,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
     const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
 
-    const enginePlan: EnginePlan = {
+    const ep: EnginePlan = {
       id: plan.id || 'plan_dynamic',
       name: plan.name || 'FIRE Plan',
       hasSpouse: Boolean(plan.hasSpouse),
@@ -128,21 +139,27 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         rothPercentage: a.rothPercentage,
       })),
       liabilities: [],
-      events: planEventsList.map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        category: e.category as any,
-        type: e.type,
-        owner: e.owner || 'primary',
-        amount: parseFloat(e.amount) || 0,
-        frequency: e.frequency as any,
-        growthRate: parseFloat(e.growthRate) || 0,
-        adjustForInflation: e.adjustForInflation !== false,
-        startTriggerType: e.startTriggerType || 'now',
-        startTriggerValue: e.startTriggerValue,
-        endTriggerType: e.endTriggerType || 'retirement',
-        endTriggerValue: e.endTriggerValue,
-      })),
+      events: planEventsList.map((e: any) => {
+        let amt = parseFloat(e.amount) || 0;
+        if (e.category === 'expense' && localExpenseModifier !== 0) {
+          amt *= (1 + localExpenseModifier / 100);
+        }
+        return {
+          id: e.id,
+          name: e.name,
+          category: e.category as any,
+          type: e.type,
+          owner: e.owner || 'primary',
+          amount: amt,
+          frequency: e.frequency as any,
+          growthRate: parseFloat(e.growthRate) || 0,
+          adjustForInflation: e.adjustForInflation !== false,
+          startTriggerType: e.startTriggerType || 'now',
+          startTriggerValue: e.startTriggerValue,
+          endTriggerType: e.endTriggerType || 'retirement',
+          endTriggerValue: e.endTriggerValue,
+        };
+      }),
       flows: planFlowsList.map((f: any) => ({
         id: f.id,
         name: f.name,
@@ -151,9 +168,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         targetAccountId: f.targetAccountId,
         ruleType: f.ruleType as any,
         ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
+        matchRate: f.matchRate ? parseFloat(f.matchRate) : undefined,
+        matchLimit: f.matchLimit ? parseFloat(f.matchLimit) : undefined,
+        matchAccountId: f.matchAccountId,
       })),
       settings: {
-        fixedInflationRate: parseFloat(plan.settings?.fixedInflationRate || '3.0'),
+        fixedInflationRate: localInflationRate,
         withholdingDeferred: parseFloat(plan.settings?.withholdingDeferred || '20.0'),
         withholdingTaxable: parseFloat(plan.settings?.withholdingTaxable || '10.0'),
         incomeTaxModifier: parseFloat(plan.settings?.incomeTaxModifier || '0.0'),
@@ -171,12 +191,28 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       rules: plan.rules || DEFAULT_2026_RULES,
     };
 
-    return runRetirementSimulation(enginePlan);
-  }, [plan, localRetirementAge, localReturnRate]);
+    return ep;
+  }, [plan, localRetirementAge, localReturnRate, localInflationRate, localExpenseModifier]);
+
+  const simulation = useMemo(() => {
+    if (!enginePlanObj) return null;
+    return runRetirementSimulation(enginePlanObj);
+  }, [enginePlanObj]);
+
+  // Monte Carlo output for probabilistic fan chart
+  const monteCarloOutput = useMemo(() => {
+    if (viewMode !== 'monte_carlo' || !enginePlanObj) return null;
+    return runMonteCarloSimulation(enginePlanObj, {
+      numberOfTrials: 250,
+      model: 'historical_bootstrap',
+      adjustForInflation: dollarMode === 'real',
+      fixedInflationRate: localInflationRate,
+    });
+  }, [viewMode, enginePlanObj, dollarMode, localInflationRate]);
 
   const yearlySimResults = useMemo(() => simulation?.yearlyResults || [], [simulation]);
 
-  // Rich Milestone Callouts Data (with stroke colors for chart markers)
+  // Rich Milestone Callouts Data
   const milestoneCallouts = useMemo(() => {
     const list = [
       {
@@ -185,8 +221,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + 50,
         icon: Award,
         color: 'text-blue-500',
-        borderColor: 'border-blue-500/30',
-        bgColor: 'bg-blue-500/10',
         stroke: '#3b82f6',
         note: 'IRA +$1k & 401(k) +$7.5k annual catch-up limits unlocked',
       },
@@ -196,8 +230,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + 55,
         icon: Clock,
         color: 'text-amber-500',
-        borderColor: 'border-amber-500/30',
-        bgColor: 'bg-amber-500/10',
         stroke: '#f59e0b',
         note: 'Penalty-free 401(k) separations allowed if separated from service',
       },
@@ -207,8 +239,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + localRetirementAge,
         icon: Palmtree,
         color: 'text-emerald-500',
-        borderColor: 'border-emerald-500/30',
-        bgColor: 'bg-emerald-500/10',
         stroke: '#10b981',
         note: 'Primary career end • Distribution phase begins',
       },
@@ -218,8 +248,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + 65,
         icon: ShieldCheck,
         color: 'text-purple-500',
-        borderColor: 'border-purple-500/30',
-        bgColor: 'bg-purple-500/10',
         stroke: '#a855f7',
         note: 'Transition to Medicare Part B/D • ACA subsidies end',
       },
@@ -229,8 +257,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + 67,
         icon: Landmark,
         color: 'text-cyan-500',
-        borderColor: 'border-cyan-500/30',
-        bgColor: 'bg-cyan-500/10',
         stroke: '#06b6d4',
         note: '100% Full Retirement Age SS benefit payout',
       },
@@ -240,8 +266,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         year: birthYear + 73,
         icon: Flag,
         color: 'text-rose-500',
-        borderColor: 'border-rose-500/30',
-        bgColor: 'bg-rose-500/10',
         stroke: '#f43f5e',
         note: 'Required Minimum Distributions start for tax-deferred accounts',
       },
@@ -257,97 +281,226 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     return map;
   }, [milestoneCallouts]);
 
-  // Chart data series mapped dynamically
+  // Chart data series mapped dynamically with Real vs. Nominal support & Expenses throughout timeline
   const chartData = useMemo(() => {
     if (yearlySimResults.length > 0) {
-      return yearlySimResults.map((y: any) => ({
-        year: y.year,
-        age: y.primaryAge,
-        spouseAge: y.spouseAge,
-        label: `${y.year}`,
-        netWorth: Math.round(y.netWorth),
-        income: Math.round(y.grossIncome),
-        expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses) : null,
-        isRetired: y.primaryAge >= localRetirementAge,
-        salaryIncome: Math.round(y.salaryIncome || 0),
-        ssIncome: Math.round(y.ssIncome || 0),
-        pensionIncome: Math.round(y.pensionIncome || 0),
-        otherIncome: Math.round(y.otherIncome || 0),
-        cashDrawdown: Math.round(y.drawdownsByType?.cash || 0),
-        taxableDrawdown: Math.round(y.drawdownsByType?.taxable || 0),
-        traditionalDrawdown: Math.round(y.drawdownsByType?.traditional || 0),
-        rothDrawdown: Math.round(y.drawdownsByType?.roth || 0),
-        hsaDrawdown: Math.round(y.drawdownsByType?.hsa || 0),
-        totalDrawdown: Math.round(y.deficitWithdrawn || 0),
-        rothConversionAmount: Math.round(y.rothConversionAmount || 0),
-        magi: Math.round(y.magi || 0),
-        irmaaSurchargeAnnual: Math.round(y.irmaaSurchargeAnnual || 0),
-        accountDrawdowns: y.accountDrawdowns || [],
-        milestone: milestoneMap[y.primaryAge],
-      }));
+      return yearlySimResults.map((y: any, idx: number) => {
+        const discountFactor = dollarMode === 'real' ? Math.pow(1 + (localInflationRate / 100), idx) : 1;
+
+        const cashD = Math.round((y.drawdownsByType?.cash || 0) / discountFactor);
+        const taxD = Math.round((y.drawdownsByType?.taxable || 0) / discountFactor);
+        const tradD = Math.round((y.drawdownsByType?.traditional || 0) / discountFactor);
+        const rothD = Math.round((y.drawdownsByType?.roth || 0) / discountFactor);
+        const hsaD = Math.round((y.drawdownsByType?.hsa || 0) / discountFactor);
+        const actualDrawdowns = cashD + taxD + tradD + rothD + hsaD;
+        const nw = Math.round(y.netWorth / discountFactor);
+        const withdrawRate = actualDrawdowns > 0 && (nw + actualDrawdowns) > 0
+          ? (actualDrawdowns / (nw + actualDrawdowns)) * 100
+          : 0;
+
+        return {
+          year: y.year,
+          age: y.primaryAge,
+          spouseAge: y.spouseAge,
+          label: `${y.year}`,
+          netWorth: nw,
+          income: Math.round(y.grossIncome / discountFactor),
+          expenses: Math.round(y.totalExpenses / discountFactor), // Show expenses during both accumulation and retirement
+          isRetired: y.primaryAge >= localRetirementAge,
+          salaryIncome: Math.round((y.salaryIncome || 0) / discountFactor),
+          ssIncome: Math.round((y.ssIncome || 0) / discountFactor),
+          pensionIncome: Math.round((y.pensionIncome || 0) / discountFactor),
+          otherIncome: Math.round((y.otherIncome || 0) / discountFactor),
+          cashDrawdown: cashD,
+          taxableDrawdown: taxD,
+          traditionalDrawdown: tradD,
+          rothDrawdown: rothD,
+          hsaDrawdown: hsaD,
+          actualDrawdowns,
+          totalDrawdown: Math.round((y.deficitWithdrawn || 0) / discountFactor),
+          withdrawalRate: Math.round(withdrawRate * 10) / 10,
+          rothConversionAmount: Math.round((y.rothConversionAmount || 0) / discountFactor),
+          magi: Math.round((y.magi || 0) / discountFactor),
+          taxesPaid: Math.round((y.taxesPaid || 0) / discountFactor),
+          effectiveTaxRate: y.effectiveTaxRate || 0,
+          irmaaSurchargeAnnual: Math.round((y.irmaaSurchargeAnnual || 0) / discountFactor),
+          accountDrawdowns: y.accountDrawdowns || [],
+          milestone: milestoneMap[y.primaryAge],
+        };
+      });
     }
     return [];
-  }, [yearlySimResults, localRetirementAge, milestoneMap]);
+  }, [yearlySimResults, localRetirementAge, milestoneMap, dollarMode, localInflationRate]);
 
-  // Key metrics
-  const retirementDataPoint = chartData.find((d) => d.age === localRetirementAge);
-  const netWorthAtRetirement = retirementDataPoint?.netWorth || 0;
-  const annualExpensesFromPlan = plan?.events?.find((e: any) => e.category === 'expense')?.amount || 42500;
-  const fireNumber = parseFloat(String(annualExpensesFromPlan)) * 25;
+  // Monte Carlo chart data format
+  const monteCarloChartData = useMemo(() => {
+    if (!monteCarloOutput) return [];
+    const p = monteCarloOutput.percentiles;
+    return p.years.map((year, idx) => ({
+      year,
+      age: currentAge + idx,
+      p10: Math.round(p.p10[idx]),
+      p25: Math.round(p.p25[idx]),
+      p50: Math.round(p.p50[idx]),
+      p75: Math.round(p.p75[idx]),
+      p90: Math.round(p.p90[idx]),
+    }));
+  }, [monteCarloOutput, currentAge]);
+
+  // Fix FIRE Target: Sum ALL expense events, not just the first one
+  const totalAnnualExpensesFromPlan = useMemo(() => {
+    if (!plan?.events || plan.events.length === 0) return 42500;
+    const expenseEvents = plan.events.filter((e: any) => e.category === 'expense');
+    if (expenseEvents.length === 0) return 42500;
+    const rawSum = expenseEvents.reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+    return rawSum * (1 + localExpenseModifier / 100);
+  }, [plan?.events, localExpenseModifier]);
+
+  const fireNumber = totalAnnualExpensesFromPlan * (plan?.fiTargetMultiplier || 25);
   const fireProgress = fireNumber > 0 ? Math.min(100, (currentNetWorth / fireNumber) * 100) : 0;
   const yearsToFire = chartData.findIndex((d) => d.netWorth >= fireNumber);
   const yearsToFireDisplay = yearsToFire >= 0 ? yearsToFire : '—';
+  const peakWithdrawalRate = Math.max(0, ...chartData.filter((d) => d.isRetired).map((d) => d.withdrawalRate));
 
-  // Strategy description tag
-  const activeStrategyLabel = useMemo(() => {
-    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
-    if (method === 'tax_optimized') return 'Tax-Bracket Shielding (Fill 12% Bracket First)';
-    if (method === 'proportional') return 'Proportional Drawdown Across Portfolio';
-    if (method === 'custom_order') return 'Custom Priority Order';
-    return 'Textbook Waterfall (Cash → Taxable → Traditional → Roth)';
-  }, [plan]);
+  const retirementDataPoint = chartData.find((d) => d.age === localRetirementAge);
+  const netWorthAtRetirement = retirementDataPoint?.netWorth || 0;
+
+  // Plan Health Scorecard
+  const planHealth = useMemo(() => {
+    const depleted = simulation?.depletionAge !== undefined || !simulation?.success;
+    if (depleted) {
+      return {
+        status: 'High Risk / Depletes',
+        badge: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+        desc: `Portfolio depletes at age ${simulation?.depletionAge || localRetirementAge}`,
+        score: 'D',
+      };
+    }
+    if (peakWithdrawalRate > 5.5) {
+      return {
+        status: 'Elevated Risk',
+        badge: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+        desc: `Peak withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) exceeds 5.5% threshold`,
+        score: 'C',
+      };
+    }
+    if (peakWithdrawalRate > 3.8) {
+      return {
+        status: 'Sustainable Plan',
+        badge: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+        desc: `Peak withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) fits 4% FIRE safety guidelines`,
+        score: 'B+',
+      };
+    }
+    return {
+      status: 'Optimal Health',
+      badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      desc: `Low withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) with strong legacy growth buffer`,
+      score: 'A+',
+    };
+  }, [simulation, peakWithdrawalRate, localRetirementAge]);
 
   return (
     <div className="space-y-6 max-w-5xl">
+      {/* View Mode & Dollar Mode Toolbar Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card border border-border rounded-xl p-3.5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="bg-primary/10 p-1.5 rounded-lg text-primary">
+            <Activity className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-foreground">Projection Controls</h3>
+            <p className="text-[10px] text-muted-foreground">Adjust valuation currency & model type</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+          {/* Nominal vs Real Dollars Toggle */}
+          <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
+            <button
+              onClick={() => setDollarMode('nominal')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                dollarMode === 'nominal' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Nominal ($)
+            </button>
+            <button
+              onClick={() => setDollarMode('real')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                dollarMode === 'real' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Real (Today's $)
+            </button>
+          </div>
+
+          {/* Deterministic vs Monte Carlo Toggle */}
+          <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
+            <button
+              onClick={() => setViewMode('deterministic')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                viewMode === 'deterministic' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Deterministic
+            </button>
+            <button
+              onClick={() => setViewMode('monte_carlo')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                viewMode === 'monte_carlo' ? 'bg-card text-amber-500 shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Monte Carlo (250 Trials)
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <DollarSign className="w-3.5 h-3.5" />
             <span className="text-[11px] font-semibold uppercase tracking-wider">Current Net Worth</span>
           </div>
-          <p className="text-xl font-extrabold text-foreground font-mono">{formatCurrency(currentNetWorth)}</p>
+          <p className="text-lg font-extrabold text-foreground font-mono">{formatCurrency(currentNetWorth)}</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Palmtree className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">At Retirement (Age {localRetirementAge})</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">At Retirement ({localRetirementAge})</span>
           </div>
-          <p className="text-xl font-extrabold text-emerald-500 font-mono">{formatCurrency(netWorthAtRetirement)}</p>
+          <p className="text-lg font-extrabold text-emerald-500 font-mono">{formatCurrency(netWorthAtRetirement)}</p>
+          {peakWithdrawalRate > 0 && (
+            <p className={`text-[10px] font-bold font-mono ${peakWithdrawalRate > 5 ? 'text-rose-500' : peakWithdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              Peak Withdraw: {peakWithdrawalRate.toFixed(1)}%
+            </p>
+          )}
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Target className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">FIRE Target (25×)</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">FIRE Target ({plan?.fiTargetMultiplier || 25}×)</span>
           </div>
-          <p className="text-xl font-extrabold text-primary font-mono">{formatCurrency(fireNumber)}</p>
+          <p className="text-lg font-extrabold text-primary font-mono">{formatCurrency(fireNumber)}</p>
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, fireProgress)}%` }}
             />
           </div>
-          <p className="text-[10px] text-muted-foreground font-medium">{fireProgress.toFixed(0)}% achieved</p>
+          <p className="text-[10px] text-muted-foreground font-medium">{fireProgress.toFixed(0)}% of target</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
             <span className="text-[11px] font-semibold uppercase tracking-wider">Years to FIRE</span>
           </div>
-          <p className="text-xl font-extrabold text-foreground font-mono">{yearsToFireDisplay}</p>
+          <p className="text-lg font-extrabold text-foreground font-mono">{yearsToFireDisplay}</p>
           {simulation?.success !== undefined && (
             <div
               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -357,270 +510,179 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               }`}
             >
               <ShieldCheck className="w-3 h-3" />
-              {simulation.success ? 'Plan Succeeds' : `Depletes at Age ${simulation.depletionAge || '?'}`}
+              {simulation.success ? 'Succeeds' : `Depletes Age ${simulation.depletionAge}`}
             </div>
           )}
         </div>
+
+        {/* Plan Health Score Card */}
+        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Scale className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Plan Health</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-extrabold text-foreground font-mono">{planHealth.score}</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
+              {planHealth.status}
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-snug line-clamp-1">{planHealth.desc}</p>
+        </div>
       </div>
 
-      {/* Main Projection Chart Container */}
+      {/* Main Chart Area: Deterministic vs Monte Carlo Fan Chart */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
-              FIRE Portfolio Net Worth Trajectory
+              {viewMode === 'monte_carlo' ? 'Monte Carlo Probabilistic Fan Chart (250 Historical Bootstrap Trials)' : 'FIRE Portfolio Net Worth Trajectory'}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {chartData.length} years projected
+              Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {dollarMode === 'real' ? 'Real (Inflation-Adjusted Today\'s Dollars)' : 'Nominal Dollars'}
             </p>
           </div>
+
+          {viewMode === 'monte_carlo' && monteCarloOutput && (
+            <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-mono">
+              <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
+              <span className="text-muted-foreground">|</span>
+              <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
+            </div>
+          )}
         </div>
 
-        {/* Dynamic Chart Area with On-Graph Milestone Reference Markers */}
+        {/* Dynamic Chart */}
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="accumulationGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
+            {viewMode === 'deterministic' ? (
+              <AreaChart data={chartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="accumulationGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
 
-              <XAxis
-                dataKey="age"
-                stroke="currentColor"
-                className="text-xs text-muted-foreground"
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(age) => `${age}`}
-                label={{ value: 'Age', position: 'insideBottomRight', offset: -5, className: 'text-xs fill-muted-foreground' }}
-              />
-              <YAxis
-                stroke="currentColor"
-                className="text-xs text-muted-foreground"
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
-              />
+                <XAxis
+                  dataKey="age"
+                  stroke="currentColor"
+                  className="text-xs text-muted-foreground"
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(age) => `${age}`}
+                />
+                <YAxis
+                  stroke="currentColor"
+                  className="text-xs text-muted-foreground"
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
+                />
 
-              <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
 
-              <Area
-                type="monotone"
-                dataKey="netWorth"
-                stroke="#10b981"
-                strokeWidth={2.5}
-                fillOpacity={1}
-                fill="url(#accumulationGrad)"
-              />
+                <Area
+                  type="monotone"
+                  dataKey="netWorth"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#accumulationGrad)"
+                />
 
-              {/* Retirement Age Vertical Line Marker */}
-              <ReferenceLine
-                x={localRetirementAge}
-                stroke="#10b981"
-                strokeDasharray="4 4"
-                strokeWidth={2}
-                label={{
-                  value: `🌴 Retirement (Age ${localRetirementAge})`,
-                  position: 'top',
-                  fill: '#10b981',
-                  fontSize: 11,
-                  fontWeight: 'bold',
-                }}
-              />
-
-              {/* Milestone Icons on Graph Trajectory Curve */}
-              {milestoneCallouts.map((m, idx) => {
-                const pt = chartData.find((d) => d.age === m.age);
-                if (!pt) return null;
-                const IconComponent = m.icon;
-                return (
-                  <ReferenceDot
-                    key={idx}
-                    x={m.age}
-                    y={pt.netWorth}
-                    shape={(dotProps: any) => {
-                      const { cx, cy } = dotProps;
-                      if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
-                      return (
-                        <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
-                          <title>{`${m.title} (Age ${m.age}, Year ${m.year})\n${m.note}\nProjected Net Worth: ${formatCurrency(pt.netWorth)}`}</title>
-                          <circle
-                            cx={14}
-                            cy={14}
-                            r={13}
-                            fill="var(--card, #ffffff)"
-                            stroke={m.stroke || '#10b981'}
-                            strokeWidth={2.5}
-                            className="shadow-sm transition-transform group-hover:scale-125"
-                          />
-                          <g transform="translate(6, 6)">
-                            <IconComponent size={16} color={m.stroke || '#10b981'} />
-                          </g>
-                        </g>
-                      );
-                    }}
-                  />
-                );
-              })}
-            </AreaChart>
+                <ReferenceLine
+                  x={localRetirementAge}
+                  stroke="#10b981"
+                  strokeDasharray="4 4"
+                  strokeWidth={2}
+                  label={{
+                    value: `🌴 Retirement (${localRetirementAge})`,
+                    position: 'top',
+                    fill: '#10b981',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                />
+              </AreaChart>
+            ) : (
+              <AreaChart data={monteCarloChartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="mcBandGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+                <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+                <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
+                <Tooltip />
+                <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile" />
+                <Area type="monotone" dataKey="p75" stroke="#3b82f6" strokeWidth={1.5} fill="none" name="75th Percentile" />
+                <Area type="monotone" dataKey="p50" stroke="#10b981" strokeWidth={2.5} fill="none" name="Median (P50)" />
+                <Area type="monotone" dataKey="p25" stroke="#a855f7" strokeWidth={1.5} fill="none" name="25th Percentile" />
+                <Area type="monotone" dataKey="p10" stroke="#f43f5e" strokeWidth={1.5} fill="none" name="10th Percentile (Worst Case)" />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Key Statutory & Retirement Milestones Grid */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between border-b border-border pb-2.5">
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Award className="w-4 h-4 text-primary" />
-            Key Statutory & Retirement Milestones
-          </h3>
-          <span className="text-[11px] text-muted-foreground font-medium">Automated Age & Statutory Triggers</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-          {milestoneCallouts.map((m, idx) => {
-            const Icon = m.icon;
-            const pt = chartData.find((d) => d.age === m.age);
-            return (
-              <div
-                key={idx}
-                className={`bg-card border ${m.borderColor} rounded-xl p-3.5 space-y-2 hover:shadow-md transition-all`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${m.bgColor} ${m.color}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
-                      <p className="text-[10px] text-muted-foreground">
-                        Age {m.age} • Year {m.year}
-                      </p>
-                    </div>
-                  </div>
-                  {pt && (
-                    <span className="text-xs font-mono font-bold text-foreground bg-muted/40 px-2 py-0.5 rounded">
-                      {formatCurrency(pt.netWorth)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-snug">{m.note}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Retirement Income Streams & Account Drawdown Sources Chart */}
+      {/* Income vs. Drawdowns Composed Stacked Bar & Line Chart */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <div>
-            <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Layers className="w-4 h-4 text-emerald-500" />
-              <h3 className="text-sm font-bold text-foreground">Retirement Income Streams & Account Drawdown Sources</h3>
-            </div>
+              Yearly Cash Flow Composition: Inflows vs. Portfolio Drawdowns
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Year-by-year income origins and account drawdown breakdown under strategy:{' '}
-              <span className="font-semibold text-primary font-mono">{activeStrategyLabel}</span>
+              Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses
             </p>
           </div>
-          <button
-            onClick={() => setShowDrawdownDetails(!showDrawdownDetails)}
-            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            {showDrawdownDetails ? 'Collapse Breakdown' : 'Expand Drawdown Breakdown'}
-          </button>
+          <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+            {activeStrategyLabel}
+          </span>
         </div>
 
-        {showDrawdownDetails && (
-          <div className="space-y-5 animate-in fade-in">
-            {/* Stacked Bar Chart for Income Streams & Drawdowns */}
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-                  <XAxis
-                    dataKey="age"
-                    stroke="currentColor"
-                    className="text-xs text-muted-foreground"
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(age) => `${age}`}
-                  />
-                  <YAxis
-                    stroke="currentColor"
-                    className="text-xs text-muted-foreground"
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
-                  />
-                  <Tooltip content={<DrawdownTooltip />} />
-                  <Legend content={<GroupedLegend />} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+              <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+              <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
+              <Tooltip content={<DrawdownTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
+              <Legend content={<GroupedLegend />} />
 
-                  {/* Retirement Age Vertical Line */}
-                  <ReferenceLine
-                    x={localRetirementAge}
-                    stroke="#10b981"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
-                    label={{
-                      value: `Retirement`,
-                      position: 'top',
-                      fill: '#10b981',
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
-                  />
+              <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="income" fill="#10b981" />
+              <Bar dataKey="ssIncome" name="Social Security" stackId="income" fill="#06b6d4" />
+              <Bar dataKey="pensionIncome" name="Pension" stackId="income" fill="#3b82f6" />
+              <Bar dataKey="otherIncome" name="Other Income" stackId="income" fill="#8b5cf6" />
 
-                  {/* Income Bars */}
-                  <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="income" fill="#10b981" />
-                  <Bar dataKey="ssIncome" name="Social Security" stackId="income" fill="#06b6d4" />
-                  <Bar dataKey="pensionIncome" name="Pension" stackId="income" fill="#3b82f6" />
-                  <Bar dataKey="otherIncome" name="Other Income" stackId="income" fill="#8b5cf6" />
+              <Bar dataKey="cashDrawdown" name="Cash Drawdown" stackId="drawdown" fill="#94a3b8" />
+              <Bar dataKey="taxableDrawdown" name="Taxable Brokerage" stackId="drawdown" fill="#f59e0b" />
+              <Bar dataKey="traditionalDrawdown" name="Traditional IRA/401k" stackId="drawdown" fill="#a855f7" />
+              <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="drawdown" fill="#ec4899" />
+              <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="drawdown" fill="#14b8a6" />
 
-                  {/* Account Drawdown Bars */}
-                  <Bar dataKey="cashDrawdown" name="Cash Drawdown" stackId="drawdown" fill="#64748b" />
-                  <Bar dataKey="taxableDrawdown" name="Taxable Brokerage" stackId="drawdown" fill="#f59e0b" />
-                  <Bar dataKey="traditionalDrawdown" name="Traditional IRA/401k" stackId="drawdown" fill="#a855f7" />
-                  <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="drawdown" fill="#ec4899" />
-                  <Bar dataKey="rothConversionAmount" name="Roth Conversion" stackId="drawdown" fill="#f97316" />
-                  <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="drawdown" fill="#14b8a6" />
-
-                  {/* Dynamic Expenses Line — follows inflation/growth per year */}
-                  <Line
-                    type="monotone"
-                    dataKey="expenses"
-                    name="Annual Expenses"
-                    stroke="#f43f5e"
-                    strokeWidth={2}
-                    strokeDasharray="6 3"
-                    dot={false}
-                    activeDot={{ r: 4, fill: '#f43f5e', strokeWidth: 0 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
+              <Line type="monotone" dataKey="expenses" name="Annual Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* What-If Explorer Sliders */}
+      {/* Interactive What-If Scenario Explorer Sliders */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Flame className="w-4 h-4 text-primary" />
-          What-If Explorer
-          <span className="text-[10px] font-medium text-muted-foreground ml-1">
-            Adjust parameters to see how they affect your projection
-          </span>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          Interactive What-If Scenario Explorer
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Retirement Age Slider */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Retirement Age Slider with Debounced Commit */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Retirement Age</span>
@@ -632,11 +694,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               max="75"
               step="1"
               value={localRetirementAge}
-              onChange={(e) => {
-                const newAge = parseInt(e.target.value, 10);
-                setLocalRetirementAge(newAge);
-                onUpdatePlan({ retirementAge: newAge });
-              }}
+              onChange={(e) => setLocalRetirementAge(parseInt(e.target.value, 10))}
+              onPointerUp={() => onUpdatePlan({ retirementAge: localRetirementAge })}
               className="w-full accent-primary h-2 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
@@ -657,25 +716,70 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </div>
             <input
               type="range"
-              min="-10"
-              max="15"
+              min="1"
+              max="12"
               step="0.5"
               value={localReturnRate}
               onChange={(e) => setLocalReturnRate(parseFloat(e.target.value))}
               className="w-full accent-primary h-2 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-              <span className="text-rose-500/80">-10%</span>
-              <span>-5%</span>
+              <span>1%</span>
+              <span>6%</span>
+              <span>8%</span>
+              <span>12%</span>
+            </div>
+          </div>
+
+          {/* Inflation Rate Slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-muted-foreground">Inflation Rate</span>
+              <span className="font-mono font-bold text-amber-500 text-sm">{localInflationRate.toFixed(1)}%</span>
+            </div>
+            <input
+              type="range"
+              min="1.0"
+              max="6.0"
+              step="0.25"
+              value={localInflationRate}
+              onChange={(e) => setLocalInflationRate(parseFloat(e.target.value))}
+              className="w-full accent-amber-500 h-2 cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+              <span>1.0%</span>
+              <span>3.0%</span>
+              <span>6.0%</span>
+            </div>
+          </div>
+
+          {/* Annual Expenses Modifier Slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-muted-foreground">Expense Adjustment</span>
+              <span className={`font-mono font-bold text-sm ${localExpenseModifier > 0 ? 'text-rose-500' : localExpenseModifier < 0 ? 'text-emerald-500' : 'text-primary'}`}>
+                {localExpenseModifier > 0 ? `+${localExpenseModifier}%` : `${localExpenseModifier}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-30"
+              max="30"
+              step="5"
+              value={localExpenseModifier}
+              onChange={(e) => setLocalExpenseModifier(parseInt(e.target.value, 10))}
+              className="w-full accent-primary h-2 cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+              <span>-30%</span>
               <span>0%</span>
-              <span>7%</span>
-              <span>15%</span>
+              <span>+30%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Expandable Year-by-Year Table with Detailed Drawdowns */}
+      {/* Year-by-Year Simulation Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         <button
           onClick={() => setShowYearlyTable(!showYearlyTable)}
@@ -701,11 +805,13 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   <th className="p-2.5">Net Worth</th>
                   <th className="p-2.5">Gross Income</th>
                   <th className="p-2.5">Expenses</th>
-                  <th className="p-2.5">Cash Drawdown</th>
-                  <th className="p-2.5">Taxable Drawdown</th>
-                  <th className="p-2.5">Traditional Drawdown</th>
-                  <th className="p-2.5">Roth Drawdown</th>
-                  <th className="p-2.5">Roth Conversion</th>
+                  <th className="p-2.5">Taxes Paid</th>
+                  <th className="p-2.5">ETR %</th>
+                  <th className="p-2.5">Taxable Draw</th>
+                  <th className="p-2.5">Trad Draw</th>
+                  <th className="p-2.5">Roth Draw</th>
+                  <th className="p-2.5">Withdraw Rate</th>
+                  <th className="p-2.5">Roth Conv</th>
                   <th className="p-2.5">MAGI</th>
                   <th className="p-2.5">Phase</th>
                 </tr>
@@ -724,10 +830,20 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                       <td className="p-2.5 font-bold text-foreground">{formatCurrency(y.netWorth)}</td>
                       <td className="p-2.5 text-emerald-500">{formatCurrency(y.income)}</td>
                       <td className="p-2.5 text-rose-500">{formatCurrency(y.expenses)}</td>
-                      <td className="p-2.5 text-slate-400">{formatCurrency(y.cashDrawdown)}</td>
+                      <td className="p-2.5 text-rose-400 font-bold">{formatCurrency(y.taxesPaid)}</td>
+                      <td className="p-2.5 text-muted-foreground">{y.effectiveTaxRate ? `${y.effectiveTaxRate.toFixed(1)}%` : '0%'}</td>
                       <td className="p-2.5 text-amber-500">{formatCurrency(y.taxableDrawdown)}</td>
                       <td className="p-2.5 text-purple-500">{formatCurrency(y.traditionalDrawdown)}</td>
                       <td className="p-2.5 text-pink-500">{formatCurrency(y.rothDrawdown)}</td>
+                      <td className="p-2.5 font-bold">
+                        {y.withdrawalRate > 0 ? (
+                          <span className={y.withdrawalRate > 5 ? 'text-rose-500' : y.withdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}>
+                            {y.withdrawalRate.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="p-2.5 text-cyan-500">{formatCurrency(y.rothConversionAmount)}</td>
                       <td className="p-2.5 text-foreground">{formatCurrency(y.magi)}</td>
                       <td className="p-2.5">
@@ -858,7 +974,6 @@ function DrawdownTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const incomeTotal = (data.salaryIncome || 0) + (data.ssIncome || 0) + (data.pensionIncome || 0) + (data.otherIncome || 0);
-  const incomeGap = Math.max(0, (data.expenses || 0) - incomeTotal);
   return (
     <div className="bg-background border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[240px]">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
@@ -932,24 +1047,26 @@ function DrawdownTooltip({ active, payload }: any) {
             <span>{formatCurrency(data.rothConversionAmount)}</span>
           </div>
         )}
-        {data.expenses != null && (
+        {data.actualDrawdowns > 0 && (
           <div className="border-t border-border/40 pt-1 space-y-1">
+            <div className="flex justify-between font-bold text-foreground">
+              <span>Total Drawn:</span>
+              <span>{formatCurrency(data.actualDrawdowns)}</span>
+            </div>
+            <div className="flex justify-between font-bold">
+              <span>Withdraw Rate:</span>
+              <span className={data.withdrawalRate > 5 ? 'text-rose-500' : data.withdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}>
+                {data.withdrawalRate.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        )}
+        {data.expenses != null && (
+          <div className="border-t border-border/40 pt-1">
             <div className="flex justify-between text-rose-500">
               <span>Expenses:</span>
               <span>{formatCurrency(data.expenses)}</span>
             </div>
-            {incomeGap > 0 && (
-              <div className="flex justify-between font-bold text-amber-500">
-                <span>Income Gap:</span>
-                <span>{formatCurrency(incomeGap)}</span>
-              </div>
-            )}
-            {incomeGap <= 0 && incomeTotal > 0 && (
-              <div className="flex justify-between font-bold text-emerald-500">
-                <span>Surplus:</span>
-                <span>{formatCurrency(incomeTotal - (data.expenses || 0))}</span>
-              </div>
-            )}
           </div>
         )}
       </div>

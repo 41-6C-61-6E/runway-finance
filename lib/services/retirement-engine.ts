@@ -48,7 +48,7 @@ export interface EngineFlow {
   type: 'invest' | 'save_maintain' | 'pay_debt';
   rank: number;
   targetAccountId: string;
-  ruleType: 'percentage' | 'maximize' | 'save_maintain' | 'save_leftover';
+  ruleType: 'percentage' | 'maximize' | 'save_maintain' | 'save_leftover' | 'fixed_amount';
   ruleValue?: number;
   matchRate?: number;
   matchLimit?: number;
@@ -127,7 +127,9 @@ export interface YearlySimulationResult {
   taxesPaid: number;
   ordinaryTax: number;
   capGainsTax: number;
+  stateTax: number;
   ficaTax: number;
+  acaSubsidy: number;
   effectiveTaxRate: number;
   netCashFlow: number;
   surplusSaved: number;
@@ -275,29 +277,104 @@ export function runRetirementSimulation(
       livingExpenses += val;
     }
 
-    // Debt Payments
+    // Debt Payments (correct amortization: interest accrues, payment covers interest first)
     let debtPayments = 0;
     for (const liabId in liabilitiesState) {
       const liab = liabilitiesState[liabId];
       if (liab.balance > 0) {
+        const annualInterest = liab.balance * (liab.interestRate / 100);
         const annualPay = liab.monthlyPayment * 12;
-        const pay = Math.min(liab.balance, annualPay);
+        const pay = Math.min(liab.balance + annualInterest, annualPay);
+        const principalPaid = Math.max(0, pay - annualInterest);
         debtPayments += pay;
-        liab.balance = Math.max(0, liab.balance - (pay - liab.balance * (liab.interestRate / 100)));
+        liab.balance = Math.max(0, liab.balance - principalPaid);
       }
     }
 
     const totalExpenses = livingExpenses + debtPayments;
 
-    // 3. Tax Estimation (MFJ Aware)
+    // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)
+    let surplusSaved = 0;
+    let totalPreTaxContrib = 0;
+    const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
+
+    const isAccumulation = primaryAge < plan.retirementAge;
+
+    if (isAccumulation && salaryIncome > 0) {
+      for (const flow of sortedFlows) {
+        const targetAcc = accountsState[flow.targetAccountId];
+        if (!targetAcc) continue;
+
+        const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+        if (!isPreTax) continue;
+
+        // Catch-up eligibility is per account owner, not household-level
+        const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+        const ownerCatchUp50 = ownerAge >= 50;
+        const ownerCatchUp55 = ownerAge >= 55;
+
+        let requestedAlloc = 0;
+        if (flow.ruleType === 'percentage' && flow.ruleValue) {
+          requestedAlloc = salaryIncome * (flow.ruleValue / 100);
+        } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
+          requestedAlloc = flow.ruleValue * compoundInflation;
+        } else if (flow.ruleType === 'save_maintain') {
+          const targetBal = (flow.ruleValue || 0) * compoundInflation;
+          requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
+        } else if (flow.ruleType === 'maximize') {
+          let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0); // IRA base limit
+          if (targetAcc.type.includes('401k')) {
+            maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+          } else if (targetAcc.type === 'hsa') {
+            maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+          }
+          // MFJ doubles IRA limit (one per spouse); 401k/HSA limits are per-person
+          if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
+            maxLimit *= 2;
+          }
+          requestedAlloc = maxLimit;
+        }
+
+        const maxSalaryAvail = Math.max(0, salaryIncome - totalPreTaxContrib);
+        const alloc = Math.min(maxSalaryAvail, requestedAlloc);
+        if (alloc > 0) {
+          targetAcc.balance += alloc;
+          totalPreTaxContrib += alloc;
+          surplusSaved += alloc;
+
+          // Employer match contribution
+          if (flow.matchRate != null && flow.matchLimit != null) {
+            const matchableContrib = Math.min(alloc, salaryIncome * (flow.matchLimit / 100));
+            const matchAmount = matchableContrib * flow.matchRate;
+            const matchTarget = flow.matchAccountId ? accountsState[flow.matchAccountId] : targetAcc;
+            if (matchTarget && matchAmount > 0) {
+              matchTarget.balance += matchAmount;
+              surplusSaved += matchAmount;
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Tax Estimation (MFJ & Pre-Tax Deduction Aware)
+    const taxableSalary = Math.max(0, salaryIncome - totalPreTaxContrib);
     const stdDeductionBase = parseFloat(rules.standardDeduction || '15000');
     const stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
-    const ficaTax = salaryIncome * 0.0765;
+
+    // FICA Tax calculation (6.2% SS up to wage base cap + 1.45% Medicare + 0.9% Additional Medicare)
+    const ssWageBase = 168600 * compoundInflation;
+    const ssTaxableSalary = Math.min(taxableSalary, ssWageBase);
+    const ssFica = ssTaxableSalary * 0.062;
+    const medicareFica = taxableSalary * 0.0145;
+    const addMedicareThresh = isMfj ? 250000 : 200000;
+    const addMedicareFica = Math.max(0, taxableSalary - addMedicareThresh) * 0.009;
+    const ficaTax = ssFica + medicareFica + addMedicareFica;
 
     // IRS Provisional Income & SS Taxation Formula
-    const provisionalIncome = salaryIncome + pensionIncome + otherIncome + totalSsIncome * 0.5;
-    const ssTier1 = (isMfj ? 32000 : 25000) * compoundInflation;
-    const ssTier2 = (isMfj ? 44000 : 34000) * compoundInflation;
+    const provisionalIncome = taxableSalary + pensionIncome + otherIncome + totalSsIncome * 0.5;
+    // IRS SS taxation thresholds are NOT inflation-indexed (frozen since 1993)
+    const ssTier1 = isMfj ? 32000 : 25000;
+    const ssTier2 = isMfj ? 44000 : 34000;
 
     let taxableSs = 0;
     if (provisionalIncome > ssTier2) {
@@ -306,7 +383,7 @@ export function runRetirementSimulation(
       taxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (provisionalIncome - ssTier1));
     }
 
-    const taxableOrdinaryIncome = Math.max(0, salaryIncome + pensionIncome + otherIncome + taxableSs - stdDeduction);
+    const taxableOrdinaryIncome = Math.max(0, taxableSalary + pensionIncome + otherIncome + taxableSs - stdDeduction);
 
     let ordinaryTax = 0;
     const bracketMult = isMfj ? 2 : 1;
@@ -321,48 +398,59 @@ export function runRetirementSimulation(
       }
     }
 
-    const capGainsTax = 0;
-    const taxesPaid = ficaTax + ordinaryTax + capGainsTax;
-    const effectiveTaxRate = grossIncome > 0 ? (taxesPaid / grossIncome) * 100 : 0;
+    let capGainsTax = 0; // Computed after drawdowns in tax reconciliation phase
+    const stateTaxRate = (plan.settings?.incomeTaxModifier || 0) / 100;
+    let stateTax = taxableOrdinaryIncome * stateTaxRate;
+    let taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax;
+    let effectiveTaxRate = grossIncome > 0 ? (taxesPaid / grossIncome) * 100 : 0;
 
-    const netCashFlow = grossIncome - totalExpenses - taxesPaid;
+    const netCashFlow = grossIncome - totalExpenses - taxesPaid - totalPreTaxContrib;
 
-    let surplusSaved = 0;
     let deficitWithdrawn = 0;
     const accountDrawdowns: AccountDrawdownDetail[] = [];
     const drawdownsByType = { cash: 0, taxable: 0, traditional: 0, roth: 0, hsa: 0 };
     let rothConversionAmount = 0;
+    let totalTaxableGains = 0;
 
-    // 4. Surplus Savings Routing or Deficit Drawdown
+    // 5. Post-Tax Savings Routing or Deficit Drawdown
     if (netCashFlow > 0) {
       let surplus = netCashFlow;
-      const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
-      for (const flow of sortedFlows) {
-        if (surplus <= 0) break;
-        const targetAcc = accountsState[flow.targetAccountId];
-        if (!targetAcc) continue;
 
-        let limit = surplus;
-        if (flow.ruleType === 'percentage' && flow.ruleValue) {
-          limit = salaryIncome * (flow.ruleValue / 100);
-        } else if (flow.ruleType === 'maximize') {
-          const isAge50 = primaryAge >= 50 || (spouseAge !== undefined && spouseAge >= 50);
-          let maxLimit = (isMfj ? 14000 : 7000) + (isAge50 ? 1000 : 0);
-          if (targetAcc.type.includes('401k')) maxLimit = (isMfj ? 46000 : 23000) + (isAge50 ? 7500 : 0);
-          else if (targetAcc.type === 'hsa') maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (primaryAge >= 55 ? 1000 : 0);
-          limit = Math.min(surplus, maxLimit);
+      if (isAccumulation) {
+        for (const flow of sortedFlows) {
+          if (surplus <= 0) break;
+          const targetAcc = accountsState[flow.targetAccountId];
+          if (!targetAcc) continue;
+
+          const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+          if (isPreTax) continue; // Already processed in Pre-Tax phase
+
+          let limit = surplus;
+          if (flow.ruleType === 'percentage' && flow.ruleValue) {
+            limit = salaryIncome * (flow.ruleValue / 100);
+          } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
+            limit = flow.ruleValue * compoundInflation;
+          } else if (flow.ruleType === 'save_maintain') {
+            const targetBal = (flow.ruleValue || 0) * compoundInflation;
+            limit = Math.max(0, targetBal - targetAcc.balance);
+          } else if (flow.ruleType === 'maximize') {
+            const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+            const ownerCatchUp50 = ownerAge >= 50;
+            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+            if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+            if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
+            limit = Math.min(surplus, maxLimit);
+          } else if (flow.ruleType === 'save_leftover') {
+            limit = surplus;
+          }
+
+          const alloc = Math.min(surplus, limit);
+          if (alloc > 0) {
+            targetAcc.balance += alloc;
+            surplus -= alloc;
+            surplusSaved += alloc;
+          }
         }
-
-        const alloc = Math.min(surplus, limit);
-        targetAcc.balance += alloc;
-        surplus -= alloc;
-        surplusSaved += alloc;
-      }
-
-      if (surplus > 0) {
-        const taxableAcc = Object.values(accountsState).find((a) => a.type === 'taxable' || a.type === 'cash');
-        if (taxableAcc) taxableAcc.balance += surplus;
-        surplusSaved += surplus;
       }
     } else if (netCashFlow < 0) {
       let deficit = Math.abs(netCashFlow);
@@ -371,6 +459,14 @@ export function runRetirementSimulation(
       const withdrawFromAcc = (acc: EngineAccount, amt: number) => {
         const actual = Math.min(acc.balance, amt);
         if (actual <= 0) return 0;
+
+        // Track capital gains for taxable account withdrawals (cost basis proportional reduction)
+        if ((acc.type === 'taxable' || acc.type === 'crypto') && acc.balance > 0) {
+          const gainRatio = Math.max(0, (acc.balance - acc.costBasis) / acc.balance);
+          totalTaxableGains += actual * gainRatio;
+          acc.costBasis = Math.max(0, acc.costBasis * (1 - actual / acc.balance));
+        }
+
         acc.balance -= actual;
         accountDrawdowns.push({
           accountId: acc.id,
@@ -466,21 +562,69 @@ export function runRetirementSimulation(
       }
     }
 
-    // 4b. Roth Conversion Ladder Engine (Retired, before RMD age 73)
+    // 5a. RMD Enforcement (Required Minimum Distributions — SECURE Act 2.0)
     const isRetired = primaryAge >= plan.retirementAge;
-    const rmdStartAge = rules.secureActRules?.rmdAge || 73;
+    const rmdStartAge = (primaryBirthYear >= 1960) ? 75 : (rules.secureActRules?.rmdAge || 73);
+    if (primaryAge >= rmdStartAge) {
+      const tradAccsForRmd = Object.values(accountsState).filter(
+        (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+      );
+      const totalTradBalance = tradAccsForRmd.reduce((s, a) => s + a.balance, 0);
+      if (totalTradBalance > 0) {
+        const divisor = IRS_UNIFORM_LIFETIME_TABLE[primaryAge] || IRS_UNIFORM_LIFETIME_TABLE[120] || 2.0;
+        const totalRmdRequired = totalTradBalance / divisor;
+        const alreadyWithdrawn = drawdownsByType.traditional;
+        const additionalRmd = Math.max(0, totalRmdRequired - alreadyWithdrawn);
+
+        if (additionalRmd > 0) {
+          let remRmd = additionalRmd;
+          for (const acc of tradAccsForRmd) {
+            if (remRmd <= 0) break;
+            const accShare = (acc.balance / totalTradBalance) * additionalRmd;
+            const actual = Math.min(acc.balance, Math.min(remRmd, accShare));
+            if (actual > 0) {
+              acc.balance -= actual;
+              remRmd -= actual;
+              drawdownsByType.traditional += actual;
+              accountDrawdowns.push({
+                accountId: acc.id,
+                accountName: acc.name,
+                accountType: acc.type,
+                amount: actual,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 5b. Roth Conversion Ladder Engine (Retired, before RMD age)
     if (plan.settings?.enableRothConversions && isRetired && primaryAge < rmdStartAge) {
       let targetCeilingRate = 0.12;
       if (plan.settings.rothConversionTargetCeiling === 'top_of_10') targetCeilingRate = 0.10;
       else if (plan.settings.rothConversionTargetCeiling === 'top_of_22') targetCeilingRate = 0.22;
 
-      const targetBracketObj =
-        rules.ordinaryTaxBrackets.find((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01) ||
-        rules.ordinaryTaxBrackets[1];
-      const targetCeilingDollars = (targetBracketObj ? targetBracketObj.threshold : 48475) * (isMfj ? 2 : 1) * compoundInflation;
+      const targetBracketIdx = rules.ordinaryTaxBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
+      const nextBracketObj = rules.ordinaryTaxBrackets[targetBracketIdx + 1];
+      const targetCeilingDollars = (nextBracketObj ? nextBracketObj.threshold : 47150) * bracketMult * compoundInflation;
 
       const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
-      const convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
+      let convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
+
+      // IRMAA Cliff Guard: cap conversions to stay below the next IRMAA threshold
+      // Uses 2-year lookback (age 63+ since Medicare starts at 65)
+      if (plan.settings.avoidIrmaaCliffs && primaryAge >= 63) {
+        const preConvMagi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
+        const irmaaGuardList = rules.irmaaThresholds || [];
+        for (let idx = 1; idx < irmaaGuardList.length; idx++) {
+          const tierObj = irmaaGuardList[idx];
+          const irmaaLimit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
+          if (irmaaLimit > 0 && preConvMagi < irmaaLimit) {
+            convHeadroom = Math.min(convHeadroom, Math.max(0, irmaaLimit - preConvMagi - 1000));
+            break;
+          }
+        }
+      }
 
       if (convHeadroom > 500) {
         const tradAccs = Object.values(accountsState).filter(
@@ -502,8 +646,50 @@ export function runRetirementSimulation(
       }
     }
 
-    // 4c. Compute MAGI & Queue IRMAA Surcharges for Year Y+2
-    const magi = salaryIncome + pensionIncome + taxableSs + drawdownsByType.traditional + rothConversionAmount;
+    // 5c. Tax Reconciliation — recompute taxes including traditional withdrawals, Roth conversions, and capital gains
+    const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount;
+    if (additionalOrdinaryIncome > 0 || totalTaxableGains > 0) {
+      const fullTaxableOrdinary = Math.max(0,
+        taxableSalary + pensionIncome + otherIncome + taxableSs + additionalOrdinaryIncome - stdDeduction
+      );
+      ordinaryTax = 0;
+      for (let i = 0; i < rules.ordinaryTaxBrackets.length; i++) {
+        const b = rules.ordinaryTaxBrackets[i];
+        const thresh = b.threshold * bracketMult * compoundInflation;
+        if (fullTaxableOrdinary > thresh) {
+          const nextB = rules.ordinaryTaxBrackets[i + 1];
+          const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+          const taxableChunk = Math.min(fullTaxableOrdinary - thresh, nextThresh - thresh);
+          ordinaryTax += taxableChunk * b.rate;
+        }
+      }
+
+      // Capital gains tax — gains stack on top of ordinary income in the bracket structure
+      if (totalTaxableGains > 0 && rules.capitalGainsBrackets) {
+        const capBrackets = rules.capitalGainsBrackets;
+        const ordinaryBase = fullTaxableOrdinary;
+        for (let i = 0; i < capBrackets.length; i++) {
+          const b = capBrackets[i];
+          const thresh = b.threshold * bracketMult * compoundInflation;
+          const nextB = capBrackets[i + 1];
+          const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+          const bracketStart = Math.max(thresh, ordinaryBase);
+          const bracketEnd = Math.min(nextThresh, ordinaryBase + totalTaxableGains);
+          if (bracketEnd > bracketStart) {
+            capGainsTax += (bracketEnd - bracketStart) * b.rate;
+          }
+        }
+      }
+
+      // Recalculate final tax totals
+      const totalTaxableIncome = grossIncome + additionalOrdinaryIncome + totalTaxableGains;
+      stateTax = fullTaxableOrdinary * stateTaxRate;
+      taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax;
+      effectiveTaxRate = totalTaxableIncome > 0 ? (taxesPaid / totalTaxableIncome) * 100 : 0;
+    }
+
+    // 5d. Compute MAGI & Queue IRMAA Surcharges for Year Y+2
+    const magi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + rothConversionAmount + totalTaxableGains;
     let irmaaTier = 0;
     const irmaaList = rules.irmaaThresholds || [];
     for (let idx = irmaaList.length - 1; idx >= 0; idx--) {
@@ -515,6 +701,26 @@ export function runRetirementSimulation(
         irmaaSurchargeQueue[simYear + 2] = annualSurcharge;
         break;
       }
+    }
+
+    // 5e. Compute ACA Healthcare Subsidy for Early Retirement (Age < 65)
+    let acaSubsidy = 0;
+    if (isRetired && primaryAge < 65) {
+      const fplBase = parseFloat(rules.fplAmount || '15060');
+      const fplHousehold = fplBase * (isMfj ? 1.35 : 1.0) * compoundInflation;
+      const fplPercent = (magi / fplHousehold) * 100;
+
+      let premiumCapPct = 0.085;
+      const subsTable = rules.acaSubsidyTable || [];
+      for (let i = subsTable.length - 1; i >= 0; i--) {
+        if (fplPercent <= subsTable[i].fplPercent) {
+          premiumCapPct = subsTable[i].premiumCapPercent;
+        }
+      }
+
+      const benchmarkCost = (isMfj ? 16800 : 8400) * compoundInflation;
+      const maxContrib = magi * premiumCapPct;
+      acaSubsidy = Math.max(0, benchmarkCost - maxContrib);
     }
 
     // 5. Asset Growth & Dividend Yield Accrual
@@ -539,7 +745,22 @@ export function runRetirementSimulation(
           divYield = acc.dividendYield / 100;
         }
 
-        acc.balance = acc.balance * (1 + growth + divYield);
+        if ((acc.type === 'taxable' || acc.type === 'crypto') && divYield > 0) {
+          const divAmount = acc.balance * divYield;
+          const qualRatio = acc.qualifiedDividendRatio ?? 1.0;
+          const qualDivs = divAmount * qualRatio;
+          const ordDivs = divAmount * (1 - qualRatio);
+          const divTax = (qualDivs * 0.15) + (ordDivs * 0.22);
+
+          if (acc.reinvestDividends) {
+            acc.balance = acc.balance * (1 + growth) + Math.max(0, divAmount - divTax);
+            acc.costBasis += Math.max(0, divAmount - divTax);
+          } else {
+            acc.balance = acc.balance * (1 + growth);
+          }
+        } else {
+          acc.balance = acc.balance * (1 + growth + divYield);
+        }
 
         if (acc.type === 'taxable' || acc.type === 'crypto') taxableTotal += acc.balance;
         else if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') taxDeferredTotal += acc.balance;
@@ -578,8 +799,10 @@ export function runRetirementSimulation(
       debtPayments,
       taxesPaid,
       ordinaryTax,
-      capGainsTax: 0,
+      capGainsTax,
+      stateTax,
       ficaTax,
+      acaSubsidy,
       effectiveTaxRate,
       netCashFlow,
       surplusSaved,
