@@ -1,0 +1,1 @@
+ALTER TABLE "plan_flows" ADD COLUMN "salary_source" text;

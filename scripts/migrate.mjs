@@ -198,6 +198,24 @@ async function runSelfHealingChecks(client) {
       }
     }
 
+    // Ensure salary_source column exists on plan_flows
+    const planFlowsCheck = await client.query(`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_flows'
+    `);
+    if (planFlowsCheck.rows.length > 0) {
+      const colCheckSalarySource = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'plan_flows' AND column_name = 'salary_source'
+      `);
+      if (colCheckSalarySource.rows.length === 0) {
+        console.log('[migrate] [self-heal] Adding missing salary_source column to plan_flows...');
+        await client.query(`
+          ALTER TABLE plan_flows
+          ADD COLUMN IF NOT EXISTS salary_source TEXT
+        `);
+      }
+    }
+
     // Mark unapplied migrations as applied if their artifacts already exist.
     // The self-heal above may create tables/columns that later migrations expect
     // to create, causing "already exists" failures that block subsequent migrations.
@@ -209,6 +227,9 @@ async function runSelfHealingChecks(client) {
       { tag: '0060_add_notifications_limiter_and_milestones', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'budget_alert_threshold'` },
       { tag: '0061_add_custom_alert_rules', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'custom_alert_rules'` },
       { tag: '0062_lame_starjammers', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_operator'` },
+      { tag: '0069_kind_sabretooth', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_accounts'` },
+      { tag: '0070_regular_aqueduct', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'spouse_name'` },
+      { tag: '0071_famous_runaways', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_flows' AND column_name = 'salary_source'` },
     ];
     for (const { tag, check } of migrationArtifacts) {
       if (appliedTags.has(tag)) continue;
