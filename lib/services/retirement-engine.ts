@@ -12,6 +12,13 @@ export interface EngineAccount {
   reinvestDividends: boolean;
   qualifiedDividendRatio: number;
   rothPercentage?: number;
+  // Per-account contribution fields
+  contributionMode?: 'none' | 'percentage' | 'fixed_amount' | 'maximize';
+  contributionValue?: number; // % of salary or annual $ amount
+  contributionSalarySource?: 'primary' | 'spouse';
+  companyMatchRate?: number; // e.g., 1.0 = 100% match
+  companyMatchLimit?: number; // Max % of salary the match applies to
+  isSurplusDestination?: boolean;
 }
 
 export interface EngineLiability {
@@ -79,6 +86,8 @@ export interface EnginePlan {
   withdrawalMethod: string; // 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order'
   fiTargetMultiplier?: number;
   customWithdrawalOrder?: string[];
+  primarySalary?: number;
+  spouseSalary?: number;
   accounts: EngineAccount[];
   liabilities: EngineLiability[];
   events: EngineEvent[];
@@ -403,6 +412,15 @@ export function runRetirementSimulation(
       return salaryIncome;
     };
 
+    // Helper to get salary base for per-account contributions (uses plan-level salary fields)
+    const getAccountSalaryBase = (acc: EngineAccount) => {
+      const planPrimarySalary = plan.primarySalary || 0;
+      const planSpouseSalary = plan.spouseSalary || 0;
+      const source = acc.contributionSalarySource || (acc.owner === 'spouse' ? 'spouse' : 'primary');
+      if (source === 'spouse') return planSpouseSalary > 0 ? planSpouseSalary : planPrimarySalary;
+      return planPrimarySalary > 0 ? planPrimarySalary : (primarySalaryIncome > 0 ? primarySalaryIncome : salaryIncome);
+    };
+
     // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)
     let surplusSaved = 0;
     let totalPreTaxContrib = 0;
@@ -410,58 +428,118 @@ export function runRetirementSimulation(
 
     const isAccumulation = primaryAge < plan.retirementAge;
 
-    if (isAccumulation && salaryIncome > 0) {
-      for (const flow of sortedFlows) {
-        let targetAcc = accountsState[flow.targetAccountId];
-        // Handle split Roth/Traditional virtual accounts
-        if (!targetAcc) {
-          targetAcc = accountsState[`${flow.targetAccountId}_trad`] || accountsState[`${flow.targetAccountId}_roth`];
-        }
-        if (!targetAcc) continue;
+    // Determine if we use per-account contributions or legacy flows
+    const hasAccountContributions = plan.accounts.some(a => a.contributionMode && a.contributionMode !== 'none');
 
-        const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
-        if (!isPreTax) continue;
-
-        const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-        const ownerCatchUp50 = ownerAge >= 50;
-        const ownerCatchUp55 = ownerAge >= 55;
-        const salaryBase = getFlowSalaryBase(flow, targetAcc);
-
-        let requestedAlloc = 0;
-        if (flow.ruleType === 'percentage' && flow.ruleValue) {
-          requestedAlloc = salaryBase * (flow.ruleValue / 100);
-        } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
-          requestedAlloc = flow.ruleValue * compoundInflation;
-        } else if (flow.ruleType === 'save_maintain') {
-          const targetBal = (flow.ruleValue || 0) * compoundInflation;
-          requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
-        } else if (flow.ruleType === 'maximize') {
-          let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
-          if (targetAcc.type.includes('401k')) {
-            maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
-          } else if (targetAcc.type === 'hsa') {
-            maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+    if (isAccumulation && (salaryIncome > 0 || hasAccountContributions)) {
+      if (hasAccountContributions) {
+        // ── Per-Account Contribution Mode (new) ──
+        // Phase 1: Pre-tax accounts
+        for (const origAcc of plan.accounts) {
+          if (!origAcc.contributionMode || origAcc.contributionMode === 'none') continue;
+          let targetAcc = accountsState[origAcc.id];
+          if (!targetAcc) {
+            targetAcc = accountsState[`${origAcc.id}_trad`] || accountsState[`${origAcc.id}_roth`];
           }
-          if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
-            maxLimit *= 2;
+          if (!targetAcc) continue;
+
+          const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+          if (!isPreTax) continue;
+
+          const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+          const ownerCatchUp50 = ownerAge >= 50;
+          const ownerCatchUp55 = ownerAge >= 55;
+          const salaryBase = getAccountSalaryBase(origAcc);
+
+          let requestedAlloc = 0;
+          if (origAcc.contributionMode === 'percentage' && origAcc.contributionValue) {
+            requestedAlloc = salaryBase * (origAcc.contributionValue / 100);
+          } else if (origAcc.contributionMode === 'fixed_amount' && origAcc.contributionValue) {
+            requestedAlloc = origAcc.contributionValue * compoundInflation;
+          } else if (origAcc.contributionMode === 'maximize') {
+            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+            if (targetAcc.type.includes('401k')) {
+              maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+            } else if (targetAcc.type === 'hsa') {
+              maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+            }
+            if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
+              maxLimit *= 2;
+            }
+            requestedAlloc = maxLimit;
           }
-          requestedAlloc = maxLimit;
+
+          const maxSalaryAvail = Math.max(0, salaryBase - totalPreTaxContrib);
+          const alloc = Math.min(maxSalaryAvail, requestedAlloc);
+          if (alloc > 0) {
+            targetAcc.balance += alloc;
+            totalPreTaxContrib += alloc;
+            surplusSaved += alloc;
+
+            // Company match
+            if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
+              const matchableContrib = Math.min(alloc, salaryBase * (origAcc.companyMatchLimit / 100));
+              const matchAmount = matchableContrib * origAcc.companyMatchRate;
+              if (matchAmount > 0) {
+                targetAcc.balance += matchAmount;
+                surplusSaved += matchAmount;
+              }
+            }
+          }
         }
+      } else if (salaryIncome > 0) {
+        // ── Legacy Flow Waterfall Mode (backward compat) ──
+        for (const flow of sortedFlows) {
+          let targetAcc = accountsState[flow.targetAccountId];
+          if (!targetAcc) {
+            targetAcc = accountsState[`${flow.targetAccountId}_trad`] || accountsState[`${flow.targetAccountId}_roth`];
+          }
+          if (!targetAcc) continue;
 
-        const maxSalaryAvail = Math.max(0, salaryBase - totalPreTaxContrib);
-        const alloc = Math.min(maxSalaryAvail, requestedAlloc);
-        if (alloc > 0) {
-          targetAcc.balance += alloc;
-          totalPreTaxContrib += alloc;
-          surplusSaved += alloc;
+          const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+          if (!isPreTax) continue;
 
-          if (flow.matchRate != null && flow.matchLimit != null) {
-            const matchableContrib = Math.min(alloc, salaryBase * (flow.matchLimit / 100));
-            const matchAmount = matchableContrib * flow.matchRate;
-            let matchTarget = flow.matchAccountId ? (accountsState[flow.matchAccountId] || accountsState[`${flow.matchAccountId}_trad`]) : targetAcc;
-            if (matchTarget && matchAmount > 0) {
-              matchTarget.balance += matchAmount;
-              surplusSaved += matchAmount;
+          const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+          const ownerCatchUp50 = ownerAge >= 50;
+          const ownerCatchUp55 = ownerAge >= 55;
+          const salaryBase = getFlowSalaryBase(flow, targetAcc);
+
+          let requestedAlloc = 0;
+          if (flow.ruleType === 'percentage' && flow.ruleValue) {
+            requestedAlloc = salaryBase * (flow.ruleValue / 100);
+          } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
+            requestedAlloc = flow.ruleValue * compoundInflation;
+          } else if (flow.ruleType === 'save_maintain') {
+            const targetBal = (flow.ruleValue || 0) * compoundInflation;
+            requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
+          } else if (flow.ruleType === 'maximize') {
+            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+            if (targetAcc.type.includes('401k')) {
+              maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+            } else if (targetAcc.type === 'hsa') {
+              maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+            }
+            if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
+              maxLimit *= 2;
+            }
+            requestedAlloc = maxLimit;
+          }
+
+          const maxSalaryAvail = Math.max(0, salaryBase - totalPreTaxContrib);
+          const alloc = Math.min(maxSalaryAvail, requestedAlloc);
+          if (alloc > 0) {
+            targetAcc.balance += alloc;
+            totalPreTaxContrib += alloc;
+            surplusSaved += alloc;
+
+            if (flow.matchRate != null && flow.matchLimit != null) {
+              const matchableContrib = Math.min(alloc, salaryBase * (flow.matchLimit / 100));
+              const matchAmount = matchableContrib * flow.matchRate;
+              let matchTarget = flow.matchAccountId ? (accountsState[flow.matchAccountId] || accountsState[`${flow.matchAccountId}_trad`]) : targetAcc;
+              if (matchTarget && matchAmount > 0) {
+                matchTarget.balance += matchAmount;
+                surplusSaved += matchAmount;
+              }
             }
           }
         }
@@ -582,42 +660,109 @@ export function runRetirementSimulation(
       let surplus = netCashFlow;
 
       if (isAccumulation) {
-        for (const flow of sortedFlows) {
-          if (surplus <= 0) break;
-          let targetAcc = accountsState[flow.targetAccountId];
-          if (!targetAcc) {
-            targetAcc = accountsState[`${flow.targetAccountId}_roth`] || accountsState[`${flow.targetAccountId}_trad`];
+        if (hasAccountContributions) {
+          // ── Per-Account Contribution Mode (new): Post-tax accounts ──
+          for (const origAcc of plan.accounts) {
+            if (surplus <= 0) break;
+            if (!origAcc.contributionMode || origAcc.contributionMode === 'none') continue;
+            if (origAcc.isSurplusDestination) continue; // Handle sweep last
+
+            let targetAcc = accountsState[origAcc.id];
+            if (!targetAcc) {
+              targetAcc = accountsState[`${origAcc.id}_roth`] || accountsState[`${origAcc.id}_trad`];
+            }
+            if (!targetAcc) continue;
+
+            const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+            if (isPreTax) continue; // Already handled in Phase 1
+
+            const salaryBase = getAccountSalaryBase(origAcc);
+            let limit = surplus;
+            if (origAcc.contributionMode === 'percentage' && origAcc.contributionValue) {
+              limit = salaryBase * (origAcc.contributionValue / 100);
+            } else if (origAcc.contributionMode === 'fixed_amount' && origAcc.contributionValue) {
+              limit = origAcc.contributionValue * compoundInflation;
+            } else if (origAcc.contributionMode === 'maximize') {
+              const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+              const ownerCatchUp50 = ownerAge >= 50;
+              let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+              if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
+              limit = Math.min(surplus, maxLimit);
+            }
+
+            const alloc = Math.min(surplus, limit);
+            if (alloc > 0) {
+              targetAcc.balance += alloc;
+              surplus -= alloc;
+              surplusSaved += alloc;
+
+              // Company match for post-tax accounts (e.g. Roth 401k)
+              if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
+                const matchableContrib = Math.min(alloc, salaryBase * (origAcc.companyMatchLimit / 100));
+                const matchAmount = matchableContrib * origAcc.companyMatchRate;
+                if (matchAmount > 0) {
+                  targetAcc.balance += matchAmount;
+                  surplusSaved += matchAmount;
+                }
+              }
+            }
           }
-          if (!targetAcc) continue;
 
-          const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
-          if (isPreTax) continue;
-
-          const salaryBase = getFlowSalaryBase(flow, targetAcc);
-          let limit = surplus;
-          if (flow.ruleType === 'percentage' && flow.ruleValue) {
-            limit = salaryBase * (flow.ruleValue / 100);
-          } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
-            limit = flow.ruleValue * compoundInflation;
-          } else if (flow.ruleType === 'save_maintain') {
-            const targetBal = (flow.ruleValue || 0) * compoundInflation;
-            limit = Math.max(0, targetBal - targetAcc.balance);
-          } else if (flow.ruleType === 'maximize') {
-            const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-            const ownerCatchUp50 = ownerAge >= 50;
-            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
-            if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
-            if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
-            limit = Math.min(surplus, maxLimit);
-          } else if (flow.ruleType === 'save_leftover') {
-            limit = surplus;
+          // Sweep remaining surplus to designated surplus destination account
+          if (surplus > 0) {
+            const surplusAcc = plan.accounts.find(a => a.isSurplusDestination);
+            if (surplusAcc) {
+              let targetAcc = accountsState[surplusAcc.id];
+              if (!targetAcc) {
+                targetAcc = accountsState[`${surplusAcc.id}_roth`] || accountsState[`${surplusAcc.id}_trad`];
+              }
+              if (targetAcc) {
+                targetAcc.balance += surplus;
+                surplusSaved += surplus;
+                surplus = 0;
+              }
+            }
           }
+        } else {
+          // ── Legacy Flow Waterfall Mode (backward compat): Post-tax ──
+          for (const flow of sortedFlows) {
+            if (surplus <= 0) break;
+            let targetAcc = accountsState[flow.targetAccountId];
+            if (!targetAcc) {
+              targetAcc = accountsState[`${flow.targetAccountId}_roth`] || accountsState[`${flow.targetAccountId}_trad`];
+            }
+            if (!targetAcc) continue;
 
-          const alloc = Math.min(surplus, limit);
-          if (alloc > 0) {
-            targetAcc.balance += alloc;
-            surplus -= alloc;
-            surplusSaved += alloc;
+            const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
+            if (isPreTax) continue;
+
+            const salaryBase = getFlowSalaryBase(flow, targetAcc);
+            let limit = surplus;
+            if (flow.ruleType === 'percentage' && flow.ruleValue) {
+              limit = salaryBase * (flow.ruleValue / 100);
+            } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
+              limit = flow.ruleValue * compoundInflation;
+            } else if (flow.ruleType === 'save_maintain') {
+              const targetBal = (flow.ruleValue || 0) * compoundInflation;
+              limit = Math.max(0, targetBal - targetAcc.balance);
+            } else if (flow.ruleType === 'maximize') {
+              const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+              const ownerCatchUp50 = ownerAge >= 50;
+              let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+              if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
+              limit = Math.min(surplus, maxLimit);
+            } else if (flow.ruleType === 'save_leftover') {
+              limit = surplus;
+            }
+
+            const alloc = Math.min(surplus, limit);
+            if (alloc > 0) {
+              targetAcc.balance += alloc;
+              surplus -= alloc;
+              surplusSaved += alloc;
+            }
           }
         }
       }

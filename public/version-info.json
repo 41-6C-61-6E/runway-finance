@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784651713121",
+  "buildNumber": "26.07.1784736757143",
   "commits": [
-    "feat: implement comprehensive retirement planning engine v1, calculation services, and multi-tab interface for financial projections.",
-    "feat: implement tax wrapper splitting with account metadata and add corresponding unit tests",
-    "feat: add customizable savings rate calculation settings including account/category exclusions and income adjustments",
-    "refactor: implement automated paystub regeneration logic with state reconciliation and deletion support",
-    "docs: add visual tour to README and expand real estate account type filtering in API route"
+    "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
+    "feat: add salary_source column to plan_flows table",
+    "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging",
+    "fix: implement financial engine updates for Roth percentages, dual-salary flows, NIIT tax, IRMAA thresholds, and early withdrawal penalties.",
+    "refactor: reorder financial milestones component within projection tab layout"
   ]
 }

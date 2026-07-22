@@ -36,6 +36,8 @@ export const plans = pgTable('plans', {
   fiTargetMultiplier: integer('fi_target_multiplier').notNull().default(25),
   withdrawalMethod: text('withdrawal_method').notNull().default('textbook'), // 'textbook' | 'proportional' | 'custom_order'
   customWithdrawalOrder: jsonb('custom_withdrawal_order'), // Array of account ids/types
+  primarySalary: text('primary_salary').notNull().default('0'),
+  spouseSalary: text('spouse_salary').notNull().default('0'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -56,6 +58,12 @@ export const planAccounts = pgTable('plan_accounts', {
   qualifiedDividendRatio: text('qualified_dividend_ratio').notNull().default('1.0'),
   rothPercentage: integer('roth_percentage'), // For mixed 401(k)s
   isIncluded: boolean('is_included').notNull().default(true),
+  contributionMode: text('contribution_mode').notNull().default('none'), // 'none' | 'percentage' | 'fixed_amount' | 'maximize'
+  contributionValue: text('contribution_value'), // % of salary or annual $ amount
+  contributionSalarySource: text('contribution_salary_source'), // 'primary' | 'spouse' — derived from owner if null
+  companyMatchRate: text('company_match_rate'), // e.g., '1.0' for 100% match
+  companyMatchLimit: text('company_match_limit'), // Max % of salary the match applies to
+  isSurplusDestination: boolean('is_surplus_destination').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

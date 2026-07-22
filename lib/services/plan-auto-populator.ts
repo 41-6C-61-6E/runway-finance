@@ -80,6 +80,23 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
 
     const balStr = String(parseFloat(acc.balance) || 0);
 
+    let contribMode = 'none';
+    let contribVal: string | undefined = undefined;
+    let matchRate: string | undefined = undefined;
+    let matchLimit: string | undefined = undefined;
+    let isSurplusDest = false;
+
+    if (type.includes('401k')) {
+      contribMode = 'percentage';
+      contribVal = '5.0';
+      matchRate = '1.0';
+      matchLimit = '5.0';
+    } else if (type.includes('roth')) {
+      contribMode = 'maximize';
+    } else if (type === 'taxable') {
+      isSurplusDest = true;
+    }
+
     const encryptedAcc = await encryptRow('plan_accounts', {
       planId,
       userId: dataUserId,
@@ -94,6 +111,11 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
       qualifiedDividendRatio: '1.0',
       rothPercentage: rothPct,
       isIncluded: true,
+      contributionMode: contribMode,
+      contributionValue: contribVal,
+      companyMatchRate: matchRate,
+      companyMatchLimit: matchLimit,
+      isSurplusDestination: isSurplusDest,
     }, dek);
 
     const inserted = await db.insert(planAccounts).values(encryptedAcc).returning();
@@ -103,10 +125,10 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
   // If no accounts exist, create default starter accounts
   if (createdPlanAccs.length === 0) {
     const defaultAccs = [
-      { name: '401(k) / Workplace Plan', type: 'traditional_401k', balance: '25000' },
-      { name: 'Roth IRA', type: 'roth_ira', balance: '15000' },
-      { name: 'Taxable Investment Account', type: 'taxable', balance: '10000' },
-      { name: 'Emergency Cash Savings', type: 'cash', balance: '10000' },
+      { name: '401(k) / Workplace Plan', type: 'traditional_401k', balance: '25000', contribMode: 'percentage', contribVal: '5.0', matchRate: '1.0', matchLimit: '5.0', isSurplus: false },
+      { name: 'Roth IRA', type: 'roth_ira', balance: '15000', contribMode: 'maximize', contribVal: undefined, matchRate: undefined, matchLimit: undefined, isSurplus: false },
+      { name: 'Taxable Investment Account', type: 'taxable', balance: '10000', contribMode: 'none', contribVal: undefined, matchRate: undefined, matchLimit: undefined, isSurplus: true },
+      { name: 'Emergency Cash Savings', type: 'cash', balance: '10000', contribMode: 'none', contribVal: undefined, matchRate: undefined, matchLimit: undefined, isSurplus: false },
     ];
 
     for (const dAcc of defaultAccs) {
@@ -123,6 +145,11 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
         reinvestDividends: true,
         qualifiedDividendRatio: '1.0',
         isIncluded: true,
+        contributionMode: dAcc.contribMode,
+        contributionValue: dAcc.contribVal,
+        companyMatchRate: dAcc.matchRate,
+        companyMatchLimit: dAcc.matchLimit,
+        isSurplusDestination: dAcc.isSurplus,
       }, dek);
 
       const inserted = await db.insert(planAccounts).values(encryptedAcc).returning();
@@ -279,8 +306,11 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
     charitableAllocationStrategy: 'tax_inefficient_first',
   }, dek);
 
-  const existingSettings = await db.select().from(planSettings).where(eq(planSettings.planId, planId)).limit(1);
-  if (existingSettings.length === 0) {
-    await db.insert(planSettings).values(encryptedSettings);
-  }
+  // 7. Update plan with estimated salary
+  const encryptedPlanSalary = await encryptRow('plans', {
+    primarySalary: String(Math.round(estimatedSalary)),
+    userId: dataUserId,
+  }, dek);
+  delete encryptedPlanSalary.userId;
+  await db.update(plans).set(encryptedPlanSalary).where(eq(plans.id, planId));
 }

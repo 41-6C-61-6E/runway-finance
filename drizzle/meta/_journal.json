@@ -505,6 +505,13 @@
       "when": 1784733882110,
       "tag": "0071_famous_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1784836700000,
+      "tag": "0072_account_contributions",
+      "breakpoints": true
     }
   ]
 }
