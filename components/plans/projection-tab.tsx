@@ -5,6 +5,9 @@ import { formatCurrency } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
   Area,
@@ -20,6 +23,7 @@ import {
   Legend,
   ReferenceLine,
   ReferenceDot,
+  ReferenceArea,
 } from 'recharts';
 import {
   TrendingUp,
@@ -43,6 +47,13 @@ import {
   Percent,
   ShieldAlert,
   Scale,
+  Eye,
+  EyeOff,
+  Filter,
+  SlidersHorizontal,
+  Check,
+  Settings,
+  Users,
 } from 'lucide-react';
 
 interface ProjectionTabProps {
@@ -55,20 +66,40 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const [showYearlyTable, setShowYearlyTable] = useState(false);
   const [showDrawdownDetails, setShowDrawdownDetails] = useState(true);
   const [localRetirementAge, setLocalRetirementAge] = useState(Number(plan?.retirementAge) || 60);
+  const [localSpouseRetirementAge, setLocalSpouseRetirementAge] = useState(Number(plan?.spouseRetirementAge) || 60);
   const [localReturnRate, setLocalReturnRate] = useState(7);
   const [localInflationRate, setLocalInflationRate] = useState(3.0);
   const [localExpenseModifier, setLocalExpenseModifier] = useState(0);
 
-  // New Phase 3 UX toggles: Nominal vs Real dollars & Deterministic vs Monte Carlo
+  // UX Toggles: Dollar Mode, View Mode, Chart Type, Milestones Visibility, Asset Category Filters
   const [dollarMode, setDollarMode] = useState<'nominal' | 'real'>('nominal');
   const [viewMode, setViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
+  const [chartType, setChartType] = useState<'total' | 'stacked'>('total');
+  const [showMilestones, setShowMilestones] = useState(true);
+  const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
+  const [activeAssetCategories, setActiveAssetCategories] = useState<Record<string, boolean>>({
+    taxable: true,
+    taxDeferred: true,
+    taxFree: true,
+    hsa: true,
+    cash: true,
+  });
+  // Collapsible section states using useCardCollapsed hook
+  const [isMainChartCollapsed, setIsMainChartCollapsed] = useCardCollapsed('fire_main_chart');
+  const [isMilestonesCollapsed, setIsMilestonesCollapsed] = useCardCollapsed('fire_milestones');
+  const [isCashFlowCollapsed, setIsCashFlowCollapsed] = useCardCollapsed('fire_cash_flow');
+  const [isWhatIfCollapsed, setIsWhatIfCollapsed] = useCardCollapsed('fire_what_if');
+  const [isYearlyTableCollapsed, setIsYearlyTableCollapsed] = useCardCollapsed('fire_yearly_table');
 
   // Sync local retirement age state when plan changes
   useEffect(() => {
     if (plan?.retirementAge) {
       setLocalRetirementAge(Number(plan.retirementAge));
     }
-  }, [plan?.retirementAge]);
+    if (plan?.spouseRetirementAge) {
+      setLocalSpouseRetirementAge(Number(plan.spouseRetirementAge));
+    }
+  }, [plan?.retirementAge, plan?.spouseRetirementAge]);
 
   const birthYear = Number(plan?.primaryBirthYear) || 1985;
   const currentYear = new Date().getFullYear();
@@ -113,7 +144,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       spouseBirthYear: plan.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
       spouseBirthMonth: plan.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
       spouseName: plan.spouseName || 'Spouse / Partner',
-      spouseRetirementAge: plan.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
+      spouseRetirementAge: localSpouseRetirementAge, // Dynamic slider override
       spouseLifeExpectancyAge: plan.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
       primarySsMonthlyAmount: plan.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500,
       primarySsStartAge: plan.primarySsStartAge ? Number(plan.primarySsStartAge) : 67,
@@ -212,9 +243,29 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
   const yearlySimResults = useMemo(() => simulation?.yearlyResults || [], [simulation]);
 
-  // Rich Milestone Callouts Data
+  // Rich Milestone Callouts Data (Sorted Chronologically)
   const milestoneCallouts = useMemo(() => {
     const list = [
+      {
+        age: localRetirementAge,
+        title: 'Primary Retirement',
+        year: birthYear + localRetirementAge,
+        icon: Palmtree,
+        emoji: '🌴',
+        color: 'text-emerald-500',
+        stroke: '#10b981',
+        note: 'Primary career end • Distribution phase begins',
+      },
+      ...(Boolean(plan?.hasSpouse || plan?.filingStatus === 'married_joint') ? [{
+        age: localSpouseRetirementAge,
+        title: `${plan?.spouseName || 'Spouse'} Retirement`,
+        year: (plan?.spouseBirthYear ? Number(plan.spouseBirthYear) : birthYear) + localSpouseRetirementAge,
+        icon: Users,
+        emoji: '👥',
+        color: 'text-indigo-500',
+        stroke: '#6366f1',
+        note: `${plan?.spouseName || 'Spouse'} target career end`,
+      }] : []),
       {
         age: 50,
         title: 'Catch-up Limits',
@@ -234,16 +285,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         color: 'text-amber-500',
         stroke: '#f59e0b',
         note: 'Penalty-free 401(k) separations allowed if separated from service',
-      },
-      {
-        age: localRetirementAge,
-        title: 'Retirement Transition',
-        year: birthYear + localRetirementAge,
-        icon: Palmtree,
-        emoji: '🌴',
-        color: 'text-emerald-500',
-        stroke: '#10b981',
-        note: 'Primary career end • Distribution phase begins',
       },
       {
         age: 65,
@@ -276,8 +317,10 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         note: 'Required Minimum Distributions start for tax-deferred accounts',
       },
     ];
-    return list.filter((m) => m.age >= currentAge && m.age <= (plan?.lifeExpectancyAge || 100));
-  }, [birthYear, localRetirementAge, currentAge, plan?.lifeExpectancyAge]);
+    return list
+      .filter((m) => m.age >= currentAge && m.age <= (plan?.lifeExpectancyAge || 100))
+      .sort((a, b) => a.age - b.age);
+  }, [birthYear, localRetirementAge, localSpouseRetirementAge, currentAge, plan?.lifeExpectancyAge, plan?.hasSpouse, plan?.filingStatus, plan?.spouseName, plan?.spouseBirthYear]);
 
   const milestoneMap = useMemo(() => {
     const map: Record<number, any> = {};
@@ -309,7 +352,29 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         const hsaD = Math.round((y.drawdownsByType?.hsa || 0) / discountFactor);
         const actualDrawdowns = cashD + taxD + tradD + rothD + hsaD;
         const nw = Math.round(y.netWorth / discountFactor);
-        const withdrawRate = actualDrawdowns > 0 && (nw + actualDrawdowns) > 0
+
+        // Portfolio breakdown by tax category with active filter toggles
+        const rawCash = Math.round((y.portfolioBreakdown?.cash || 0) / discountFactor);
+        const rawTaxable = Math.round((y.portfolioBreakdown?.taxable || 0) / discountFactor);
+        const rawTaxDeferred = Math.round((y.portfolioBreakdown?.taxDeferred || 0) / discountFactor);
+        const rawTaxFree = Math.round((y.portfolioBreakdown?.taxFree || 0) / discountFactor);
+        const rawHsa = Math.round((y.portfolioBreakdown?.hsa || 0) / discountFactor);
+
+        const cashBal = activeAssetCategories.cash ? rawCash : 0;
+        const taxableBal = activeAssetCategories.taxable ? rawTaxable : 0;
+        const taxDeferredBal = activeAssetCategories.taxDeferred ? rawTaxDeferred : 0;
+        const taxFreeBal = activeAssetCategories.taxFree ? rawTaxFree : 0;
+        const hsaBal = activeAssetCategories.hsa ? rawHsa : 0;
+
+        const filteredPortfolio = cashBal + taxableBal + taxDeferredBal + taxFreeBal + hsaBal;
+
+        // Discretionary drawdown excludes forced RMD distributions
+        const discDeficit = Math.round((y.discretionaryDeficitWithdrawn ?? y.deficitWithdrawn ?? 0) / discountFactor);
+        const discretionaryWithdrawalRate = discDeficit > 0 && (nw + discDeficit) > 0
+          ? (discDeficit / (nw + discDeficit)) * 100
+          : 0;
+
+        const totalWithdrawalRate = actualDrawdowns > 0 && (nw + actualDrawdowns) > 0
           ? (actualDrawdowns / (nw + actualDrawdowns)) * 100
           : 0;
 
@@ -318,7 +383,14 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           age: y.primaryAge,
           spouseAge: y.spouseAge,
           label: `${y.year}`,
-          netWorth: nw,
+          netWorth: filteredPortfolio,
+          portfolioBalance: filteredPortfolio,
+          totalNetWorth: nw,
+          cashBal,
+          taxableBal,
+          taxDeferredBal,
+          taxFreeBal,
+          hsaBal,
           income: Math.round(y.grossIncome / discountFactor),
           expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses / discountFactor) : null,
           isRetired: y.primaryAge >= localRetirementAge,
@@ -333,11 +405,18 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           hsaDrawdown: hsaD,
           actualDrawdowns,
           totalDrawdown: Math.round((y.deficitWithdrawn || 0) / discountFactor),
-          withdrawalRate: Math.round(withdrawRate * 10) / 10,
+          discretionaryDeficit: discDeficit,
+          rmdMandatory: Math.round((y.rmdMandatoryDrawdown || 0) / discountFactor),
+          withdrawalRate: Math.round(discretionaryWithdrawalRate * 10) / 10,
+          totalWithdrawalRate: Math.round(totalWithdrawalRate * 10) / 10,
           rothConversionAmount: Math.round((y.rothConversionAmount || 0) / discountFactor),
           magi: Math.round((y.magi || 0) / discountFactor),
           taxesPaid: Math.round((y.taxesPaid || 0) / discountFactor),
           effectiveTaxRate: y.effectiveTaxRate || 0,
+          niitTax: Math.round((y.niitTax || 0) / discountFactor),
+          earlyPenaltyTax: Math.round((y.earlyPenaltyTax || 0) / discountFactor),
+          irmaaNotice: y.irmaaNotice,
+          earlyWithdrawalWarnings: y.earlyWithdrawalWarnings || [],
           irmaaSurchargeAnnual: Math.round((y.irmaaSurchargeAnnual || 0) / discountFactor),
           accountDrawdowns: y.accountDrawdowns || [],
           milestone: milestoneMap[y.primaryAge],
@@ -375,6 +454,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const fireProgress = fireNumber > 0 ? Math.min(100, (currentNetWorth / fireNumber) * 100) : 0;
   const yearsToFire = chartData.findIndex((d) => d.netWorth >= fireNumber);
   const yearsToFireDisplay = yearsToFire >= 0 ? yearsToFire : '—';
+  // Use discretionary withdrawal rate for peak withdrawal rate risk assessment
   const peakWithdrawalRate = Math.max(0, ...chartData.filter((d) => d.isRetired).map((d) => d.withdrawalRate));
 
   const retirementDataPoint = chartData.find((d) => d.age === localRetirementAge);
@@ -477,7 +557,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <DollarSign className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Current Net Worth</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Current Retirement Portfolio</span>
           </div>
           <p className="text-lg font-extrabold text-foreground font-mono">{formatCurrency(currentNetWorth)}</p>
         </div>
@@ -546,27 +626,141 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
       </div>
 
-      {/* Main Chart Area: Deterministic vs Monte Carlo Fan Chart */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              {viewMode === 'monte_carlo' ? 'Monte Carlo Probabilistic Fan Chart (250 Historical Bootstrap Trials)' : 'FIRE Portfolio Net Worth Trajectory'}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {dollarMode === 'real' ? 'Real (Inflation-Adjusted Today\'s Dollars)' : 'Nominal Dollars'}
-            </p>
-          </div>
-
-          {viewMode === 'monte_carlo' && monteCarloOutput && (
-            <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-mono">
-              <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
-              <span className="text-muted-foreground">|</span>
-              <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
+      {/* Main Chart Card: Deterministic vs Monte Carlo Fan Chart */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isMainChartCollapsed}
+          onToggle={setIsMainChartCollapsed}
+          title={
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                {viewMode === 'monte_carlo' ? 'Monte Carlo Probabilistic Fan Chart (250 Historical Bootstrap Trials)' : 'FIRE Retirement Portfolio Trajectory'}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {dollarMode === 'real' ? 'Real (Inflation-Adjusted Today\'s Dollars)' : 'Nominal Dollars'}
+              </p>
             </div>
-          )}
-        </div>
+          }
+          actions={
+            viewMode === 'monte_carlo' && monteCarloOutput ? (
+              <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg text-xs font-mono">
+                <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
+              </div>
+            ) : null
+          }
+        />
+
+        {!isMainChartCollapsed && (
+          <>
+
+        {/* Collapsible Options Panel (Structured like Net Worth Chart & Accounts page) */}
+        {viewMode === 'deterministic' && (
+          <CollapsibleFilterPanel
+            isOpen={showChartOptionsDropdown}
+            onToggle={() => setShowChartOptionsDropdown(!showChartOptionsDropdown)}
+            feedback={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {chartType === 'stacked' ? 'Stacked Volume' : 'Total Trajectory'}
+                </span>
+                {showMilestones && (
+                  <span className="bg-muted/60 text-muted-foreground border border-border px-2 py-0.5 rounded text-[10px] font-semibold">
+                    Milestones Enabled
+                  </span>
+                )}
+              </div>
+            }
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              {/* Chart View Style */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Visualization Style
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-muted/40 p-1 rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setChartType('total')}
+                    className={`py-1 px-2 rounded text-xs font-bold transition-all cursor-pointer ${
+                      chartType === 'total' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Total Trajectory
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartType('stacked')}
+                    className={`py-1 px-2 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      chartType === 'stacked' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Layers className="w-3 h-3 text-primary" />
+                    Stacked Volume
+                  </button>
+                </div>
+              </div>
+
+              {/* Milestones Visibility Toggle */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Milestone Markers
+                </label>
+                <label className="flex items-center justify-between p-2 bg-muted/30 border border-border rounded-lg cursor-pointer h-[38px]">
+                  <span className="text-xs font-medium text-foreground">Show Milestones on Chart</span>
+                  <input
+                    type="checkbox"
+                    checked={showMilestones}
+                    onChange={(e) => setShowMilestones(e.target.checked)}
+                    className="w-4 h-4 accent-primary rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Account / Asset Category Filters */}
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Filter Asset Categories
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-1.5">
+                  {[
+                    { key: 'taxable', label: 'Taxable Brokerage', dot: 'bg-amber-500' },
+                    { key: 'taxDeferred', label: 'Tax-Deferred (Trad)', dot: 'bg-purple-500' },
+                    { key: 'taxFree', label: 'Tax-Free (Roth)', dot: 'bg-pink-500' },
+                    { key: 'hsa', label: 'HSA', dot: 'bg-teal-500' },
+                    { key: 'cash', label: 'Cash & Savings', dot: 'bg-slate-400' },
+                  ].map((cat) => (
+                    <label
+                      key={cat.key}
+                      className="flex items-center justify-between p-1.5 bg-muted/20 border border-border rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${cat.dot}`} />
+                        <span className="truncate">{cat.label}</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(activeAssetCategories[cat.key])}
+                        onChange={(e) =>
+                          setActiveAssetCategories((prev) => ({
+                            ...prev,
+                            [cat.key]: e.target.checked,
+                          }))
+                        }
+                        className="w-3.5 h-3.5 accent-primary rounded cursor-pointer shrink-0 ml-1"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+        )}
+
+        {/* Dynamic Chart Container */}
+        <div className="p-5">
 
         {/* Dynamic Chart */}
         <div className="h-80 w-full">
@@ -578,9 +772,37 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                   </linearGradient>
+                  <linearGradient id="cashGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#94a3b8" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="taxableGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="taxDeferredGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="taxFreeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="hsaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.05} />
+                  </linearGradient>
                 </defs>
 
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+
+                {/* Retirement Phase Background Shading */}
+                <ReferenceArea
+                  x1={localRetirementAge}
+                  x2={plan?.lifeExpectancyAge || 100}
+                  fill="#f59e0b"
+                  fillOpacity={0.04}
+                />
 
                 <XAxis
                   dataKey="age"
@@ -600,16 +822,27 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
                 <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
 
-                <Area
-                  type="monotone"
-                  dataKey="netWorth"
-                  stroke="#10b981"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#accumulationGrad)"
-                />
+                {chartType === 'total' ? (
+                  <Area
+                    type="monotone"
+                    dataKey="portfolioBalance"
+                    name="Retirement Portfolio"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#accumulationGrad)"
+                  />
+                ) : (
+                  <>
+                    <Area type="monotone" dataKey="cashBal" name="Cash & Savings" stackId="portfolio" stroke="#94a3b8" strokeWidth={1.5} fill="url(#cashGrad)" />
+                    <Area type="monotone" dataKey="taxableBal" name="Taxable Brokerage" stackId="portfolio" stroke="#f59e0b" strokeWidth={1.5} fill="url(#taxableGrad)" />
+                    <Area type="monotone" dataKey="taxDeferredBal" name="Tax-Deferred (Traditional)" stackId="portfolio" stroke="#a855f7" strokeWidth={1.5} fill="url(#taxDeferredGrad)" />
+                    <Area type="monotone" dataKey="taxFreeBal" name="Tax-Free (Roth)" stackId="portfolio" stroke="#ec4899" strokeWidth={1.5} fill="url(#taxFreeGrad)" />
+                    <Area type="monotone" dataKey="hsaBal" name="HSA" stackId="portfolio" stroke="#14b8a6" strokeWidth={1.5} fill="url(#hsaGrad)" />
+                  </>
+                )}
 
-                {milestoneCallouts.map((m, idx) => {
+                {showMilestones && milestoneCallouts.map((m, idx) => {
                   const pt = chartData.find((d) => d.age === m.age);
                   if (!pt) return null;
                   const IconComponent = m.icon;
@@ -623,7 +856,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                         if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
                         return (
                           <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
-                            <title>{`${m.title} (Age ${m.age}, Year ${m.year})\n${m.note}\nProjected Net Worth: ${formatCurrency(pt.netWorth)}`}</title>
+                            <title>{`${m.title} (Age ${m.age}, Year ${m.year})\n${m.note}\nProjected Portfolio Balance: ${formatCurrency(pt.netWorth)}`}</title>
                             <circle
                               cx={14}
                               cy={14}
@@ -664,54 +897,76 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             )}
           </ResponsiveContainer>
         </div>
+        </div>
+          </>
+        )}
       </div>
 
       {/* Key Financial & Life Milestones Cards */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Flag className="w-3.5 h-3.5 text-primary" />
-          Key Financial & Life Milestones Timeline
-        </h3>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isMilestonesCollapsed}
+          onToggle={setIsMilestonesCollapsed}
+          title={
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Flag className="w-3.5 h-3.5 text-primary" />
+              Key Financial & Life Milestones Timeline
+            </h3>
+          }
+        />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {milestoneCallouts.map((m) => {
-            const Icon = m.icon;
-            return (
-              <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
-                    <Icon className="w-4 h-4" />
-                  </span>
-                  <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
-                    Age {m.age} ({m.year})
-                  </span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {!isMilestonesCollapsed && (
+          <div className="p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {milestoneCallouts.map((m) => {
+                const Icon = m.icon;
+                return (
+                  <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
+                        Age {m.age} ({m.year})
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Income vs. Drawdowns Composed Stacked Bar & Line Chart */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Layers className="w-4 h-4 text-emerald-500" />
-              Yearly Cash Flow Composition: Inflows vs. Portfolio Drawdowns
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses
-            </p>
-          </div>
-          <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
-            {activeStrategyLabel}
-          </span>
-        </div>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isCashFlowCollapsed}
+          onToggle={setIsCashFlowCollapsed}
+          title={
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Layers className="w-4 h-4 text-emerald-500" />
+                Yearly Cash Flow Composition: Inflows vs. Portfolio Drawdowns
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses
+              </p>
+            </div>
+          }
+          actions={
+            <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+              {activeStrategyLabel}
+            </span>
+          }
+        />
+
+        {!isCashFlowCollapsed && (
+          <div className="p-5">
 
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -763,17 +1018,28 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+          </div>
+        )}
       </div>
 
       {/* Interactive What-If Scenario Explorer Sliders */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          Interactive What-If Scenario Explorer
-        </h3>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isWhatIfCollapsed}
+          onToggle={setIsWhatIfCollapsed}
+          title={
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              Interactive What-If Scenario Explorer
+            </h3>
+          }
+        />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Retirement Age Slider with Debounced Commit */}
+        {!isWhatIfCollapsed && (
+          <div className="p-5 space-y-4">
+
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${Boolean(plan?.hasSpouse || plan?.filingStatus === 'married_joint') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-6`}>
+          {/* Primary Retirement Age Slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Retirement Age</span>
@@ -796,6 +1062,32 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <span>75</span>
             </div>
           </div>
+
+          {/* Spouse Retirement Age Slider */}
+          {Boolean(plan?.hasSpouse || plan?.filingStatus === 'married_joint') && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-muted-foreground">{plan?.spouseName || 'Spouse'} Retirement</span>
+                <span className="font-mono font-bold text-primary text-sm">{localSpouseRetirementAge}</span>
+              </div>
+              <input
+                type="range"
+                min="40"
+                max="75"
+                step="1"
+                value={localSpouseRetirementAge}
+                onChange={(e) => setLocalSpouseRetirementAge(parseInt(e.target.value, 10))}
+                onPointerUp={() => onUpdatePlan({ spouseRetirementAge: localSpouseRetirementAge })}
+                className="w-full accent-primary h-2 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                <span>40</span>
+                <span>55</span>
+                <span>65</span>
+                <span>75</span>
+              </div>
+            </div>
+          )}
 
           {/* Expected Return Rate Slider */}
           <div className="space-y-2">
@@ -864,32 +1156,34 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </div>
           </div>
         </div>
+          </div>
+        )}
       </div>
 
       {/* Year-by-Year Simulation Table */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        <button
-          onClick={() => setShowYearlyTable(!showYearlyTable)}
-          className="w-full flex items-center justify-between p-4 text-sm font-bold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" />
-            Detailed Year-by-Year Account Drawdown & Tax Table
-          </span>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{chartData.length} years</span>
-            {showYearlyTable ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </div>
-        </button>
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isYearlyTableCollapsed}
+          onToggle={setIsYearlyTableCollapsed}
+          title={
+            <span className="flex items-center gap-2 font-bold text-sm text-foreground">
+              <Calendar className="w-4 h-4 text-primary" />
+              Detailed Year-by-Year Account Drawdown & Tax Table
+            </span>
+          }
+          actions={
+            <span className="text-xs text-muted-foreground font-mono">{chartData.length} years</span>
+          }
+        />
 
-        {showYearlyTable && (
+        {!isYearlyTableCollapsed && (
           <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-muted/40 text-muted-foreground font-semibold sticky top-0 bg-card">
                 <tr>
                   <th className="p-2.5">Year</th>
                   <th className="p-2.5">Age</th>
-                  <th className="p-2.5">Net Worth</th>
+                  <th className="p-2.5">Portfolio Balance</th>
                   <th className="p-2.5">Gross Income</th>
                   <th className="p-2.5">Expenses</th>
                   <th className="p-2.5">Taxes Paid</th>
@@ -958,48 +1252,70 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const MilestoneIcon = data.milestone?.icon;
-  const incomeTotal = (data.income || 0);
-  const incomeGap = Math.max(0, (data.expenses || 0) - incomeTotal);
 
   return (
-    <div className="bg-background border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[210px] z-50">
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[230px] z-50">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
-        <span>Year {data.year} (Age {data.age})</span>
-        <span className={data.isRetired ? 'text-amber-500' : 'text-emerald-500'}>
-          {data.isRetired ? 'Retired' : 'Working'}
+        <span className="text-foreground font-mono">Year {data.year} (Age {data.age})</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
+          data.isRetired
+            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        }`}>
+          {data.isRetired ? '🌴 Retired' : '📈 Accumulation'}
         </span>
       </div>
-      <div className="space-y-1 font-mono">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Net Worth:</span>
-          <span className="font-bold text-emerald-500">{formatCurrency(data.netWorth)}</span>
+
+      <div className="space-y-1.5 font-mono">
+        <div className="flex justify-between items-center text-sm font-extrabold pb-1.5 border-b border-border/50">
+          <span className="text-muted-foreground text-xs font-semibold font-sans">Retirement Portfolio:</span>
+          <span className="text-emerald-500 font-mono">{formatCurrency(data.portfolioBalance || data.netWorth)}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Income:</span>
-          <span className="text-foreground">{formatCurrency(data.income)}</span>
+
+        {/* Asset Category Balances */}
+        <div className="space-y-1 text-[11px] pt-0.5">
+          {data.taxableBal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-amber-500 font-sans">Taxable Brokerage:</span>
+              <span className="font-bold text-foreground">{formatCurrency(data.taxableBal)}</span>
+            </div>
+          )}
+          {data.taxDeferredBal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-purple-500 font-sans">Tax-Deferred (Traditional):</span>
+              <span className="font-bold text-foreground">{formatCurrency(data.taxDeferredBal)}</span>
+            </div>
+          )}
+          {data.taxFreeBal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-pink-500 font-sans">Tax-Free (Roth):</span>
+              <span className="font-bold text-foreground">{formatCurrency(data.taxFreeBal)}</span>
+            </div>
+          )}
+          {data.hsaBal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-teal-500 font-sans">HSA:</span>
+              <span className="font-bold text-foreground">{formatCurrency(data.hsaBal)}</span>
+            </div>
+          )}
+          {data.cashBal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400 font-sans">Cash & Savings:</span>
+              <span className="font-bold text-foreground">{formatCurrency(data.cashBal)}</span>
+            </div>
+          )}
         </div>
-        {data.expenses != null && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Expenses:</span>
-            <span className="text-rose-500">{formatCurrency(data.expenses)}</span>
-          </div>
-        )}
-        {incomeGap > 0 && (
-          <div className="flex justify-between text-amber-500 font-bold">
-            <span>Income Gap:</span>
-            <span>{formatCurrency(incomeGap)}</span>
-          </div>
-        )}
-        {data.totalDrawdown > 0 && (
-          <div className="flex justify-between pt-1 border-t border-border/50 text-amber-500 font-bold">
-            <span>Portfolio Drawdown:</span>
-            <span>{formatCurrency(data.totalDrawdown)}</span>
+
+        {data.discretionaryDeficit > 0 && (
+          <div className="flex justify-between items-center pt-1 border-t border-border/40 text-amber-500 text-[11px]">
+            <span className="font-sans">Annual Portfolio Draw:</span>
+            <span className="font-bold">{formatCurrency(data.discretionaryDeficit)}</span>
           </div>
         )}
       </div>
 
       {data.milestone && (
-        <div className="bg-primary/10 border border-primary/20 rounded-lg p-2.5 mt-2 space-y-1 text-left">
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 mt-1 space-y-0.5 text-left font-sans">
           <div className="flex items-center gap-1.5 font-bold text-primary text-[11px]">
             {MilestoneIcon && <MilestoneIcon className="w-3.5 h-3.5 shrink-0" />}
             <span>{data.milestone.title}</span>
