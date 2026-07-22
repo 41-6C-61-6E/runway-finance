@@ -13,6 +13,9 @@ describe('Monte Carlo Simulation Engine', () => {
     filingStatus: 'single',
     retirementAge: 60,
     lifeExpectancyAge: 85,
+    primarySalary: 80000,
+    primarySalaryYear: 2026,
+    primarySalaryRaisePct: 2.5,
     withdrawalMethod: 'textbook',
     accounts: [
       {
@@ -30,19 +33,6 @@ describe('Monte Carlo Simulation Engine', () => {
     ],
     liabilities: [],
     events: [
-      {
-        id: 'ev_1',
-        name: 'Salary',
-        category: 'income',
-        type: 'salary',
-        owner: 'primary',
-        amount: 80000,
-        frequency: 'yearly',
-        growthRate: 2.5,
-        adjustForInflation: true,
-        startTriggerType: 'now',
-        endTriggerType: 'retirement',
-      },
       {
         id: 'ev_2',
         name: 'Living Expenses',

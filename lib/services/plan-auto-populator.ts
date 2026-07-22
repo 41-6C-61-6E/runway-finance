@@ -158,18 +158,9 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
   }
 
   // 4. Auto-populate realistic Events (Income & Expenses)
+  // Note: Primary/spouse salary is driven by plan-level fields (primarySalary, spouseSalary),
+  // not by salary events. Salary events are only for side jobs / additional income streams.
   const autoEvents = [
-    {
-      name: 'Primary Salary',
-      category: 'income',
-      type: 'salary',
-      amount: String(Math.round(estimatedSalary)),
-      frequency: 'yearly',
-      growthRate: '3.0',
-      adjustForInflation: true,
-      startTriggerType: 'now',
-      endTriggerType: 'retirement',
-    },
     {
       name: 'Base Living Expenses',
       category: 'expense',
@@ -309,6 +300,7 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
   // 7. Update plan with estimated salary
   const encryptedPlanSalary = await encryptRow('plans', {
     primarySalary: String(Math.round(estimatedSalary)),
+    primarySalaryYear: new Date().getFullYear(),
     userId: dataUserId,
   }, dek);
   delete encryptedPlanSalary.userId;
