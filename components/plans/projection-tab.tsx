@@ -55,6 +55,9 @@ import {
   Check,
   Settings,
   Users,
+  X,
+  Building2,
+  ArrowUpCircle,
 } from 'lucide-react';
 
 interface ProjectionTabProps {
@@ -78,6 +81,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const [chartType, setChartType] = useState<'total' | 'stacked'>('total');
   const [showMilestones, setShowMilestones] = useState(true);
   const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
+  const [selectedYearDetail, setSelectedYearDetail] = useState<any>(null);
   const [activeAssetCategories, setActiveAssetCategories] = useState<Record<string, boolean>>({
     taxable: true,
     taxDeferred: true,
@@ -397,6 +401,14 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           ? (actualDrawdowns / (nw + actualDrawdowns)) * 100
           : 0;
 
+        const salInc = Math.round((y.salaryIncome || 0) / discountFactor);
+        const ssInc = Math.round((y.ssIncome || 0) / discountFactor);
+        const penInc = Math.round((y.pensionIncome || 0) / discountFactor);
+        const othInc = Math.round((y.otherIncome || 0) / discountFactor);
+        const totExpenses = Math.round(y.totalExpenses / discountFactor);
+        const totSources = salInc + ssInc + penInc + othInc + actualDrawdowns;
+        const shortfall = totExpenses > totSources ? totExpenses - totSources : 0;
+
         return {
           year: y.year,
           age: y.primaryAge,
@@ -414,18 +426,20 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           accountBalances: rawAccountBalances,
           filteredAccountBalances,
           income: Math.round(y.grossIncome / discountFactor),
-          expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses / discountFactor) : null,
+          expenses: totExpenses,
           isRetired: y.primaryAge >= localRetirementAge,
-          salaryIncome: Math.round((y.salaryIncome || 0) / discountFactor),
-          ssIncome: Math.round((y.ssIncome || 0) / discountFactor),
-          pensionIncome: Math.round((y.pensionIncome || 0) / discountFactor),
-          otherIncome: Math.round((y.otherIncome || 0) / discountFactor),
+          salaryIncome: salInc,
+          ssIncome: ssInc,
+          pensionIncome: penInc,
+          otherIncome: othInc,
           cashDrawdown: cashD,
           taxableDrawdown: taxD,
           traditionalDrawdown: tradD,
           rothDrawdown: rothD,
           hsaDrawdown: hsaD,
           actualDrawdowns,
+          totalSources: totSources,
+          shortfall,
           totalDrawdown: Math.round((y.deficitWithdrawn || 0) / discountFactor),
           discretionaryDeficit: discDeficit,
           rmdMandatory: Math.round((y.rmdMandatoryDrawdown || 0) / discountFactor),
@@ -518,6 +532,20 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     };
   }, [simulation, peakWithdrawalRate, localRetirementAge]);
 
+  const diagnosticWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (totalAnnualExpensesFromPlan <= 0) {
+      warnings.push('No living expenses configured for this plan. Add expense events under Plan Details to see realistic portfolio drawdowns.');
+    }
+    if (plan?.hasSpouse && !plan?.spouseBirthYear) {
+      warnings.push('Spouse option is enabled, but spouse birth year is missing. Defaulting to 1987.');
+    }
+    if (simulation?.depletionAge) {
+      warnings.push(`Portfolio depletes at age ${simulation.depletionAge}. Consider increasing retirement age or expected growth rate.`);
+    }
+    return warnings;
+  }, [totalAnnualExpensesFromPlan, plan?.hasSpouse, plan?.spouseBirthYear, simulation?.depletionAge]);
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* View Mode & Dollar Mode Toolbar Header */}
@@ -533,11 +561,26 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+          {/* Withdrawal Strategy Selector Quick Control */}
+          <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border border-border">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline">Strategy:</span>
+            <select
+              value={plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook'}
+              onChange={(e) => onUpdatePlan({ withdrawalMethod: e.target.value })}
+              className="bg-card text-foreground text-[11px] font-bold rounded px-1.5 py-0.5 border border-border cursor-pointer focus:outline-none"
+            >
+              <option value="textbook">Textbook Waterfall</option>
+              <option value="proportional">Proportional</option>
+              <option value="tax_optimized">Tax-Optimized (12% Bracket)</option>
+              <option value="custom_order">Custom Order</option>
+            </select>
+          </div>
+
           {/* Nominal vs Real Dollars Toggle */}
           <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
             <button
               onClick={() => setDollarMode('nominal')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                 dollarMode === 'nominal' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -545,7 +588,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </button>
             <button
               onClick={() => setDollarMode('real')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                 dollarMode === 'real' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -557,7 +600,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
             <button
               onClick={() => setViewMode('deterministic')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                 viewMode === 'deterministic' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -565,7 +608,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </button>
             <button
               onClick={() => setViewMode('monte_carlo')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                 viewMode === 'monte_carlo' ? 'bg-card text-amber-500 shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -574,6 +617,21 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           </div>
         </div>
       </div>
+
+      {/* Engine Diagnostic Warnings Banner */}
+      {diagnosticWarnings.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 space-y-1.5">
+          <div className="flex items-center gap-2 font-bold text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Engine Setup Diagnostic Warnings ({diagnosticWarnings.length})</span>
+          </div>
+          <ul className="space-y-1 pl-6 list-disc text-xs text-amber-700 dark:text-amber-300 font-mono">
+            {diagnosticWarnings.map((w, idx) => (
+              <li key={idx}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -1063,6 +1121,24 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 );
               })()}
 
+              {/* Shortfall zone shading: solid transparent red area where expenses exceed earned income */}
+              {chartData
+                .filter((d: any) => d.expenses != null && d.expenses > ((d.salaryIncome || 0) + (d.ssIncome || 0) + (d.pensionIncome || 0) + (d.otherIncome || 0)))
+                .map((d: any) => {
+                  const incomeTotal = (d.salaryIncome || 0) + (d.ssIncome || 0) + (d.pensionIncome || 0) + (d.otherIncome || 0);
+                  return (
+                    <ReferenceArea
+                      key={`shortfall-area-${d.year || d.age}`}
+                      x1={d.age}
+                      x2={d.age}
+                      y1={incomeTotal}
+                      y2={d.expenses}
+                      fill="rgba(244, 63, 94, 0.20)"
+                      stroke="none"
+                    />
+                  );
+                })}
+
               <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="sources" fill="#10b981" />
               <Bar dataKey="ssIncome" name="Social Security" stackId="sources" fill="#06b6d4" />
               <Bar dataKey="pensionIncome" name="Pension" stackId="sources" fill="#3b82f6" />
@@ -1264,23 +1340,23 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
         {!isYearlyTableCollapsed && (
           <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-muted/40 text-muted-foreground font-semibold sticky top-0 bg-card">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-muted/60 text-muted-foreground font-semibold sticky top-0 bg-card z-20">
                 <tr>
-                  <th className="p-2.5">Year</th>
-                  <th className="p-2.5">Age</th>
+                  <th className="p-2.5 sticky left-0 bg-card z-30 shadow-xs border-r border-border/50">Year</th>
+                  <th className="p-2.5 sticky left-14 bg-card z-30 shadow-xs border-r border-border/50">Age</th>
                   <th className="p-2.5">Portfolio Balance</th>
                   <th className="p-2.5">Gross Income</th>
                   <th className="p-2.5">Expenses</th>
-                  <th className="p-2.5">Taxes Paid</th>
-                  <th className="p-2.5">Penalty</th>
-                  <th className="p-2.5">ETR %</th>
-                  <th className="p-2.5">Taxable Draw</th>
-                  <th className="p-2.5">Trad Draw</th>
-                  <th className="p-2.5">Roth Draw</th>
-                  <th className="p-2.5">Withdraw Rate</th>
-                  <th className="p-2.5">Roth Conv</th>
-                  <th className="p-2.5">MAGI</th>
+                  <th className="p-2.5" title="Total Taxes Paid (FICA, Ordinary, Cap Gains, NIIT, State, Penalties)">Taxes Paid</th>
+                  <th className="p-2.5" title="IRS Early Withdrawal Penalties">Penalty</th>
+                  <th className="p-2.5" title="Effective Tax Rate % (Total Taxes / Total Tax Base)">ETR %</th>
+                  <th className="p-2.5" title="Withdrawal from Taxable Brokerage Accounts">Taxable Draw</th>
+                  <th className="p-2.5" title="Withdrawal from Traditional IRA / 401(k) Accounts">Trad Draw</th>
+                  <th className="p-2.5" title="Withdrawal from Tax-Free Roth IRA / 401(k) Accounts">Roth Draw</th>
+                  <th className="p-2.5" title="Portfolio Withdrawal Rate (Discretionary Portfolio Draw / Net Worth)">Withdraw Rate</th>
+                  <th className="p-2.5" title="Traditional to Roth Conversion Ladder Amount">Roth Conv</th>
+                  <th className="p-2.5" title="Modified Adjusted Gross Income (MAGI)">MAGI</th>
                   <th className="p-2.5">Phase</th>
                 </tr>
               </thead>
@@ -1291,10 +1367,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   return (
                     <tr
                       key={y.year}
-                      className={`hover:bg-muted/20 ${isRetirementYear ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500' : ''}`}
+                      onClick={() => setSelectedYearDetail(y)}
+                      className={`hover:bg-primary/10 transition-colors cursor-pointer group ${isRetirementYear ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500' : ''}`}
+                      title="Click row for full tax waterfall, cash flow & account breakdown"
                     >
-                      <td className="p-2.5 font-medium">{y.year}</td>
-                      <td className="p-2.5">{y.age}</td>
+                      <td className="p-2.5 font-medium sticky left-0 bg-card group-hover:bg-accent/40 z-10 border-r border-border/50">{y.year}</td>
+                      <td className="p-2.5 sticky left-14 bg-card group-hover:bg-accent/40 z-10 border-r border-border/50">{y.age}</td>
                       <td className="p-2.5 font-bold text-foreground">{formatCurrency(y.netWorth)}</td>
                       <td className="p-2.5 text-emerald-500">{formatCurrency(y.income)}</td>
                       <td className="p-2.5 text-rose-500">{formatCurrency(y.expenses)}</td>
@@ -1338,6 +1416,13 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           </div>
         )}
       </div>
+
+      {/* Year Detail Interactive Audit Modal */}
+      <YearDetailModal
+        isOpen={Boolean(selectedYearDetail)}
+        yearData={selectedYearDetail}
+        onClose={() => setSelectedYearDetail(null)}
+      />
     </div>
   );
 }
@@ -1532,6 +1617,10 @@ function GroupedLegend({ payload }: any) {
               <span className="text-muted-foreground">{item.value}</span>
             </div>
           ))}
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-2.5 rounded-sm bg-rose-500/20" />
+            <span className="text-muted-foreground">Shortfall Zone</span>
+          </div>
         </>
       )}
     </div>
@@ -1609,6 +1698,12 @@ function DrawdownTooltip({ active, payload }: any) {
             <span>{formatCurrency(data.hsaDrawdown)}</span>
           </div>
         )}
+        {data.shortfall > 0 && (
+          <div className="flex justify-between text-rose-500 font-bold border-t border-rose-500/30 pt-1">
+            <span>⚠ Unfunded Shortfall:</span>
+            <span>{formatCurrency(data.shortfall)}</span>
+          </div>
+        )}
         {data.rothConversionAmount > 0 && (
           <div className="flex justify-between text-orange-400 font-bold border-t border-border/40 pt-1">
             <span>Roth Conversion:</span>
@@ -1650,6 +1745,196 @@ function DrawdownTooltip({ active, payload }: any) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearData: any; onClose: () => void }) {
+  if (!isOpen || !yearData) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      <div className="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-foreground">
+                Year {yearData.year} Audit Breakdown (Age {yearData.age})
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {yearData.isRetired ? '🌴 Retirement Phase • Distribution' : '📈 Accumulation Phase • Savings'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Section 1: Inflows & Income Breakdown */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-sans">
+            <ArrowUpCircle className="w-4 h-4 text-emerald-500" />
+            Income & Cash Inflows
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Salary Income</span>
+              <span className="font-bold text-emerald-500">{formatCurrency(yearData.salaryIncome || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Social Security</span>
+              <span className="font-bold text-cyan-500">{formatCurrency(yearData.ssIncome || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Pension Income</span>
+              <span className="font-bold text-blue-500">{formatCurrency(yearData.pensionIncome || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Other Income</span>
+              <span className="font-bold text-purple-500">{formatCurrency(yearData.otherIncome || 0)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Comprehensive Tax Waterfall */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-sans">
+            <Scale className="w-4 h-4 text-rose-500" />
+            Comprehensive Tax Waterfall
+          </h3>
+          <div className="bg-muted/20 border border-border rounded-xl p-3.5 space-y-2 text-xs font-mono">
+            <div className="flex justify-between items-center text-muted-foreground font-sans text-[11px]">
+              <span>Gross Income:</span>
+              <span className="font-mono font-bold text-foreground">{formatCurrency(yearData.income || 0)}</span>
+            </div>
+            <div className="flex justify-between items-center text-rose-400">
+              <span className="font-sans">FICA Tax (SS 6.2% + Medicare 1.45%):</span>
+              <span>{formatCurrency(yearData.ficaTax || 0)}</span>
+            </div>
+            <div className="flex justify-between items-center text-rose-400">
+              <span className="font-sans">Federal & State Ordinary Tax:</span>
+              <span>{formatCurrency(yearData.ordinaryTax || 0)}</span>
+            </div>
+            {yearData.capGainsTax > 0 && (
+              <div className="flex justify-between items-center text-amber-500">
+                <span className="font-sans">Capital Gains Tax:</span>
+                <span>{formatCurrency(yearData.capGainsTax)}</span>
+              </div>
+            )}
+            {yearData.niitTax > 0 && (
+              <div className="flex justify-between items-center text-rose-500">
+                <span className="font-sans">NIIT (3.8% Net Investment Tax):</span>
+                <span>{formatCurrency(yearData.niitTax)}</span>
+              </div>
+            )}
+            {yearData.stateTax > 0 && (
+              <div className="flex justify-between items-center text-purple-400">
+                <span className="font-sans">State Income Tax:</span>
+                <span>{formatCurrency(yearData.stateTax)}</span>
+              </div>
+            )}
+            {yearData.earlyPenaltyTax > 0 && (
+              <div className="flex justify-between items-center text-amber-500 font-bold bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                <span className="font-sans flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Early Withdrawal Penalties:
+                </span>
+                <span>{formatCurrency(yearData.earlyPenaltyTax)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center font-bold text-foreground border-t border-border pt-2 text-sm">
+              <span className="font-sans">Total Taxes Paid:</span>
+              <span className="text-rose-500">{formatCurrency(yearData.taxesPaid || 0)}</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px] text-muted-foreground font-sans pt-0.5">
+              <span>Effective Tax Rate (ETR %):</span>
+              <span className="font-mono font-bold text-foreground">{yearData.effectiveTaxRate ? `${yearData.effectiveTaxRate.toFixed(1)}%` : '0%'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Cash Flow & Deficit Drawdown Sequence */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-sans">
+            <Layers className="w-4 h-4 text-primary" />
+            Portfolio Drawdowns & Conversion Sequence
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Cash Drawdown</span>
+              <span className="font-bold text-slate-400">{formatCurrency(yearData.cashDrawdown || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Taxable Brokerage</span>
+              <span className="font-bold text-amber-500">{formatCurrency(yearData.taxableDrawdown || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Traditional IRA/401(k)</span>
+              <span className="font-bold text-purple-500">{formatCurrency(yearData.traditionalDrawdown || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Roth IRA/401(k)</span>
+              <span className="font-bold text-pink-500">{formatCurrency(yearData.rothDrawdown || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">HSA Drawdown</span>
+              <span className="font-bold text-teal-500">{formatCurrency(yearData.hsaDrawdown || 0)}</span>
+            </div>
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border">
+              <span className="text-[10px] text-muted-foreground block font-sans">Roth Conversion</span>
+              <span className="font-bold text-cyan-500">{formatCurrency(yearData.rothConversionAmount || 0)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: Per-Account Ledger Table */}
+        {yearData.accountBalances && yearData.accountBalances.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-sans">
+              <Building2 className="w-4 h-4 text-primary" />
+              Projected Account Balances & Drawdowns
+            </h3>
+            <div className="border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/50 text-muted-foreground font-semibold">
+                  <tr>
+                    <th className="p-2">Account</th>
+                    <th className="p-2">Category</th>
+                    <th className="p-2">Owner</th>
+                    <th className="p-2 text-right">Projected Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50 font-mono">
+                  {yearData.accountBalances.map((acc: any, i: number) => (
+                    <tr key={acc.id || i} className="hover:bg-muted/20">
+                      <td className="p-2 font-sans font-medium text-foreground">{acc.name}</td>
+                      <td className="p-2 font-sans capitalize">{acc.category}</td>
+                      <td className="p-2 font-sans capitalize">{acc.owner}</td>
+                      <td className="p-2 text-right font-bold text-emerald-500">{formatCurrency(acc.projectedBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-primary/90 transition-all cursor-pointer"
+          >
+            Close Audit View
+          </button>
+        </div>
       </div>
     </div>
   );

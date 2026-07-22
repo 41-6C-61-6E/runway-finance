@@ -890,6 +890,169 @@ describe('Retirement Projection Engine', () => {
     expect(yr1.portfolioBreakdown.taxDeferred).toBeCloseTo(k401Acc?.balance || 0, 1);
     expect(yr1.portfolioBreakdown.taxFree).toBeCloseTo(rothAcc?.balance || 0, 1);
   });
+
+  it('correctly calculates FICA tax on gross salary excluding 401(k) pre-tax deductions', () => {
+    const ficaPlan: EnginePlan = {
+      id: 'fica_plan',
+      name: 'FICA Test Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1990,
+      primaryBirthMonth: 1,
+      withdrawalMethod: 'textbook',
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 80,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
+      accounts: [
+        {
+          id: 'acc_401k',
+          name: 'Traditional 401(k)',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 0,
+          costBasis: 0,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'fixed_amount',
+          contributionValue: 20000,
+        },
+      ],
+      liabilities: [],
+      events: [],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(ficaPlan);
+    const yr1 = output.yearlyResults[0];
+
+    // FICA (6.2% SS + 1.45% Medicare = 7.65%) should be calculated on full $100,000 salary ($7,650),
+    // NOT on $80,000 ($6,120).
+    expect(yr1.ficaTax).toBeCloseTo(7650, 0);
+  });
+
+  it('recalculates Social Security taxation when Traditional IRA drawdowns occur in retirement', () => {
+    const ssDrawdownPlan: EnginePlan = {
+      id: 'ss_draw_plan',
+      name: 'SS Drawdown Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1959, // Age 67 in 2026
+      primaryBirthMonth: 1,
+      withdrawalMethod: 'textbook',
+      filingStatus: 'single',
+      retirementAge: 60, // Already retired
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      primarySsMonthlyAmount: 2000, // $24,000/yr SS
+      primarySsStartAge: 67,
+      accounts: [
+        {
+          id: 'acc_trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 500000,
+          costBasis: 500000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0, withdrawalMethod: 'textbook' },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(ssDrawdownPlan);
+    const yr1 = output.yearlyResults[0];
+
+    // With $24k SS and $50k Traditional IRA drawdown, Provisional Income = 50k + 12k = $62,000 (exceeds $34k tier 2).
+    // Taxable SS should be calculated and taxes paid should be greater than 0.
+    expect(yr1.ssIncome).toBe(24000);
+    expect(yr1.drawdownsByType.traditional).toBeGreaterThan(0);
+    expect(yr1.taxesPaid).toBeGreaterThan(0);
+  });
+
+  it('allows penalty-free Roth IRA withdrawals up to cost basis before age 59.5, but penalizes earnings', () => {
+    const rothEarlyPlan: EnginePlan = {
+      id: 'roth_early_plan',
+      name: 'Roth Early Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1974, // Age 52 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 50, // Retired at 50
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      primarySalary: 0,
+      accounts: [
+        {
+          id: 'acc_roth',
+          name: 'Vanguard Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000, // $100k balance
+          costBasis: 30000, // $30k contribution basis, $70k growth
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(rothEarlyPlan);
+    const yr1 = output.yearlyResults[0];
+
+    // Total drawn: $50,000 from Roth IRA at age 52.
+    // Basis is $30,000 -> $30,000 comes out tax-free and penalty-free!
+    // Remaining $20,000 is non-qualified earnings -> 10% penalty = $2,000 penalty.
+    expect(yr1.drawdownsByType.roth).toBe(50000);
+    expect(yr1.earlyPenaltyTax).toBe(2000);
+    expect(yr1.earlyPenaltyDetails?.length).toBe(1);
+    expect(yr1.earlyPenaltyDetails?.[0].amount).toBe(20000);
+  });
 });
 
 
