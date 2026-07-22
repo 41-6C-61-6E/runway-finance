@@ -142,26 +142,8 @@ export async function GET(req: NextRequest) {
     // Fetch user plans
     let dbPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId));
 
-    // If user has no plans, auto-create a Default Plan populated with user finances
     if (dbPlans.length === 0) {
-      const encryptedValues = await encryptRow('plans', {
-        userId: dataUserId,
-        name: 'Default Plan',
-        hasSpouse: false,
-        primaryBirthYear: 1985,
-        primaryBirthMonth: 1,
-        country: 'US',
-        filingStatus: 'single',
-        retirementAge: 60,
-        lifeExpectancyAge: 100,
-        fiTargetMultiplier: 25,
-        withdrawalMethod: 'textbook',
-        isDefault: true,
-      }, dek);
-
-      const inserted = await getDb().insert(plans).values(encryptedValues).returning();
-      await populatePlanWithUserFinances(inserted[0].id, dataUserId, dek);
-      dbPlans = inserted;
+      return NextResponse.json([]);
     }
 
     const decryptedPlans = await Promise.all(

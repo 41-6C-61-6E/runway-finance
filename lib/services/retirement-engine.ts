@@ -102,11 +102,48 @@ export interface EnginePlan {
   rules?: typeof DEFAULT_2026_RULES;
 }
 
+export function getAccountCategory(type: string): 'taxable' | 'taxDeferred' | 'taxFree' | 'hsa' | 'cash' {
+  const t = (type || '').toLowerCase();
+  if (t === 'hsa') return 'hsa';
+  if (t.includes('roth')) return 'taxFree';
+  if (
+    t.includes('401k') ||
+    t.includes('403b') ||
+    t.includes('ira') ||
+    t.includes('pension') ||
+    t.includes('traditional') ||
+    t.includes('sep') ||
+    t.includes('simple')
+  ) {
+    return 'taxDeferred';
+  }
+  if (
+    t === 'taxable' ||
+    t === 'brokerage' ||
+    t === 'investment' ||
+    t === 'crypto' ||
+    t === 'asset' ||
+    t === 'stock_option'
+  ) {
+    return 'taxable';
+  }
+  return 'cash';
+}
+
 export interface AccountDrawdownDetail {
   accountId: string;
   accountName: string;
   accountType: string;
   amount: number;
+}
+
+export interface YearlyAccountBalance {
+  id: string;
+  name: string;
+  type: string;
+  category: 'taxable' | 'taxDeferred' | 'taxFree' | 'hsa' | 'cash';
+  owner: string;
+  balance: number;
 }
 
 export interface YearlySimulationResult {
@@ -150,6 +187,7 @@ export interface YearlySimulationResult {
     hsa: number;
     cash: number;
   };
+  accountBalances: YearlyAccountBalance[];
   accountDrawdowns: AccountDrawdownDetail[];
   drawdownsByType: {
     cash: number;
@@ -846,6 +884,7 @@ export function runRetirementSimulation(
     let taxFreeTotal = 0;
     let hsaTotal = 0;
     let cashTotal = 0;
+    const accountBalances: YearlyAccountBalance[] = [];
 
     for (const accId in accountsState) {
       const acc = accountsState[accId];
@@ -862,7 +901,9 @@ export function runRetirementSimulation(
           divYield = acc.dividendYield / 100;
         }
 
-        if ((acc.type === 'taxable' || acc.type === 'crypto') && divYield > 0) {
+        const isTaxableType = acc.type === 'taxable' || acc.type === 'crypto' || acc.type === 'brokerage' || acc.type === 'investment';
+
+        if (isTaxableType && divYield > 0) {
           const divAmount = acc.balance * divYield;
           const qualRatio = acc.qualifiedDividendRatio ?? 1.0;
           const qualDivs = divAmount * qualRatio;
@@ -879,11 +920,21 @@ export function runRetirementSimulation(
           acc.balance = acc.balance * (1 + growth + divYield);
         }
 
-        if (acc.type === 'taxable' || acc.type === 'crypto') taxableTotal += acc.balance;
-        else if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') taxDeferredTotal += acc.balance;
-        else if (acc.type === 'roth_ira' || acc.type === 'roth_401k') taxFreeTotal += acc.balance;
-        else if (acc.type === 'hsa') hsaTotal += acc.balance;
+        const cat = getAccountCategory(acc.type);
+        if (cat === 'taxable') taxableTotal += acc.balance;
+        else if (cat === 'taxDeferred') taxDeferredTotal += acc.balance;
+        else if (cat === 'taxFree') taxFreeTotal += acc.balance;
+        else if (cat === 'hsa') hsaTotal += acc.balance;
         else cashTotal += acc.balance;
+
+        accountBalances.push({
+          id: acc.id,
+          name: acc.name,
+          type: acc.type,
+          category: cat,
+          owner: acc.owner || 'primary',
+          balance: acc.balance,
+        });
       }
     }
 
@@ -945,6 +996,7 @@ export function runRetirementSimulation(
         hsa: hsaTotal,
         cash: cashTotal,
       },
+      accountBalances,
       accountDrawdowns,
       drawdownsByType,
       rothConversionAmount,
