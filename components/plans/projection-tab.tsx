@@ -666,6 +666,36 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
       </div>
 
+      {/* Key Financial & Life Milestones Cards */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Flag className="w-3.5 h-3.5 text-primary" />
+          Key Financial & Life Milestones Timeline
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {milestoneCallouts.map((m) => {
+            const Icon = m.icon;
+            return (
+              <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                  <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
+                    Age {m.age} ({m.year})
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Income vs. Drawdowns Composed Stacked Bar & Line Chart */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -732,36 +762,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <Line type="monotone" dataKey="expenses" name="Annual Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Key Financial & Life Milestones Cards */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Flag className="w-3.5 h-3.5 text-primary" />
-          Key Financial & Life Milestones Timeline
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {milestoneCallouts.map((m) => {
-            const Icon = m.icon;
-            return (
-              <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
-                    <Icon className="w-4 h-4" />
-                  </span>
-                  <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
-                    Age {m.age} ({m.year})
-                  </span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 
