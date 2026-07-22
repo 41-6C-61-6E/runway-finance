@@ -3,40 +3,65 @@
 import { useState, useMemo } from 'react';
 import { runMonteCarloSimulation, MonteCarloOutput } from '@/lib/services/monte-carlo';
 import { runBeamSearchOptimization, OptimizationObjective, OptimizationIntensity, OptimizationOutput } from '@/lib/services/beam-search-optimizer';
+import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
+import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { formatCurrency } from '@/lib/utils/format';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { ShieldCheck, Play, RefreshCw, Zap, Star, BarChart3, ArrowRight } from 'lucide-react';
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { ShieldCheck, Play, RefreshCw, Zap, Star, BarChart3, ArrowRight, GitCompare, Layers, Scale, CheckCircle2 } from 'lucide-react';
 
 interface ScenariosTabProps {
   plan: any;
 }
 
 export function ScenariosTab({ plan }: ScenariosTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'montecarlo' | 'matrix' | 'optimizer'>('montecarlo');
+  const [activeSubTab, setActiveSubTab] = useState<'montecarlo' | 'matrix' | 'optimizer' | 'compare'>('montecarlo');
 
-  // Monte Carlo controls
+  // Monte Carlo controls & custom assumptions state
   const [trialsCount, setTrialsCount] = useState(250);
   const [model, setModel] = useState<'historical_bootstrap' | 'normal_distribution'>('historical_bootstrap');
+  const [equityAllocation, setEquityAllocation] = useState(80);
+  const [meanAnnualReturn, setMeanAnnualReturn] = useState(7.0);
+  const [returnStdDev, setReturnStdDev] = useState(12.0);
+  const [adjustForInflation, setAdjustForInflation] = useState(true);
+  const [fixedInflationRate, setFixedInflationRate] = useState(3.0);
 
   // Optimizer controls
   const [objective, setObjective] = useState<OptimizationObjective>('legacy');
   const [intensity, setIntensity] = useState<OptimizationIntensity>('standard');
   const [optLoading, setOptLoading] = useState(false);
 
-  // Hydrate enginePlan accurately from plan data
+  // Scenario Comparison (Side-by-Side) state overrides
+  const [scenarioBRetirementAge, setScenarioBRetirementAge] = useState(55);
+  const [scenarioBReturnRate, setScenarioBReturnRate] = useState(8.0);
+  const [scenarioBStateTaxRate, setScenarioBStateTaxRate] = useState(0.0);
+
+  // Hydrate enginePlan accurately from plan data with full parameter parity
   const enginePlan = useMemo(() => {
+    const planAccountsList = Array.isArray(plan?.accounts) ? plan.accounts : [];
+    const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
+
     return {
       id: plan?.id || 'plan_1',
       name: plan?.name || 'Primary Plan',
-      hasSpouse: plan?.hasSpouse || false,
-      primaryBirthYear: plan?.primaryBirthYear || 1985,
-      primaryBirthMonth: plan?.primaryBirthMonth || 1,
+      hasSpouse: Boolean(plan?.hasSpouse),
+      primaryBirthYear: Number(plan?.primaryBirthYear) || 1985,
+      primaryBirthMonth: Number(plan?.primaryBirthMonth) || 1,
+      spouseBirthYear: plan?.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
+      spouseBirthMonth: plan?.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
+      spouseName: plan?.spouseName || 'Spouse / Partner',
+      spouseRetirementAge: plan?.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
+      spouseLifeExpectancyAge: plan?.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
+      primarySsMonthlyAmount: plan?.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500,
+      primarySsStartAge: plan?.primarySsStartAge ? Number(plan.primarySsStartAge) : 67,
+      spouseSsMonthlyAmount: plan?.spouseSsMonthlyAmount ? parseFloat(plan.spouseSsMonthlyAmount) : 2000,
+      spouseSsStartAge: plan?.spouseSsStartAge ? Number(plan.spouseSsStartAge) : 67,
+      enableSpousalSsBenefit: plan?.enableSpousalSsBenefit !== false,
       filingStatus: plan?.filingStatus || 'single',
-      retirementAge: plan?.retirementAge || 60,
-      lifeExpectancyAge: plan?.lifeExpectancyAge || 100,
-      withdrawalMethod: plan?.withdrawalMethod || 'textbook',
+      retirementAge: Number(plan?.retirementAge) || 60,
+      lifeExpectancyAge: Number(plan?.lifeExpectancyAge) || 100,
+      withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
       customWithdrawalOrder: Array.isArray(plan?.customWithdrawalOrder) ? plan.customWithdrawalOrder : undefined,
-      accounts: (plan?.accounts || []).map((a: any) => ({
+      accounts: activeAccounts.map((a: any) => ({
         id: a.id,
         name: a.name,
         type: a.type,
@@ -76,7 +101,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
       })),
       settings: {
-        fixedInflationRate: parseFloat(plan?.settings?.fixedInflationRate || '3.0'),
+        fixedInflationRate: parseFloat(plan?.settings?.fixedInflationRate || String(fixedInflationRate)),
         withholdingDeferred: parseFloat(plan?.settings?.withholdingDeferred || '20.0'),
         withholdingTaxable: parseFloat(plan?.settings?.withholdingTaxable || '10.0'),
         incomeTaxModifier: parseFloat(plan?.settings?.incomeTaxModifier || '0.0'),
@@ -86,17 +111,38 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         realEstateLiquidationRate: parseFloat(plan?.settings?.realEstateLiquidationRate || '6.0'),
         administrativeCostRate: parseFloat(plan?.settings?.administrativeCostRate || '1.0'),
         charitableGiving: parseFloat(plan?.settings?.charitableGiving || '0.0'),
+        withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
+        enableRothConversions: Boolean(plan?.settings?.enableRothConversions),
+        rothConversionTargetCeiling: plan?.settings?.rothConversionTargetCeiling || 'top_of_12',
+        avoidIrmaaCliffs: Boolean(plan?.settings?.avoidIrmaaCliffs),
       },
+      rules: plan?.rules || DEFAULT_2026_RULES,
     };
-  }, [plan]);
+  }, [plan, fixedInflationRate]);
 
   // Monte Carlo simulation state
   const [mcResult, setMcResult] = useState<MonteCarloOutput>(() =>
-    runMonteCarloSimulation(enginePlan as any, { numberOfTrials: trialsCount, model })
+    runMonteCarloSimulation(enginePlan as any, {
+      numberOfTrials: trialsCount,
+      model,
+      equityAllocation,
+      meanAnnualReturn: meanAnnualReturn / 100,
+      returnStdDev: returnStdDev / 100,
+      adjustForInflation,
+      fixedInflationRate,
+    })
   );
 
   const handleRunMonteCarlo = () => {
-    const res = runMonteCarloSimulation(enginePlan as any, { numberOfTrials: trialsCount, model });
+    const res = runMonteCarloSimulation(enginePlan as any, {
+      numberOfTrials: trialsCount,
+      model,
+      equityAllocation,
+      meanAnnualReturn: meanAnnualReturn / 100,
+      returnStdDev: returnStdDev / 100,
+      adjustForInflation,
+      fixedInflationRate,
+    });
     setMcResult(res);
   };
 
@@ -114,6 +160,36 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
     }, 200);
   };
 
+  // Side-by-side scenario simulations
+  const comparisonSims = useMemo(() => {
+    const planA = enginePlan;
+    const planB: EnginePlan = JSON.parse(JSON.stringify(enginePlan));
+
+    planB.retirementAge = scenarioBRetirementAge;
+    planB.accounts.forEach((acc) => {
+      acc.expectedGrowthRate = scenarioBReturnRate;
+    });
+    planB.settings.incomeTaxModifier = scenarioBStateTaxRate;
+
+    const simA = runRetirementSimulation(planA as any);
+    const simB = runRetirementSimulation(planB as any);
+
+    const taxesA = simA.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+    const taxesB = simB.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+
+    const chartComparison = simA.yearlyResults.map((yA, i) => {
+      const yB = simB.yearlyResults[i];
+      return {
+        year: yA.year,
+        age: yA.primaryAge,
+        netWorthA: Math.round(yA.netWorth),
+        netWorthB: Math.round(yB?.netWorth || 0),
+      };
+    });
+
+    return { simA, simB, taxesA, taxesB, chartComparison };
+  }, [enginePlan, scenarioBRetirementAge, scenarioBReturnRate, scenarioBStateTaxRate]);
+
   const mcChartData = useMemo(() => {
     if (!mcResult?.percentiles?.years) return [];
     return mcResult.percentiles.years.map((year, i) => ({
@@ -126,7 +202,6 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
     }));
   }, [mcResult]);
 
-  // Dynamic Strategy Comparison Matrix based on plan's baseline simulation
   const baselineLegacy = plan?.simulation?.netLegacy || enginePlan.accounts.reduce((s: number, a: any) => s + a.balance, 0) * 3.5;
   const baselineTaxes = (plan?.simulation?.yearlyResults || []).reduce((s: number, y: any) => s + (y.taxesPaid || 0), 0) || 250000;
 
@@ -147,6 +222,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
           { id: 'montecarlo' as const, label: 'Monte Carlo Stress Test', icon: BarChart3 },
           { id: 'matrix' as const, label: 'Strategy Matrix', icon: Star },
           { id: 'optimizer' as const, label: 'Beam Optimizer', icon: Zap },
+          { id: 'compare' as const, label: 'Scenario Comparison', icon: GitCompare },
         ].map((t) => {
           const Icon = t.icon;
           const isActive = activeSubTab === t.id;
@@ -154,7 +230,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
             <button
               key={t.id}
               onClick={() => setActiveSubTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
               }`}
             >
@@ -176,29 +252,29 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
                 {mcResult.successRate.toFixed(0)}%
               </div>
               <div>
-                <h3 className="text-sm font-bold text-foreground">Monte Carlo Stress Test</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-foreground">Monte Carlo Stress Test</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    adjustForInflation
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  }`}>
+                    {adjustForInflation ? "Real (Today's Dollars)" : 'Nominal Dollars'}
+                  </span>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Ran {mcResult.totalTrials} market trials using {model.replace('_', ' ')}
+                  Ran {mcResult.totalTrials} market trials using {model.replace('_', ' ')} ({equityAllocation}% stocks / {100 - equityAllocation}% bonds)
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value as any)}
-                className="bg-background border border-border rounded-lg px-3 py-1.5 text-xs font-medium text-foreground"
-              >
-                <option value="historical_bootstrap">Historical Bootstrap (1928–2025)</option>
-                <option value="normal_distribution">Normal Distribution (Mean/StdDev)</option>
-              </select>
-
               <button
                 onClick={handleRunMonteCarlo}
-                className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all"
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Run Test
+                Run Stress Test
               </button>
             </div>
           </div>
@@ -211,7 +287,9 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
               </p>
             </div>
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">Median Legacy (50th %)</span>
+              <span className="text-xs font-semibold text-muted-foreground">
+                Median Legacy (50th %) {adjustForInflation ? "(Real)" : "(Nominal)"}
+              </span>
               <p className="text-2xl font-extrabold text-foreground font-mono">{formatCurrency(mcResult.medianLegacy)}</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
@@ -344,7 +422,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
               <button
                 onClick={handleRunOptimizer}
                 disabled={optLoading}
-                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 {optLoading ? 'Optimizing...' : 'Run Beam Search'}
@@ -361,6 +439,99 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
               <span className="text-xs font-bold text-muted-foreground uppercase">Projected Legacy Increase</span>
               <p className="text-2xl font-extrabold text-primary font-mono">{formatCurrency(optResult.savings.legacyIncrease)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Tab 4: Scenario Comparison (Side-by-Side Overlay) */}
+      {activeSubTab === 'compare' && (
+        <div className="space-y-6">
+          {/* Controls to configure Scenario B */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <GitCompare className="w-5 h-5 text-primary" />
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Side-by-Side Scenario Modeling</h3>
+                <p className="text-xs text-muted-foreground">Compare Baseline Plan (Scenario A) against an Alternative Hypothesis (Scenario B)</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
+                <input
+                  type="number"
+                  min="40"
+                  max="75"
+                  value={scenarioBRetirementAge}
+                  onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={scenarioBReturnRate}
+                  onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={scenarioBStateTaxRate}
+                  onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Comparison Table */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase">Baseline (Plan A) Ending Net Worth</span>
+              <p className="text-2xl font-extrabold text-emerald-500 font-mono">{formatCurrency(comparisonSims.simA.endingNetWorth)}</p>
+              <p className="text-[11px] text-muted-foreground">Retire at age {enginePlan.retirementAge} • {enginePlan.accounts[0]?.expectedGrowthRate || 6}% Return</p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+              <span className="text-xs font-bold text-amber-500 uppercase">Scenario B Ending Net Worth</span>
+              <p className="text-2xl font-extrabold text-amber-500 font-mono">{formatCurrency(comparisonSims.simB.endingNetWorth)}</p>
+              <p className="text-[11px] text-muted-foreground">Retire at age {scenarioBRetirementAge} • {scenarioBReturnRate}% Return</p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase">Net Worth Delta</span>
+              <p className={`text-2xl font-extrabold font-mono ${comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? '+' : ''}{formatCurrency(comparisonSims.simB.endingNetWorth - comparisonSims.simA.endingNetWorth)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">Difference at plan horizon</p>
+            </div>
+          </div>
+
+          {/* Overlaid Trajectory Chart */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-foreground">Overlaid Net Worth Trajectory</h3>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={comparisonSims.chartComparison}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+                  <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+                  <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Net Worth']} />
+                  <Legend />
+                  <Line type="monotone" dataKey="netWorthA" name="Baseline (Plan A)" stroke="#10b981" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="netWorthB" name="Alternative (Scenario B)" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

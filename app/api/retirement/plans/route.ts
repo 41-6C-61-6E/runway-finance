@@ -344,6 +344,7 @@ export async function PUT(req: NextRequest) {
           name: fl.name !== undefined ? fl.name : decFl.name,
           type: fl.type !== undefined ? fl.type : decFl.type,
           rank: fl.rank !== undefined ? fl.rank : decFl.rank,
+          targetAccountId: fl.targetAccountId !== undefined ? fl.targetAccountId : decFl.targetAccountId,
           ruleType: fl.ruleType !== undefined ? fl.ruleType : decFl.ruleType,
           ruleValue: fl.ruleValue !== undefined ? String(fl.ruleValue) : decFl.ruleValue,
           updatedAt: new Date(),
