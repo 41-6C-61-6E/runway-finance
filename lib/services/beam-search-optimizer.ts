@@ -66,7 +66,7 @@ export function runBeamSearchOptimization(
 
       if (ceiling !== 'none') {
         candidatePlan.settings.enableRothConversions = true;
-        candidatePlan.settings.rothConversionTargetCeiling = ceiling;
+        candidatePlan.settings.rothConversionTargetCeiling = ceiling as any;
       } else {
         candidatePlan.settings.enableRothConversions = false;
       }

@@ -184,27 +184,84 @@ export async function POST(req: NextRequest) {
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const body = await req.json();
 
-    const { name, retirementAge, lifeExpectancyAge, filingStatus } = body;
+    const {
+      name,
+      retirementAge,
+      lifeExpectancyAge,
+      filingStatus,
+      hasSpouse,
+      primaryBirthYear,
+      primaryBirthMonth,
+      spouseName,
+      spouseRetirementAge,
+      spouseBirthYear,
+      spouseBirthMonth,
+      spouseLifeExpectancyAge,
+      primarySsMonthlyAmount,
+      primarySsStartAge,
+      spouseSsMonthlyAmount,
+      spouseSsStartAge,
+      enableSpousalSsBenefit,
+      fiTargetMultiplier,
+      isDefault,
+      accountInclusions,
+    } = body;
+
+    // If setting as default, clear default status on other plans
+    if (isDefault) {
+      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, dataUserId));
+    }
 
     const encryptedValues = await encryptRow('plans', {
       userId: dataUserId,
       name: name || 'Default Plan',
-      hasSpouse: false,
-      primaryBirthYear: 1985,
-      primaryBirthMonth: 1,
+      hasSpouse: Boolean(hasSpouse),
+      primaryBirthYear: Number(primaryBirthYear) || 1985,
+      primaryBirthMonth: Number(primaryBirthMonth) || 1,
+      spouseName: spouseName || 'Spouse / Partner',
+      spouseRetirementAge: Number(spouseRetirementAge) || 60,
+      spouseBirthYear: spouseBirthYear ? Number(spouseBirthYear) : undefined,
+      spouseBirthMonth: spouseBirthMonth ? Number(spouseBirthMonth) : undefined,
+      spouseLifeExpectancyAge: spouseLifeExpectancyAge ? Number(spouseLifeExpectancyAge) : 100,
+      primarySsMonthlyAmount: primarySsMonthlyAmount !== undefined ? String(primarySsMonthlyAmount) : '2500',
+      primarySsStartAge: Number(primarySsStartAge) || 67,
+      spouseSsMonthlyAmount: spouseSsMonthlyAmount !== undefined ? String(spouseSsMonthlyAmount) : '2000',
+      spouseSsStartAge: Number(spouseSsStartAge) || 67,
+      enableSpousalSsBenefit: enableSpousalSsBenefit !== false,
       country: 'US',
       filingStatus: filingStatus || 'single',
-      retirementAge: retirementAge || 60,
-      lifeExpectancyAge: lifeExpectancyAge || 100,
-      fiTargetMultiplier: 25,
+      retirementAge: Number(retirementAge) || 60,
+      lifeExpectancyAge: Number(lifeExpectancyAge) || 100,
+      fiTargetMultiplier: Number(fiTargetMultiplier) || 25,
       withdrawalMethod: 'textbook',
-      isDefault: false,
+      isDefault: Boolean(isDefault),
     }, dek);
 
     const inserted = await getDb().insert(plans).values(encryptedValues).returning();
+    const newPlanId = inserted[0].id;
     
     // Auto-populate accounts, income, expenses, and flows from user finances
-    await populatePlanWithUserFinances(inserted[0].id, dataUserId, dek);
+    await populatePlanWithUserFinances(newPlanId, dataUserId, dek);
+
+    // Apply specific account inclusions if passed from the wizard
+    if (accountInclusions && typeof accountInclusions === 'object') {
+      const rawAccounts = await getDb().select().from(planAccounts).where(eq(planAccounts.planId, newPlanId));
+      for (const a of rawAccounts) {
+        const decAcc = await decryptRow('plan_accounts', a, dek);
+        const incVal = accountInclusions[decAcc.id] !== undefined ? accountInclusions[decAcc.id] : accountInclusions[decAcc.name];
+        if (incVal !== undefined) {
+          const encAcc = await encryptRow('plan_accounts', {
+            ...decAcc,
+            isIncluded: Boolean(incVal),
+            userId: dataUserId,
+            planId: newPlanId,
+          }, dek);
+          delete encAcc.userId;
+          delete encAcc.planId;
+          await getDb().update(planAccounts).set(encAcc).where(eq(planAccounts.id, a.id));
+        }
+      }
+    }
 
     // Return the fully hydrated plan with all sub-entities + simulation
     const hydratedPlan = await hydratePlan(inserted[0], dek);
@@ -239,6 +296,16 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
 
+    // Handle setting as default plan
+    if (updates.isDefault === true) {
+      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, dataUserId));
+    }
+
+    // Reset default / plan finances
+    if (updates.resetPlanFinances || updates.resetDefault) {
+      await populatePlanWithUserFinances(planId, dataUserId, dek);
+    }
+
     // Build the update fields (only encrypt changed plan-level fields)
     const allowedFields = [
       'name', 'retirementAge', 'lifeExpectancyAge', 'filingStatus',
@@ -246,7 +313,7 @@ export async function PUT(req: NextRequest) {
       'spouseBirthYear', 'spouseBirthMonth', 'customWithdrawalOrder',
       'spouseName', 'spouseRetirementAge', 'spouseLifeExpectancyAge',
       'primarySsMonthlyAmount', 'primarySsStartAge', 'spouseSsMonthlyAmount',
-      'spouseSsStartAge', 'enableSpousalSsBenefit',
+      'spouseSsStartAge', 'enableSpousalSsBenefit', 'fiTargetMultiplier', 'isDefault',
     ];
 
     const planUpdates: Record<string, any> = {};
@@ -261,6 +328,26 @@ export async function PUT(req: NextRequest) {
       const encrypted = await encryptRow('plans', { ...planUpdates, userId: dataUserId }, dek);
       delete encrypted.userId;
       await getDb().update(plans).set(encrypted).where(eq(plans.id, planId));
+    }
+
+    // Handle account inclusions map
+    if (updates.accountInclusions && typeof updates.accountInclusions === 'object') {
+      const rawAccounts = await getDb().select().from(planAccounts).where(eq(planAccounts.planId, planId));
+      for (const a of rawAccounts) {
+        const decAcc = await decryptRow('plan_accounts', a, dek);
+        const incVal = updates.accountInclusions[decAcc.id] !== undefined ? updates.accountInclusions[decAcc.id] : updates.accountInclusions[decAcc.name];
+        if (incVal !== undefined) {
+          const encAcc = await encryptRow('plan_accounts', {
+            ...decAcc,
+            isIncluded: Boolean(incVal),
+            userId: dataUserId,
+            planId,
+          }, dek);
+          delete encAcc.userId;
+          delete encAcc.planId;
+          await getDb().update(planAccounts).set(encAcc).where(eq(planAccounts.id, a.id));
+        }
+      }
     }
 
     // Handle toggling account inclusion
@@ -445,6 +532,14 @@ export async function DELETE(req: NextRequest) {
     }
 
     await getDb().delete(plans).where(eq(plans.id, planId));
+
+    // If the deleted plan was default, mark the first remaining plan as default
+    if (existing[0].isDefault) {
+      const remainingPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId)).limit(1);
+      if (remainingPlans.length > 0) {
+        await getDb().update(plans).set({ isDefault: true }).where(eq(plans.id, remainingPlans[0].id));
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -1,66 +1,65 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { runMonteCarloSimulation, MonteCarloOutput } from '@/lib/services/monte-carlo';
 import { runBeamSearchOptimization, OptimizationObjective, OptimizationIntensity, OptimizationOutput } from '@/lib/services/beam-search-optimizer';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { formatCurrency } from '@/lib/utils/format';
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { ShieldCheck, Play, RefreshCw, Zap, Star, BarChart3, ArrowRight, GitCompare, Layers, Scale, CheckCircle2 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { Play, Zap, Star, GitCompare, Sparkles, CheckCircle2, ShieldAlert, ArrowRight, Layers, Award } from 'lucide-react';
 
 interface ScenariosTabProps {
   plan: any;
+  allPlans?: any[];
+  onUpdatePlan?: (updates: any) => void;
 }
 
-export function ScenariosTab({ plan }: ScenariosTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'montecarlo' | 'matrix' | 'optimizer' | 'compare'>('montecarlo');
+export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'compare' | 'matrix' | 'optimizer'>('compare');
 
-  // Monte Carlo controls & custom assumptions state
-  const [trialsCount, setTrialsCount] = useState(250);
-  const [model, setModel] = useState<'historical_bootstrap' | 'normal_distribution'>('historical_bootstrap');
-  const [equityAllocation, setEquityAllocation] = useState(80);
-  const [meanAnnualReturn, setMeanAnnualReturn] = useState(7.0);
-  const [returnStdDev, setReturnStdDev] = useState(12.0);
-  const [adjustForInflation, setAdjustForInflation] = useState(true);
-  const [fixedInflationRate, setFixedInflationRate] = useState(3.0);
+  // Scenario Comparison mode: 'saved_plans' vs 'custom_params'
+  const [compareMode, setCompareMode] = useState<'saved_plans' | 'custom_params'>('saved_plans');
+  const [selectedPlanBId, setSelectedPlanBId] = useState<string>(() => {
+    const secondary = allPlans.find((p) => p.id !== plan?.id);
+    return secondary?.id || plan?.id || '';
+  });
+
+  // Custom hypothetical scenario parameters
+  const [scenarioBRetirementAge, setScenarioBRetirementAge] = useState(55);
+  const [scenarioBReturnRate, setScenarioBReturnRate] = useState(8.0);
+  const [scenarioBStateTaxRate, setScenarioBStateTaxRate] = useState(0.0);
 
   // Optimizer controls
   const [objective, setObjective] = useState<OptimizationObjective>('legacy');
   const [intensity, setIntensity] = useState<OptimizationIntensity>('standard');
   const [optLoading, setOptLoading] = useState(false);
 
-  // Scenario Comparison (Side-by-Side) state overrides
-  const [scenarioBRetirementAge, setScenarioBRetirementAge] = useState(55);
-  const [scenarioBReturnRate, setScenarioBReturnRate] = useState(8.0);
-  const [scenarioBStateTaxRate, setScenarioBStateTaxRate] = useState(0.0);
-
-  // Hydrate enginePlan accurately from plan data with full parameter parity
-  const enginePlan = useMemo(() => {
-    const planAccountsList = Array.isArray(plan?.accounts) ? plan.accounts : [];
+  // Helper to convert DB plan to EnginePlan object
+  const buildEnginePlan = (targetPlan: any): EnginePlan => {
+    const planAccountsList = Array.isArray(targetPlan?.accounts) ? targetPlan.accounts : [];
     const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
 
     return {
-      id: plan?.id || 'plan_1',
-      name: plan?.name || 'Primary Plan',
-      hasSpouse: Boolean(plan?.hasSpouse),
-      primaryBirthYear: Number(plan?.primaryBirthYear) || 1985,
-      primaryBirthMonth: Number(plan?.primaryBirthMonth) || 1,
-      spouseBirthYear: plan?.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
-      spouseBirthMonth: plan?.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
-      spouseName: plan?.spouseName || 'Spouse / Partner',
-      spouseRetirementAge: plan?.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
-      spouseLifeExpectancyAge: plan?.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
-      primarySsMonthlyAmount: plan?.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500,
-      primarySsStartAge: plan?.primarySsStartAge ? Number(plan.primarySsStartAge) : 67,
-      spouseSsMonthlyAmount: plan?.spouseSsMonthlyAmount ? parseFloat(plan.spouseSsMonthlyAmount) : 2000,
-      spouseSsStartAge: plan?.spouseSsStartAge ? Number(plan.spouseSsStartAge) : 67,
-      enableSpousalSsBenefit: plan?.enableSpousalSsBenefit !== false,
-      filingStatus: plan?.filingStatus || 'single',
-      retirementAge: Number(plan?.retirementAge) || 60,
-      lifeExpectancyAge: Number(plan?.lifeExpectancyAge) || 100,
-      withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-      customWithdrawalOrder: Array.isArray(plan?.customWithdrawalOrder) ? plan.customWithdrawalOrder : undefined,
+      id: targetPlan?.id || 'plan_1',
+      name: targetPlan?.name || 'Primary Plan',
+      hasSpouse: Boolean(targetPlan?.hasSpouse),
+      primaryBirthYear: Number(targetPlan?.primaryBirthYear) || 1985,
+      primaryBirthMonth: Number(targetPlan?.primaryBirthMonth) || 1,
+      spouseBirthYear: targetPlan?.spouseBirthYear ? Number(targetPlan.spouseBirthYear) : undefined,
+      spouseBirthMonth: targetPlan?.spouseBirthMonth ? Number(targetPlan.spouseBirthMonth) : undefined,
+      spouseName: targetPlan?.spouseName || 'Spouse / Partner',
+      spouseRetirementAge: targetPlan?.spouseRetirementAge ? Number(targetPlan.spouseRetirementAge) : 60,
+      spouseLifeExpectancyAge: targetPlan?.spouseLifeExpectancyAge ? Number(targetPlan.spouseLifeExpectancyAge) : 100,
+      primarySsMonthlyAmount: targetPlan?.primarySsMonthlyAmount ? parseFloat(targetPlan.primarySsMonthlyAmount) : 2500,
+      primarySsStartAge: targetPlan?.primarySsStartAge ? Number(targetPlan.primarySsStartAge) : 67,
+      spouseSsMonthlyAmount: targetPlan?.spouseSsMonthlyAmount ? parseFloat(targetPlan.spouseSsMonthlyAmount) : 2000,
+      spouseSsStartAge: targetPlan?.spouseSsStartAge ? Number(targetPlan.spouseSsStartAge) : 67,
+      enableSpousalSsBenefit: targetPlan?.enableSpousalSsBenefit !== false,
+      filingStatus: targetPlan?.filingStatus || 'single',
+      retirementAge: Number(targetPlan?.retirementAge) || 60,
+      lifeExpectancyAge: Number(targetPlan?.lifeExpectancyAge) || 100,
+      withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
+      customWithdrawalOrder: Array.isArray(targetPlan?.customWithdrawalOrder) ? targetPlan.customWithdrawalOrder : undefined,
       accounts: activeAccounts.map((a: any) => ({
         id: a.id,
         name: a.name,
@@ -75,7 +74,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         rothPercentage: a.rothPercentage,
       })),
       liabilities: [],
-      events: (plan?.events || []).map((e: any) => ({
+      events: (targetPlan?.events || []).map((e: any) => ({
         id: e.id,
         name: e.name,
         category: e.category,
@@ -91,7 +90,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         endTriggerType: e.endTriggerType || 'end_of_plan',
         endTriggerValue: e.endTriggerValue,
       })),
-      flows: (plan?.flows || []).map((f: any) => ({
+      flows: (targetPlan?.flows || []).map((f: any) => ({
         id: f.id,
         name: f.name,
         type: f.type || 'invest',
@@ -99,83 +98,62 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         targetAccountId: f.targetAccountId,
         ruleType: f.ruleType || 'save_leftover',
         ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
+        matchRate: f.matchRate ? parseFloat(f.matchRate) : undefined,
+        matchLimit: f.matchLimit ? parseFloat(f.matchLimit) : undefined,
+        matchAccountId: f.matchAccountId,
       })),
       settings: {
-        fixedInflationRate: parseFloat(plan?.settings?.fixedInflationRate || String(fixedInflationRate)),
-        withholdingDeferred: parseFloat(plan?.settings?.withholdingDeferred || '20.0'),
-        withholdingTaxable: parseFloat(plan?.settings?.withholdingTaxable || '10.0'),
-        incomeTaxModifier: parseFloat(plan?.settings?.incomeTaxModifier || '0.0'),
-        capGainsTaxModifier: parseFloat(plan?.settings?.capGainsTaxModifier || '0.0'),
-        heirFlatIncomeTaxRate: parseFloat(plan?.settings?.heirFlatIncomeTaxRate || '25.0'),
-        stepUpBasis: plan?.settings?.stepUpBasis ?? true,
-        realEstateLiquidationRate: parseFloat(plan?.settings?.realEstateLiquidationRate || '6.0'),
-        administrativeCostRate: parseFloat(plan?.settings?.administrativeCostRate || '1.0'),
-        charitableGiving: parseFloat(plan?.settings?.charitableGiving || '0.0'),
-        withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-        enableRothConversions: Boolean(plan?.settings?.enableRothConversions),
-        rothConversionTargetCeiling: plan?.settings?.rothConversionTargetCeiling || 'top_of_12',
-        avoidIrmaaCliffs: Boolean(plan?.settings?.avoidIrmaaCliffs),
+        fixedInflationRate: parseFloat(targetPlan?.settings?.fixedInflationRate || '3.0'),
+        withholdingDeferred: parseFloat(targetPlan?.settings?.withholdingDeferred || '20.0'),
+        withholdingTaxable: parseFloat(targetPlan?.settings?.withholdingTaxable || '10.0'),
+        incomeTaxModifier: parseFloat(targetPlan?.settings?.incomeTaxModifier || '0.0'),
+        capGainsTaxModifier: parseFloat(targetPlan?.settings?.capGainsTaxModifier || '0.0'),
+        heirFlatIncomeTaxRate: parseFloat(targetPlan?.settings?.heirFlatIncomeTaxRate || '25.0'),
+        stepUpBasis: targetPlan?.settings?.stepUpBasis ?? true,
+        realEstateLiquidationRate: parseFloat(targetPlan?.settings?.realEstateLiquidationRate || '6.0'),
+        administrativeCostRate: parseFloat(targetPlan?.settings?.administrativeCostRate || '1.0'),
+        charitableGiving: parseFloat(targetPlan?.settings?.charitableGiving || '0.0'),
+        withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
+        enableRothConversions: Boolean(targetPlan?.settings?.enableRothConversions),
+        rothConversionTargetCeiling: targetPlan?.settings?.rothConversionTargetCeiling || 'top_of_12',
+        avoidIrmaaCliffs: Boolean(targetPlan?.settings?.avoidIrmaaCliffs),
       },
-      rules: plan?.rules || DEFAULT_2026_RULES,
+      rules: targetPlan?.rules || DEFAULT_2026_RULES,
     };
-  }, [plan, fixedInflationRate]);
-
-  // Monte Carlo simulation state
-  const [mcResult, setMcResult] = useState<MonteCarloOutput>(() =>
-    runMonteCarloSimulation(enginePlan as any, {
-      numberOfTrials: trialsCount,
-      model,
-      equityAllocation,
-      meanAnnualReturn: meanAnnualReturn / 100,
-      returnStdDev: returnStdDev / 100,
-      adjustForInflation,
-      fixedInflationRate,
-    })
-  );
-
-  const handleRunMonteCarlo = () => {
-    const res = runMonteCarloSimulation(enginePlan as any, {
-      numberOfTrials: trialsCount,
-      model,
-      equityAllocation,
-      meanAnnualReturn: meanAnnualReturn / 100,
-      returnStdDev: returnStdDev / 100,
-      adjustForInflation,
-      fixedInflationRate,
-    });
-    setMcResult(res);
   };
 
-  // Optimizer state
-  const [optResult, setOptResult] = useState<OptimizationOutput>(() =>
-    runBeamSearchOptimization(enginePlan as any, objective, intensity)
-  );
+  const primaryEnginePlan = useMemo(() => buildEnginePlan(plan), [plan]);
 
-  const handleRunOptimizer = () => {
-    setOptLoading(true);
-    setTimeout(() => {
-      const res = runBeamSearchOptimization(enginePlan as any, objective, intensity);
-      setOptResult(res);
-      setOptLoading(false);
-    }, 200);
-  };
+  // Selected Plan B from saved plans
+  const planBTarget = useMemo(() => {
+    return allPlans.find((p) => p.id === selectedPlanBId) || plan;
+  }, [allPlans, selectedPlanBId, plan]);
 
-  // Side-by-side scenario simulations
+  // Comparison simulations
   const comparisonSims = useMemo(() => {
-    const planA = enginePlan;
-    const planB: EnginePlan = JSON.parse(JSON.stringify(enginePlan));
+    const planA = primaryEnginePlan;
+    let planB: EnginePlan;
 
-    planB.retirementAge = scenarioBRetirementAge;
-    planB.accounts.forEach((acc) => {
-      acc.expectedGrowthRate = scenarioBReturnRate;
-    });
-    planB.settings.incomeTaxModifier = scenarioBStateTaxRate;
+    if (compareMode === 'saved_plans') {
+      planB = buildEnginePlan(planBTarget);
+    } else {
+      planB = JSON.parse(JSON.stringify(primaryEnginePlan));
+      planB.retirementAge = scenarioBRetirementAge;
+      planB.accounts.forEach((acc) => {
+        acc.expectedGrowthRate = scenarioBReturnRate;
+      });
+      if (!planB.settings) planB.settings = { fixedInflationRate: 3.0 };
+      planB.settings.incomeTaxModifier = scenarioBStateTaxRate;
+    }
 
-    const simA = runRetirementSimulation(planA as any);
-    const simB = runRetirementSimulation(planB as any);
+    const simA = runRetirementSimulation(planA);
+    const simB = runRetirementSimulation(planB);
 
     const taxesA = simA.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
     const taxesB = simB.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+
+    const etrA = simA.yearlyResults.length > 0 ? simA.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / simA.yearlyResults.length : 0;
+    const etrB = simB.yearlyResults.length > 0 ? simB.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / simB.yearlyResults.length : 0;
 
     const chartComparison = simA.yearlyResults.map((yA, i) => {
       const yB = simB.yearlyResults[i];
@@ -187,42 +165,116 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
       };
     });
 
-    return { simA, simB, taxesA, taxesB, chartComparison };
-  }, [enginePlan, scenarioBRetirementAge, scenarioBReturnRate, scenarioBStateTaxRate]);
+    return { simA, simB, planBName: planB.name, taxesA, taxesB, etrA, etrB, chartComparison };
+  }, [primaryEnginePlan, compareMode, planBTarget, scenarioBRetirementAge, scenarioBReturnRate, scenarioBStateTaxRate]);
 
-  const mcChartData = useMemo(() => {
-    if (!mcResult?.percentiles?.years) return [];
-    return mcResult.percentiles.years.map((year, i) => ({
-      year,
-      p10: mcResult.percentiles.p10[i] || 0,
-      p25: mcResult.percentiles.p25[i] || 0,
-      p50: mcResult.percentiles.p50[i] || 0,
-      p75: mcResult.percentiles.p75[i] || 0,
-      p90: mcResult.percentiles.p90[i] || 0,
-    }));
-  }, [mcResult]);
+  // Live Dynamic Strategy Matrix (runs 6 real simulations using engine)
+  const realStrategyMatrix = useMemo(() => {
+    const base = primaryEnginePlan;
 
-  const baselineLegacy = plan?.simulation?.netLegacy || enginePlan.accounts.reduce((s: number, a: any) => s + a.balance, 0) * 3.5;
-  const baselineTaxes = (plan?.simulation?.yearlyResults || []).reduce((s: number, y: any) => s + (y.taxesPaid || 0), 0) || 250000;
+    // 1. Baseline
+    const sim1 = runRetirementSimulation(base);
 
-  const taxStrategies = [
-    { name: 'Baseline Plan', desc: 'Default rules and withdrawal order', tax: baselineTaxes, legacy: baselineLegacy, etr: 13.0, rmds: 180000, isOptimal: false },
-    { name: 'Roth Conversion (12% Bracket)', desc: 'Convert Traditional to Roth up to 12% bracket', tax: baselineTaxes * 0.88, legacy: baselineLegacy * 1.12, etr: 11.4, rmds: 90000, isOptimal: true },
-    { name: 'Roth Conversion (22% Bracket)', desc: 'Convert up to 22% bracket during gap years', tax: baselineTaxes * 0.92, legacy: baselineLegacy * 1.08, etr: 12.1, rmds: 60000, isOptimal: false },
-    { name: 'Capital Gain Harvesting', desc: 'Sell taxable assets up to 0% LTCG bracket', tax: baselineTaxes * 0.90, legacy: baselineLegacy * 1.09, etr: 11.8, rmds: 180000, isOptimal: false },
-    { name: 'Social Security Delay (Age 70)', desc: 'Delay Social Security claiming to age 70', tax: baselineTaxes * 0.91, legacy: baselineLegacy * 1.10, etr: 11.9, rmds: 180000, isOptimal: false },
-    { name: 'Social Security Early (Age 62)', desc: 'Claim Social Security as early as possible', tax: baselineTaxes * 1.08, legacy: baselineLegacy * 0.92, etr: 14.5, rmds: 180000, isOptimal: false },
-  ];
+    // 2. Roth Conversion 12% Bracket
+    const plan2: EnginePlan = JSON.parse(JSON.stringify(base));
+    plan2.settings.enableRothConversions = true;
+    plan2.settings.rothConversionTargetCeiling = 'top_of_12';
+    const sim2 = runRetirementSimulation(plan2);
+
+    // 3. Roth Conversion 22% Bracket
+    const plan3: EnginePlan = JSON.parse(JSON.stringify(base));
+    plan3.settings.enableRothConversions = true;
+    plan3.settings.rothConversionTargetCeiling = 'top_of_22';
+    const sim3 = runRetirementSimulation(plan3);
+
+    // 4. Tax Optimized Drawdown
+    const plan4: EnginePlan = JSON.parse(JSON.stringify(base));
+    plan4.settings.withdrawalMethod = 'tax_optimized';
+    const sim4 = runRetirementSimulation(plan4);
+
+    // 5. Social Security Delay (Age 70)
+    const plan5: EnginePlan = JSON.parse(JSON.stringify(base));
+    plan5.primarySsStartAge = 70;
+    plan5.spouseSsStartAge = 70;
+    const sim5 = runRetirementSimulation(plan5);
+
+    // 6. Social Security Early (Age 62)
+    const plan6: EnginePlan = JSON.parse(JSON.stringify(base));
+    plan6.primarySsStartAge = 62;
+    plan6.spouseSsStartAge = 62;
+    const sim6 = runRetirementSimulation(plan6);
+
+    const calcStats = (sim: any, name: string, desc: string, updateSettings: any) => {
+      const taxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
+      const etr = sim.yearlyResults.length > 0 ? sim.yearlyResults.reduce((s: number, y: any) => s + y.effectiveTaxRate, 0) / sim.yearlyResults.length : 0;
+      const rmds = sim.yearlyResults.reduce((s: number, y: any) => s + (y.drawdownsByType?.traditional || 0), 0);
+      const peakWithdrawal = Math.max(0, ...sim.yearlyResults.filter((y: any) => y.primaryAge >= base.retirementAge).map((y: any) => {
+        const cashD = y.drawdownsByType?.cash || 0;
+        const taxD = y.drawdownsByType?.taxable || 0;
+        const tradD = y.drawdownsByType?.traditional || 0;
+        const rothD = y.drawdownsByType?.roth || 0;
+        const hsaD = y.drawdownsByType?.hsa || 0;
+        const totalD = cashD + taxD + tradD + rothD + hsaD;
+        return (totalD > 0 && y.netWorth + totalD > 0) ? (totalD / (y.netWorth + totalD)) * 100 : 0;
+      }));
+
+      return {
+        name,
+        desc,
+        tax: taxes,
+        legacy: sim.netLegacy,
+        etr,
+        rmds,
+        peakWithdrawal,
+        success: sim.success,
+        updateSettings,
+      };
+    };
+
+    const strats = [
+      calcStats(sim1, 'Baseline Plan', 'Current plan rules and settings', {}),
+      calcStats(sim2, 'Roth Conversion (Top of 12% Bracket)', 'Converts Traditional to Roth filling up to 12% tax bracket', { enableRothConversions: true, rothConversionTargetCeiling: 'top_of_12' }),
+      calcStats(sim3, 'Roth Conversion (Top of 22% Bracket)', 'Converts Traditional to Roth filling up to 22% tax bracket', { enableRothConversions: true, rothConversionTargetCeiling: 'top_of_22' }),
+      calcStats(sim4, 'Tax-Optimized Bracket Shielding', 'Draws from taxable accounts first, then traditional up to 12% bracket', { withdrawalMethod: 'tax_optimized' }),
+      calcStats(sim5, 'Social Security Delay (Age 70)', 'Delays Social Security claiming to age 70 for +24-32% benefit increase', { primarySsStartAge: 70, spouseSsStartAge: 70 }),
+      calcStats(sim6, 'Social Security Early (Age 62)', 'Claims Social Security at earliest eligibility (Age 62)', { primarySsStartAge: 62, spouseSsStartAge: 62 }),
+    ];
+
+    // Mark highest legacy with 100% success as optimal
+    let maxLegacy = -Infinity;
+    let optIdx = 0;
+    strats.forEach((s, idx) => {
+      if (s.success && s.legacy > maxLegacy) {
+        maxLegacy = s.legacy;
+        optIdx = idx;
+      }
+    });
+
+    return strats.map((s, idx) => ({ ...s, isOptimal: idx === optIdx }));
+  }, [primaryEnginePlan]);
+
+  // Beam Search Optimizer
+  const [optResult, setOptResult] = useState<OptimizationOutput>(() =>
+    runBeamSearchOptimization(primaryEnginePlan, objective, intensity)
+  );
+
+  const handleRunOptimizer = () => {
+    setOptLoading(true);
+    setTimeout(() => {
+      const res = runBeamSearchOptimization(primaryEnginePlan, objective, intensity);
+      setOptResult(res);
+      setOptLoading(false);
+    }, 200);
+  };
 
   return (
     <div className="space-y-6">
       {/* Sub-navigation bar */}
       <div className="flex items-center gap-2 border-b border-border pb-3">
         {[
-          { id: 'montecarlo' as const, label: 'Monte Carlo Stress Test', icon: BarChart3 },
-          { id: 'matrix' as const, label: 'Strategy Matrix', icon: Star },
-          { id: 'optimizer' as const, label: 'Beam Optimizer', icon: Zap },
           { id: 'compare' as const, label: 'Scenario Comparison', icon: GitCompare },
+          { id: 'matrix' as const, label: 'Live Strategy Matrix', icon: Star },
+          { id: 'optimizer' as const, label: 'Beam Optimizer', icon: Zap },
         ].map((t) => {
           const Icon = t.icon;
           const isActive = activeSubTab === t.id;
@@ -230,7 +282,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
             <button
               key={t.id}
               onClick={() => setActiveSubTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
               }`}
             >
@@ -241,96 +293,169 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
         })}
       </div>
 
-      {/* Sub-Tab 1: Monte Carlo Stress Test */}
-      {activeSubTab === 'montecarlo' && (
+      {/* Sub-Tab 1: Saved Plan & Custom Scenario Comparison */}
+      {activeSubTab === 'compare' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card border border-border rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg border ${
-                mcResult.successRate >= 80 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-              }`}>
-                {mcResult.successRate.toFixed(0)}%
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-foreground">Monte Carlo Stress Test</h3>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    adjustForInflation
-                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                  }`}>
-                    {adjustForInflation ? "Real (Today's Dollars)" : 'Nominal Dollars'}
-                  </span>
+          {/* Controls to pick mode & select plans */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <GitCompare className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Scenario Comparison Engine</h3>
+                  <p className="text-xs text-muted-foreground">Compare saved FIRE plans side-by-side or model custom hypotheses</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Ran {mcResult.totalTrials} market trials using {model.replace('_', ' ')} ({equityAllocation}% stocks / {100 - equityAllocation}% bonds)
-                </p>
+              </div>
+
+              {/* Mode Toggle: Saved Plans vs Custom Parameters */}
+              <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border text-xs">
+                <button
+                  onClick={() => setCompareMode('saved_plans')}
+                  className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                    compareMode === 'saved_plans' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Compare Saved Plans ({allPlans.length})
+                </button>
+                <button
+                  onClick={() => setCompareMode('custom_params')}
+                  className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                    compareMode === 'custom_params' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Custom What-If Parameters
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleRunMonteCarlo}
-                className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Run Stress Test
-              </button>
-            </div>
+            {compareMode === 'saved_plans' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
+                  <span className="font-bold text-emerald-500 uppercase tracking-wider text-[10px]">Plan A (Active Plan)</span>
+                  <p className="text-sm font-extrabold text-foreground font-mono">{plan?.name || 'Primary Plan'}</p>
+                  <p className="text-[11px] text-muted-foreground">Retirement Age {plan?.retirementAge || 60} • {plan?.filingStatus === 'married_joint' ? 'Married Filing Jointly' : 'Single'}</p>
+                </div>
+
+                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
+                  <label className="font-bold text-amber-500 uppercase tracking-wider text-[10px] block">Select Plan B to Compare</label>
+                  <select
+                    value={selectedPlanBId}
+                    onChange={(e) => setSelectedPlanBId(e.target.value)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
+                  >
+                    {allPlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {p.id === plan?.id ? '(Current Active)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">Choose any saved plan to compare trajectories</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
+                  <input
+                    type="number"
+                    min="40"
+                    max="75"
+                    value={scenarioBRetirementAge}
+                    onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={scenarioBReturnRate}
+                    onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={scenarioBStateTaxRate}
+                    onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Metric Comparison Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">Success Rate</span>
-              <p className={`text-2xl font-extrabold font-mono ${mcResult.successRate >= 80 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                {mcResult.successRate.toFixed(1)}%
+              <span className="text-xs font-bold text-emerald-500 uppercase">Plan A ({plan?.name}) Net Worth</span>
+              <p className="text-xl font-extrabold text-emerald-500 font-mono">{formatCurrency(comparisonSims.simA.endingNetWorth)}</p>
+              <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesA)} | ETR: {comparisonSims.etrA.toFixed(1)}%</p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+              <span className="text-xs font-bold text-amber-500 uppercase">Plan B ({comparisonSims.planBName}) Net Worth</span>
+              <p className="text-xl font-extrabold text-amber-500 font-mono">{formatCurrency(comparisonSims.simB.endingNetWorth)}</p>
+              <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesB)} | ETR: {comparisonSims.etrB.toFixed(1)}%</p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase">Net Worth Delta</span>
+              <p className={`text-xl font-extrabold font-mono ${comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? '+' : ''}{formatCurrency(comparisonSims.simB.endingNetWorth - comparisonSims.simA.endingNetWorth)}
               </p>
+              <p className="text-[11px] text-muted-foreground">Ending legacy buffer difference</p>
             </div>
+
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">
-                Median Legacy (50th %) {adjustForInflation ? "(Real)" : "(Nominal)"}
-              </span>
-              <p className="text-2xl font-extrabold text-foreground font-mono">{formatCurrency(mcResult.medianLegacy)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">Worst Case (10th %)</span>
-              <p className="text-2xl font-extrabold text-rose-500 font-mono">{formatCurrency(mcResult.worstCaseLegacy)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">Best Case (90th %)</span>
-              <p className="text-2xl font-extrabold text-primary font-mono">{formatCurrency(mcResult.bestCaseLegacy)}</p>
+              <span className="text-xs font-bold text-muted-foreground uppercase">Lifetime Tax Delta</span>
+              <p className={`text-xl font-extrabold font-mono ${comparisonSims.taxesB <= comparisonSims.taxesA ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {comparisonSims.taxesB <= comparisonSims.taxesA ? '-' : '+'}{formatCurrency(Math.abs(comparisonSims.taxesA - comparisonSims.taxesB))}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{comparisonSims.taxesB <= comparisonSims.taxesA ? 'Plan B saves taxes' : 'Plan B owes higher taxes'}</p>
             </div>
           </div>
 
+          {/* Overlaid Trajectory Chart */}
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground">Percentile Net Worth Trajectories</h3>
+            <h3 className="text-sm font-bold text-foreground">Overlaid Net Worth Trajectories</h3>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mcChartData}>
-                  <XAxis dataKey="year" stroke="currentColor" className="text-xs text-muted-foreground" axisLine={false} tickLine={false} />
-                  <YAxis stroke="currentColor" className="text-xs text-muted-foreground" axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <LineChart data={comparisonSims.chartComparison}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
+                  <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
+                  <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Net Worth']} />
-                  <Area type="monotone" dataKey="p90" stroke="var(--color-chart-1)" fill="var(--color-chart-1)" fillOpacity={0.1} strokeWidth={1} />
-                  <Area type="monotone" dataKey="p50" stroke="var(--color-chart-1)" fill="var(--color-chart-1)" fillOpacity={0.3} strokeWidth={2.5} />
-                  <Area type="monotone" dataKey="p10" stroke="var(--color-chart-4)" fill="var(--color-chart-4)" fillOpacity={0.1} strokeWidth={1} />
-                </AreaChart>
+                  <Legend />
+                  <Line type="monotone" dataKey="netWorthA" name={`Plan A: ${plan?.name}`} stroke="#10b981" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="netWorthB" name={`Plan B: ${comparisonSims.planBName}`} stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
       )}
 
-      {/* Sub-Tab 2: Strategy Comparison Matrix */}
+      {/* Sub-Tab 2: Live Dynamic Strategy Matrix */}
       {activeSubTab === 'matrix' && (
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border pb-3">
             <div>
-              <h3 className="text-sm font-bold text-foreground">Tax & Withdrawal Strategy Comparison</h3>
-              <p className="text-xs text-muted-foreground">Side-by-side comparison of baseline plan vs alternative strategies</p>
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                Live Engine Strategy Matrix
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Real-time simulation results comparing tax & withdrawal strategies on your active plan</p>
             </div>
             <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              <Star className="w-3.5 h-3.5 fill-amber-500" />
-              Optimal Strategy
+              <Award className="w-3.5 h-3.5" />
+              Engine Recommended
             </span>
           </div>
 
@@ -341,12 +466,13 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
                   <th className="p-3">Strategy Name</th>
                   <th className="p-3">Lifetime Taxes</th>
                   <th className="p-3">Average ETR</th>
-                  <th className="p-3">Net Legacy</th>
-                  <th className="p-3">Cumulative RMDs</th>
+                  <th className="p-3">Ending Net Worth</th>
+                  <th className="p-3">Peak Draw %</th>
+                  <th className="p-3">Plan Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {taxStrategies.map((strat) => (
+                {realStrategyMatrix.map((strat) => (
                   <tr key={strat.name} className={`hover:bg-muted/20 ${strat.isOptimal ? 'bg-primary/5' : ''}`}>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
@@ -360,7 +486,18 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
                     <td className="p-3 font-mono font-bold text-rose-500">{formatCurrency(strat.tax)}</td>
                     <td className="p-3 font-mono font-bold">{strat.etr.toFixed(1)}%</td>
                     <td className="p-3 font-mono font-bold text-emerald-500">{formatCurrency(strat.legacy)}</td>
-                    <td className="p-3 font-mono">{formatCurrency(strat.rmds)}</td>
+                    <td className="p-3 font-mono">
+                      <span className={strat.peakWithdrawal > 5 ? 'text-rose-500 font-bold' : strat.peakWithdrawal > 3.5 ? 'text-amber-500' : 'text-emerald-500 font-bold'}>
+                        {strat.peakWithdrawal.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        strat.success ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                      }`}>
+                        {strat.success ? 'Succeeds' : 'Depletes'}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -409,7 +546,7 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
                     <button
                       key={lvl}
                       onClick={() => setIntensity(lvl)}
-                      className={`px-2.5 py-1 text-xs font-semibold capitalize rounded-md transition-all ${
+                      className={`px-2.5 py-1 text-xs font-semibold capitalize rounded-md transition-all cursor-pointer ${
                         intensity === lvl ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
@@ -439,99 +576,6 @@ export function ScenariosTab({ plan }: ScenariosTabProps) {
             <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
               <span className="text-xs font-bold text-muted-foreground uppercase">Projected Legacy Increase</span>
               <p className="text-2xl font-extrabold text-primary font-mono">{formatCurrency(optResult.savings.legacyIncrease)}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sub-Tab 4: Scenario Comparison (Side-by-Side Overlay) */}
-      {activeSubTab === 'compare' && (
-        <div className="space-y-6">
-          {/* Controls to configure Scenario B */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 border-b border-border pb-3">
-              <GitCompare className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Side-by-Side Scenario Modeling</h3>
-                <p className="text-xs text-muted-foreground">Compare Baseline Plan (Scenario A) against an Alternative Hypothesis (Scenario B)</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
-                <input
-                  type="number"
-                  min="40"
-                  max="75"
-                  value={scenarioBRetirementAge}
-                  onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={scenarioBReturnRate}
-                  onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={scenarioBStateTaxRate}
-                  onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Metric Comparison Table */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Baseline (Plan A) Ending Net Worth</span>
-              <p className="text-2xl font-extrabold text-emerald-500 font-mono">{formatCurrency(comparisonSims.simA.endingNetWorth)}</p>
-              <p className="text-[11px] text-muted-foreground">Retire at age {enginePlan.retirementAge} • {enginePlan.accounts[0]?.expectedGrowthRate || 6}% Return</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-amber-500 uppercase">Scenario B Ending Net Worth</span>
-              <p className="text-2xl font-extrabold text-amber-500 font-mono">{formatCurrency(comparisonSims.simB.endingNetWorth)}</p>
-              <p className="text-[11px] text-muted-foreground">Retire at age {scenarioBRetirementAge} • {scenarioBReturnRate}% Return</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Net Worth Delta</span>
-              <p className={`text-2xl font-extrabold font-mono ${comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? '+' : ''}{formatCurrency(comparisonSims.simB.endingNetWorth - comparisonSims.simA.endingNetWorth)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">Difference at plan horizon</p>
-            </div>
-          </div>
-
-          {/* Overlaid Trajectory Chart */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground">Overlaid Net Worth Trajectory</h3>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={comparisonSims.chartComparison}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-                  <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
-                  <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Net Worth']} />
-                  <Legend />
-                  <Line type="monotone" dataKey="netWorthA" name="Baseline (Plan A)" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                  <Line type="monotone" dataKey="netWorthB" name="Alternative (Scenario B)" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
             </div>
           </div>
         </div>

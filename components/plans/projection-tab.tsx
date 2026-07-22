@@ -220,6 +220,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'Catch-up Limits',
         year: birthYear + 50,
         icon: Award,
+        emoji: '💡',
         color: 'text-blue-500',
         stroke: '#3b82f6',
         note: 'IRA +$1k & 401(k) +$7.5k annual catch-up limits unlocked',
@@ -229,6 +230,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'Rule of 55 Access',
         year: birthYear + 55,
         icon: Clock,
+        emoji: '⏳',
         color: 'text-amber-500',
         stroke: '#f59e0b',
         note: 'Penalty-free 401(k) separations allowed if separated from service',
@@ -238,6 +240,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'Retirement Transition',
         year: birthYear + localRetirementAge,
         icon: Palmtree,
+        emoji: '🌴',
         color: 'text-emerald-500',
         stroke: '#10b981',
         note: 'Primary career end • Distribution phase begins',
@@ -247,6 +250,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'Medicare Eligibility',
         year: birthYear + 65,
         icon: ShieldCheck,
+        emoji: '🛡️',
         color: 'text-purple-500',
         stroke: '#a855f7',
         note: 'Transition to Medicare Part B/D • ACA subsidies end',
@@ -256,6 +260,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'Full Social Security',
         year: birthYear + 67,
         icon: Landmark,
+        emoji: '🏛️',
         color: 'text-cyan-500',
         stroke: '#06b6d4',
         note: '100% Full Retirement Age SS benefit payout',
@@ -265,6 +270,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         title: 'RMD Mandatory Start',
         year: birthYear + 73,
         icon: Flag,
+        emoji: '🚩',
         color: 'text-rose-500',
         stroke: '#f43f5e',
         note: 'Required Minimum Distributions start for tax-deferred accounts',
@@ -280,6 +286,15 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     }
     return map;
   }, [milestoneCallouts]);
+
+  // Strategy description tag
+  const activeStrategyLabel = useMemo(() => {
+    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+    if (method === 'tax_optimized') return 'Tax-Bracket Shielding (Fill 12% Bracket First)';
+    if (method === 'proportional') return 'Proportional Drawdown Across Portfolio';
+    if (method === 'custom_order') return 'Custom Priority Order';
+    return 'Textbook Waterfall (Cash → Taxable → Traditional → Roth)';
+  }, [plan]);
 
   // Chart data series mapped dynamically with Real vs. Nominal support & Expenses throughout timeline
   const chartData = useMemo(() => {
@@ -305,7 +320,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           label: `${y.year}`,
           netWorth: nw,
           income: Math.round(y.grossIncome / discountFactor),
-          expenses: Math.round(y.totalExpenses / discountFactor), // Show expenses during both accumulation and retirement
+          expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses / discountFactor) : null,
           isRetired: y.primaryAge >= localRetirementAge,
           salaryIncome: Math.round((y.salaryIncome || 0) / discountFactor),
           ssIncome: Math.round((y.ssIncome || 0) / discountFactor),
@@ -594,19 +609,39 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   fill="url(#accumulationGrad)"
                 />
 
-                <ReferenceLine
-                  x={localRetirementAge}
-                  stroke="#10b981"
-                  strokeDasharray="4 4"
-                  strokeWidth={2}
-                  label={{
-                    value: `🌴 Retirement (${localRetirementAge})`,
-                    position: 'top',
-                    fill: '#10b981',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                />
+                {milestoneCallouts.map((m, idx) => {
+                  const pt = chartData.find((d) => d.age === m.age);
+                  if (!pt) return null;
+                  const IconComponent = m.icon;
+                  return (
+                    <ReferenceDot
+                      key={idx}
+                      x={m.age}
+                      y={pt.netWorth}
+                      shape={(dotProps: any) => {
+                        const { cx, cy } = dotProps;
+                        if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
+                        return (
+                          <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
+                            <title>{`${m.title} (Age ${m.age}, Year ${m.year})\n${m.note}\nProjected Net Worth: ${formatCurrency(pt.netWorth)}`}</title>
+                            <circle
+                              cx={14}
+                              cy={14}
+                              r={13}
+                              fill="var(--card, #ffffff)"
+                              stroke={m.stroke || '#10b981'}
+                              strokeWidth={2.5}
+                              className="shadow-sm transition-transform group-hover:scale-125"
+                            />
+                            <g transform="translate(6, 6)">
+                              <IconComponent size={16} color={m.stroke || '#10b981'} />
+                            </g>
+                          </g>
+                        );
+                      }}
+                    />
+                  );
+                })}
               </AreaChart>
             ) : (
               <AreaChart data={monteCarloChartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
@@ -648,29 +683,85 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           </span>
         </div>
 
-        <div className="h-72 w-full">
+        <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
+            <ComposedChart data={chartData} maxBarSize={40} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
               <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
               <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
               <Tooltip content={<DrawdownTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
               <Legend content={<GroupedLegend />} />
 
-              <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="income" fill="#10b981" />
-              <Bar dataKey="ssIncome" name="Social Security" stackId="income" fill="#06b6d4" />
-              <Bar dataKey="pensionIncome" name="Pension" stackId="income" fill="#3b82f6" />
-              <Bar dataKey="otherIncome" name="Other Income" stackId="income" fill="#8b5cf6" />
+              {(() => {
+                const retPt = chartData.find((d) => d.age === localRetirementAge);
+                if (!retPt) return null;
+                const totalAtRet = (retPt.salaryIncome || 0) + (retPt.ssIncome || 0) + (retPt.pensionIncome || 0) + (retPt.otherIncome || 0)
+                  + (retPt.cashDrawdown || 0) + (retPt.taxableDrawdown || 0) + (retPt.traditionalDrawdown || 0) + (retPt.rothDrawdown || 0) + (retPt.hsaDrawdown || 0);
+                return (
+                  <ReferenceDot
+                    x={localRetirementAge}
+                    y={totalAtRet}
+                    shape={(dotProps: any) => {
+                      const { cx, cy } = dotProps;
+                      if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
+                      return (
+                        <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
+                          <title>{`Retirement (Age ${localRetirementAge})`}</title>
+                          <circle cx={14} cy={14} r={13} fill="var(--card, #ffffff)" stroke="#10b981" strokeWidth={2.5} className="shadow-sm transition-transform group-hover:scale-125" />
+                          <g transform="translate(6, 6)">
+                            <Palmtree size={16} color="#10b981" />
+                          </g>
+                        </g>
+                      );
+                    }}
+                  />
+                );
+              })()}
 
-              <Bar dataKey="cashDrawdown" name="Cash Drawdown" stackId="drawdown" fill="#94a3b8" />
-              <Bar dataKey="taxableDrawdown" name="Taxable Brokerage" stackId="drawdown" fill="#f59e0b" />
-              <Bar dataKey="traditionalDrawdown" name="Traditional IRA/401k" stackId="drawdown" fill="#a855f7" />
-              <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="drawdown" fill="#ec4899" />
-              <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="drawdown" fill="#14b8a6" />
+              <Bar dataKey="salaryIncome" name="Salary / Earned" stackId="sources" fill="#10b981" />
+              <Bar dataKey="ssIncome" name="Social Security" stackId="sources" fill="#06b6d4" />
+              <Bar dataKey="pensionIncome" name="Pension" stackId="sources" fill="#3b82f6" />
+              <Bar dataKey="otherIncome" name="Other Income" stackId="sources" fill="#8b5cf6" />
+
+              <Bar dataKey="cashDrawdown" name="Cash Drawdown" stackId="sources" fill="#94a3b8" />
+              <Bar dataKey="taxableDrawdown" name="Taxable Brokerage" stackId="sources" fill="#f59e0b" />
+              <Bar dataKey="traditionalDrawdown" name="Traditional IRA/401k" stackId="sources" fill="#a855f7" />
+              <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="sources" fill="#ec4899" />
+              <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="sources" fill="#14b8a6" />
 
               <Line type="monotone" dataKey="expenses" name="Annual Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Key Financial & Life Milestones Cards */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Flag className="w-3.5 h-3.5 text-primary" />
+          Key Financial & Life Milestones Timeline
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {milestoneCallouts.map((m) => {
+            const Icon = m.icon;
+            return (
+              <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                  <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
+                    Age {m.age} ({m.year})
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
