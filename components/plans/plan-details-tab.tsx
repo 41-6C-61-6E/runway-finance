@@ -5,8 +5,9 @@ import { formatCurrency } from '@/lib/utils/format';
 import {
   Plus, ArrowUpCircle, ArrowDownCircle, Landmark,
   Trash2, X, CheckSquare, Square, Eye, EyeOff,
-  Pencil, Save, ChevronDown, ChevronRight, Building2, Zap,
+  Pencil, Save, ChevronDown, ChevronRight, Building2, Zap, HelpCircle,
 } from 'lucide-react';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
@@ -484,7 +485,19 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                           {/* Contribution Mode */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Contribution Mode</label>
+                              <div className="flex items-center gap-1">
+                                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Contribution Mode</label>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs text-xs">
+                                      Choose how much money you save into this account each year during your working years before retirement.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                               <select
                                 value={contribMode}
                                 onChange={(e) => handleUpdateContribution(accId, { contributionMode: e.target.value })}
@@ -499,9 +512,24 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
                             {(contribMode === 'percentage' || contribMode === 'fixed_amount') && (
                               <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  {contribMode === 'percentage' ? 'Salary %' : 'Annual Amount ($)'}
-                                </label>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {contribMode === 'percentage' ? 'Salary %' : 'Annual Amount ($)'}
+                                  </label>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs text-xs">
+                                        {contribMode === 'percentage'
+                                          ? 'Percentage of your annual base salary to deposit into this account each year.'
+                                          : 'Fixed dollar amount to contribute each year (compounds with inflation).'
+                                        }
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                                 <div className="relative">
                                   {contribMode === 'fixed_amount' && (
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">$</span>
@@ -523,7 +551,19 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
                             {contribMode === 'maximize' && (
                               <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">IRS Annual Limit</label>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">IRS Annual Limit</label>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs text-xs">
+                                        Automatically contributes up to the maximum IRS limit ($23,000 for 401k/403b, $7,000 for IRA, $4,150/$8,300 for HSA, plus catch-up if age 50+).
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                                 <div className="flex items-center h-[34px] px-3 rounded-lg bg-muted/40 border border-border">
                                   <span className="text-xs font-mono font-bold text-primary">{formatCurrency(getContributionAmount(acc))}/yr</span>
                                 </div>
@@ -532,7 +572,19 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
                             {contribMode !== 'none' && plan.hasSpouse && (
                               <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Salary Source</label>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Salary Source</label>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs text-xs">
+                                        Select which spouse&apos;s salary is used as the base for percentage contributions and employer matches.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                                 <select
                                   value={acc.contributionSalarySource || (safeString(acc.owner) === 'spouse' ? 'spouse' : 'primary')}
                                   onChange={(e) => handleUpdateContribution(accId, { contributionSalarySource: e.target.value })}
@@ -551,6 +603,16 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                               <div className="flex items-center gap-2 mb-2">
                                 <Building2 className="w-3.5 h-3.5 text-emerald-500" />
                                 <span className="text-[11px] font-bold text-foreground uppercase tracking-wider">Employer Match</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs text-xs">
+                                      Pre-tax employer matching contributions deposited into your account (e.g. 100% match up to 6% of salary).
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 <div className="space-y-1">
@@ -597,23 +659,40 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                           )}
 
                           {/* Surplus Destination Toggle & Contribution Summary */}
-                          <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                            <label className="flex items-center gap-2 cursor-pointer text-xs">
-                              <input
-                                type="checkbox"
-                                checked={isSurplus}
-                                onChange={(e) => handleUpdateContribution(accId, { isSurplusDestination: e.target.checked })}
-                                className="rounded border-border accent-violet-500"
-                              />
-                              <span className="text-muted-foreground font-medium">Sweep leftover savings here</span>
-                            </label>
+                          <div className="pt-2 border-t border-border/40 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 cursor-pointer text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={isSurplus}
+                                  onChange={(e) => handleUpdateContribution(accId, { isSurplusDestination: e.target.checked })}
+                                  className="rounded border-border accent-violet-500"
+                                />
+                                <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                                  Sweep leftover savings here
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <HelpCircle className="w-3.5 h-3.5 text-violet-400 hover:text-violet-300 transition-colors cursor-pointer" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                        <strong>Surplus Cash Sweep:</strong> During your working years, 100% of any remaining unallocated cash surplus (salary minus taxes, expenses, and set contributions) is automatically saved into this account.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </span>
+                              </label>
 
-                            {contribMode !== 'none' && (
-                              <div className="text-right">
-                                <span className="text-xs font-bold text-foreground">Total Inflow: </span>
-                                <span className="text-xs font-mono font-bold text-primary">{formatCurrency(totalInflow)}/yr</span>
-                              </div>
-                            )}
+                              {contribMode !== 'none' && (
+                                <div className="text-right">
+                                  <span className="text-xs font-bold text-foreground">Total Inflow: </span>
+                                  <span className="text-xs font-mono font-bold text-primary">{formatCurrency(totalInflow)}/yr</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/70 pl-5">
+                              Unallocated net cash flow (after expenses and set contributions) is automatically swept into this account each year during your accumulation phase.
+                            </p>
                           </div>
                         </div>
                       )}
