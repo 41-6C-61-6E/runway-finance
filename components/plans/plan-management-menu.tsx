@@ -73,7 +73,7 @@ export function PlanManagementMenu({
         >
           {plans.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name} {p.isDefault ? '★ (Default)' : ''}
+              {p.name}
             </option>
           ))}
         </select>
