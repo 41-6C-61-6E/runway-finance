@@ -1,12 +1,36 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { runBeamSearchOptimization, OptimizationObjective, OptimizationIntensity, OptimizationOutput } from '@/lib/services/beam-search-optimizer';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { formatCurrency } from '@/lib/utils/format';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { Play, Zap, Star, GitCompare, Sparkles, CheckCircle2, ShieldAlert, ArrowRight, Layers, Award } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend,
+} from 'recharts';
+import {
+  TrendingUp,
+  ShieldCheck,
+  Check,
+  CheckCircle2,
+  Sparkles,
+  Layers,
+  HeartHandshake,
+  DollarSign,
+  Calendar,
+  Zap,
+  Sliders,
+  AlertTriangle,
+  Flame,
+  ArrowUpRight,
+  RefreshCw,
+} from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
@@ -16,31 +40,22 @@ interface ScenariosTabProps {
   onUpdatePlan?: (updates: any) => void;
 }
 
-export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'compare' | 'matrix' | 'optimizer'>('compare');
+export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
+  const [activeSection, setActiveSection] = useState<'strategies' | 'whatif' | 'tactics'>('strategies');
 
   // Collapsible card states
-  const [isCompareCardCollapsed, setIsCompareCardCollapsed] = useCardCollapsed('scenarios_compare_card');
-  const [isTrajectoryChartCollapsed, setIsTrajectoryChartCollapsed] = useCardCollapsed('scenarios_trajectory_chart');
-  const [isMatrixCollapsed, setIsMatrixCollapsed] = useCardCollapsed('scenarios_matrix');
-  const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useCardCollapsed('scenarios_optimizer');
+  const [isStrategiesCollapsed, setIsStrategiesCollapsed] = useCardCollapsed('scenarios_strategies');
+  const [isWhatIfCollapsed, setIsWhatIfCollapsed] = useCardCollapsed('scenarios_whatif');
+  const [isTacticsCollapsed, setIsTacticsCollapsed] = useCardCollapsed('scenarios_tactics');
 
-  // Scenario Comparison mode: 'saved_plans' vs 'custom_params'
-  const [compareMode, setCompareMode] = useState<'saved_plans' | 'custom_params'>('saved_plans');
-  const [selectedPlanBId, setSelectedPlanBId] = useState<string>(() => {
-    const secondary = allPlans.find((p) => p.id !== plan?.id);
-    return secondary?.id || plan?.id || '';
-  });
+  // What-If Simulator State
+  const [whatIfRetirementAge, setWhatIfRetirementAge] = useState<number>(plan?.retirementAge || 60);
+  const [whatIfMarketScenario, setWhatIfMarketScenario] = useState<'baseline' | 'bull' | 'bear' | 'crash'>('baseline');
+  const [whatIfInflationRate, setWhatIfInflationRate] = useState<number>(parseFloat(plan?.settings?.fixedInflationRate || '3.0'));
+  const [whatIfExpenseModifier, setWhatIfExpenseModifier] = useState<number>(0); // % adjustment (-30% to +30%)
 
-  // Custom hypothetical scenario parameters
-  const [scenarioBRetirementAge, setScenarioBRetirementAge] = useState(55);
-  const [scenarioBReturnRate, setScenarioBReturnRate] = useState(8.0);
-  const [scenarioBStateTaxRate, setScenarioBStateTaxRate] = useState(0.0);
-
-  // Optimizer controls
-  const [objective, setObjective] = useState<OptimizationObjective>('legacy');
-  const [intensity, setIntensity] = useState<OptimizationIntensity>('standard');
-  const [optLoading, setOptLoading] = useState(false);
+  // Applied Toast Feedback
+  const [appliedMsg, setAppliedMsg] = useState<string>('');
 
   // Helper to convert DB plan to EnginePlan object
   const buildEnginePlan = (targetPlan: any): EnginePlan => {
@@ -68,6 +83,14 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
       lifeExpectancyAge: Number(targetPlan?.lifeExpectancyAge) || 100,
       withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
       customWithdrawalOrder: Array.isArray(targetPlan?.customWithdrawalOrder) ? targetPlan.customWithdrawalOrder : undefined,
+      primarySalary: parseFloat(targetPlan?.primarySalary) || 0,
+      spouseSalary: parseFloat(targetPlan?.spouseSalary) || 0,
+      primarySalaryYear: Number(targetPlan?.primarySalaryYear) || new Date().getFullYear(),
+      primarySalaryRaisePct: parseFloat(targetPlan?.primarySalaryRaisePct) || 0,
+      primarySalaryOverrides: targetPlan?.primarySalaryOverrides && typeof targetPlan?.primarySalaryOverrides === 'object' ? targetPlan.primarySalaryOverrides : undefined,
+      spouseSalaryYear: Number(targetPlan?.spouseSalaryYear) || new Date().getFullYear(),
+      spouseSalaryRaisePct: parseFloat(targetPlan?.spouseSalaryRaisePct) || 0,
+      spouseSalaryOverrides: targetPlan?.spouseSalaryOverrides && typeof targetPlan?.spouseSalaryOverrides === 'object' ? targetPlan.spouseSalaryOverrides : undefined,
       accounts: activeAccounts.map((a: any) => ({
         id: a.id,
         name: a.name,
@@ -80,6 +103,12 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
         reinvestDividends: a.reinvestDividends ?? true,
         qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
         rothPercentage: a.rothPercentage,
+        contributionMode: (a.contributionMode as any) || 'none',
+        contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
+        contributionSalarySource: a.contributionSalarySource || undefined,
+        companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
+        companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
+        isSurplusDestination: Boolean(a.isSurplusDestination),
       })),
       liabilities: [],
       events: (targetPlan?.events || []).map((e: any) => ({
@@ -123,7 +152,7 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
         charitableGiving: parseFloat(targetPlan?.settings?.charitableGiving || '0.0'),
         withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
         enableRothConversions: Boolean(targetPlan?.settings?.enableRothConversions),
-        rothConversionTargetCeiling: targetPlan?.settings?.rothConversionTargetCeiling || 'top_of_12',
+        rothConversionTargetCeiling: (targetPlan?.settings?.rothConversionTargetCeiling as any) || 'top_of_12',
         avoidIrmaaCliffs: Boolean(targetPlan?.settings?.avoidIrmaaCliffs),
       },
       rules: targetPlan?.rules || DEFAULT_2026_RULES,
@@ -132,334 +161,476 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
 
   const primaryEnginePlan = useMemo(() => buildEnginePlan(plan), [plan]);
 
-  // Selected Plan B from saved plans
-  const planBTarget = useMemo(() => {
-    return allPlans.find((p) => p.id === selectedPlanBId) || plan;
-  }, [allPlans, selectedPlanBId, plan]);
+  // ── SECTION 1: WITHDRAWAL STRATEGY COMPARISON ENGINE ──
+  const strategiesList = useMemo(() => {
+    const baseline = primaryEnginePlan;
 
-  // Comparison simulations
-  const comparisonSims = useMemo(() => {
-    const planA = primaryEnginePlan;
-    let planB: EnginePlan;
-
-    if (compareMode === 'saved_plans') {
-      planB = buildEnginePlan(planBTarget);
-    } else {
-      planB = JSON.parse(JSON.stringify(primaryEnginePlan));
-      planB.retirementAge = scenarioBRetirementAge;
-      planB.accounts.forEach((acc) => {
-        acc.expectedGrowthRate = scenarioBReturnRate;
-      });
-      if (!planB.settings) planB.settings = { fixedInflationRate: 3.0 };
-      planB.settings.incomeTaxModifier = scenarioBStateTaxRate;
-    }
-
-    const simA = runRetirementSimulation(planA);
-    const simB = runRetirementSimulation(planB);
-
-    const taxesA = simA.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
-    const taxesB = simB.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
-
-    const etrA = simA.yearlyResults.length > 0 ? simA.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / simA.yearlyResults.length : 0;
-    const etrB = simB.yearlyResults.length > 0 ? simB.yearlyResults.reduce((s, y) => s + y.effectiveTaxRate, 0) / simB.yearlyResults.length : 0;
-
-    const chartComparison = simA.yearlyResults.map((yA, i) => {
-      const yB = simB.yearlyResults[i];
-      return {
-        year: yA.year,
-        age: yA.primaryAge,
-        netWorthA: Math.round(yA.netWorth),
-        netWorthB: Math.round(yB?.netWorth || 0),
-      };
-    });
-
-    return { simA, simB, planBName: planB.name, taxesA, taxesB, etrA, etrB, chartComparison };
-  }, [primaryEnginePlan, compareMode, planBTarget, scenarioBRetirementAge, scenarioBReturnRate, scenarioBStateTaxRate]);
-
-  // Live Dynamic Strategy Matrix (runs 6 real simulations using engine)
-  const realStrategyMatrix = useMemo(() => {
-    const base = primaryEnginePlan;
-
-    // 1. Baseline
-    const sim1 = runRetirementSimulation(base);
-
-    // 2. Roth Conversion 12% Bracket
-    const plan2: EnginePlan = JSON.parse(JSON.stringify(base));
-    plan2.settings.enableRothConversions = true;
-    plan2.settings.rothConversionTargetCeiling = 'top_of_12';
-    const sim2 = runRetirementSimulation(plan2);
-
-    // 3. Roth Conversion 22% Bracket
-    const plan3: EnginePlan = JSON.parse(JSON.stringify(base));
-    plan3.settings.enableRothConversions = true;
-    plan3.settings.rothConversionTargetCeiling = 'top_of_22';
-    const sim3 = runRetirementSimulation(plan3);
-
-    // 4. Tax Optimized Drawdown
-    const plan4: EnginePlan = JSON.parse(JSON.stringify(base));
-    plan4.settings.withdrawalMethod = 'tax_optimized';
-    const sim4 = runRetirementSimulation(plan4);
-
-    // 5. Social Security Delay (Age 70)
-    const plan5: EnginePlan = JSON.parse(JSON.stringify(base));
-    plan5.primarySsStartAge = 70;
-    plan5.spouseSsStartAge = 70;
-    const sim5 = runRetirementSimulation(plan5);
-
-    // 6. Social Security Early (Age 62)
-    const plan6: EnginePlan = JSON.parse(JSON.stringify(base));
-    plan6.primarySsStartAge = 62;
-    plan6.spouseSsStartAge = 62;
-    const sim6 = runRetirementSimulation(plan6);
-
-    const calcStats = (sim: any, name: string, desc: string, updateSettings: any) => {
-      const taxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
-      const etr = sim.yearlyResults.length > 0 ? sim.yearlyResults.reduce((s: number, y: any) => s + y.effectiveTaxRate, 0) / sim.yearlyResults.length : 0;
-      const rmds = sim.yearlyResults.reduce((s: number, y: any) => s + (y.drawdownsByType?.traditional || 0), 0);
-      const peakWithdrawal = Math.max(0, ...sim.yearlyResults.filter((y: any) => y.primaryAge >= base.retirementAge).map((y: any) => {
-        const cashD = y.drawdownsByType?.cash || 0;
-        const taxD = y.drawdownsByType?.taxable || 0;
-        const tradD = y.drawdownsByType?.traditional || 0;
-        const rothD = y.drawdownsByType?.roth || 0;
-        const hsaD = y.drawdownsByType?.hsa || 0;
-        const totalD = cashD + taxD + tradD + rothD + hsaD;
-        return (totalD > 0 && y.netWorth + totalD > 0) ? (totalD / (y.netWorth + totalD)) * 100 : 0;
-      }));
-
-      return {
-        name,
-        desc,
-        tax: taxes,
-        legacy: sim.netLegacy,
-        etr,
-        rmds,
-        peakWithdrawal,
-        success: sim.success,
-        updateSettings,
-      };
+    // 1. Textbook / Taxable First
+    const stratTextbook = { ...baseline, withdrawalMethod: 'textbook' as const };
+    // 2. Proportional / Pro-Rata
+    const stratProportional = { ...baseline, withdrawalMethod: 'proportional' as const };
+    // 3. Tax-Deferred First / Waterfall
+    const stratTaxDeferred = { ...baseline, withdrawalMethod: 'tax_deferred_first' as const };
+    // 4. Tax-Optimized Bracket Filling
+    const stratTaxOptimized = { ...baseline, withdrawalMethod: 'tax_optimized' as const };
+    // 5. Roth Conversion Ladder Strategy
+    const stratRothLadder = {
+      ...baseline,
+      withdrawalMethod: 'textbook' as const,
+      settings: {
+        ...baseline.settings,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'top_of_12' as const,
+        avoidIrmaaCliffs: true,
+      },
     };
 
-    const strats = [
-      calcStats(sim1, 'Baseline Plan', 'Current plan rules and settings', {}),
-      calcStats(sim2, 'Roth Conversion (Top of 12% Bracket)', 'Converts Traditional to Roth filling up to 12% tax bracket', { enableRothConversions: true, rothConversionTargetCeiling: 'top_of_12' }),
-      calcStats(sim3, 'Roth Conversion (Top of 22% Bracket)', 'Converts Traditional to Roth filling up to 22% tax bracket', { enableRothConversions: true, rothConversionTargetCeiling: 'top_of_22' }),
-      calcStats(sim4, 'Tax-Optimized Bracket Shielding', 'Draws from taxable accounts first, then traditional up to 12% bracket', { withdrawalMethod: 'tax_optimized' }),
-      calcStats(sim5, 'Social Security Delay (Age 70)', 'Delays Social Security claiming to age 70 for +24-32% benefit increase', { primarySsStartAge: 70, spouseSsStartAge: 70 }),
-      calcStats(sim6, 'Social Security Early (Age 62)', 'Claims Social Security at earliest eligibility (Age 62)', { primarySsStartAge: 62, spouseSsStartAge: 62 }),
+    const simTextbook = runRetirementSimulation(stratTextbook);
+    const simProportional = runRetirementSimulation(stratProportional);
+    const simTaxDeferred = runRetirementSimulation(stratTaxDeferred);
+    const simTaxOptimized = runRetirementSimulation(stratTaxOptimized);
+    const simRothLadder = runRetirementSimulation(stratRothLadder);
+
+    const getSimSummary = (sim: any) => {
+      const lastYr = sim.yearlyResults[sim.yearlyResults.length - 1];
+      const endNW = lastYr?.netWorth || 0;
+      const totalTaxes = sim.yearlyResults.reduce((sum: number, y: any) => sum + (y.taxesPaid || 0), 0);
+      const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdAmount || 0));
+      const ranOutOfMoney = sim.yearlyResults.some((y: any) => y.netWorth <= 0);
+      return { endNW, totalTaxes, maxRmd, ranOutOfMoney, yearlyResults: sim.yearlyResults };
+    };
+
+    const textSum = getSimSummary(simTextbook);
+    const propSum = getSimSummary(simProportional);
+    const defSum = getSimSummary(simTaxDeferred);
+    const optSum = getSimSummary(simTaxOptimized);
+    const rothSum = getSimSummary(simRothLadder);
+
+    return [
+      {
+        id: 'textbook',
+        name: 'Taxable First (Textbook)',
+        description: 'Spend taxable accounts first, preserving tax-free Roth growth until last.',
+        method: 'textbook',
+        enableRoth: false,
+        summary: textSum,
+        color: '#3b82f6', // blue
+      },
+      {
+        id: 'proportional',
+        name: 'Proportional (Pro-Rata)',
+        description: 'Withdraw proportionally from taxable, pre-tax, and Roth buckets each year.',
+        method: 'proportional',
+        enableRoth: false,
+        summary: propSum,
+        color: '#8b5cf6', // purple
+      },
+      {
+        id: 'tax_deferred_first',
+        name: 'Tax-Deferred First (Waterfall)',
+        description: 'Spend traditional 401(k)/IRA balances early to minimize mandatory RMD tax drag.',
+        method: 'tax_deferred_first',
+        enableRoth: false,
+        summary: defSum,
+        color: '#f59e0b', // amber
+      },
+      {
+        id: 'tax_optimized',
+        name: 'Tax Bracket Filling',
+        description: 'Draw tax-deferred funds up to low bracket limit, then pull remainder from Roth.',
+        method: 'tax_optimized',
+        enableRoth: false,
+        summary: optSum,
+        color: '#10b981', // emerald
+      },
+      {
+        id: 'roth_ladder',
+        name: 'Roth Conversion Ladder',
+        description: 'Execute annual pre-tax conversions to Roth up to top of 12% bracket while avoiding IRMAA cliffs.',
+        method: 'textbook',
+        enableRoth: true,
+        summary: rothSum,
+        color: '#ec4899', // pink
+      },
     ];
-
-    // Mark highest legacy with 100% success as optimal
-    let maxLegacy = -Infinity;
-    let optIdx = 0;
-    strats.forEach((s, idx) => {
-      if (s.success && s.legacy > maxLegacy) {
-        maxLegacy = s.legacy;
-        optIdx = idx;
-      }
-    });
-
-    return strats.map((s, idx) => ({ ...s, isOptimal: idx === optIdx }));
   }, [primaryEnginePlan]);
 
-  // Beam Search Optimizer
-  const [optResult, setOptResult] = useState<OptimizationOutput>(() =>
-    runBeamSearchOptimization(primaryEnginePlan, objective, intensity)
-  );
+  // Combined Chart Data for all 5 strategies
+  const strategyChartData = useMemo(() => {
+    const length = strategiesList[0]?.summary.yearlyResults.length || 0;
+    const data = [];
 
-  const handleRunOptimizer = () => {
-    setOptLoading(true);
-    setTimeout(() => {
-      const res = runBeamSearchOptimization(primaryEnginePlan, objective, intensity);
-      setOptResult(res);
-      setOptLoading(false);
-    }, 200);
+    for (let i = 0; i < length; i++) {
+      const yearObj: any = {
+        year: strategiesList[0].summary.yearlyResults[i].year,
+        age: strategiesList[0].summary.yearlyResults[i].primaryAge,
+      };
+
+      strategiesList.forEach((strat) => {
+        const res = strat.summary.yearlyResults[i];
+        yearObj[strat.id] = Math.round(res?.netWorth || 0);
+      });
+
+      data.push(yearObj);
+    }
+    return data;
+  }, [strategiesList]);
+
+  // ── SECTION 2: WHAT-IF STRESS TESTER ──
+  const whatIfSim = useMemo(() => {
+    const enginePlan: EnginePlan = JSON.parse(JSON.stringify(primaryEnginePlan));
+
+    // Apply What-If Retirement Age
+    enginePlan.retirementAge = whatIfRetirementAge;
+
+    // Apply Inflation Rate
+    if (enginePlan.settings) {
+      enginePlan.settings.fixedInflationRate = whatIfInflationRate;
+    }
+
+    // Apply Expense Modifier
+    if (whatIfExpenseModifier !== 0) {
+      const mod = 1 + (whatIfExpenseModifier / 100);
+      enginePlan.events.forEach((ev) => {
+        if (ev.category === 'expense') {
+          ev.amount = Math.round(ev.amount * mod);
+        }
+      });
+    }
+
+    // Apply Market Return / Crash Scenario
+    if (whatIfMarketScenario === 'bull') {
+      enginePlan.accounts.forEach((a) => {
+        if (a.type !== 'cash') a.expectedGrowthRate = Math.min(15, a.expectedGrowthRate + 2.5);
+      });
+    } else if (whatIfMarketScenario === 'bear') {
+      enginePlan.accounts.forEach((a) => {
+        if (a.type !== 'cash') a.expectedGrowthRate = Math.max(1, a.expectedGrowthRate - 2.5);
+      });
+    } else if (whatIfMarketScenario === 'crash') {
+      // Early retirement crash: -25% market return in first 2 years of retirement
+      enginePlan.accounts.forEach((a) => {
+        if (a.type !== 'cash') a.expectedGrowthRate = 6.0;
+      });
+    }
+
+    const baselineSim = runRetirementSimulation(primaryEnginePlan);
+    const modifiedSim = runRetirementSimulation(enginePlan);
+
+    // If market crash scenario, simulate -25% hit at retirement year
+    if (whatIfMarketScenario === 'crash') {
+      const retYrIndex = modifiedSim.yearlyResults.findIndex((y) => y.primaryAge === whatIfRetirementAge);
+      if (retYrIndex !== -1) {
+        for (let i = retYrIndex; i < Math.min(retYrIndex + 2, modifiedSim.yearlyResults.length); i++) {
+          modifiedSim.yearlyResults[i].netWorth *= 0.75;
+        }
+      }
+    }
+
+    const baseEndNW = baselineSim.yearlyResults[baselineSim.yearlyResults.length - 1]?.netWorth || 0;
+    const modEndNW = modifiedSim.yearlyResults[modifiedSim.yearlyResults.length - 1]?.netWorth || 0;
+    const deltaNW = modEndNW - baseEndNW;
+
+    const baseTaxes = baselineSim.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+    const modTaxes = modifiedSim.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+    const deltaTaxes = modTaxes - baseTaxes;
+
+    const chartData = baselineSim.yearlyResults.map((y, idx) => ({
+      year: y.year,
+      age: y.primaryAge,
+      baselineNW: Math.round(y.netWorth),
+      whatIfNW: Math.round(modifiedSim.yearlyResults[idx]?.netWorth || 0),
+    }));
+
+    return {
+      baselineSim,
+      modifiedSim,
+      baseEndNW,
+      modEndNW,
+      deltaNW,
+      baseTaxes,
+      modTaxes,
+      deltaTaxes,
+      chartData,
+    };
+  }, [primaryEnginePlan, whatIfRetirementAge, whatIfMarketScenario, whatIfInflationRate, whatIfExpenseModifier]);
+
+  // ── SECTION 3: RETIREMENT TACTICS & TAX MATRIX ──
+  const ssMatrix = useMemo(() => {
+    const plan62 = { ...primaryEnginePlan, primarySsStartAge: 62 };
+    const plan67 = { ...primaryEnginePlan, primarySsStartAge: 67 };
+    const plan70 = { ...primaryEnginePlan, primarySsStartAge: 70 };
+
+    const sim62 = runRetirementSimulation(plan62);
+    const sim67 = runRetirementSimulation(plan67);
+    const sim70 = runRetirementSimulation(plan70);
+
+    const getSsMetrics = (sim: any, age: number) => {
+      const endNW = sim.yearlyResults[sim.yearlyResults.length - 1]?.netWorth || 0;
+      const totalTaxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
+      const monthly = (primaryEnginePlan.primarySsMonthlyAmount || 2500);
+      const multiplier = age === 62 ? 0.70 : age === 67 ? 1.0 : 1.24;
+      const annualBenefit = Math.round(monthly * 12 * multiplier);
+      const yearsClaimed = Math.max(0, primaryEnginePlan.lifeExpectancyAge - age);
+      const lifetimeBenefit = annualBenefit * yearsClaimed;
+      return { age, annualBenefit, lifetimeBenefit, endNW, totalTaxes };
+    };
+
+    return {
+      age62: getSsMetrics(sim62, 62),
+      age67: getSsMetrics(sim67, 67),
+      age70: getSsMetrics(sim70, 70),
+    };
+  }, [primaryEnginePlan]);
+
+  const rothMatrix = useMemo(() => {
+    const planNoRoth = {
+      ...primaryEnginePlan,
+      settings: { ...primaryEnginePlan.settings, enableRothConversions: false },
+    };
+    const plan12Pct = {
+      ...primaryEnginePlan,
+      settings: {
+        ...primaryEnginePlan.settings,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'top_of_12' as const,
+        avoidIrmaaCliffs: true,
+      },
+    };
+    const plan22Pct = {
+      ...primaryEnginePlan,
+      settings: {
+        ...primaryEnginePlan.settings,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'top_of_22' as const,
+        avoidIrmaaCliffs: false,
+      },
+    };
+
+    const simNoRoth = runRetirementSimulation(planNoRoth);
+    const sim12 = runRetirementSimulation(plan12Pct);
+    const sim22 = runRetirementSimulation(plan22Pct);
+
+    const getRothSummary = (sim: any) => {
+      const endNW = sim.yearlyResults[sim.yearlyResults.length - 1]?.netWorth || 0;
+      const totalTaxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
+      const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdAmount || 0));
+      return { endNW, totalTaxes, maxRmd };
+    };
+
+    return {
+      noRoth: getRothSummary(simNoRoth),
+      top12: getRothSummary(sim12),
+      top22: getRothSummary(sim22),
+    };
+  }, [primaryEnginePlan]);
+
+  // Handle Strategy Apply CTA
+  const handleApplyStrategy = (strat: any) => {
+    if (!onUpdatePlan) return;
+
+    if (strat.id === 'roth_ladder') {
+      onUpdatePlan({
+        withdrawalMethod: 'textbook',
+        settings: {
+          ...plan?.settings,
+          withdrawalMethod: 'textbook',
+          enableRothConversions: true,
+          rothConversionTargetCeiling: 'top_of_12',
+          avoidIrmaaCliffs: true,
+        },
+      });
+    } else {
+      onUpdatePlan({
+        withdrawalMethod: strat.method,
+        settings: {
+          ...plan?.settings,
+          withdrawalMethod: strat.method,
+        },
+      });
+    }
+
+    setAppliedMsg(`Applied ${strat.name} strategy to active plan!`);
+    setTimeout(() => setAppliedMsg(''), 4000);
+  };
+
+  const handleApplySsAge = (age: number) => {
+    if (!onUpdatePlan) return;
+    onUpdatePlan({ primarySsStartAge: age });
+    setAppliedMsg(`Set Primary Social Security claiming age to ${age}!`);
+    setTimeout(() => setAppliedMsg(''), 4000);
   };
 
   return (
     <div className="space-y-6">
-      {/* Sub-navigation bar */}
-      <div className="flex items-center gap-2 border-b border-border pb-3">
-        {[
-          { id: 'compare' as const, label: 'Scenario Comparison', icon: GitCompare },
-          { id: 'matrix' as const, label: 'Live Strategy Matrix', icon: Star },
-          { id: 'optimizer' as const, label: 'Beam Optimizer', icon: Zap },
-        ].map((t) => {
-          const Icon = t.icon;
-          const isActive = activeSubTab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setActiveSubTab(t.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
+      {/* Toast Notification Banner */}
+      {appliedMsg && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>{appliedMsg}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Scenarios Section Header Navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-card border border-border rounded-2xl p-3 shadow-sm">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setActiveSection('strategies')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'strategies'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            Withdrawal Strategy Lab
+          </button>
+          <button
+            onClick={() => setActiveSection('whatif')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'whatif'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            What-If Stress Tester
+          </button>
+          <button
+            onClick={() => setActiveSection('tactics')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'tactics'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Retirement Tactics Matrix
+          </button>
+        </div>
       </div>
 
-      {/* Sub-Tab 1: Saved Plan & Custom Scenario Comparison */}
-      {activeSubTab === 'compare' && (
+      {/* SECTION 1: WITHDRAWAL STRATEGY COMPARISON LAB */}
+      {activeSection === 'strategies' && (
         <div className="space-y-6">
-          {/* Controls to pick mode & select plans */}
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <CollapsibleCardHeader
-              isCollapsed={isCompareCardCollapsed}
-              onToggle={setIsCompareCardCollapsed}
-              title={
-                <div className="flex items-center gap-2">
-                  <GitCompare className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Scenario Comparison Engine</h3>
-                    <p className="text-xs text-muted-foreground">Compare saved FIRE plans side-by-side or model custom hypotheses</p>
-                  </div>
-                </div>
-              }
-              actions={
-                <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border text-xs">
-                  <button
-                    onClick={() => setCompareMode('saved_plans')}
-                    className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
-                      compareMode === 'saved_plans' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Compare Saved Plans ({allPlans.length})
-                  </button>
-                  <button
-                    onClick={() => setCompareMode('custom_params')}
-                    className={`px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
-                      compareMode === 'custom_params' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Custom What-If Parameters
-                  </button>
-                </div>
-              }
+              title="Withdrawal Sequencing Strategy Laboratory"
+              description="Simulate and compare 5 distinct withdrawal ordering methods directly on your plan"
+              icon={Layers}
+              isCollapsed={isStrategiesCollapsed}
+              onToggle={() => setIsStrategiesCollapsed(!isStrategiesCollapsed)}
             />
 
-            {!isCompareCardCollapsed && (
-              <div className="p-5 space-y-4">
-                {compareMode === 'saved_plans' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
-                      <span className="font-bold text-emerald-500 uppercase tracking-wider text-[10px]">Plan A (Active Plan)</span>
-                      <p className="text-sm font-extrabold text-foreground font-mono">{plan?.name || 'Primary Plan'}</p>
-                      <p className="text-[11px] text-muted-foreground">Retirement Age {plan?.retirementAge || 60} • {plan?.filingStatus === 'married_joint' ? 'Married Filing Jointly' : 'Single'}</p>
-                    </div>
-
-                    <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border">
-                      <label className="font-bold text-amber-500 uppercase tracking-wider text-[10px] block">Select Plan B to Compare</label>
-                      <select
-                        value={selectedPlanBId}
-                        onChange={(e) => setSelectedPlanBId(e.target.value)}
-                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
-                      >
-                        {allPlans.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} {p.id === plan?.id ? '(Current Active)' : ''}
-                          </option>
+            {!isStrategiesCollapsed && (
+              <div className="p-5 space-y-6">
+                {/* Visual Trajectory Multi-Line Chart */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-foreground">Net Worth Trajectory by Strategy</h4>
+                    <span className="text-[11px] text-muted-foreground">Projections to Age {primaryEnginePlan.lifeExpectancyAge}</span>
+                  </div>
+                  <div className="h-72 w-full pt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={strategyChartData}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                        <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />
+                        <YAxis
+                          stroke="#888888"
+                          fontSize={10}
+                          tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          formatter={(value: any) => [formatCurrency(Number(value)), 'Net Worth']}
+                          labelFormatter={(label) => `Age ${label}`}
+                          contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                        {strategiesList.map((strat) => (
+                          <Line
+                            key={strat.id}
+                            type="monotone"
+                            dataKey={strat.id}
+                            name={strat.name}
+                            stroke={strat.color}
+                            strokeWidth={plan?.withdrawalMethod === strat.method ? 3 : 1.5}
+                            dot={false}
+                          />
                         ))}
-                      </select>
-                      <p className="text-[11px] text-muted-foreground">Choose any saved plan to compare trajectories</p>
-                    </div>
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-foreground block">Scenario B Retirement Age</label>
-                      <input
-                        type="number"
-                        min="40"
-                        max="75"
-                        value={scenarioBRetirementAge}
-                        onChange={(e) => setScenarioBRetirementAge(Number(e.target.value))}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                      />
-                    </div>
+                </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-foreground block">Scenario B Annual Return (%)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={scenarioBReturnRate}
-                        onChange={(e) => setScenarioBReturnRate(Number(e.target.value))}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                      />
-                    </div>
+                {/* Strategy Metrics Comparison Table */}
+                <div className="border border-border rounded-xl overflow-hidden shadow-sm">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-muted/60 text-muted-foreground font-semibold">
+                      <tr>
+                        <th className="px-4 py-3">Strategy Name</th>
+                        <th className="px-3 py-3 text-right">Ending Net Worth</th>
+                        <th className="px-3 py-3 text-right">Lifetime Taxes</th>
+                        <th className="px-3 py-3 text-right">Max Age 75 RMD</th>
+                        <th className="px-3 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {strategiesList.map((strat) => {
+                        const isCurrentActive = plan?.withdrawalMethod === strat.method && (!strat.enableRoth || Boolean(plan?.settings?.enableRothConversions));
+                        const isHighestNW = strat.summary.endNW === Math.max(...strategiesList.map((s) => s.summary.endNW));
 
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-foreground block">Scenario B State Tax Rate (%)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={scenarioBStateTaxRate}
-                        onChange={(e) => setScenarioBStateTaxRate(Number(e.target.value))}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Metric Comparison Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-emerald-500 uppercase">Plan A ({plan?.name}) Portfolio</span>
-              <p className="text-xl font-extrabold text-emerald-500 font-mono">{formatCurrency(comparisonSims.simA.endingNetWorth)}</p>
-              <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesA)} | ETR: {comparisonSims.etrA.toFixed(1)}%</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-amber-500 uppercase">Plan B ({comparisonSims.planBName}) Portfolio</span>
-              <p className="text-xl font-extrabold text-amber-500 font-mono">{formatCurrency(comparisonSims.simB.endingNetWorth)}</p>
-              <p className="text-[11px] font-mono text-muted-foreground">Taxes: {formatCurrency(comparisonSims.taxesB)} | ETR: {comparisonSims.etrB.toFixed(1)}%</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Portfolio Delta</span>
-              <p className={`text-xl font-extrabold font-mono ${comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {comparisonSims.simB.endingNetWorth >= comparisonSims.simA.endingNetWorth ? '+' : ''}{formatCurrency(comparisonSims.simB.endingNetWorth - comparisonSims.simA.endingNetWorth)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">Ending legacy buffer difference</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Lifetime Tax Delta</span>
-              <p className={`text-xl font-extrabold font-mono ${comparisonSims.taxesB <= comparisonSims.taxesA ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {comparisonSims.taxesB <= comparisonSims.taxesA ? '-' : '+'}{formatCurrency(Math.abs(comparisonSims.taxesA - comparisonSims.taxesB))}
-              </p>
-              <p className="text-[11px] text-muted-foreground">{comparisonSims.taxesB <= comparisonSims.taxesA ? 'Plan B saves taxes' : 'Plan B owes higher taxes'}</p>
-            </div>
-          </div>
-
-          {/* Overlaid Trajectory Chart */}
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-            <CollapsibleCardHeader
-              isCollapsed={isTrajectoryChartCollapsed}
-              onToggle={setIsTrajectoryChartCollapsed}
-              title={<h3 className="text-sm font-bold text-foreground">Overlaid Retirement Portfolio Trajectories</h3>}
-            />
-
-            {!isTrajectoryChartCollapsed && (
-              <div className="p-5">
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={comparisonSims.chartComparison}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-                      <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
-                      <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), 'Retirement Portfolio']} />
-                      <Legend />
-                      <Line type="monotone" dataKey="netWorthA" name={`Plan A: ${plan?.name}`} stroke="#10b981" strokeWidth={2.5} dot={false} />
-                      <Line type="monotone" dataKey="netWorthB" name={`Plan B: ${comparisonSims.planBName}`} stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                        return (
+                          <tr key={strat.id} className={`hover:bg-muted/30 transition-colors ${isCurrentActive ? 'bg-primary/5 font-medium' : ''}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: strat.color }} />
+                                <div>
+                                  <span className="font-bold text-foreground block">{strat.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{strat.description}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className={`px-3 py-3 text-right font-mono font-bold ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
+                              {formatCurrency(strat.summary.endNW)}
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono text-muted-foreground">
+                              {formatCurrency(strat.summary.totalTaxes)}
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono text-amber-500 font-semibold">
+                              {formatCurrency(strat.summary.maxRmd)}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {isCurrentActive ? (
+                                <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  <Check className="w-3 h-3" /> Active
+                                </span>
+                              ) : isHighestNW ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  <Sparkles className="w-3 h-3" /> Highest Value
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">Alternative</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {!isCurrentActive && onUpdatePlan && (
+                                <button
+                                  onClick={() => handleApplyStrategy(strat)}
+                                  className="bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                                >
+                                  Apply Strategy
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -467,163 +638,273 @@ export function ScenariosTab({ plan, allPlans = [], onUpdatePlan }: ScenariosTab
         </div>
       )}
 
-      {/* Sub-Tab 2: Live Dynamic Strategy Matrix */}
-      {activeSubTab === 'matrix' && (
-        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-          <CollapsibleCardHeader
-            isCollapsed={isMatrixCollapsed}
-            onToggle={setIsMatrixCollapsed}
-            title={
-              <div>
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                  Live Engine Strategy Matrix
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Real-time simulation results comparing tax & withdrawal strategies on your active plan</p>
+      {/* SECTION 2: WHAT-IF INTERACTIVE STRESS TESTER */}
+      {activeSection === 'whatif' && (
+        <div className="space-y-6">
+          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <CollapsibleCardHeader
+              title="What-If Real-Time Stress Simulator"
+              description="Test economic shocks, retirement age shifts, and expense changes on your plan"
+              icon={Sliders}
+              isCollapsed={isWhatIfCollapsed}
+              onToggle={() => setIsWhatIfCollapsed(!isWhatIfCollapsed)}
+            />
+
+            {!isWhatIfCollapsed && (
+              <div className="p-5 space-y-6">
+                {/* Interactive Controls Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 bg-muted/30 border border-border p-4 rounded-xl text-xs">
+                  {/* Slider 1: Target Retirement Age */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="font-semibold text-muted-foreground">Target Retirement Age</label>
+                      <span className="font-mono font-bold text-primary text-sm">{whatIfRetirementAge}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={45}
+                      max={75}
+                      step={1}
+                      value={whatIfRetirementAge}
+                      onChange={(e) => setWhatIfRetirementAge(parseInt(e.target.value, 10))}
+                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
+                    />
+                    <span className="text-[10px] text-muted-foreground block">Baseline: {primaryEnginePlan.retirementAge} yrs</span>
+                  </div>
+
+                  {/* Option 2: Market Scenario */}
+                  <div className="space-y-2">
+                    <label className="font-semibold text-muted-foreground block">Market Return Scenario</label>
+                    <select
+                      value={whatIfMarketScenario}
+                      onChange={(e: any) => setWhatIfMarketScenario(e.target.value)}
+                      className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="baseline">Baseline Expected (7.0%)</option>
+                      <option value="bull">Bull Market (+9.5%)</option>
+                      <option value="bear">Bear Market (+4.5%)</option>
+                      <option value="crash">Early Retirement Crash (-25% Shock)</option>
+                    </select>
+                    <span className="text-[10px] text-muted-foreground block">Simulates sequence of returns</span>
+                  </div>
+
+                  {/* Slider 3: Inflation Rate */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="font-semibold text-muted-foreground">Inflation Rate (%)</label>
+                      <span className="font-mono font-bold text-primary text-sm">{whatIfInflationRate.toFixed(1)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1.5}
+                      max={6.5}
+                      step={0.5}
+                      value={whatIfInflationRate}
+                      onChange={(e) => setWhatIfInflationRate(parseFloat(e.target.value))}
+                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
+                    />
+                    <span className="text-[10px] text-muted-foreground block">Baseline: 3.0%</span>
+                  </div>
+
+                  {/* Slider 4: Expense Shock */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="font-semibold text-muted-foreground">Expense Modifier</label>
+                      <span className={`font-mono font-bold text-sm ${whatIfExpenseModifier > 0 ? 'text-rose-500' : whatIfExpenseModifier < 0 ? 'text-emerald-500' : 'text-primary'}`}>
+                        {whatIfExpenseModifier > 0 ? `+${whatIfExpenseModifier}%` : `${whatIfExpenseModifier}%`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-30}
+                      max={30}
+                      step={5}
+                      value={whatIfExpenseModifier}
+                      onChange={(e) => setWhatIfExpenseModifier(parseInt(e.target.value, 10))}
+                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
+                    />
+                    <span className="text-[10px] text-muted-foreground block">Adjusts living expenses</span>
+                  </div>
+                </div>
+
+                {/* What-If Summary Impact Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Ending Net Worth (Age {primaryEnginePlan.lifeExpectancyAge})</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold font-mono text-foreground">{formatCurrency(whatIfSim.modEndNW)}</span>
+                      <span className={`text-xs font-mono font-bold ${whatIfSim.deltaNW >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {whatIfSim.deltaNW >= 0 ? `+${formatCurrency(whatIfSim.deltaNW)}` : formatCurrency(whatIfSim.deltaNW)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Taxes Paid</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold font-mono text-foreground">{formatCurrency(whatIfSim.modTaxes)}</span>
+                      <span className={`text-xs font-mono font-bold ${whatIfSim.deltaTaxes <= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {whatIfSim.deltaTaxes <= 0 ? formatCurrency(whatIfSim.deltaTaxes) : `+${formatCurrency(whatIfSim.deltaTaxes)}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-semibold text-muted-foreground block">Plan Longevity</span>
+                      <span className={`text-base font-bold font-mono ${whatIfSim.modEndNW > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {whatIfSim.modEndNW > 0 ? '100% Fully Funded' : 'Depletes Before Target'}
+                      </span>
+                    </div>
+                    {whatIfSim.modEndNW <= 0 && <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />}
+                  </div>
+                </div>
+
+                {/* Trajectory Overlay Chart: Baseline vs What-If */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-foreground">Baseline vs What-If Trajectory</h4>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={whatIfSim.chartData}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                        <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />
+                        <YAxis stroke="#888888" fontSize={10} tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`} tickLine={false} />
+                        <Tooltip formatter={(value: any) => [formatCurrency(Number(value)), 'Net Worth']} labelFormatter={(l) => `Age ${l}`} />
+                        <Legend wrapperStyle={{ fontSize: '11px' }} />
+                        <Line type="monotone" dataKey="baselineNW" name="Baseline Plan" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                        <Line type="monotone" dataKey="whatIfNW" name="What-If Stress Scenario" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
-            }
-            actions={
-              <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                <Award className="w-3.5 h-3.5" />
-                Engine Recommended
-              </span>
-            }
-          />
+            )}
+          </div>
+        </div>
+      )}
 
-          {!isMatrixCollapsed && (
-            <div className="p-5">
+      {/* SECTION 3: RETIREMENT TACTICS & TAX MATRIX */}
+      {activeSection === 'tactics' && (
+        <div className="space-y-6">
+          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <CollapsibleCardHeader
+              title="Retirement Tactics & Tax Optimization Matrix"
+              description="Calculate outcomes for Social Security timing, Roth conversion ceilings, and IRMAA cliffs"
+              icon={Zap}
+              isCollapsed={isTacticsCollapsed}
+              onToggle={() => setIsTacticsCollapsed(!isTacticsCollapsed)}
+            />
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border">
-                <tr>
-                  <th className="p-3">Strategy Name</th>
-                  <th className="p-3">Lifetime Taxes</th>
-                  <th className="p-3">Average ETR</th>
-                  <th className="p-3">Ending Portfolio</th>
-                  <th className="p-3">Peak Draw %</th>
-                  <th className="p-3">Plan Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {realStrategyMatrix.map((strat) => (
-                  <tr key={strat.name} className={`hover:bg-muted/20 ${strat.isOptimal ? 'bg-primary/5' : ''}`}>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        {strat.isOptimal && <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
+            {!isTacticsCollapsed && (
+              <div className="p-5 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* TACTIC 1: Social Security Claiming Strategy */}
+                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-border pb-3">
+                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <HeartHandshake className="w-4 h-4 text-emerald-500" />
+                        Social Security Claiming Strategy
+                      </h4>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                        Current: Age {primaryEnginePlan.primarySsStartAge}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Compare lifetime benefits and portfolio preservation across claiming ages 62, 67, and 70.
+                    </p>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      {/* Age 62 */}
+                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 62 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
+                        <span className="text-[10px] font-bold text-muted-foreground block">Age 62 (Early)</span>
+                        <span className="text-xs font-bold font-mono text-foreground block mt-1">{formatCurrency(ssMatrix.age62.annualBenefit)}/yr</span>
+                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age62.lifetimeBenefit)}</span>
+                        {onUpdatePlan && (
+                          <button
+                            onClick={() => handleApplySsAge(62)}
+                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Set Age 62
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Age 67 */}
+                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 67 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
+                        <span className="text-[10px] font-bold text-muted-foreground block">Age 67 (FRA)</span>
+                        <span className="text-xs font-bold font-mono text-foreground block mt-1">{formatCurrency(ssMatrix.age67.annualBenefit)}/yr</span>
+                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age67.lifetimeBenefit)}</span>
+                        {onUpdatePlan && (
+                          <button
+                            onClick={() => handleApplySsAge(67)}
+                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Set Age 67
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Age 70 */}
+                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 70 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
+                        <span className="text-[10px] font-bold text-muted-foreground block">Age 70 (Delayed)</span>
+                        <span className="text-xs font-bold font-mono text-emerald-500 block mt-1">{formatCurrency(ssMatrix.age70.annualBenefit)}/yr</span>
+                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age70.lifetimeBenefit)}</span>
+                        {onUpdatePlan && (
+                          <button
+                            onClick={() => handleApplySsAge(70)}
+                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Set Age 70
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TACTIC 2: Roth Conversions & IRMAA Protection */}
+                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-border pb-3">
+                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-rose-500" />
+                        Roth Conversion & IRMAA Strategy
+                      </h4>
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">
+                        IRMAA Safe
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Proactively convert traditional IRA/401(k) funds to tax-free Roth during early retirement to eliminate future RMD tax spikes.
+                    </p>
+
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border">
                         <div>
-                          <span className="font-bold text-foreground">{strat.name}</span>
-                          <p className="text-[11px] text-muted-foreground">{strat.desc}</p>
+                          <span className="font-bold text-foreground block">No Conversions</span>
+                          <span className="text-[10px] text-muted-foreground">Standard RMD trajectory</span>
+                        </div>
+                        <div className="text-right font-mono">
+                          <span className="font-bold text-foreground block">{formatCurrency(rothMatrix.noRoth.endNW)}</span>
+                          <span className="text-[10px] text-muted-foreground">Max RMD: {formatCurrency(rothMatrix.noRoth.maxRmd)}</span>
                         </div>
                       </div>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-rose-500">{formatCurrency(strat.tax)}</td>
-                    <td className="p-3 font-mono font-bold">{strat.etr.toFixed(1)}%</td>
-                    <td className="p-3 font-mono font-bold text-emerald-500">{formatCurrency(strat.legacy)}</td>
-                    <td className="p-3 font-mono">
-                      <span className={strat.peakWithdrawal > 5 ? 'text-rose-500 font-bold' : strat.peakWithdrawal > 3.5 ? 'text-amber-500' : 'text-emerald-500 font-bold'}>
-                        {strat.peakWithdrawal.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        strat.success ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                      }`}>
-                        {strat.success ? 'Succeeds' : 'Depletes'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* Sub-Tab 3: Beam Search Optimizer */}
-      {activeSubTab === 'optimizer' && (
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-            <CollapsibleCardHeader
-              isCollapsed={isOptimizerCollapsed}
-              onToggle={setIsOptimizerCollapsed}
-              title={
-                <div className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />
-                  <h3 className="text-sm font-bold text-foreground">Optimization Objective</h3>
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                        <div>
+                          <span className="font-bold text-emerald-500 block">Top of 12% Bracket + IRMAA Safe</span>
+                          <span className="text-[10px] text-muted-foreground">Optimal tax-bracket filling</span>
+                        </div>
+                        <div className="text-right font-mono">
+                          <span className="font-bold text-emerald-500 block">{formatCurrency(rothMatrix.top12.endNW)}</span>
+                          <span className="text-[10px] text-muted-foreground">Max RMD: {formatCurrency(rothMatrix.top12.maxRmd)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              }
-            />
-
-            {!isOptimizerCollapsed && (
-              <div className="p-5 space-y-5">
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-              {[
-                { id: 'legacy' as const, label: 'Higher Net Legacy', desc: 'Maximize estate passed to heirs' },
-                { id: 'taxes' as const, label: 'Lower Lifetime Taxes', desc: 'Minimize cumulative taxes paid' },
-                { id: 'networth' as const, label: 'Higher Portfolio Balance', desc: 'Maximize final ending portfolio' },
-                { id: 'etr' as const, label: 'Lower Effective Tax Rate', desc: 'Minimize average annual ETR' },
-                { id: 'rmds' as const, label: 'Lower RMD Distributions', desc: 'Reduce mandatory traditional withdrawals' },
-              ].map((obj) => (
-                <div
-                  key={obj.id}
-                  onClick={() => setObjective(obj.id)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                    objective === obj.id
-                      ? 'bg-primary/10 border-primary text-foreground shadow-sm'
-                      : 'bg-muted/30 border-border text-muted-foreground hover:border-primary/40'
-                  }`}
-                >
-                  <span className="font-bold block text-foreground">{obj.label}</span>
-                  <p className="text-[11px] text-muted-foreground mt-1">{obj.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-border">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-semibold text-muted-foreground">Search Intensity:</span>
-                <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border">
-                  {(['quick', 'standard', 'deep'] as const).map((lvl) => (
-                    <button
-                      key={lvl}
-                      onClick={() => setIntensity(lvl)}
-                      className={`px-2.5 py-1 text-xs font-semibold capitalize rounded-md transition-all cursor-pointer ${
-                        intensity === lvl ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleRunOptimizer}
-                disabled={optLoading}
-                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                {optLoading ? 'Optimizing...' : 'Run Beam Search'}
-              </button>
-            </div>
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Estimated Lifetime Tax Savings</span>
-              <p className="text-2xl font-extrabold text-emerald-500 font-mono">{formatCurrency(optResult.savings.taxesSaved)}</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Projected Legacy Increase</span>
-              <p className="text-2xl font-extrabold text-primary font-mono">{formatCurrency(optResult.savings.legacyIncrease)}</p>
-            </div>
           </div>
         </div>
       )}
