@@ -40,31 +40,31 @@ export function PlanWizardModal({
   const [isDefault, setIsDefault] = useState(false);
   const [filingStatus, setFilingStatus] = useState<'single' | 'married_joint' | 'married_separate' | 'head_of_household'>('single');
   const [hasSpouse, setHasSpouse] = useState(false);
-  const [primaryBirthYear, setPrimaryBirthYear] = useState(1985);
+  const [primaryBirthYear, setPrimaryBirthYear] = useState<number | ''>(1985);
   const [primaryBirthMonth, setPrimaryBirthMonth] = useState(1);
-  const [retirementAge, setRetirementAge] = useState(60);
-  const [lifeExpectancyAge, setLifeExpectancyAge] = useState(100);
+  const [retirementAge, setRetirementAge] = useState<number | ''>(60);
+  const [lifeExpectancyAge, setLifeExpectancyAge] = useState<number | ''>(100);
 
   // Partner State
   const [spouseName, setSpouseName] = useState('Spouse / Partner');
-  const [spouseBirthYear, setSpouseBirthYear] = useState(1987);
+  const [spouseBirthYear, setSpouseBirthYear] = useState<number | ''>(1987);
   const [spouseBirthMonth, setSpouseBirthMonth] = useState(1);
-  const [spouseRetirementAge, setSpouseRetirementAge] = useState(60);
-  const [spouseLifeExpectancyAge, setSpouseLifeExpectancyAge] = useState(100);
-  const [spouseSsMonthlyAmount, setSpouseSsMonthlyAmount] = useState(2000);
-  const [spouseSsStartAge, setSpouseSsStartAge] = useState(67);
+  const [spouseRetirementAge, setSpouseRetirementAge] = useState<number | ''>(60);
+  const [spouseLifeExpectancyAge, setSpouseLifeExpectancyAge] = useState<number | ''>(100);
+  const [spouseSsMonthlyAmount, setSpouseSsMonthlyAmount] = useState<number | ''>(2000);
+  const [spouseSsStartAge, setSpouseSsStartAge] = useState<number | ''>(67);
   const [enableSpousalSsBenefit, setEnableSpousalSsBenefit] = useState(true);
 
   // Salary State
-  const [primarySalary, setPrimarySalary] = useState(0);
-  const [spouseSalary, setSpouseSalary] = useState(0);
+  const [primarySalary, setPrimarySalary] = useState<number | ''>(0);
+  const [spouseSalary, setSpouseSalary] = useState<number | ''>(0);
   const [primarySalaryRaisePct, setPrimarySalaryRaisePct] = useState('0');
   const [spouseSalaryRaisePct, setSpouseSalaryRaisePct] = useState('0');
 
   // SS & FI Target State
-  const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState(2500);
-  const [primarySsStartAge, setPrimarySsStartAge] = useState(67);
-  const [fiTargetMultiplier, setFiTargetMultiplier] = useState(25);
+  const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState<number | ''>(2500);
+  const [primarySsStartAge, setPrimarySsStartAge] = useState<number | ''>(67);
+  const [fiTargetMultiplier, setFiTargetMultiplier] = useState<number | ''>(25);
 
   // Accounts Inclusion Map
   const [accountInclusions, setAccountInclusions] = useState<Record<string, boolean>>({});
@@ -189,6 +189,8 @@ export function PlanWizardModal({
     if (e) e.preventDefault();
     if (!name.trim() || saving) return;
 
+    const sourcePlan = defaultPlan || initialPlan;
+
     setSaving(true);
     try {
       await onSave({
@@ -196,28 +198,29 @@ export function PlanWizardModal({
         isDefault,
         filingStatus,
         hasSpouse,
-        primaryBirthYear,
+        primaryBirthYear: parseInt(String(primaryBirthYear), 10) || 1985,
         primaryBirthMonth,
-        retirementAge,
-        lifeExpectancyAge,
+        retirementAge: parseInt(String(retirementAge), 10) || 60,
+        lifeExpectancyAge: parseInt(String(lifeExpectancyAge), 10) || 100,
         spouseName,
-        spouseBirthYear,
+        spouseBirthYear: parseInt(String(spouseBirthYear), 10) || 1987,
         spouseBirthMonth,
-        spouseRetirementAge,
-        spouseLifeExpectancyAge,
-        spouseSsMonthlyAmount,
-        spouseSsStartAge,
+        spouseRetirementAge: parseInt(String(spouseRetirementAge), 10) || 60,
+        spouseLifeExpectancyAge: parseInt(String(spouseLifeExpectancyAge), 10) || 100,
+        spouseSsMonthlyAmount: parseFloat(String(spouseSsMonthlyAmount)) || 0,
+        spouseSsStartAge: parseInt(String(spouseSsStartAge), 10) || 67,
         enableSpousalSsBenefit,
-        primarySalary,
-        spouseSalary,
+        primarySalary: parseFloat(String(primarySalary)) || 0,
+        spouseSalary: parseFloat(String(spouseSalary)) || 0,
         primarySalaryRaisePct,
         spouseSalaryRaisePct,
         primarySalaryYear: new Date().getFullYear(),
         spouseSalaryYear: new Date().getFullYear(),
-        primarySsMonthlyAmount,
-        primarySsStartAge,
-        fiTargetMultiplier,
+        primarySsMonthlyAmount: parseFloat(String(primarySsMonthlyAmount)) || 0,
+        primarySsStartAge: parseInt(String(primarySsStartAge), 10) || 67,
+        fiTargetMultiplier: parseInt(String(fiTargetMultiplier), 10) || 25,
         accountInclusions,
+        sourcePlanId: sourcePlan?.id,
       });
       onClose();
     } catch (err) {
@@ -346,7 +349,7 @@ export function PlanWizardModal({
                     min={1940}
                     max={2010}
                     value={primaryBirthYear}
-                    onChange={(e) => setPrimaryBirthYear(parseInt(e.target.value, 10) || 1985)}
+                    onChange={(e) => setPrimaryBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -359,7 +362,7 @@ export function PlanWizardModal({
                     min={30}
                     max={80}
                     value={retirementAge}
-                    onChange={(e) => setRetirementAge(parseInt(e.target.value, 10) || 60)}
+                    onChange={(e) => setRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -372,7 +375,7 @@ export function PlanWizardModal({
                     min={65}
                     max={110}
                     value={lifeExpectancyAge}
-                    onChange={(e) => setLifeExpectancyAge(parseInt(e.target.value, 10) || 100)}
+                    onChange={(e) => setLifeExpectancyAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -384,8 +387,8 @@ export function PlanWizardModal({
                     min={0}
                     step={1000}
                     placeholder="e.g. 120000"
-                    value={primarySalary || ''}
-                    onChange={(e) => setPrimarySalary(parseFloat(e.target.value) || 0)}
+                    value={primarySalary === 0 ? '' : primarySalary}
+                    onChange={(e) => setPrimarySalary(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -447,7 +450,7 @@ export function PlanWizardModal({
                     min={1940}
                     max={2010}
                     value={spouseBirthYear}
-                    onChange={(e) => setSpouseBirthYear(parseInt(e.target.value, 10) || 1987)}
+                    onChange={(e) => setSpouseBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -459,7 +462,7 @@ export function PlanWizardModal({
                     min={30}
                     max={80}
                     value={spouseRetirementAge}
-                    onChange={(e) => setSpouseRetirementAge(parseInt(e.target.value, 10) || 60)}
+                    onChange={(e) => setSpouseRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -471,8 +474,8 @@ export function PlanWizardModal({
                     min={0}
                     step={1000}
                     placeholder="e.g. 85000"
-                    value={spouseSalary || ''}
-                    onChange={(e) => setSpouseSalary(parseFloat(e.target.value) || 0)}
+                    value={spouseSalary === 0 ? '' : spouseSalary}
+                    onChange={(e) => setSpouseSalary(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -497,7 +500,7 @@ export function PlanWizardModal({
                     min={0}
                     step={100}
                     value={spouseSsMonthlyAmount}
-                    onChange={(e) => setSpouseSsMonthlyAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setSpouseSsMonthlyAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -509,7 +512,7 @@ export function PlanWizardModal({
                     min={62}
                     max={70}
                     value={spouseSsStartAge}
-                    onChange={(e) => setSpouseSsStartAge(parseInt(e.target.value, 10) || 67)}
+                    onChange={(e) => setSpouseSsStartAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>

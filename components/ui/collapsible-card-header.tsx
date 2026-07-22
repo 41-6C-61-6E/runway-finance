@@ -8,11 +8,13 @@ interface CollapsibleCardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivEl
   isCollapsed?: boolean;
   onToggle?: (collapsed: boolean) => void;
   title?: React.ReactNode;
+  description?: React.ReactNode;
+  icon?: React.ElementType;
   actions?: React.ReactNode;
 }
 
 const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHeaderProps>(
-  ({ isCollapsed = false, onToggle, title, actions, className, children, ...props }, ref) => {
+  ({ isCollapsed = false, onToggle, title, description, icon: Icon, actions, className, children, ...props }, ref) => {
     const showActions = actions && !isCollapsed;
 
     return (
@@ -20,20 +22,26 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
         ref={ref}
         className={cn(
           'flex sm:flex-row sm:items-center justify-between px-4 sm:px-6 transition-all duration-200',
-          showActions ? 'flex-col gap-2.5 py-4' : 'flex-row gap-4 py-2.5',
+          showActions ? 'flex-col gap-2.5 py-4' : 'flex-row gap-4 py-3',
           className
         )}
         {...props}
       >
         <div className="flex items-center justify-between w-full sm:w-auto gap-3 min-w-0">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            {title && (
-              typeof title === 'string' ? (
-                <h3 className="font-normal truncate text-foreground text-sm sm:text-base">{title}</h3>
-              ) : (
-                <div className="min-w-0 flex-1 text-sm sm:text-base text-foreground font-normal [&>h3]:text-sm sm:[&>h3]:text-base [&>h3]:font-normal [&>span]:text-sm sm:[&>span]:text-base [&>span]:font-normal [&>h2]:text-sm sm:[&>h2]:text-base [&>h2]:font-normal [&>div]:font-normal [&>h1]:font-normal">{title}</div>
-              )
-            )}
+            {Icon && <Icon className="w-4 h-4 text-primary shrink-0" />}
+            <div className="min-w-0 flex-1">
+              {title && (
+                typeof title === 'string' ? (
+                  <h3 className="font-bold truncate text-foreground text-sm sm:text-base">{title}</h3>
+                ) : (
+                  <div className="min-w-0 flex-1 text-sm sm:text-base text-foreground font-bold">{title}</div>
+                )
+              )}
+              {description && (
+                <p className="text-xs text-muted-foreground font-normal leading-tight mt-0.5">{description}</p>
+              )}
+            </div>
             {children}
           </div>
           <button

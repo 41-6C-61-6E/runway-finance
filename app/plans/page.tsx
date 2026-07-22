@@ -173,7 +173,13 @@ export default function PlansPage() {
   // Generic Update Plan callback for child tabs
   const handleUpdatePlan = useCallback(
     async (updates: any) => {
-      if (!selectedPlanId || updating) return;
+      if (!selectedPlanId) return;
+
+      // Optimistically update local plan state in plansList immediately
+      setPlansList((prev) =>
+        prev.map((p) => (p.id === selectedPlanId ? { ...p, ...updates } : p))
+      );
+
       setUpdating(true);
       try {
         const res = await fetch('/api/retirement/plans', {
@@ -191,7 +197,7 @@ export default function PlansPage() {
         setUpdating(false);
       }
     },
-    [selectedPlanId, updating]
+    [selectedPlanId]
   );
 
   // Handle plan deletion after user confirms in dialog

@@ -266,7 +266,15 @@ export async function POST(req: NextRequest) {
       spouseSalaryRaisePct,
       primarySalaryYear,
       spouseSalaryYear,
+      sourcePlanId,
     } = body;
+
+    // Find default plan ID as source if not explicitly passed
+    let effectiveSourcePlanId = sourcePlanId;
+    if (!effectiveSourcePlanId) {
+      const defaultPlanRow = await getDb().select({ id: plans.id }).from(plans).where(and(eq(plans.userId, dataUserId), eq(plans.isDefault, true))).limit(1);
+      effectiveSourcePlanId = defaultPlanRow[0]?.id;
+    }
 
     // If setting as default, clear default status on other plans
     if (isDefault) {
@@ -307,8 +315,8 @@ export async function POST(req: NextRequest) {
     const inserted = await getDb().insert(plans).values(encryptedValues).returning();
     const newPlanId = inserted[0].id;
     
-    // Auto-populate accounts, income, expenses, and flows from user finances
-    await populatePlanWithUserFinances(newPlanId, dataUserId, dek);
+    // Auto-populate accounts, income, expenses, and flows (cloning from source plan if available)
+    await populatePlanWithUserFinances(newPlanId, dataUserId, dek, effectiveSourcePlanId);
 
     // Apply specific account inclusions if passed from the wizard
     if (accountInclusions && typeof accountInclusions === 'object') {
