@@ -695,6 +695,7 @@ describe('Retirement Projection Engine', () => {
       name: 'Age Gap Plan',
       hasSpouse: true,
       primaryBirthYear: 1970, // Age 55
+      primaryBirthMonth: 1,
       spouseBirthYear: 1980,  // Age 45 (10-year gap)
       filingStatus: 'married_joint',
       retirementAge: 60,
