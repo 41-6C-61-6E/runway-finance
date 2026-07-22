@@ -204,11 +204,14 @@ export default function PlansPage() {
         if (remaining.length > 0) {
           setPlansList(remaining);
           if (selectedPlanId === planToDelete.id) {
-            setSelectedPlanId(remaining[0].id);
+            const nextDefault = remaining.find((p) => p.isDefault) || remaining[0];
+            setSelectedPlanId(nextDefault.id);
           }
         } else {
-          // If deleting the last plan, fetch fresh auto-created Default Plan
-          await fetchPlansAndAccounts();
+          // If deleting the last plan (default plan), clear state and open setup wizard
+          setPlansList([]);
+          setSelectedPlanId(null);
+          openNewPlanWizard();
         }
       }
     } catch (err) {

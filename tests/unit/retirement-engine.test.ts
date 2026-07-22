@@ -898,6 +898,83 @@ describe('Retirement Projection Engine', () => {
     // Roth conversions should happen while keeping MAGI within safe bounds
     expect(yr1.magi).toBeLessThan(200000);
   });
+
+  it('correctly categorizes diverse account types and tracks accountBalances in yearly simulation results', () => {
+    const multiAccountPlan: EnginePlan = {
+      id: 'plan_multi',
+      name: 'Multi Account Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1985,
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 70,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_1',
+          name: 'Fidelity Brokerage',
+          type: 'brokerage',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 80000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 0.0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+        {
+          id: 'acc_2',
+          name: 'Empower 401(k)',
+          type: '401k',
+          owner: 'primary',
+          balance: 200000,
+          costBasis: 200000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 0.0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+        {
+          id: 'acc_3',
+          name: 'Vanguard Roth IRA',
+          type: 'roth',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 0.0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      liabilities: [],
+      events: [],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(multiAccountPlan);
+    const yr1 = output.yearlyResults[0];
+
+    // Verify accountBalances exists and contains all accounts
+    expect(yr1.accountBalances).toBeDefined();
+    expect(yr1.accountBalances.length).toBe(3);
+
+    const brokerageAcc = yr1.accountBalances.find((a) => a.id === 'acc_1');
+    const k401Acc = yr1.accountBalances.find((a) => a.id === 'acc_2');
+    const rothAcc = yr1.accountBalances.find((a) => a.id === 'acc_3');
+
+    expect(brokerageAcc?.category).toBe('taxable');
+    expect(k401Acc?.category).toBe('taxDeferred');
+    expect(rothAcc?.category).toBe('taxFree');
+
+    // Verify portfolioBreakdown matches
+    expect(yr1.portfolioBreakdown.taxable).toBeCloseTo(brokerageAcc?.balance || 0, 1);
+    expect(yr1.portfolioBreakdown.taxDeferred).toBeCloseTo(k401Acc?.balance || 0, 1);
+    expect(yr1.portfolioBreakdown.taxFree).toBeCloseTo(rothAcc?.balance || 0, 1);
+  });
 });
 
 

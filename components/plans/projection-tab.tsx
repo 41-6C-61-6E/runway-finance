@@ -368,6 +368,16 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
         const filteredPortfolio = cashBal + taxableBal + taxDeferredBal + taxFreeBal + hsaBal;
 
+        // Process per-account projected balances
+        const rawAccountBalances = (y.accountBalances || []).map((acc: any) => ({
+          ...acc,
+          projectedBalance: Math.round(acc.balance / discountFactor),
+        }));
+
+        const filteredAccountBalances = rawAccountBalances.filter(
+          (acc: any) => activeAssetCategories[acc.category] !== false
+        );
+
         // Discretionary drawdown excludes forced RMD distributions
         const discDeficit = Math.round((y.discretionaryDeficitWithdrawn ?? y.deficitWithdrawn ?? 0) / discountFactor);
         const discretionaryWithdrawalRate = discDeficit > 0 && (nw + discDeficit) > 0
@@ -386,11 +396,14 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           netWorth: filteredPortfolio,
           portfolioBalance: filteredPortfolio,
           totalNetWorth: nw,
+          totalUnfilteredPortfolio: rawCash + rawTaxable + rawTaxDeferred + rawTaxFree + rawHsa,
           cashBal,
           taxableBal,
           taxDeferredBal,
           taxFreeBal,
           hsaBal,
+          accountBalances: rawAccountBalances,
+          filteredAccountBalances,
           income: Math.round(y.grossIncome / discountFactor),
           expenses: y.primaryAge >= localRetirementAge ? Math.round(y.totalExpenses / discountFactor) : null,
           isRetired: y.primaryAge >= localRetirementAge,
@@ -424,7 +437,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
       });
     }
     return [];
-  }, [yearlySimResults, localRetirementAge, milestoneMap, dollarMode, localInflationRate]);
+  }, [yearlySimResults, localRetirementAge, milestoneMap, dollarMode, localInflationRate, activeAssetCategories]);
 
   // Monte Carlo chart data format
   const monteCarloChartData = useMemo(() => {
@@ -1252,9 +1265,10 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const MilestoneIcon = data.milestone?.icon;
+  const isFiltered = data.portfolioBalance !== data.totalUnfilteredPortfolio && data.totalUnfilteredPortfolio > 0;
 
   return (
-    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[230px] z-50">
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
         <span className="text-foreground font-mono">Year {data.year} (Age {data.age})</span>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
@@ -1267,44 +1281,114 @@ function CustomTooltip({ active, payload }: any) {
       </div>
 
       <div className="space-y-1.5 font-mono">
-        <div className="flex justify-between items-center text-sm font-extrabold pb-1.5 border-b border-border/50">
-          <span className="text-muted-foreground text-xs font-semibold font-sans">Retirement Portfolio:</span>
-          <span className="text-emerald-500 font-mono">{formatCurrency(data.portfolioBalance || data.netWorth)}</span>
+        <div>
+          <div className="flex justify-between items-center text-sm font-extrabold pb-1 border-b border-border/50">
+            <span className="text-muted-foreground text-xs font-semibold font-sans">Retirement Portfolio:</span>
+            <span className="text-emerald-500 font-mono">{formatCurrency(data.portfolioBalance || data.netWorth)}</span>
+          </div>
+          {isFiltered && (
+            <div className="text-[10px] text-amber-500 font-sans text-right pt-0.5">
+              Filtered ({formatCurrency(data.portfolioBalance)} of {formatCurrency(data.totalUnfilteredPortfolio)})
+            </div>
+          )}
         </div>
 
         {/* Asset Category Balances */}
         <div className="space-y-1 text-[11px] pt-0.5">
           {data.taxableBal > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-amber-500 font-sans">Taxable Brokerage:</span>
+              <span className="text-amber-500 font-sans flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Taxable Brokerage:
+              </span>
               <span className="font-bold text-foreground">{formatCurrency(data.taxableBal)}</span>
             </div>
           )}
           {data.taxDeferredBal > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-purple-500 font-sans">Tax-Deferred (Traditional):</span>
+              <span className="text-purple-500 font-sans flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                Tax-Deferred (Traditional):
+              </span>
               <span className="font-bold text-foreground">{formatCurrency(data.taxDeferredBal)}</span>
             </div>
           )}
           {data.taxFreeBal > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-pink-500 font-sans">Tax-Free (Roth):</span>
+              <span className="text-pink-500 font-sans flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                Tax-Free (Roth):
+              </span>
               <span className="font-bold text-foreground">{formatCurrency(data.taxFreeBal)}</span>
             </div>
           )}
           {data.hsaBal > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-teal-500 font-sans">HSA:</span>
+              <span className="text-teal-500 font-sans flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                HSA:
+              </span>
               <span className="font-bold text-foreground">{formatCurrency(data.hsaBal)}</span>
             </div>
           )}
           {data.cashBal > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-sans">Cash & Savings:</span>
+              <span className="text-slate-400 font-sans flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                Cash & Savings:
+              </span>
               <span className="font-bold text-foreground">{formatCurrency(data.cashBal)}</span>
             </div>
           )}
         </div>
+
+        {/* Per-Account Projected Balance Breakdown */}
+        {data.filteredAccountBalances && data.filteredAccountBalances.length > 0 && (
+          <div className="pt-2 border-t border-border/50 space-y-1.5 font-sans">
+            <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span>Account Projections</span>
+              <span className="font-mono text-[9.5px] text-muted-foreground">
+                {data.filteredAccountBalances.length} account{data.filteredAccountBalances.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+              {data.filteredAccountBalances
+                .slice()
+                .sort((a: any, b: any) => b.projectedBalance - a.projectedBalance)
+                .map((acc: any, i: number) => {
+                  const pct = data.portfolioBalance > 0 ? (acc.projectedBalance / data.portfolioBalance) * 100 : 0;
+                  const catDot =
+                    acc.category === 'taxable'
+                      ? 'bg-amber-500'
+                      : acc.category === 'taxDeferred'
+                      ? 'bg-purple-500'
+                      : acc.category === 'taxFree'
+                      ? 'bg-pink-500'
+                      : acc.category === 'hsa'
+                      ? 'bg-teal-500'
+                      : 'bg-slate-400';
+                  return (
+                    <div key={acc.id || i} className="flex items-center justify-between text-[11px] gap-2 py-0.5">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${catDot}`} />
+                        <span className="font-medium text-foreground truncate max-w-[140px]" title={acc.name}>
+                          {acc.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 font-mono text-right">
+                        <span className="font-bold text-foreground">{formatCurrency(acc.projectedBalance)}</span>
+                        {pct > 0 && (
+                          <span className="text-[9.5px] text-muted-foreground font-sans">
+                            ({pct.toFixed(0)}%)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {data.discretionaryDeficit > 0 && (
           <div className="flex justify-between items-center pt-1 border-t border-border/40 text-amber-500 text-[11px]">
