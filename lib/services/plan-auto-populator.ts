@@ -3,8 +3,78 @@ import { accounts, paystubs, plans, planAccounts, planEvents, planFlows, planSet
 import { eq } from 'drizzle-orm';
 import { encryptRow, decryptRow } from '@/lib/crypto';
 
-export async function populatePlanWithUserFinances(planId: string, dataUserId: string, dek: Uint8Array) {
+export async function populatePlanWithUserFinances(planId: string, dataUserId: string, dek: Uint8Array, sourcePlanId?: string) {
   const db = getDb();
+
+  // If cloning from an existing plan (e.g. Default Plan), copy its events, flows, settings, and account rules
+  if (sourcePlanId) {
+    const [rawSrcAccounts, rawSrcEvents, rawSrcFlows, rawSrcSettings] = await Promise.all([
+      db.select().from(planAccounts).where(eq(planAccounts.planId, sourcePlanId)),
+      db.select().from(planEvents).where(eq(planEvents.planId, sourcePlanId)),
+      db.select().from(planFlows).where(eq(planFlows.planId, sourcePlanId)),
+      db.select().from(planSettings).where(eq(planSettings.planId, sourcePlanId)).limit(1),
+    ]);
+
+    if (rawSrcAccounts.length > 0 || rawSrcEvents.length > 0 || rawSrcFlows.length > 0) {
+      await db.delete(planAccounts).where(eq(planAccounts.planId, planId));
+      await db.delete(planEvents).where(eq(planEvents.planId, planId));
+      await db.delete(planFlows).where(eq(planFlows.planId, planId));
+      await db.delete(planSettings).where(eq(planSettings.planId, planId));
+
+      const accountIdMap: Record<string, string> = {};
+
+      for (const a of rawSrcAccounts) {
+        const decAcc = await decryptRow('plan_accounts', a, dek);
+        const encAcc = await encryptRow('plan_accounts', {
+          ...decAcc,
+          planId,
+          userId: dataUserId,
+        }, dek);
+        delete encAcc.id;
+        const insertedAcc = await db.insert(planAccounts).values(encAcc).returning();
+        if (decAcc.id && insertedAcc[0]) {
+          accountIdMap[decAcc.id] = insertedAcc[0].id;
+        }
+      }
+
+      for (const e of rawSrcEvents) {
+        const decEv = await decryptRow('plan_events', e, dek);
+        const encEv = await encryptRow('plan_events', {
+          ...decEv,
+          planId,
+          userId: dataUserId,
+        }, dek);
+        delete encEv.id;
+        await db.insert(planEvents).values(encEv);
+      }
+
+      for (const f of rawSrcFlows) {
+        const decFl = await decryptRow('plan_flows', f, dek);
+        const encFl = await encryptRow('plan_flows', {
+          ...decFl,
+          planId,
+          userId: dataUserId,
+          targetAccountId: decFl.targetAccountId ? (accountIdMap[decFl.targetAccountId] || decFl.targetAccountId) : undefined,
+          matchAccountId: decFl.matchAccountId ? (accountIdMap[decFl.matchAccountId] || decFl.matchAccountId) : undefined,
+        }, dek);
+        delete encFl.id;
+        await db.insert(planFlows).values(encFl);
+      }
+
+      if (rawSrcSettings[0]) {
+        const decSt = await decryptRow('plan_settings', rawSrcSettings[0], dek);
+        const encSt = await encryptRow('plan_settings', {
+          ...decSt,
+          planId,
+          userId: dataUserId,
+        }, dek);
+        delete (encSt as any).id;
+        await db.insert(planSettings).values(encSt);
+      }
+
+      return;
+    }
+  }
 
   // 1. Fetch & decrypt user accounts
   const rawUserAccs = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));

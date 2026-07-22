@@ -507,56 +507,82 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                 <div className="p-5 space-y-4">
                   <div className="space-y-3 text-xs">
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Partner Name / Label</label>
-                      <input
-                        type="text"
-                        value={spouseName}
+                      <label className="font-semibold text-muted-foreground">Tax Filing Status</label>
+                      <select
+                        value={filingStatus}
                         onChange={(e) => {
-                          setSpouseName(e.target.value);
-                          onUpdatePlan({ spouseName: e.target.value });
+                          const status = e.target.value;
+                          setFilingStatus(status);
+                          const hasSpouseUpdate = status === 'married_joint';
+                          onUpdatePlan({ filingStatus: status, hasSpouse: hasSpouseUpdate });
                         }}
-                        placeholder="Spouse / Partner"
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
-                      />
+                      >
+                        <option value="single">Single</option>
+                        <option value="married_joint">Married Filing Jointly (MFJ)</option>
+                        <option value="married_separate">Married Filing Separately</option>
+                        <option value="head_of_household">Head of Household</option>
+                      </select>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Partner Birth Year</label>
+                      <label className="font-semibold text-muted-foreground">Primary Birth Year</label>
                       <input
                         type="number"
-                        value={spouseBirthYear}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          setSpouseBirthYear(val);
-                          onUpdatePlan({ spouseBirthYear: val });
+                        value={birthYear || ''}
+                        onChange={(e) => setBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        onBlur={() => {
+                          const val = parseInt(String(birthYear), 10) || 1985;
+                          setBirthYear(val);
+                          onUpdatePlan({ primaryBirthYear: val });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseInt(String(birthYear), 10) || 1985;
+                            onUpdatePlan({ primaryBirthYear: val });
+                          }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Partner Retirement Age Target</label>
+                      <label className="font-semibold text-muted-foreground font-mono font-normal">Retirement Age Target</label>
                       <input
                         type="number"
-                        value={spouseRetirementAge}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          setSpouseRetirementAge(val);
-                          onUpdatePlan({ spouseRetirementAge: val });
+                        value={retirementAge || ''}
+                        onChange={(e) => setRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        onBlur={() => {
+                          const val = parseInt(String(retirementAge), 10) || 60;
+                          setRetirementAge(val);
+                          onUpdatePlan({ retirementAge: val });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseInt(String(retirementAge), 10) || 60;
+                            onUpdatePlan({ retirementAge: val });
+                          }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Partner Life Expectancy Target</label>
+                      <label className="font-semibold text-muted-foreground font-mono font-normal">Life Expectancy Target</label>
                       <input
                         type="number"
-                        value={spouseLifeExpectancy}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          setSpouseLifeExpectancy(val);
-                          onUpdatePlan({ spouseLifeExpectancyAge: val });
+                        value={lifeExpectancy || ''}
+                        onChange={(e) => setLifeExpectancy(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        onBlur={() => {
+                          const val = parseInt(String(lifeExpectancy), 10) || 100;
+                          setLifeExpectancy(val);
+                          onUpdatePlan({ lifeExpectancyAge: val });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseInt(String(lifeExpectancy), 10) || 100;
+                            onUpdatePlan({ lifeExpectancyAge: val });
+                          }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                       />
@@ -564,17 +590,18 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
 
                     <div className="space-y-1">
                       <label className="font-semibold text-muted-foreground">Gross Annual Salary</label>
-                      <p className="text-[10px] text-muted-foreground/70 -mt-0.5">Used to calculate {spouseName}'s account contribution amounts</p>
+                      <p className="text-[10px] text-muted-foreground/70 -mt-0.5">Used to calculate account contribution amounts (% of salary)</p>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">$</span>
                         <input
-                          type="number"
-                          value={spouseSalary}
-                          onChange={(e) => {
-                            setSpouseSalary(e.target.value);
-                            onUpdatePlan({ spouseSalary: e.target.value });
+                          type="text"
+                          value={primarySalary}
+                          onChange={(e) => setPrimarySalary(e.target.value)}
+                          onBlur={() => onUpdatePlan({ primarySalary: primarySalary })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') onUpdatePlan({ primarySalary: primarySalary });
                           }}
-                          placeholder="e.g. 85000"
+                          placeholder="e.g. 120000"
                           className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                         />
                       </div>
@@ -583,11 +610,12 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           <label className="text-[10px] font-semibold text-muted-foreground">Base Year</label>
                           <input
                             type="number"
-                            value={spouseSalaryYear}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              setSpouseSalaryYear(val);
-                              onUpdatePlan({ spouseSalaryYear: val });
+                            value={primarySalaryYear || ''}
+                            onChange={(e) => setPrimarySalaryYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                            onBlur={() => {
+                              const val = parseInt(String(primarySalaryYear), 10) || new Date().getFullYear();
+                              setPrimarySalaryYear(val);
+                              onUpdatePlan({ primarySalaryYear: val });
                             }}
                             className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
                           />
@@ -596,12 +624,12 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           <label className="text-[10px] font-semibold text-muted-foreground">Yearly Raise (%)</label>
                           <div className="relative">
                             <input
-                              type="number"
-                              step="0.1"
-                              value={spouseSalaryRaisePct}
-                              onChange={(e) => {
-                                setSpouseSalaryRaisePct(e.target.value);
-                                onUpdatePlan({ spouseSalaryRaisePct: e.target.value });
+                              type="text"
+                              value={primarySalaryRaisePct}
+                              onChange={(e) => setPrimarySalaryRaisePct(e.target.value)}
+                              onBlur={() => onUpdatePlan({ primarySalaryRaisePct: primarySalaryRaisePct })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') onUpdatePlan({ primarySalaryRaisePct: primarySalaryRaisePct });
                               }}
                               placeholder="e.g. 3.0"
                               className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
@@ -610,10 +638,10 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           </div>
                         </div>
                       </div>
-                      {(parseFloat(spouseSalaryRaisePct) > 0 || Object.keys(spouseSalaryOverrides).length > 0) && (
+                      {(parseFloat(primarySalaryRaisePct) > 0 || Object.keys(primarySalaryOverrides).length > 0) && (
                         <div className="mt-2 border border-border rounded-lg overflow-hidden">
                           <button
-                            onClick={() => setShowSpouseSchedule(!showSpouseSchedule)}
+                            onClick={() => setShowPrimarySchedule(!showPrimarySchedule)}
                             className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted/50 transition-colors"
                           >
                             <span>Salary Schedule Preview</span>
