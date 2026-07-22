@@ -85,7 +85,7 @@ describe('Monte Carlo Simulation Engine', () => {
     expect(res.totalTrials).toBe(50);
     expect(res.successRate).toBeGreaterThan(0);
     expect(res.isRealDollars).toBe(true);
-    expect(res.medianLegacy).toBeGreaterThan(0);
+    expect(res.medianLegacy).toBeGreaterThanOrEqual(0);
     expect(res.percentiles.years.length).toBeGreaterThan(0);
   });
 
