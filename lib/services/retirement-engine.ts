@@ -88,6 +88,12 @@ export interface EnginePlan {
   customWithdrawalOrder?: string[];
   primarySalary?: number;
   spouseSalary?: number;
+  primarySalaryYear?: number;
+  primarySalaryRaisePct?: number;
+  primarySalaryOverrides?: Record<number, number>;
+  spouseSalaryYear?: number;
+  spouseSalaryRaisePct?: number;
+  spouseSalaryOverrides?: Record<number, number>;
   accounts: EngineAccount[];
   liabilities: EngineLiability[];
   events: EngineEvent[];
@@ -223,6 +229,35 @@ export interface SimulationOutput {
   depletionAge?: number;
 }
 
+export function getYearSalary(
+  baseSalary: number,
+  baseYear: number,
+  raisePct: number,
+  overrides: Record<number, number> | undefined,
+  targetYear: number
+): number {
+  if (baseSalary <= 0) return 0;
+
+  let effectiveBase = baseSalary;
+  let effectiveBaseYear = baseYear;
+
+  if (overrides) {
+    const overrideYears = Object.keys(overrides)
+      .map(Number)
+      .filter((y) => y <= targetYear)
+      .sort((a, b) => b - a);
+    if (overrideYears.length > 0) {
+      const latestOverrideYear = overrideYears[0];
+      effectiveBase = overrides[latestOverrideYear];
+      effectiveBaseYear = latestOverrideYear;
+    }
+  }
+
+  const yearDiff = targetYear - effectiveBaseYear;
+  if (yearDiff <= 0) return effectiveBase;
+  return effectiveBase * Math.pow(1 + raisePct / 100, yearDiff);
+}
+
 export function runRetirementSimulation(
   plan: EnginePlan,
   yearGrowthFn?: (yearIndex: number, acc: EngineAccount) => { growth: number; dividend: number }
@@ -314,10 +349,20 @@ export function runRetirementSimulation(
     // 0. Check IRMAA surcharges triggered from 2 years prior (age 65+)
     const irmaaSurchargeAnnual = primaryAge >= 65 ? irmaaSurchargeQueue[simYear] || 0 : 0;
 
-    // 1. Income Events Calculation (Separate Primary vs Spouse salary)
-    let salaryIncome = 0;
-    let primarySalaryIncome = 0;
-    let spouseSalaryIncome = 0;
+    // 1. Income Calculation — primary/spouse salary from plan-level fields, events for other income
+    const isPrimaryWorking = primaryAge < plan.retirementAge;
+    const isSpouseWorking = isMfj && spouseAge !== undefined && spouseAge < (plan.spouseRetirementAge || plan.retirementAge);
+
+    const adjustedPrimarySalary = isPrimaryWorking
+      ? getYearSalary(plan.primarySalary || 0, plan.primarySalaryYear || currentYear, plan.primarySalaryRaisePct || 0, plan.primarySalaryOverrides, simYear)
+      : 0;
+    const adjustedSpouseSalary = isSpouseWorking
+      ? getYearSalary(plan.spouseSalary || 0, plan.spouseSalaryYear || currentYear, plan.spouseSalaryRaisePct || 0, plan.spouseSalaryOverrides, simYear)
+      : 0;
+
+    let salaryIncome = adjustedPrimarySalary + adjustedSpouseSalary;
+    let primarySalaryIncome = adjustedPrimarySalary;
+    let spouseSalaryIncome = adjustedSpouseSalary;
     let primarySsIncome = 0;
     let spouseSsIncome = 0;
     let pensionIncome = 0;
@@ -325,6 +370,7 @@ export function runRetirementSimulation(
 
     for (const ev of plan.events) {
       if (ev.category !== 'income') continue;
+      if (ev.type === 'salary') continue; // Primary/spouse salary comes from plan-level fields
       if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge)) continue;
 
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
@@ -333,14 +379,7 @@ export function runRetirementSimulation(
       let val = baseAmt * growthMult * inflMult;
       if (ev.growthCap && val > ev.growthCap) val = ev.growthCap;
 
-      if (ev.type === 'salary') {
-        salaryIncome += val;
-        if (ev.owner === 'spouse') {
-          spouseSalaryIncome += val;
-        } else {
-          primarySalaryIncome += val;
-        }
-      } else if (ev.type === 'pension') pensionIncome += val;
+      if (ev.type === 'pension') pensionIncome += val;
       else if (ev.type === 'social_security') {
         if (ev.owner === 'spouse') spouseSsIncome += val;
         else primarySsIncome += val;
@@ -407,18 +446,16 @@ export function runRetirementSimulation(
     // Helper to get applicable salary base for a flow (Primary vs Spouse vs Combined)
     const getFlowSalaryBase = (flow: EngineFlow, targetAcc: EngineAccount) => {
       const source = flow.salarySource || (targetAcc.owner === 'spouse' ? 'spouse' : targetAcc.owner === 'primary' ? 'primary' : 'combined');
-      if (source === 'spouse') return spouseSalaryIncome > 0 ? spouseSalaryIncome : salaryIncome;
-      if (source === 'primary') return primarySalaryIncome > 0 ? primarySalaryIncome : salaryIncome;
-      return salaryIncome;
+      if (source === 'spouse') return adjustedSpouseSalary > 0 ? adjustedSpouseSalary : adjustedPrimarySalary;
+      if (source === 'primary') return adjustedPrimarySalary > 0 ? adjustedPrimarySalary : adjustedSpouseSalary;
+      return adjustedPrimarySalary + adjustedSpouseSalary;
     };
 
     // Helper to get salary base for per-account contributions (uses plan-level salary fields)
     const getAccountSalaryBase = (acc: EngineAccount) => {
-      const planPrimarySalary = plan.primarySalary || 0;
-      const planSpouseSalary = plan.spouseSalary || 0;
       const source = acc.contributionSalarySource || (acc.owner === 'spouse' ? 'spouse' : 'primary');
-      if (source === 'spouse') return planSpouseSalary > 0 ? planSpouseSalary : planPrimarySalary;
-      return planPrimarySalary > 0 ? planPrimarySalary : (primarySalaryIncome > 0 ? primarySalaryIncome : salaryIncome);
+      if (source === 'spouse') return adjustedSpouseSalary > 0 ? adjustedSpouseSalary : adjustedPrimarySalary;
+      return adjustedPrimarySalary;
     };
 
     // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)

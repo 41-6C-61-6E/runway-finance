@@ -58,6 +58,8 @@ export function PlanWizardModal({
   // Salary State
   const [primarySalary, setPrimarySalary] = useState(0);
   const [spouseSalary, setSpouseSalary] = useState(0);
+  const [primarySalaryRaisePct, setPrimarySalaryRaisePct] = useState('0');
+  const [spouseSalaryRaisePct, setSpouseSalaryRaisePct] = useState('0');
 
   // SS & FI Target State
   const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState(2500);
@@ -95,6 +97,8 @@ export function PlanWizardModal({
 
       setPrimarySalary(parseFloat(initialPlan.primarySalary) || 0);
       setSpouseSalary(parseFloat(initialPlan.spouseSalary) || 0);
+      setPrimarySalaryRaisePct(initialPlan.primarySalaryRaisePct || '0');
+      setSpouseSalaryRaisePct(initialPlan.spouseSalaryRaisePct || '0');
       setPrimarySsMonthlyAmount(parseFloat(initialPlan.primarySsMonthlyAmount) || 2500);
       setPrimarySsStartAge(Number(initialPlan.primarySsStartAge) || 67);
       setFiTargetMultiplier(Number(initialPlan.fiTargetMultiplier) || 25);
@@ -129,6 +133,8 @@ export function PlanWizardModal({
 
       setPrimarySalary(parseFloat(sourcePlan?.primarySalary) || 0);
       setSpouseSalary(parseFloat(sourcePlan?.spouseSalary) || 0);
+      setPrimarySalaryRaisePct(sourcePlan?.primarySalaryRaisePct || '0');
+      setSpouseSalaryRaisePct(sourcePlan?.spouseSalaryRaisePct || '0');
       setPrimarySsMonthlyAmount(parseFloat(sourcePlan?.primarySsMonthlyAmount) || 2500);
       setPrimarySsStartAge(Number(sourcePlan?.primarySsStartAge) || 67);
       setFiTargetMultiplier(Number(sourcePlan?.fiTargetMultiplier) || 25);
@@ -204,6 +210,10 @@ export function PlanWizardModal({
         enableSpousalSsBenefit,
         primarySalary,
         spouseSalary,
+        primarySalaryRaisePct,
+        spouseSalaryRaisePct,
+        primarySalaryYear: new Date().getFullYear(),
+        spouseSalaryYear: new Date().getFullYear(),
         primarySsMonthlyAmount,
         primarySsStartAge,
         fiTargetMultiplier,
@@ -379,6 +389,19 @@ export function PlanWizardModal({
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Yearly Raise (%)</label>
+                  <input
+                    type="number"
+                    step={0.1}
+                    min={0}
+                    placeholder="e.g. 3.0"
+                    value={primarySalaryRaisePct || ''}
+                    onChange={(e) => setPrimarySalaryRaisePct(e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl p-3 text-xs text-muted-foreground">
@@ -450,6 +473,19 @@ export function PlanWizardModal({
                     placeholder="e.g. 85000"
                     value={spouseSalary || ''}
                     onChange={(e) => setSpouseSalary(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Partner Yearly Raise (%)</label>
+                  <input
+                    type="number"
+                    step={0.1}
+                    min={0}
+                    placeholder="e.g. 3.0"
+                    value={spouseSalaryRaisePct || ''}
+                    onChange={(e) => setSpouseSalaryRaisePct(e.target.value)}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>

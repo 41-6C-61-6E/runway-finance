@@ -10,9 +10,12 @@ describe('Retirement Engine Advanced Drawdowns, Conversions & IRMAA', () => {
     primaryBirthYear: 1970, // Age 56 in 2026
     primaryBirthMonth: 1,
     filingStatus: 'single',
-    retirementAge: 60, // Retirement in 4 years (2030)
-    lifeExpectancyAge: 85,
-    withdrawalMethod: 'textbook',
+      retirementAge: 60, // Retirement in 4 years (2030)
+      lifeExpectancyAge: 85,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 2.0,
+      withdrawalMethod: 'textbook',
     accounts: [
       {
         id: 'acc_cash',
@@ -65,19 +68,6 @@ describe('Retirement Engine Advanced Drawdowns, Conversions & IRMAA', () => {
     ],
     liabilities: [],
     events: [
-      {
-        id: 'ev_salary',
-        name: 'Primary Salary',
-        category: 'income',
-        type: 'salary',
-        owner: 'primary',
-        amount: 100000,
-        frequency: 'yearly',
-        growthRate: 2.0,
-        adjustForInflation: true,
-        startTriggerType: 'now',
-        endTriggerType: 'retirement',
-      },
       {
         id: 'ev_living',
         name: 'Living Expenses',

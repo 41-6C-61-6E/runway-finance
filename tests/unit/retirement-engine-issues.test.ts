@@ -52,6 +52,12 @@ describe('FIRE Open Issues Fixes', () => {
       filingStatus: 'married_joint',
       retirementAge: 65,
       lifeExpectancyAge: 90,
+      primarySalary: 100000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
+      spouseSalary: 50000,
+      spouseSalaryYear: 2026,
+      spouseSalaryRaisePct: 0,
       withdrawalMethod: 'textbook',
       accounts: [
         {
@@ -80,34 +86,7 @@ describe('FIRE Open Issues Fixes', () => {
         },
       ],
       liabilities: [],
-      events: [
-        {
-          id: 'ev-primary-sal',
-          name: 'Primary Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'primary',
-          amount: 100000,
-          frequency: 'yearly',
-          growthRate: 0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-        {
-          id: 'ev-spouse-sal',
-          name: 'Spouse Salary',
-          category: 'income',
-          type: 'salary',
-          owner: 'spouse',
-          amount: 50000,
-          frequency: 'yearly',
-          growthRate: 0,
-          adjustForInflation: false,
-          startTriggerType: 'now',
-          endTriggerType: 'retirement',
-        },
-      ],
+      events: [],
       flows: [
         {
           id: 'flow-primary',
