@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784742944026",
+  "buildNumber": "26.07.1784761661855",
   "commits": [
-    "feat: add salary-based account contribution logic and configurable employer matching settings to the retirement planning engine",
-    "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
-    "feat: add salary_source column to plan_flows table",
-    "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging",
-    "fix: implement financial engine updates for Roth percentages, dual-salary flows, NIIT tax, IRMAA thresholds, and early withdrawal penalties."
+    "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
+    "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
+    "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
+    "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
+    "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI"
   ]
 }

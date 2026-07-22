@@ -181,6 +181,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         reinvestDividends: a.reinvestDividends !== false,
         qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
         rothPercentage: a.rothPercentage,
+        contributionMode: (a.contributionMode as any) || 'none',
+        contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
+        contributionSalarySource: (a.contributionSalarySource as any) || undefined,
+        companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
+        companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
+        isSurplusDestination: Boolean(a.isSurplusDestination),
       })),
       liabilities: [],
       events: planEventsList.map((e: any) => {
