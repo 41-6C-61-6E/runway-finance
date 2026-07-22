@@ -131,6 +131,7 @@ export function PlanManagementMenu({
                   setDropdownOpen(false);
                   onOpenWizardEdit(selectedPlan);
                 }}
+                title="Review and adjust all plan settings (retirement age, accounts, income, expenses, investment flows) in the step-by-step wizard."
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors text-left cursor-pointer"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
@@ -144,6 +145,7 @@ export function PlanManagementMenu({
                     setDropdownOpen(false);
                     await onSetDefaultPlan(selectedPlan.id);
                   }}
+                  title="Make this the active plan used for projections, dashboards, and the FIRE engine."
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-amber-500/10 hover:text-amber-600 rounded-xl transition-colors text-left cursor-pointer"
                 >
                   <Star className="w-3.5 h-3.5 shrink-0 text-amber-500" />
@@ -151,14 +153,15 @@ export function PlanManagementMenu({
                 </button>
               )}
 
-              {/* Reset Default Plan */}
+              {/* Re-Sync Finances */}
               <button
                 onClick={handleReset}
                 disabled={resetting}
+                title="Re-import your latest linked accounts, paystub salary, and auto-generate income/expense events and investment flows. Overwrites custom changes."
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-blue-500/10 hover:text-blue-600 rounded-xl transition-colors text-left cursor-pointer disabled:opacity-50"
               >
                 <RotateCcw className={`w-3.5 h-3.5 shrink-0 ${resetting ? 'animate-spin' : ''}`} />
-                <span>{resetting ? 'Resetting Finances...' : 'Reset Live Finances'}</span>
+                <span>{resetting ? 'Syncing...' : 'Re-Sync Finances'}</span>
               </button>
 
               <div className="border-t border-border my-1" />
@@ -169,6 +172,7 @@ export function PlanManagementMenu({
                   setDropdownOpen(false);
                   onOpenDeleteConfirm(selectedPlan);
                 }}
+                title="Permanently remove this plan and all its settings, accounts, events, and flows."
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors text-left cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
