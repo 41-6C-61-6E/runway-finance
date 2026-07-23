@@ -92,7 +92,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   });
   // Collapsible section states using useCardCollapsed hook
   const [isControlsCollapsed, setIsControlsCollapsed] = useCardCollapsed('fire_projection_controls', true); // Collapsed by default
-  const [isSummaryStatsCollapsed, setIsSummaryStatsCollapsed] = useCardCollapsed('fire_summary_stats', false);
+  const [isSummaryStatsCollapsed, setIsSummaryStatsCollapsed] = useCardCollapsed('fire_summary_stats', true); // Collapsed by default
   const [isMainChartCollapsed, setIsMainChartCollapsed] = useCardCollapsed('fire_main_chart');
   const [isMilestonesCollapsed, setIsMilestonesCollapsed] = useCardCollapsed('fire_milestones');
   const [isCashFlowCollapsed, setIsCashFlowCollapsed] = useCardCollapsed('fire_cash_flow');
@@ -738,12 +738,11 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </div>
           }
           actions={
-            <div className="flex items-center gap-2 font-mono text-xs">
-              <span className="font-extrabold text-foreground">{formatCurrency(currentNetWorth)}</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
+            isSummaryStatsCollapsed ? (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-mono ${planHealth.badge}`}>
                 Grade {planHealth.score}
               </span>
-            </div>
+            ) : null
           }
         />
 
