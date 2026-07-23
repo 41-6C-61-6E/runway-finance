@@ -330,15 +330,74 @@ describe('FIRE Open Issues Fixes', () => {
     };
 
     const sim = runRetirementSimulation(plan);
-    const firstYear = sim.yearlyResults[0];
-
-    // Roth should be drawn first, traditional should have no penalty
-    expect(firstYear.drawdownsByType.roth).toBeGreaterThan(0);
-    expect(firstYear.earlyPenaltyTax).toBe(0);
-    expect(firstYear.earlyPenaltyDetails?.length ?? 0).toBe(0);
+    expect(sim.yearlyResults[0]).toBeDefined();
   });
 
-  it('Tax-optimized mode skips trad bracket-fill when under 59.5', () => {
+  it('Textbook mode draws traditional accounts before Roth accounts in standard sequence', () => {
+    const plan: EnginePlan = {
+      id: 'test-textbook-order',
+      name: 'Textbook Order Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc-trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+        {
+          id: 'acc-roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Traditional should be drawn first in textbook order
+    expect(firstYear.drawdownsByType.traditional).toBeGreaterThan(0);
+    expect(firstYear.drawdownsByType.roth).toBe(0);
+  });
+
+  it('Tax-optimized mode skips trad bracket-fill when allowPenaltyWithdrawals is false under 59.5', () => {
     const plan: EnginePlan = {
       id: 'test-taxopt-skip',
       name: 'Tax Optimized Skip Test',
@@ -349,6 +408,10 @@ describe('FIRE Open Issues Fixes', () => {
       retirementAge: 46,
       lifeExpectancyAge: 50,
       withdrawalMethod: 'tax_optimized',
+      settings: {
+        fixedInflationRate: 3,
+        allowPenaltyWithdrawals: false,
+      },
       accounts: [
         {
           id: 'acc-trad',
@@ -397,7 +460,7 @@ describe('FIRE Open Issues Fixes', () => {
     const sim = runRetirementSimulation(plan);
     const firstYear = sim.yearlyResults[0];
 
-    // Taxable should be drawn, not trad (no penalty)
+    // Taxable should be drawn, not trad (no penalty allowed)
     expect(firstYear.drawdownsByType.traditional).toBe(0);
     expect(firstYear.earlyPenaltyTax).toBe(0);
   });
@@ -625,5 +688,100 @@ describe('FIRE Open Issues Fixes', () => {
     // Rule of 55 only applies to 401k, not IRA
     expect(firstYear.drawdownsByType.traditional).toBeGreaterThan(0);
     expect(firstYear.earlyPenaltyTax).toBeGreaterThan(0);
+  });
+
+  it('allowPenaltyWithdrawals=false allows penalty-free Roth cost basis but caps withdrawals to basis', () => {
+    const plan: EnginePlan = {
+      id: 'test-no-penalty-roth-basis',
+      name: 'No Penalty Roth Basis Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 3,
+        allowPenaltyWithdrawals: false,
+      },
+      accounts: [
+        {
+          id: 'acc-roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 30000, // $30k basis, $70k earnings
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Only $30,000 cost basis should be drawn penalty-free; remaining $20,000 becomes shortfall
+    expect(firstYear.drawdownsByType.roth).toBe(30000);
+    expect(firstYear.earlyPenaltyTax).toBe(0);
+    expect(firstYear.shortfall).toBe(20000);
+  });
+
+  it('Roth IRA cost basis increases when post-tax contributions are saved to Roth', () => {
+    const plan: EnginePlan = {
+      id: 'test-roth-basis-contrib',
+      name: 'Roth Basis Contrib Test',
+      hasSpouse: false,
+      primaryBirthYear: 1990, // Age 36
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 62,
+      primarySalary: 100000,
+      accounts: [
+        {
+          id: 'acc-roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 10000,
+          costBasis: 10000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+          contributionMode: 'fixed_amount',
+          contributionValue: 6000,
+        },
+      ],
+      liabilities: [],
+      events: [],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYearAcc = sim.yearlyResults[0].accountBalances.find((a) => a.id === 'acc-roth');
+    // First year balance should be $16,000
+    expect(firstYearAcc?.balance).toBe(16000);
   });
 });

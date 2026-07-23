@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
       retirementAge: Number(retirementAge) || 60,
       lifeExpectancyAge: Number(lifeExpectancyAge) || 100,
       fiTargetMultiplier: Number(fiTargetMultiplier) || 25,
-      withdrawalMethod: 'textbook',
+      withdrawalMethod: body.withdrawalMethod || 'textbook',
       isDefault: Boolean(isDefault),
       primarySalary: primarySalary !== undefined ? String(primarySalary) : '0',
       spouseSalary: spouseSalary !== undefined ? String(spouseSalary) : '0',
@@ -318,6 +318,124 @@ export async function POST(req: NextRequest) {
     
     // Auto-populate accounts, income, expenses, and flows (cloning from source plan if available)
     await populatePlanWithUserFinances(newPlanId, dataUserId, dek, effectiveSourcePlanId);
+
+    // Apply specific settings overrides if passed from the wizard
+    if (body.settings && typeof body.settings === 'object') {
+      const settingsRow = await getDb().select().from(planSettings)
+        .where(eq(planSettings.planId, newPlanId)).limit(1);
+
+      if (settingsRow[0]) {
+        const decSettings = await decryptRow('plan_settings', settingsRow[0], dek);
+        const settingsUpdates = { ...decSettings, ...body.settings, updatedAt: new Date() };
+        const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId: dataUserId, planId: newPlanId }, dek);
+        delete encSettings.userId;
+        delete encSettings.planId;
+        await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, newPlanId));
+      }
+    }
+
+    // Apply living expenses / healthcare / pension event overrides if passed from the wizard
+    const rawEvents = await getDb().select().from(planEvents).where(eq(planEvents.planId, newPlanId));
+    const decEvents = await Promise.all(rawEvents.map((e) => decryptRow('plan_events', e, dek)));
+
+    if (body.livingExpenseAmount !== undefined && Number(body.livingExpenseAmount) >= 0) {
+      const existingLiving = decEvents.find((e) => e.type === 'living_expense' || e.category === 'expense');
+      if (existingLiving) {
+        const encEv = await encryptRow('plan_events', {
+          ...existingLiving,
+          amount: String(body.livingExpenseAmount),
+          adjustForInflation: body.livingExpenseAdjustForInflation !== false,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId: newPlanId,
+        }, dek);
+        delete encEv.userId;
+        delete encEv.planId;
+        await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingLiving.id));
+      } else {
+        const encEv = await encryptRow('plan_events', {
+          planId: newPlanId,
+          userId: dataUserId,
+          name: 'Base Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: String(body.livingExpenseAmount),
+          frequency: 'yearly',
+          growthRate: '2.5',
+          adjustForInflation: body.livingExpenseAdjustForInflation !== false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        }, dek);
+        await getDb().insert(planEvents).values(encEv);
+      }
+    }
+
+    if (body.healthcareExpenseAmount !== undefined && Number(body.healthcareExpenseAmount) >= 0) {
+      const existingHealth = decEvents.find((e) => e.type === 'healthcare');
+      if (existingHealth) {
+        const encEv = await encryptRow('plan_events', {
+          ...existingHealth,
+          amount: String(body.healthcareExpenseAmount),
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId: newPlanId,
+        }, dek);
+        delete encEv.userId;
+        delete encEv.planId;
+        await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingHealth.id));
+      } else if (Number(body.healthcareExpenseAmount) > 0) {
+        const encEv = await encryptRow('plan_events', {
+          planId: newPlanId,
+          userId: dataUserId,
+          name: 'Healthcare & Medical Expenses',
+          category: 'expense',
+          type: 'healthcare',
+          owner: 'primary',
+          amount: String(body.healthcareExpenseAmount),
+          frequency: 'yearly',
+          growthRate: '4.5',
+          adjustForInflation: true,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        }, dek);
+        await getDb().insert(planEvents).values(encEv);
+      }
+    }
+
+    if (body.pensionIncomeAmount !== undefined && Number(body.pensionIncomeAmount) >= 0) {
+      const existingPension = decEvents.find((e) => e.type === 'pension' || e.type === 'passive');
+      if (existingPension) {
+        const encEv = await encryptRow('plan_events', {
+          ...existingPension,
+          amount: String(body.pensionIncomeAmount),
+          startTriggerValue: body.pensionStartAge ? String(body.pensionStartAge) : existingPension.startTriggerValue,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId: newPlanId,
+        }, dek);
+        delete encEv.userId;
+        delete encEv.planId;
+        await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingPension.id));
+      } else if (Number(body.pensionIncomeAmount) > 0) {
+        const encEv = await encryptRow('plan_events', {
+          planId: newPlanId,
+          userId: dataUserId,
+          name: 'Pension / Passive Income',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: String(body.pensionIncomeAmount),
+          frequency: 'yearly',
+          growthRate: '0.0',
+          adjustForInflation: true,
+          startTriggerType: 'age',
+          startTriggerValue: body.pensionStartAge ? String(body.pensionStartAge) : String(Number(retirementAge) || 60),
+          endTriggerType: 'end_of_plan',
+        }, dek);
+        await getDb().insert(planEvents).values(encEv);
+      }
+    }
 
     // Apply specific account inclusions if passed from the wizard
     if (accountInclusions && typeof accountInclusions === 'object') {
@@ -456,11 +574,117 @@ export async function PUT(req: NextRequest) {
         .where(eq(planSettings.planId, planId)).limit(1);
 
       if (settingsRow[0]) {
-        const settingsUpdates = { ...updates.settings, updatedAt: new Date() };
+        const decSettings = await decryptRow('plan_settings', settingsRow[0], dek);
+        const settingsUpdates = { ...decSettings, ...updates.settings, updatedAt: new Date() };
         const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId: dataUserId, planId }, dek);
         delete encSettings.userId;
         delete encSettings.planId;
         await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, planId));
+      }
+    }
+
+    // Handle wizard living expenses / healthcare / pension event updates
+    if (updates.livingExpenseAmount !== undefined || updates.healthcareExpenseAmount !== undefined || updates.pensionIncomeAmount !== undefined) {
+      const rawEvents = await getDb().select().from(planEvents).where(eq(planEvents.planId, planId));
+      const decEvents = await Promise.all(rawEvents.map((e) => decryptRow('plan_events', e, dek)));
+
+      if (updates.livingExpenseAmount !== undefined && Number(updates.livingExpenseAmount) >= 0) {
+        const existingLiving = decEvents.find((e) => e.type === 'living_expense' || e.category === 'expense');
+        if (existingLiving) {
+          const encEv = await encryptRow('plan_events', {
+            ...existingLiving,
+            amount: String(updates.livingExpenseAmount),
+            adjustForInflation: updates.livingExpenseAdjustForInflation !== false,
+            updatedAt: new Date(),
+            userId: dataUserId,
+            planId,
+          }, dek);
+          delete encEv.userId;
+          delete encEv.planId;
+          await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingLiving.id));
+        } else {
+          const encEv = await encryptRow('plan_events', {
+            planId,
+            userId: dataUserId,
+            name: 'Base Living Expenses',
+            category: 'expense',
+            type: 'living_expense',
+            owner: 'primary',
+            amount: String(updates.livingExpenseAmount),
+            frequency: 'yearly',
+            growthRate: '2.5',
+            adjustForInflation: updates.livingExpenseAdjustForInflation !== false,
+            startTriggerType: 'now',
+            endTriggerType: 'end_of_plan',
+          }, dek);
+          await getDb().insert(planEvents).values(encEv);
+        }
+      }
+
+      if (updates.healthcareExpenseAmount !== undefined && Number(updates.healthcareExpenseAmount) >= 0) {
+        const existingHealth = decEvents.find((e) => e.type === 'healthcare');
+        if (existingHealth) {
+          const encEv = await encryptRow('plan_events', {
+            ...existingHealth,
+            amount: String(updates.healthcareExpenseAmount),
+            updatedAt: new Date(),
+            userId: dataUserId,
+            planId,
+          }, dek);
+          delete encEv.userId;
+          delete encEv.planId;
+          await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingHealth.id));
+        } else if (Number(updates.healthcareExpenseAmount) > 0) {
+          const encEv = await encryptRow('plan_events', {
+            planId,
+            userId: dataUserId,
+            name: 'Healthcare & Medical Expenses',
+            category: 'expense',
+            type: 'healthcare',
+            owner: 'primary',
+            amount: String(updates.healthcareExpenseAmount),
+            frequency: 'yearly',
+            growthRate: '4.5',
+            adjustForInflation: true,
+            startTriggerType: 'now',
+            endTriggerType: 'end_of_plan',
+          }, dek);
+          await getDb().insert(planEvents).values(encEv);
+        }
+      }
+
+      if (updates.pensionIncomeAmount !== undefined && Number(updates.pensionIncomeAmount) >= 0) {
+        const existingPension = decEvents.find((e) => e.type === 'pension' || e.type === 'passive');
+        if (existingPension) {
+          const encEv = await encryptRow('plan_events', {
+            ...existingPension,
+            amount: String(updates.pensionIncomeAmount),
+            startTriggerValue: updates.pensionStartAge ? String(updates.pensionStartAge) : existingPension.startTriggerValue,
+            updatedAt: new Date(),
+            userId: dataUserId,
+            planId,
+          }, dek);
+          delete encEv.userId;
+          delete encEv.planId;
+          await getDb().update(planEvents).set(encEv).where(eq(planEvents.id, existingPension.id));
+        } else if (Number(updates.pensionIncomeAmount) > 0) {
+          const encEv = await encryptRow('plan_events', {
+            planId,
+            userId: dataUserId,
+            name: 'Pension / Passive Income',
+            category: 'income',
+            type: 'pension',
+            owner: 'primary',
+            amount: String(updates.pensionIncomeAmount),
+            frequency: 'yearly',
+            growthRate: '0.0',
+            adjustForInflation: true,
+            startTriggerType: 'age',
+            startTriggerValue: updates.pensionStartAge ? String(updates.pensionStartAge) : '60',
+            endTriggerType: 'end_of_plan',
+          }, dek);
+          await getDb().insert(planEvents).values(encEv);
+        }
       }
     }
 

@@ -177,7 +177,14 @@ export default function PlansPage() {
 
       // Optimistically update local plan state in plansList immediately
       setPlansList((prev) =>
-        prev.map((p) => (p.id === selectedPlanId ? { ...p, ...updates } : p))
+        prev.map((p) => {
+          if (p.id !== selectedPlanId) return p;
+          return {
+            ...p,
+            ...updates,
+            settings: updates.settings ? { ...p.settings, ...updates.settings } : p.settings,
+          };
+        })
       );
 
       setUpdating(true);
