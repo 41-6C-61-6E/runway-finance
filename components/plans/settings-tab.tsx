@@ -120,6 +120,13 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
       setSpouseSsMonthly(plan.spouseSsMonthlyAmount || '2000');
       setSpouseSsStartAge(plan.spouseSsStartAge || 67);
       setEnableSpousalSsBenefit(plan.enableSpousalSsBenefit !== false);
+
+      // Synchronize withdrawal strategy and penalty engine settings
+      setWithdrawalMethod(plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook');
+      setEnableRothConversions(Boolean(plan.settings?.enableRothConversions));
+      setRothConversionTargetCeiling(plan.settings?.rothConversionTargetCeiling || 'top_of_12');
+      setAvoidIrmaaCliffs(plan.settings?.avoidIrmaaCliffs !== false);
+      setAllowPenaltyWithdrawals(plan.settings?.allowPenaltyWithdrawals !== false);
     }
   }, [plan]);
 

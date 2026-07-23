@@ -439,8 +439,15 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                               {safeString(acc.owner) === 'spouse' && plan.hasSpouse && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">{plan.spouseName || 'Spouse'}</span>
                               )}
-                              {isPreTaxType(accType) && (
+                              {isPreTaxType(accType) && (!acc.rothPercentage || acc.rothPercentage === 0) && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 uppercase tracking-wider">Pre-Tax</span>
+                              )}
+                              {acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100 && (
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-semibold px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300">
+                                  <span>{100 - acc.rothPercentage}% Pre-Tax ({formatCurrency((parseFloat(acc.balance) || 0) * (1 - acc.rothPercentage / 100))})</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="text-pink-600 dark:text-pink-400 font-bold">{acc.rothPercentage}% Roth ({formatCurrency((parseFloat(acc.balance) || 0) * (acc.rothPercentage / 100))})</span>
+                                </span>
                               )}
                               {isSurplus && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 uppercase tracking-wider">Surplus Sweep</span>
@@ -654,6 +661,54 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                     </div>
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Roth vs Pre-Tax Split Configuration */}
+                          {(accType.includes('401k') || accType.includes('403b') || accType.includes('457') || accType.includes('ira') || accType.includes('retirement')) && (
+                            <div className="pt-2 border-t border-border/40 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Roth vs Pre-Tax Split</label>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs text-xs">
+                                        For mixed retirement accounts (e.g. 401k with both Roth and Traditional balances), set the percentage that is Tax-Free Roth vs Pre-Tax Traditional.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                                <span className="text-xs font-mono font-bold text-foreground">
+                                  <span className="text-purple-600 dark:text-purple-400">{100 - (acc.rothPercentage ?? 0)}% Pre-Tax</span>
+                                  <span className="mx-1.5 text-muted-foreground">•</span>
+                                  <span className="text-pink-600 dark:text-pink-400">{acc.rothPercentage ?? 0}% Roth</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={acc.rothPercentage ?? 0}
+                                  onChange={(e) => handleUpdateContribution(accId, { rothPercentage: parseInt(e.target.value, 10) })}
+                                  className="w-full accent-primary h-1.5 bg-muted rounded-lg cursor-pointer"
+                                />
+                                <div className="relative w-24 shrink-0">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={acc.rothPercentage ?? 0}
+                                    onChange={(e) => handleUpdateContribution(accId, { rothPercentage: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) })}
+                                    className="w-full bg-background border border-border rounded-lg pl-2 pr-6 py-1 text-xs font-mono text-foreground text-center"
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-mono">%</span>
+                                </div>
                               </div>
                             </div>
                           )}

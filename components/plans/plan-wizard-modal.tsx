@@ -633,7 +633,14 @@ export function PlanWizardModal({
                             className="w-4 h-4 accent-primary rounded cursor-pointer"
                           />
                           <div>
-                            <span className="text-xs font-bold text-foreground block">{acc.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-foreground block">{acc.name}</span>
+                              {acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100 && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300">
+                                  {100 - acc.rothPercentage}% Pre-Tax / {acc.rothPercentage}% Roth
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[10px] text-muted-foreground capitalize">
                               {(acc.type || 'account').replace(/_/g, ' ')}
                             </span>
