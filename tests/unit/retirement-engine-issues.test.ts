@@ -784,4 +784,179 @@ describe('FIRE Open Issues Fixes', () => {
     // First year balance should be $16,000
     expect(firstYearAcc?.balance).toBe(16000);
   });
+
+  it('mixed 401(k) with rothPercentage draws Pre-Tax portion in Traditional phase (rank 3) and Roth portion in Roth phase (rank 4)', () => {
+    const plan: EnginePlan = {
+      id: 'test-mixed-401k-strategy',
+      name: 'Mixed 401k Strategy Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 0,
+        allowPenaltyWithdrawals: true,
+      },
+      accounts: [
+        {
+          id: 'acc-mixed-401k',
+          name: 'Company 401(k)',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 100000, // 60% Trad ($60k), 40% Roth ($40k)
+          costBasis: 100000,
+          rothPercentage: 40,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 80000, // Needs $80,000 drawdown
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Under textbook order:
+    // 1. Draws entire Pre-Tax Traditional portion ($60,000) at rank 3
+    // 2. Draws remaining $20,000 from Tax-Free Roth portion at rank 4
+    expect(firstYear.drawdownsByType.traditional).toBe(60000);
+    expect(firstYear.drawdownsByType.roth).toBe(20000);
+    // Penalty: 10% on $60,000 early Traditional draw = $6,000
+    expect(firstYear.earlyPenaltyTax).toBe(6000);
+  });
+
+  it('when allowPenaltyWithdrawals is false, early traditional withdrawals are strictly blocked and produce 0 early penalties', () => {
+    const plan: EnginePlan = {
+      id: 'test-block-penalty-trad',
+      name: 'Block Penalty Trad Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 46,
+      lifeExpectancyAge: 50,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 0,
+        allowPenaltyWithdrawals: false,
+      },
+      accounts: [
+        {
+          id: 'acc-trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // Early traditional withdrawals before 59.5 are blocked ($0 drawn)
+    expect(firstYear.drawdownsByType.traditional).toBe(0);
+    expect(firstYear.earlyPenaltyTax).toBe(0);
+    expect(firstYear.shortfall).toBe(50000);
+  });
+
+  it('RMD mandatory drawdowns preserve net proceeds in portfolio net worth', () => {
+    const plan: EnginePlan = {
+      id: 'test-rmd-cash-preservation',
+      name: 'RMD Cash Preservation Test',
+      hasSpouse: false,
+      primaryBirthYear: 1950, // Age 76 in 2026 (RMD active)
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 78,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 0,
+        allowPenaltyWithdrawals: true,
+      },
+      accounts: [
+        {
+          id: 'acc-403b',
+          name: 'University 403(b)',
+          type: 'traditional_403b',
+          owner: 'primary',
+          balance: 1000000, // $1M balance at age 76 -> ~ $42,194 RMD
+          costBasis: 1000000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev-exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 10000, // Living expenses lower than RMD
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const firstYear = sim.yearlyResults[0];
+
+    // RMD drawn should be mandatory (~$42,194 for 76 year old)
+    expect(firstYear.rmdMandatoryDrawdown).toBeGreaterThan(40000);
+    // Net worth should preserve assets (Total assets ~ $1,000,000 minus taxes/living expenses, NOT losing RMD)
+    expect(firstYear.totalAssets).toBeGreaterThan(950000);
+  });
 });

@@ -1899,7 +1899,19 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
                   {yearData.accountBalances.map((acc: any, i: number) => (
                     <tr key={acc.id || i} className="hover:bg-muted/20">
                       <td className="p-2 font-sans font-medium text-foreground">{acc.name}</td>
-                      <td className="p-2 font-sans capitalize">{acc.category}</td>
+                      <td className="p-2 font-sans">
+                        {acc.category === 'taxDeferred' ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300">Pre-Tax Traditional</span>
+                        ) : acc.category === 'taxFree' ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-700 dark:text-pink-300">Tax-Free Roth</span>
+                        ) : acc.category === 'taxable' ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">Taxable Brokerage</span>
+                        ) : acc.category === 'hsa' ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400">HSA</span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 capitalize">{acc.category}</span>
+                        )}
+                      </td>
                       <td className="p-2 font-sans capitalize">{acc.owner}</td>
                       <td className="p-2 text-right font-bold text-emerald-500">{formatCurrency(acc.projectedBalance)}</td>
                     </tr>

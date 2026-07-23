@@ -1057,7 +1057,7 @@ export function runRetirementSimulation(
     const isRetired = primaryAge >= plan.retirementAge;
     if (primaryAge >= rmdStartAge) {
       const tradAccsForRmd = Object.values(accountsState).filter(
-        (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+        (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
       );
       const totalTradBalance = tradAccsForRmd.reduce((s, a) => s + a.balance, 0);
       if (totalTradBalance > 0) {
@@ -1083,6 +1083,33 @@ export function runRetirementSimulation(
                 accountType: acc.type,
                 amount: actual,
               });
+
+              // Preserve net RMD proceeds in Cash / Taxable Brokerage account so funds stay in net worth
+              let destAcc = Object.values(accountsState).find((a) => a.type === 'cash')
+                || Object.values(accountsState).find((a) => a.type === 'taxable' || a.type === 'brokerage' || a.type === 'crypto');
+
+              if (!destAcc) {
+                const newCashId = 'rmd_cash_sweep_target';
+                accountsState[newCashId] = {
+                  id: newCashId,
+                  name: 'Cash / Taxable Savings',
+                  type: 'cash',
+                  owner: 'primary',
+                  balance: 0,
+                  costBasis: 0,
+                  expectedGrowthRate: 2.0,
+                  dividendYield: 0,
+                  reinvestDividends: true,
+                  qualifiedDividendRatio: 1.0,
+                };
+                destAcc = accountsState[newCashId];
+              }
+
+              destAcc.balance += actual;
+              const destCat = getAccountCategory(destAcc.type);
+              if (destCat === 'taxable' || destCat === 'taxFree') {
+                destAcc.costBasis = (destAcc.costBasis || 0) + actual;
+              }
             }
           }
         }
@@ -1117,9 +1144,26 @@ export function runRetirementSimulation(
 
       if (convHeadroom > 500) {
         const tradAccs = Object.values(accountsState).filter(
-          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
         );
-        const rothAcc = Object.values(accountsState).find((a) => a.type === 'roth_ira' || a.type === 'roth_401k');
+        let rothAcc = Object.values(accountsState).find((a) => a.type === 'roth_ira' || a.type === 'roth_401k' || a.type.includes('roth'));
+
+        if (!rothAcc && tradAccs.length > 0) {
+          const newRothId = 'roth_conversion_target_acc';
+          accountsState[newRothId] = {
+            id: newRothId,
+            name: 'Roth IRA (Conversion Target)',
+            type: 'roth_ira',
+            owner: 'primary',
+            balance: 0,
+            costBasis: 0,
+            expectedGrowthRate: 6.0,
+            dividendYield: 2.5,
+            reinvestDividends: true,
+            qualifiedDividendRatio: 1.0,
+          };
+          rothAcc = accountsState[newRothId];
+        }
 
         if (tradAccs.length > 0 && rothAcc) {
           let remRoom = convHeadroom;
