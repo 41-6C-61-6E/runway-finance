@@ -113,6 +113,7 @@ export interface EnginePlan {
     enableRothConversions?: boolean;
     rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'irmaa_tier1';
     avoidIrmaaCliffs?: boolean;
+    allowPenaltyWithdrawals?: boolean;
   };
   rules?: typeof DEFAULT_2026_RULES;
 }
@@ -218,6 +219,7 @@ export interface YearlySimulationResult {
   irmaaNotice?: { tier: number; surcharge: number; magi: number; threshold: number };
   earlyWithdrawalWarnings?: string[];
   earlyPenaltyDetails?: { age: number; accountId: string; accountName: string; accountType: string; amount: number; penalty: number }[];
+  shortfall?: number;
   milestonesReached: string[];
 }
 
@@ -692,6 +694,7 @@ export function runRetirementSimulation(
     let deficitWithdrawn = 0;
     let discretionaryDeficitWithdrawn = 0;
     let rmdMandatoryDrawdown = 0;
+    let shortfall = 0;
     const accountDrawdowns: AccountDrawdownDetail[] = [];
     const drawdownsByType = { cash: 0, taxable: 0, traditional: 0, roth: 0, hsa: 0 };
     const earlyWithdrawalWarnings: string[] = [];
@@ -918,17 +921,18 @@ export function runRetirementSimulation(
           }
         }
       }
-    } else if (netCashFlow < 0) {
+    } else if (netCashFlow < 0 && !isAccumulation) {
       let deficit = Math.abs(netCashFlow);
       deficitWithdrawn = deficit;
       discretionaryDeficitWithdrawn = deficit;
 
+      const allowPenalty = plan.settings?.allowPenaltyWithdrawals !== false;
       const method = plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook';
 
       if (method === 'proportional') {
-        // Prefer non-penalized accounts first; fall back to penalized only if deficit remains
+        // Prefer non-penalized accounts first; fall back to penalized only if deficit remains and allowed
         const safeAccs = Object.values(accountsState).filter((a) => a.balance > 0 && !wouldIncurPenalty(a));
-        const penaltyAccs = Object.values(accountsState).filter((a) => a.balance > 0 && wouldIncurPenalty(a));
+        const penaltyAccs = allowPenalty ? Object.values(accountsState).filter((a) => a.balance > 0 && wouldIncurPenalty(a)) : [];
         const totalSafeBal = safeAccs.reduce((s, a) => s + a.balance, 0);
 
         let remDeficit = deficit;
@@ -966,6 +970,8 @@ export function runRetirementSimulation(
             }
           }
         }
+
+        if (remDeficit > 0) shortfall = remDeficit;
       } else if (method === 'tax_optimized') {
         const target12Limit = 48475 * (isMfj ? 2 : 1) * compoundInflation;
         const currentTaxable = taxableOrdinaryIncome;
@@ -991,21 +997,23 @@ export function runRetirementSimulation(
           const remOrder = ['cash', 'taxable', 'crypto', 'roth_ira', 'roth_401k', 'hsa'];
           const sortedAccs = Object.values(accountsState)
             .filter((a) => a.balance > 0 && remOrder.includes(a.type))
+            .filter((a) => allowPenalty || !wouldIncurPenalty(a))
             .sort((a, b) => remOrder.indexOf(a.type) - remOrder.indexOf(b.type));
           for (const acc of sortedAccs) {
             if (deficit <= 0) break;
             const w = withdrawFromAcc(acc, deficit);
             deficit -= w;
           }
+          if (deficit > 0) shortfall = deficit;
         }
       } else {
         const accountsList = Object.values(accountsState);
         const getDrawdownOrder = () => {
           if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
-            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
+            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean).filter((a) => allowPenalty || !wouldIncurPenalty(a));
           }
           // Check if any traditional/hsa accounts would incur penalties
-          const hasPenaltyAccounts = accountsList.some((a) => wouldIncurPenalty(a));
+          const hasPenaltyAccounts = allowPenalty && accountsList.some((a) => wouldIncurPenalty(a));
           const orderMap: Record<string, number> = {
             cash: 1,
             taxable: 2,
@@ -1015,7 +1023,9 @@ export function runRetirementSimulation(
             roth_401k: 4,
             hsa: 5,
           };
-          return accountsList.sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
+          return accountsList
+            .filter((a) => allowPenalty || !wouldIncurPenalty(a))
+            .sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
         };
 
         const orderedAccounts = getDrawdownOrder();
@@ -1025,6 +1035,7 @@ export function runRetirementSimulation(
           const w = withdrawFromAcc(acc, deficit);
           deficit -= w;
         }
+        if (deficit > 0) shortfall = deficit;
       }
     }
 
@@ -1343,6 +1354,7 @@ export function runRetirementSimulation(
       irmaaNotice,
       earlyWithdrawalWarnings,
       earlyPenaltyDetails,
+      shortfall: shortfall > 0 ? shortfall : undefined,
       milestonesReached,
     });
   }
