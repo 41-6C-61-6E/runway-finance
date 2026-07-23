@@ -154,6 +154,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRothConversions: Boolean(targetPlan?.settings?.enableRothConversions),
         rothConversionTargetCeiling: (targetPlan?.settings?.rothConversionTargetCeiling as any) || 'top_of_12',
         avoidIrmaaCliffs: Boolean(targetPlan?.settings?.avoidIrmaaCliffs),
+        allowPenaltyWithdrawals: targetPlan?.settings?.allowPenaltyWithdrawals !== false,
       },
       rules: targetPlan?.rules || DEFAULT_2026_RULES,
     };

@@ -200,7 +200,10 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
     })),
     events: decEvents,
     flows: decFlows,
-    settings: decSettings,
+    settings: {
+      ...decSettings,
+      ...enginePlan.settings,
+    },
     simulation,
   };
 }
@@ -580,6 +583,13 @@ export async function PUT(req: NextRequest) {
         delete encSettings.userId;
         delete encSettings.planId;
         await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, planId));
+      } else {
+        const encSettings = await encryptRow('plan_settings', {
+          planId,
+          userId: dataUserId,
+          ...updates.settings,
+        }, dek);
+        await getDb().insert(planSettings).values(encSettings);
       }
     }
 
@@ -765,6 +775,7 @@ export async function PUT(req: NextRequest) {
           companyMatchRate: contrib.companyMatchRate !== undefined ? (contrib.companyMatchRate != null ? String(contrib.companyMatchRate) : null) : decAcc.companyMatchRate,
           companyMatchLimit: contrib.companyMatchLimit !== undefined ? (contrib.companyMatchLimit != null ? String(contrib.companyMatchLimit) : null) : decAcc.companyMatchLimit,
           isSurplusDestination: contrib.isSurplusDestination !== undefined ? contrib.isSurplusDestination : decAcc.isSurplusDestination,
+          rothPercentage: contrib.rothPercentage !== undefined ? (contrib.rothPercentage != null ? Number(contrib.rothPercentage) : null) : decAcc.rothPercentage,
           updatedAt: new Date(),
           userId: dataUserId,
           planId,
