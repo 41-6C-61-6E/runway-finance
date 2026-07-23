@@ -12,6 +12,8 @@ import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
 import { DeletePlanDialog } from '@/components/plans/delete-plan-dialog';
 import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
 
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+
 export default function PlansPage() {
   const [activeTab, setActiveTab] = useState<'projection' | 'details' | 'scenarios' | 'settings'>('projection');
   const [plansList, setPlansList] = useState<any[]>([]);
@@ -39,7 +41,7 @@ export default function PlansPage() {
 
       if (accRes.ok) {
         const accs = await accRes.json();
-        setAccountsList(accs);
+        setAccountsList(Array.isArray(accs) ? accs.filter(isFireEligibleAccount) : []);
       }
 
       if (planRes.ok) {
@@ -89,16 +91,18 @@ export default function PlansPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(wizardData),
         });
-        if (res.ok) {
-          const newPlan = await res.json();
-          setPlansList((prev) => {
-            // If new plan is default, update previous plans isDefault = false
-            const nextPlans = wizardData.isDefault ? prev.map((p) => ({ ...p, isDefault: false })) : [...prev];
-            return [...nextPlans, newPlan];
-          });
-          setSelectedPlanId(newPlan.id);
-          setActiveTab('projection');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server returned status ${res.status}`);
         }
+        const newPlan = await res.json();
+        setPlansList((prev) => {
+          // If new plan is default, update previous plans isDefault = false
+          const nextPlans = wizardData.isDefault ? prev.map((p) => ({ ...p, isDefault: false })) : [...prev];
+          return [...nextPlans, newPlan];
+        });
+        setSelectedPlanId(newPlan.id);
+        setActiveTab('projection');
       } else if (wizardMode === 'edit' && editingPlanTarget) {
         const res = await fetch('/api/retirement/plans', {
           method: 'PUT',
@@ -108,19 +112,19 @@ export default function PlansPage() {
             ...wizardData,
           }),
         });
-        if (res.ok) {
-          const updatedPlan = await res.json();
-          setPlansList((prev) =>
-            prev.map((p) => {
-              if (p.id === updatedPlan.id) return updatedPlan;
-              if (wizardData.isDefault) return { ...p, isDefault: false };
-              return p;
-            })
-          );
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server returned status ${res.status}`);
         }
+        const updatedPlan = await res.json();
+        setPlansList((prev) =>
+          prev.map((p) => {
+            if (p.id === updatedPlan.id) return updatedPlan;
+            if (wizardData.isDefault) return { ...p, isDefault: false };
+            return p;
+          })
+        );
       }
-    } catch (err) {
-      console.error('Wizard save failed', err);
     } finally {
       setUpdating(false);
     }

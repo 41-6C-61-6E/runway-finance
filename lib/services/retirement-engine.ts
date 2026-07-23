@@ -1,4 +1,5 @@
 import { DEFAULT_2026_RULES, IRS_UNIFORM_LIFETIME_TABLE } from '@/lib/constants/retirement-defaults';
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
 export interface EngineAccount {
   id: string;
@@ -275,7 +276,8 @@ export function runRetirementSimulation(
 
   // Mutable deep clones of state for simulation loop (with Roth percentage splitting)
   const accountsState: Record<string, EngineAccount> = {};
-  for (const acc of plan.accounts) {
+  const eligibleAccounts = (plan.accounts || []).filter((a) => (a as any).isIncluded !== false && isFireEligibleAccount(a));
+  for (const acc of eligibleAccounts) {
     if (acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100) {
       const rothPct = acc.rothPercentage / 100;
       const tradPct = 1 - rothPct;

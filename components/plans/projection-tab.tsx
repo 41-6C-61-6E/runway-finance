@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -78,7 +79,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   // UX Toggles: Dollar Mode, View Mode, Chart Type, Milestones Visibility, Asset Category Filters
   const [dollarMode, setDollarMode] = useState<'nominal' | 'real'>('nominal');
   const [viewMode, setViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
-  const [chartType, setChartType] = useState<'total' | 'stacked'>('total');
+  const [chartType, setChartType] = useState<'total' | 'stacked_category' | 'stacked_account'>('stacked_category');
   const [showMilestones, setShowMilestones] = useState(true);
   const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
   const [selectedYearDetail, setSelectedYearDetail] = useState<any>(null);
@@ -114,12 +115,13 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const currentNetWorth = useMemo(() => {
     if (Array.isArray(plan?.accounts) && plan.accounts.length > 0) {
       return plan.accounts
-        .filter((acc: any) => acc.isIncluded !== false)
+        .filter((acc: any) => acc.isIncluded !== false && isFireEligibleAccount(acc))
         .reduce((sum: number, acc: any) => sum + (parseFloat(acc.balance) || 0), 0);
     }
     let assets = 0;
     let liabilities = 0;
     for (const acc of accounts) {
+      if (!isFireEligibleAccount(acc)) continue;
       const bal = parseFloat(acc.balance) || 0;
       if (['credit_card', 'loan', 'mortgage', 'car_loan'].includes(acc.type) || bal < 0) {
         liabilities += Math.abs(bal);
@@ -134,7 +136,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const enginePlanObj = useMemo(() => {
     if (!plan) return null;
 
-    const planAccountsList = Array.isArray(plan.accounts) ? plan.accounts : [];
+    const planAccountsList = (Array.isArray(plan.accounts) ? plan.accounts : []).filter(isFireEligibleAccount);
     const planEventsList = Array.isArray(plan.events) ? plan.events : [];
     const planFlowsList = Array.isArray(plan.flows) ? plan.flows : [];
 
@@ -359,6 +361,50 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     return 'Textbook Waterfall (Cash → Taxable → Traditional → Roth)';
   }, [plan]);
 
+  // Unique account list across simulation with color mapping for stacked area chart by individual account
+  const accountSeries = useMemo(() => {
+    if (!yearlySimResults || yearlySimResults.length === 0) return [];
+    const accMap = new Map<string, { id: string; name: string; category: string; type: string; color: string }>();
+
+    const categoryPalette: Record<string, string[]> = {
+      taxable: ['#f59e0b', '#d97706', '#b45309', '#fbbf24', '#eab308'],
+      taxDeferred: ['#a855f7', '#8b5cf6', '#7c3aed', '#6366f1', '#4f46e5'],
+      taxFree: ['#ec4899', '#f43f5e', '#e11d48', '#10b981', '#059669'],
+      hsa: ['#14b8a6', '#0d9488', '#0f766e'],
+      cash: ['#94a3b8', '#64748b', '#06b6d4', '#0891b2'],
+    };
+
+    const categoryIndexTracker: Record<string, number> = {
+      taxable: 0,
+      taxDeferred: 0,
+      taxFree: 0,
+      hsa: 0,
+      cash: 0,
+    };
+
+    yearlySimResults.forEach((y: any) => {
+      (y.accountBalances || []).forEach((a: any) => {
+        if (!accMap.has(a.id)) {
+          const cat = a.category || 'cash';
+          const colors = categoryPalette[cat] || ['#3b82f6'];
+          const colorIdx = (categoryIndexTracker[cat] || 0) % colors.length;
+          categoryIndexTracker[cat] = (categoryIndexTracker[cat] || 0) + 1;
+          const color = colors[colorIdx];
+
+          accMap.set(a.id, {
+            id: a.id,
+            name: a.name,
+            category: cat,
+            type: a.type,
+            color,
+          });
+        }
+      });
+    });
+
+    return Array.from(accMap.values());
+  }, [yearlySimResults]);
+
   // Chart data series mapped dynamically with Real vs. Nominal support & Expenses throughout timeline
   const chartData = useMemo(() => {
     if (yearlySimResults.length > 0) {
@@ -388,11 +434,17 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
         const filteredPortfolio = cashBal + taxableBal + taxDeferredBal + taxFreeBal + hsaBal;
 
-        // Process per-account projected balances
-        const rawAccountBalances = (y.accountBalances || []).map((acc: any) => ({
-          ...acc,
-          projectedBalance: Math.round(acc.balance / discountFactor),
-        }));
+        // Process per-account projected balances and map keys for stacked account view
+        const accDataPointKeys: Record<string, number> = {};
+        const rawAccountBalances = (y.accountBalances || []).map((acc: any) => {
+          const projBal = Math.round(acc.balance / discountFactor);
+          const isIncluded = activeAssetCategories[acc.category] !== false;
+          accDataPointKeys[`acc_${acc.id}`] = isIncluded ? projBal : 0;
+          return {
+            ...acc,
+            projectedBalance: projBal,
+          };
+        });
 
         const filteredAccountBalances = rawAccountBalances.filter(
           (acc: any) => activeAssetCategories[acc.category] !== false
@@ -430,6 +482,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           taxDeferredBal,
           taxFreeBal,
           hsaBal,
+          ...accDataPointKeys,
           accountBalances: rawAccountBalances,
           filteredAccountBalances,
           income: Math.round(y.grossIncome / discountFactor),
@@ -723,7 +776,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             <div>
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
-                {viewMode === 'monte_carlo' ? 'Monte Carlo Probabilistic Fan Chart (250 Historical Bootstrap Trials)' : 'FIRE Retirement Portfolio Trajectory'}
+                {viewMode === 'monte_carlo' ? 'Monte Carlo Portfolio Trajectory (250 Bootstrap Trials)' : 'Portfolio Trajectory'}
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {dollarMode === 'real' ? 'Real (Inflation-Adjusted Today\'s Dollars)' : 'Nominal Dollars'}
@@ -752,7 +805,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             feedback={
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {chartType === 'stacked' ? 'Stacked Volume' : 'Total Trajectory'}
+                  {chartType === 'stacked_account' ? 'Stacked by Account' : chartType === 'stacked_category' ? 'Stacked by Category' : 'Total Trajectory'}
                 </span>
                 {showMilestones && (
                   <span className="bg-muted/60 text-muted-foreground border border-border px-2 py-0.5 rounded text-[10px] font-semibold">
@@ -764,29 +817,39 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               {/* Chart View Style */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
                   Visualization Style
                 </label>
-                <div className="grid grid-cols-2 gap-1.5 bg-muted/40 p-1 rounded-lg border border-border">
+                <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-lg border border-border">
                   <button
                     type="button"
-                    onClick={() => setChartType('total')}
-                    className={`py-1 px-2 rounded text-xs font-bold transition-all cursor-pointer ${
-                      chartType === 'total' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                    onClick={() => setChartType('stacked_category')}
+                    className={`py-1 px-1.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      chartType === 'stacked_category' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    Total Trajectory
+                    <Layers className="w-3 h-3 text-primary shrink-0" />
+                    By Category
                   </button>
                   <button
                     type="button"
-                    onClick={() => setChartType('stacked')}
-                    className={`py-1 px-2 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                      chartType === 'stacked' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                    onClick={() => setChartType('stacked_account')}
+                    className={`py-1 px-1.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      chartType === 'stacked_account' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <Layers className="w-3 h-3 text-primary" />
-                    Stacked Volume
+                    <Layers className="w-3 h-3 text-emerald-500 shrink-0" />
+                    By Account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartType('total')}
+                    className={`py-1 px-1.5 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
+                      chartType === 'total' ? 'bg-card text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Total Line
                   </button>
                 </div>
               </div>
@@ -920,6 +983,20 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                     fillOpacity={1}
                     fill="url(#accumulationGrad)"
                   />
+                ) : chartType === 'stacked_account' ? (
+                  accountSeries.map((acc) => (
+                    <Area
+                      key={acc.id}
+                      type="monotone"
+                      dataKey={`acc_${acc.id}`}
+                      name={acc.name}
+                      stackId="portfolio"
+                      stroke={acc.color}
+                      strokeWidth={1.5}
+                      fill={acc.color}
+                      fillOpacity={0.45}
+                    />
+                  ))
                 ) : (
                   <>
                     <Area type="monotone" dataKey="cashBal" name="Cash & Savings" stackId="portfolio" stroke="#94a3b8" strokeWidth={1.5} fill="url(#cashGrad)" />
@@ -1063,7 +1140,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             <div>
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Layers className="w-4 h-4 text-emerald-500" />
-                Yearly Cash Flow Composition: Inflows vs. Portfolio Drawdowns
+                Withdrawal Sequencing
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses
