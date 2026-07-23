@@ -720,12 +720,26 @@ export function runRetirementSimulation(
     };
 
     // Helper for withdrawing from an account with penalty tracking
-    const withdrawFromAcc = (acc: EngineAccount, amt: number) => {
-      const actual = Math.min(acc.balance, amt);
-      if (actual <= 0) return 0;
-
+    const withdrawFromAcc = (acc: EngineAccount, amt: number, allowPenalty: boolean = true) => {
+      let maxAvail = acc.balance;
       const accOwnerAge = acc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
       const accOwnerRetirementAge = acc.owner === 'spouse' && plan.spouseRetirementAge ? plan.spouseRetirementAge : plan.retirementAge;
+
+      if (!allowPenalty) {
+        if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k' || acc.type.includes('403b')) {
+          const isRuleOf55 = (acc.type.includes('401k') || acc.type.includes('403b')) && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
+          if (accOwnerAge < 59.5 && !isRuleOf55) {
+            maxAvail = 0;
+          }
+        } else if ((acc.type === 'roth_ira' || acc.type === 'roth_401k' || acc.type.includes('roth')) && accOwnerAge < 59.5) {
+          maxAvail = Math.min(acc.balance, Math.max(0, acc.costBasis || 0));
+        } else if (acc.type === 'hsa' && accOwnerAge < 65) {
+          maxAvail = 0;
+        }
+      }
+
+      const actual = Math.min(maxAvail, amt);
+      if (actual <= 0) return 0;
 
       // 10% IRS Early Withdrawal Penalty check for Traditional accounts before 59.5 (Rule of 55 exception check for 401k)
       if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
@@ -836,7 +850,7 @@ export function runRetirementSimulation(
             const alloc = Math.min(surplus, limit);
             if (alloc > 0) {
               targetAcc.balance += alloc;
-              if (cat === 'taxable') {
+              if (cat === 'taxable' || cat === 'taxFree') {
                 targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
               }
               surplus -= alloc;
@@ -849,7 +863,8 @@ export function runRetirementSimulation(
               if (matchAmount > 0) {
                 const matchTarget = getMatchTarget(origAcc, targetAcc);
                 matchTarget.balance += matchAmount;
-                if (getAccountCategory(matchTarget.type) === 'taxable') {
+                const targetCat = getAccountCategory(matchTarget.type);
+                if (targetCat === 'taxable' || targetCat === 'taxFree') {
                   matchTarget.costBasis = (matchTarget.costBasis || 0) + matchAmount;
                 }
                 surplusSaved += matchAmount;
@@ -868,7 +883,8 @@ export function runRetirementSimulation(
               }
               if (targetAcc) {
                 targetAcc.balance += surplus;
-                if (getAccountCategory(targetAcc.type) === 'taxable') {
+                const targetCat = getAccountCategory(targetAcc.type);
+                if (targetCat === 'taxable' || targetCat === 'taxFree') {
                   targetAcc.costBasis = (targetAcc.costBasis || 0) + surplus;
                 }
                 surplusSaved += surplus;
@@ -912,7 +928,8 @@ export function runRetirementSimulation(
             const alloc = Math.min(surplus, limit);
             if (alloc > 0) {
               targetAcc.balance += alloc;
-              if (getAccountCategory(targetAcc.type) === 'taxable') {
+              const targetCat = getAccountCategory(targetAcc.type);
+              if (targetCat === 'taxable' || targetCat === 'taxFree') {
                 targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
               }
               surplus -= alloc;
@@ -942,13 +959,13 @@ export function runRetirementSimulation(
           for (const acc of safeAccs) {
             if (remDeficit <= 0) break;
             const propShare = (acc.balance / totalSafeBal) * deficit;
-            const w = withdrawFromAcc(acc, propShare);
+            const w = withdrawFromAcc(acc, propShare, allowPenalty);
             remDeficit -= w;
           }
           // Catch-up pass for rounding gaps
           for (const acc of safeAccs) {
             if (remDeficit <= 0) break;
-            const w = withdrawFromAcc(acc, remDeficit);
+            const w = withdrawFromAcc(acc, remDeficit, allowPenalty);
             remDeficit -= w;
           }
         }
@@ -960,12 +977,12 @@ export function runRetirementSimulation(
             for (const acc of penaltyAccs) {
               if (remDeficit <= 0) break;
               const propShare = (acc.balance / totalPenaltyBal) * remDeficit;
-              const w = withdrawFromAcc(acc, propShare);
+              const w = withdrawFromAcc(acc, propShare, allowPenalty);
               remDeficit -= w;
             }
             for (const acc of penaltyAccs) {
               if (remDeficit <= 0) break;
-              const w = withdrawFromAcc(acc, remDeficit);
+              const w = withdrawFromAcc(acc, remDeficit, allowPenalty);
               remDeficit -= w;
             }
           }
@@ -977,17 +994,17 @@ export function runRetirementSimulation(
         const currentTaxable = taxableOrdinaryIncome;
         const bracketRoom = Math.max(0, target12Limit - currentTaxable);
 
-        // Only fill 12% bracket with traditional accounts if none would incur penalties
+        // Only fill 12% bracket with traditional accounts if allowed or non-penalized
         const tradAccs = Object.values(accountsState).filter(
-          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k') && a.balance > 0
+          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
         );
         const tradHasPenaltyRisk = tradAccs.some((a) => wouldIncurPenalty(a));
 
-        if (bracketRoom > 0 && deficit > 0 && !tradHasPenaltyRisk) {
+        if (bracketRoom > 0 && deficit > 0 && (!tradHasPenaltyRisk || allowPenalty)) {
           let tradNeeded = Math.min(deficit, bracketRoom);
           for (const acc of tradAccs) {
             if (tradNeeded <= 0) break;
-            const w = withdrawFromAcc(acc, tradNeeded);
+            const w = withdrawFromAcc(acc, tradNeeded, allowPenalty);
             tradNeeded -= w;
             deficit -= w;
           }
@@ -997,11 +1014,10 @@ export function runRetirementSimulation(
           const remOrder = ['cash', 'taxable', 'crypto', 'roth_ira', 'roth_401k', 'hsa'];
           const sortedAccs = Object.values(accountsState)
             .filter((a) => a.balance > 0 && remOrder.includes(a.type))
-            .filter((a) => allowPenalty || !wouldIncurPenalty(a))
             .sort((a, b) => remOrder.indexOf(a.type) - remOrder.indexOf(b.type));
           for (const acc of sortedAccs) {
             if (deficit <= 0) break;
-            const w = withdrawFromAcc(acc, deficit);
+            const w = withdrawFromAcc(acc, deficit, allowPenalty);
             deficit -= w;
           }
           if (deficit > 0) shortfall = deficit;
@@ -1010,21 +1026,19 @@ export function runRetirementSimulation(
         const accountsList = Object.values(accountsState);
         const getDrawdownOrder = () => {
           if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
-            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean).filter((a) => allowPenalty || !wouldIncurPenalty(a));
+            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
           }
-          // Check if any traditional/hsa accounts would incur penalties
-          const hasPenaltyAccounts = allowPenalty && accountsList.some((a) => wouldIncurPenalty(a));
           const orderMap: Record<string, number> = {
             cash: 1,
             taxable: 2,
-            traditional_ira: hasPenaltyAccounts ? 7 : 3,
-            traditional_401k: hasPenaltyAccounts ? 7 : 3,
+            crypto: 2,
+            traditional_ira: 3,
+            traditional_401k: 3,
             roth_ira: 4,
             roth_401k: 4,
             hsa: 5,
           };
           return accountsList
-            .filter((a) => allowPenalty || !wouldIncurPenalty(a))
             .sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
         };
 
@@ -1032,7 +1046,7 @@ export function runRetirementSimulation(
         for (const acc of orderedAccounts) {
           if (deficit <= 0) break;
           if (acc.balance <= 0) continue;
-          const w = withdrawFromAcc(acc, deficit);
+          const w = withdrawFromAcc(acc, deficit, allowPenalty);
           deficit -= w;
         }
         if (deficit > 0) shortfall = deficit;
@@ -1167,7 +1181,7 @@ export function runRetirementSimulation(
       }
 
       const totalTaxableIncome = grossIncome + additionalOrdinaryIncome + totalTaxableGains;
-      stateTax = fullTaxableOrdinary * stateTaxRate;
+      stateTax = (fullTaxableOrdinary + totalTaxableGains) * stateTaxRate;
     }
 
     // Compute Net Investment Income Tax (NIIT 3.8%)
