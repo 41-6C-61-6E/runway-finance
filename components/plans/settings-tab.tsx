@@ -87,6 +87,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [enableRothConversions, setEnableRothConversions] = useState(Boolean(plan?.settings?.enableRothConversions));
   const [rothConversionTargetCeiling, setRothConversionTargetCeiling] = useState(plan?.settings?.rothConversionTargetCeiling || 'top_of_12');
   const [avoidIrmaaCliffs, setAvoidIrmaaCliffs] = useState(Boolean(plan?.settings?.avoidIrmaaCliffs));
+  const [allowPenaltyWithdrawals, setAllowPenaltyWithdrawals] = useState(plan?.settings?.allowPenaltyWithdrawals !== false);
 
   // Engine Rules State
   const [rules, setRules] = useState<any>(DEFAULT_2026_RULES);
@@ -1066,12 +1067,35 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                   </div>
                 )}
               </div>
+
             </div>
+          </div>
+
+          {/* Allow Penalty Withdrawals Toggle */}
+          <div className="flex items-center justify-between pt-1 border-t border-border">
+            <div>
+              <span className="font-bold text-foreground flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-500" />
+                Allow Withdrawals at a Penalty
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                When enabled, the engine may draw from accounts that incur early withdrawal penalties (10%/20%) to cover deficits.
+                When disabled, penalized accounts are skipped entirely — unmet deficits show as a shortfall.
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={allowPenaltyWithdrawals}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAllowPenaltyWithdrawals(checked);
+                onUpdatePlan({ settings: { allowPenaltyWithdrawals: checked } });
+              }}
+              className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary"
+            />
           </div>
         </div>
       )}
-
-      {/* Sub-Tab: Engine Data & Tax Rules */}
       {subTab === 'engine_rules' && (
         <EngineRulesView
           rules={rules}

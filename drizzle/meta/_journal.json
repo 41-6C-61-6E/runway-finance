@@ -519,6 +519,13 @@
       "when": 1784742651553,
       "tag": "0073_loving_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1753238400000,
+      "tag": "0074_add_allow_penalty_withdrawals",
+      "breakpoints": true
     }
   ]
 }
