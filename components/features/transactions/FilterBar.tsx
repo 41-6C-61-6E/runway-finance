@@ -47,6 +47,7 @@ interface FilterBarProps {
   pendingAiCount?: number;
   aiSuggestionsDismissed?: boolean;
   onAiSuggestionsDismissed?: (dismissed: boolean) => void;
+  onOpenAiSuggestions?: () => void;
 }
 
 type Account = {
@@ -184,7 +185,8 @@ export default function FilterBar({
   onCompactViewChange,
   pendingAiCount,
   aiSuggestionsDismissed,
-  onAiSuggestionsDismissed
+  onAiSuggestionsDismissed,
+  onOpenAiSuggestions,
 }: FilterBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSavingView, setIsSavingView] = useState(false);
@@ -499,28 +501,41 @@ export default function FilterBar({
         ))}
         className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
         actions={
-          pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && (
-            <Link
-              href="/ai-suggestions"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-all pr-1.5 shadow-sm shrink-0"
+          onOpenAiSuggestions ? (
+            <button
+              type="button"
+              onClick={onOpenAiSuggestions}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all shadow-sm shrink-0 cursor-pointer ${
+                pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed
+                  ? 'text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 pr-1.5'
+                  : 'text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80'
+              }`}
             >
-              <Sparkles className="h-3 w-3" />
-              <span>{pendingAiCount} suggestion{pendingAiCount !== 1 ? 's' : ''}</span>
-              <span className="w-px h-3 bg-primary/25 mx-0.5" />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onAiSuggestionsDismissed?.(true);
-                }}
-                className="p-0.5 hover:bg-primary/20 rounded text-primary transition-colors cursor-pointer flex items-center justify-center"
-                aria-label="Dismiss AI suggestions"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Link>
-          )
+              <Sparkles className="h-3 w-3 text-primary" />
+              <span>
+                {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed
+                  ? `${pendingAiCount} suggestion${pendingAiCount !== 1 ? 's' : ''}`
+                  : 'AI Suggestions'}
+              </span>
+              {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && (
+                <>
+                  <span className="w-px h-3 bg-primary/25 mx-0.5" />
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onAiSuggestionsDismissed?.(true);
+                    }}
+                    className="p-0.5 hover:bg-primary/20 rounded text-primary transition-colors cursor-pointer flex items-center justify-center"
+                    aria-label="Dismiss AI suggestions"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                </>
+              )}
+            </button>
+          ) : undefined
         }
         rightActions={
           <button

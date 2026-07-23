@@ -752,6 +752,7 @@ describe('FIRE Open Issues Fixes', () => {
       id: 'test-roth-basis-contrib',
       name: 'Roth Basis Contrib Test',
       hasSpouse: false,
+      withdrawalMethod: 'tax_optimized',
       primaryBirthYear: 1990, // Age 36
       primaryBirthMonth: 1,
       filingStatus: 'single',

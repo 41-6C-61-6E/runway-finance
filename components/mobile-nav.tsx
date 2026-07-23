@@ -45,7 +45,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'goals', href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals', category: 'finances' },
   { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic', category: 'finances' },
   { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'finances' },
-  { id: 'ai-suggestions', href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings', category: 'finances' },
   { id: 'plans', href: '/plans', label: 'FIRE', icon: Flame, pageKey: 'plans', category: 'planning' },
 ];
 
