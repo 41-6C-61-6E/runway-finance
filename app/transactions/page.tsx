@@ -8,6 +8,7 @@ import TransactionTable from '@/components/features/transactions/TransactionTabl
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
 import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
+import AiSuggestionsModal from '@/components/features/ai/AiSuggestionsModal';
 import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -78,12 +79,33 @@ function TransactionsContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('edit');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [aiModalOpen, setAiModalOpen] = useState(searchParams.get('aiSuggestions') === 'true');
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
   const [pendingAiIds, setPendingAiIds] = useState<string[]>([]);
   const [aiSuggestionsDismissed, setAiSuggestionsDismissed] = useState(false);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = usePersistentState<string[]>('finance:transactions:dismissedSuggestionIds', []);
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
+
+  const fetchPendingAi = useCallback(() => {
+    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPendingAiCount(data.length);
+          setPendingAiIds(data.map((p: any) => p.id));
+        } else {
+          setPendingAiCount(0);
+          setPendingAiIds([]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleProposalsUpdated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+    fetchPendingAi();
+  }, [fetchPendingAi]);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
@@ -147,19 +169,8 @@ function TransactionsContent() {
   const isSuggestionsDismissed = aiSuggestionsDismissed || !hasNewSuggestions;
 
   useEffect(() => {
-    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setPendingAiCount(data.length);
-          setPendingAiIds(data.map((p: any) => p.id));
-        } else {
-          setPendingAiCount(0);
-          setPendingAiIds([]);
-        }
-      })
-      .catch(() => {})
-  }, []);
+    fetchPendingAi();
+  }, [fetchPendingAi]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -381,6 +392,7 @@ function TransactionsContent() {
           pendingAiCount={pendingAiCount}
           aiSuggestionsDismissed={isSuggestionsDismissed}
           onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
+          onOpenAiSuggestions={() => setAiModalOpen(true)}
         />
 
         <div className="min-w-0">
@@ -413,6 +425,11 @@ function TransactionsContent() {
               mode={drawerMode}
             />
           )}
+          <AiSuggestionsModal
+            open={aiModalOpen}
+            onOpenChange={setAiModalOpen}
+            onProposalsUpdated={handleProposalsUpdated}
+          />
         </div>
       </PageContent>
     </div>

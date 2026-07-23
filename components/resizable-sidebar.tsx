@@ -22,7 +22,6 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },
   { href: '/financial-logic', label: 'Financial Logic', icon: Calculator, pageKey: 'financialLogic' },
   { href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer' },
-  { href: '/ai-suggestions', label: 'Suggestions', icon: Sparkles, pageKey: 'settings' },
 ]
 
 const planningItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
@@ -38,18 +37,12 @@ export default function ResizableSidebar() {
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
   const [devMode, setDevMode] = useState<boolean | null>(null)
-  const [pendingAiCount, setPendingAiCount] = useState<number>(0)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
-    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => setPendingAiCount(Array.isArray(data) ? data.length : 0))
-      .catch(() => {})
-
     fetch('/api/dev-mode', { credentials: 'include' })
       .then(res => res.json())
       .then(data => setDevMode(data.devMode))
