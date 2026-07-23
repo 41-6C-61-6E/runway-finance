@@ -91,6 +91,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
     cash: true,
   });
   // Collapsible section states using useCardCollapsed hook
+  const [isControlsCollapsed, setIsControlsCollapsed] = useCardCollapsed('fire_projection_controls', true); // Collapsed by default
+  const [isSummaryStatsCollapsed, setIsSummaryStatsCollapsed] = useCardCollapsed('fire_summary_stats', false);
   const [isMainChartCollapsed, setIsMainChartCollapsed] = useCardCollapsed('fire_main_chart');
   const [isMilestonesCollapsed, setIsMilestonesCollapsed] = useCardCollapsed('fire_milestones');
   const [isCashFlowCollapsed, setIsCashFlowCollapsed] = useCardCollapsed('fire_cash_flow');
@@ -608,74 +610,102 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* View Mode & Dollar Mode Toolbar Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-card border border-border rounded-xl p-3.5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary/10 p-1.5 rounded-lg text-primary">
-            <Activity className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-foreground">Projection Controls</h3>
-            <p className="text-[10px] text-muted-foreground">Adjust valuation currency & model type</p>
-          </div>
-        </div>
+      {/* Projection Engine Controls (Collapsible, Collapsed by Default) */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isControlsCollapsed}
+          onToggle={setIsControlsCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary shrink-0" />
+              <div>
+                <h3 className="text-xs font-bold text-foreground">Projection Engine Controls</h3>
+                <p className="text-[10px] text-muted-foreground">Adjust valuation currency & model simulation type</p>
+              </div>
+            </div>
+          }
+          actions={
+            <div className="flex items-center gap-1.5 text-xs font-mono">
+              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold">
+                {dollarMode === 'real' ? "Real ($)" : "Nominal ($)"}
+              </span>
+              <span className="bg-muted text-muted-foreground border border-border px-2 py-0.5 rounded text-[10px] font-semibold">
+                {viewMode === 'monte_carlo' ? 'Monte Carlo' : 'Deterministic'}
+              </span>
+            </div>
+          }
+        />
 
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-          {/* Withdrawal Strategy Selector Quick Control */}
-          <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border border-border">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline">Strategy:</span>
-            <select
-              value={plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook'}
-              onChange={(e) => onUpdatePlan({ withdrawalMethod: e.target.value })}
-              className="bg-card text-foreground text-[11px] font-bold rounded px-1.5 py-0.5 border border-border cursor-pointer focus:outline-none"
-            >
-              <option value="textbook">Textbook Waterfall</option>
-              <option value="proportional">Proportional</option>
-              <option value="tax_optimized">Tax-Optimized (12% Bracket)</option>
-              <option value="custom_order">Custom Order</option>
-            </select>
-          </div>
+        {!isControlsCollapsed && (
+          <div className="p-3.5 sm:p-4 border-t border-border">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Quick Strategy Selector */}
+              <div className="flex items-center justify-between bg-muted/30 rounded-lg px-2.5 py-1.5 border border-border">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-2">Strategy</span>
+                <select
+                  value={plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook'}
+                  onChange={(e) => onUpdatePlan({ withdrawalMethod: e.target.value })}
+                  className="bg-card text-foreground text-[11px] font-bold rounded px-2 py-1 border border-border cursor-pointer focus:ring-1 focus:ring-primary w-full text-right"
+                >
+                  <option value="textbook">Textbook Waterfall</option>
+                  <option value="proportional">Proportional</option>
+                  <option value="tax_optimized">Tax-Optimized (12%)</option>
+                  <option value="custom_order">Custom Order</option>
+                </select>
+              </div>
 
-          {/* Nominal vs Real Dollars Toggle */}
-          <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
-            <button
-              onClick={() => setDollarMode('nominal')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                dollarMode === 'nominal' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Nominal ($)
-            </button>
-            <button
-              onClick={() => setDollarMode('real')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                dollarMode === 'real' ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Real (Today's $)
-            </button>
-          </div>
+              {/* Valuation Currency Mode Toggle */}
+              <div className="flex items-center justify-between bg-muted/30 rounded-lg p-1 border border-border">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1.5 hidden sm:inline">Valuation</span>
+                <div className="grid grid-cols-2 gap-1 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDollarMode('nominal')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
+                      dollarMode === 'nominal' ? 'bg-card text-foreground shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Nominal ($)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDollarMode('real')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
+                      dollarMode === 'real' ? 'bg-card text-primary shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Real (Today's $)
+                  </button>
+                </div>
+              </div>
 
-          {/* Deterministic vs Monte Carlo Toggle */}
-          <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
-            <button
-              onClick={() => setViewMode('deterministic')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                viewMode === 'deterministic' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Deterministic
-            </button>
-            <button
-              onClick={() => setViewMode('monte_carlo')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                viewMode === 'monte_carlo' ? 'bg-card text-amber-500 shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Monte Carlo (250 Trials)
-            </button>
+              {/* Simulation Model Toggle */}
+              <div className="flex items-center justify-between bg-muted/30 rounded-lg p-1 border border-border">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1.5 hidden sm:inline">Model</span>
+                <div className="grid grid-cols-2 gap-1 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('deterministic')}
+                    className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
+                      viewMode === 'deterministic' ? 'bg-card text-foreground shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Deterministic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('monte_carlo')}
+                    className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
+                      viewMode === 'monte_carlo' ? 'bg-card text-amber-500 shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Monte Carlo
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Engine Diagnostic Warnings Banner */}
@@ -693,78 +723,116 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         </div>
       )}
 
-      {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <DollarSign className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Current Retirement Portfolio</span>
-          </div>
-          <p className="text-lg font-extrabold text-foreground font-mono">{formatCurrency(currentNetWorth)}</p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Palmtree className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">At Retirement ({localRetirementAge})</span>
-          </div>
-          <p className="text-lg font-extrabold text-emerald-500 font-mono">{formatCurrency(netWorthAtRetirement)}</p>
-          {peakWithdrawalRate > 0 && (
-            <p className={`text-[10px] font-bold font-mono ${peakWithdrawalRate > 5 ? 'text-rose-500' : peakWithdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}`}>
-              Peak Withdraw: {peakWithdrawalRate.toFixed(1)}%
-            </p>
-          )}
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Target className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">FIRE Target ({plan?.fiTargetMultiplier || 25}×)</span>
-          </div>
-          <p className="text-lg font-extrabold text-primary font-mono">{formatCurrency(fireNumber)}</p>
-          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, fireProgress)}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-muted-foreground font-medium">{fireProgress.toFixed(0)}% of target</p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Years to FIRE</span>
-          </div>
-          <p className="text-lg font-extrabold text-foreground font-mono">{yearsToFireDisplay}</p>
-          {simulation?.success !== undefined && (
-            <div
-              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                simulation.success
-                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                  : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-              }`}
-            >
-              <ShieldCheck className="w-3 h-3" />
-              {simulation.success ? 'Succeeds' : `Depletes Age ${simulation.depletionAge}`}
+      {/* Summary KPI Cards (Collapsible) */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <CollapsibleCardHeader
+          isCollapsed={isSummaryStatsCollapsed}
+          onToggle={setIsSummaryStatsCollapsed}
+          title={
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
+              <div>
+                <h3 className="text-xs font-bold text-foreground">Portfolio Summary & Key Plan Metrics</h3>
+                <p className="text-[10px] text-muted-foreground">Current assets, retirement target, and plan health grade</p>
+              </div>
             </div>
-          )}
-        </div>
+          }
+          actions={
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <span className="font-extrabold text-foreground">{formatCurrency(currentNetWorth)}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
+                Grade {planHealth.score}
+              </span>
+            </div>
+          }
+        />
 
-        {/* Plan Health Score Card */}
-        <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm space-y-1">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Scale className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Plan Health</span>
+        {!isSummaryStatsCollapsed && (
+          <div className="p-3.5 sm:p-4 border-t border-border">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <DollarSign className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">Current Portfolio</span>
+                </div>
+                <p className="text-base sm:text-lg font-extrabold text-foreground font-mono truncate">{formatCurrency(currentNetWorth)}</p>
+                <span className="text-[10px] text-muted-foreground block font-sans">Starting Balance</span>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Palmtree className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">At Retirement ({localRetirementAge})</span>
+                </div>
+                <p className="text-base sm:text-lg font-extrabold text-emerald-500 font-mono truncate">{formatCurrency(netWorthAtRetirement)}</p>
+                {peakWithdrawalRate > 0 ? (
+                  <p className={`text-[10px] font-bold font-mono truncate ${peakWithdrawalRate > 5 ? 'text-rose-500' : peakWithdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    Peak Draw: {peakWithdrawalRate.toFixed(1)}%
+                  </p>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground block font-sans">Projected Nest Egg</span>
+                )}
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider truncate">FIRE Target ({plan?.fiTargetMultiplier || 25}×)</span>
+                  </div>
+                </div>
+                <p className="text-base sm:text-lg font-extrabold text-primary font-mono truncate">{formatCurrency(fireNumber)}</p>
+                <div className="space-y-0.5">
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, fireProgress)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium">{fireProgress.toFixed(0)}% of target</p>
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">Years to FIRE</span>
+                </div>
+                <p className="text-base sm:text-lg font-extrabold text-foreground font-mono truncate">
+                  {yearsToFireDisplay} {typeof yearsToFireDisplay === 'number' ? (yearsToFireDisplay === 1 ? 'yr' : 'yrs') : ''}
+                </p>
+                {simulation?.success !== undefined && (
+                  <div
+                    className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full border ${
+                      simulation.success
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{simulation.success ? 'Succeeds' : `Depletes Age ${simulation.depletionAge}`}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1 col-span-2 sm:col-span-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Activity className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider truncate">Plan Health</span>
+                  </div>
+                  <span className="text-sm font-mono font-extrabold text-foreground">{planHealth.score}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
+                    {planHealth.status}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">{planHealth.desc}</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-extrabold text-foreground font-mono">{planHealth.score}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
-              {planHealth.status}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground leading-snug line-clamp-1">{planHealth.desc}</p>
-        </div>
+        )}
       </div>
 
       {/* Main Chart Card: Deterministic vs Monte Carlo Fan Chart */}

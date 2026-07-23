@@ -307,7 +307,7 @@ export default function PlansPage() {
           {/* App Consistent Tab Navigation Bar with Enhanced Plan Selector */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-6 gap-4">
             {/* App Style Tabs */}
-            <div className="flex items-center gap-6 overflow-x-auto">
+            <div className="flex items-center gap-6 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -315,7 +315,7 @@ export default function PlansPage() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`pb-2.5 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px flex items-center gap-1.5 whitespace-nowrap ${
+                    className={`pb-2.5 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                       isActive
                         ? 'border-primary text-primary font-bold'
                         : 'border-transparent text-muted-foreground hover:text-foreground'
