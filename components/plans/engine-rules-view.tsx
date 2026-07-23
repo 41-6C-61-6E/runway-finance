@@ -1020,6 +1020,78 @@ export function EngineRulesView({
             </p>
           </div>
 
+          {/* Real 2026 Social Security Estimation Parameters */}
+          <div className="bg-gradient-to-r from-purple-500/5 via-primary/5 to-emerald-500/5 border border-purple-500/20 rounded-xl p-4 space-y-3">
+            <h5 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              2026 SSA Benefit Estimation Parameters (PIA Bend Points & Claiming Factors)
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[11px]">
+              <div className="bg-card border border-border rounded-lg p-2.5 space-y-1">
+                <span className="text-muted-foreground block font-medium">1. Max Wage Base Cap</span>
+                <span className="font-mono font-bold text-foreground">$176,100 / year</span>
+                <span className="text-[10px] text-muted-foreground block">($14,675 / month max AIME)</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-2.5 space-y-1">
+                <span className="text-muted-foreground block font-medium">2. Bend Point 1 (90%)</span>
+                <span className="font-mono font-bold text-emerald-500">$1,226 / month AIME</span>
+                <span className="text-[10px] text-muted-foreground block">Max $1,103.40 / mo from Tier 1</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-2.5 space-y-1">
+                <span className="text-muted-foreground block font-medium">3. Bend Point 2 (32%)</span>
+                <span className="font-mono font-bold text-blue-500">$7,391 / month AIME</span>
+                <span className="text-[10px] text-muted-foreground block">Add 32% for AIME $1,226–$7,391</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-2.5 space-y-1">
+                <span className="text-muted-foreground block font-medium">4. Tier 3 Replacement (15%)</span>
+                <span className="font-mono font-bold text-purple-500">Above $7,391 AIME</span>
+                <span className="text-[10px] text-muted-foreground block">Add 15% for AIME up to Cap</span>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-lg p-3 text-[11px] space-y-2">
+              <span className="font-bold text-foreground block">Claiming Age Multiplier Schedule (Relative to FRA Age 67 = 100%)</span>
+              <div className="grid grid-cols-3 sm:grid-cols-9 gap-1 text-center font-mono">
+                <div className="bg-rose-500/10 border border-rose-500/20 p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 62</span>
+                  <span className="font-bold text-rose-500">70.0%</span>
+                </div>
+                <div className="bg-rose-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 63</span>
+                  <span className="font-bold text-foreground">75.0%</span>
+                </div>
+                <div className="bg-amber-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 64</span>
+                  <span className="font-bold text-foreground">80.0%</span>
+                </div>
+                <div className="bg-amber-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 65</span>
+                  <span className="font-bold text-foreground">86.7%</span>
+                </div>
+                <div className="bg-amber-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 66</span>
+                  <span className="font-bold text-foreground">93.3%</span>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/30 p-1.5 rounded-md">
+                  <span className="block text-[10px] text-emerald-600 font-bold">Age 67 (FRA)</span>
+                  <span className="font-bold text-emerald-500">100.0%</span>
+                </div>
+                <div className="bg-blue-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 68</span>
+                  <span className="font-bold text-foreground">108.0%</span>
+                </div>
+                <div className="bg-blue-500/5 border border-border p-1.5 rounded-md">
+                  <span className="block text-[10px] text-muted-foreground">Age 69</span>
+                  <span className="font-bold text-foreground">116.0%</span>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 p-1.5 rounded-md">
+                  <span className="block text-[10px] text-purple-600 font-bold">Age 70</span>
+                  <span className="font-bold text-purple-500">124.0%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             {/* Single SS Tiers */}
             <div className="bg-muted/30 border border-border rounded-xl p-3.5 space-y-2">

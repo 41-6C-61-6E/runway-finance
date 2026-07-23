@@ -100,3 +100,80 @@ export function isAccountActiveOnDate(
   }
   return true;
 }
+
+export function isFireEligibleAccount(acc: any): boolean {
+  if (!acc) return false;
+  const rawType = (acc.type || '').toLowerCase();
+  const rawSubtype = (acc.subtype || '').toLowerCase();
+  const rawCategory = (acc.category || '').toLowerCase();
+  const rawName = (acc.name || '').toLowerCase();
+
+  // Excluded from FIRE engine: checking accounts, credit cards / credit accounts, real estate / properties, mortgages, and loans/liabilities
+  const excludedKeywords = [
+    'checking',
+    'credit',
+    'real_estate',
+    'realestate',
+    'primaryhome',
+    'secondaryhome',
+    'rentalproperty',
+    'commercial',
+    'land',
+    'property',
+    'mortgage',
+    'loan',
+    'car_loan',
+    'auto_loan',
+    'student_loan',
+    'personal_loan',
+    'liability',
+    'hsachecking',
+    'vehicle',
+    'valuable',
+  ];
+
+  if (
+    excludedKeywords.some(
+      (kw) =>
+        rawType.includes(kw) ||
+        rawSubtype.includes(kw) ||
+        rawCategory.includes(kw) ||
+        rawName.includes(kw)
+    )
+  ) {
+    return false;
+  }
+
+  // Valid investable asset/savings holdings for FIRE retirement engine
+  const validKeywords = [
+    'cash',
+    'savings',
+    'cd',
+    'money_market',
+    'taxable',
+    'brokerage',
+    'investment',
+    '401k',
+    '403b',
+    'ira',
+    'roth',
+    'traditional',
+    'sep',
+    'simple',
+    'retirement',
+    'hsa',
+    'crypto',
+    '529',
+    'pension',
+    'stock_option',
+    'asset',
+  ];
+
+  return validKeywords.some(
+    (kw) =>
+      rawType.includes(kw) ||
+      rawSubtype.includes(kw) ||
+      rawCategory.includes(kw)
+  );
+}
+

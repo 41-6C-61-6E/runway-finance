@@ -2,8 +2,15 @@ import { getDb } from '@/lib/db';
 import { accounts, paystubs, plans, planAccounts, planEvents, planFlows, planSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { encryptRow, decryptRow } from '@/lib/crypto';
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
-export async function populatePlanWithUserFinances(planId: string, dataUserId: string, dek: Uint8Array, sourcePlanId?: string) {
+export async function populatePlanWithUserFinances(
+  planId: string,
+  dataUserId: string,
+  dek: Uint8Array,
+  sourcePlanId?: string,
+  accountInclusions?: Record<string, boolean>
+) {
   const db = getDb();
 
   // If cloning from an existing plan (e.g. Default Plan), copy its events, flows, settings, and account rules
@@ -25,8 +32,20 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
 
       for (const a of rawSrcAccounts) {
         const decAcc = await decryptRow('plan_accounts', a, dek);
+        if (!isFireEligibleAccount(decAcc)) continue;
+
+        let incVal = decAcc.isIncluded !== false;
+        if (accountInclusions) {
+          if (accountInclusions[decAcc.id] !== undefined) {
+            incVal = Boolean(accountInclusions[decAcc.id]);
+          } else if (accountInclusions[decAcc.name] !== undefined) {
+            incVal = Boolean(accountInclusions[decAcc.name]);
+          }
+        }
+
         const encAcc = await encryptRow('plan_accounts', {
           ...decAcc,
+          isIncluded: incVal,
           planId,
           userId: dataUserId,
         }, dek);
@@ -106,40 +125,27 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
     const accSubtype = (accAny.subtype || '').toLowerCase();
     const accCategory = (accAny.category || '').toLowerCase();
 
-    // 1. Banking > Savings
+    if (!isFireEligibleAccount(acc)) {
+      continue; // Skip checking accounts, credit cards, loans, mortgages, and real estate
+    }
+
     const isSavings =
       accType === 'savings' ||
       accSubtype === 'savings' ||
       accType === 'cd' ||
       accSubtype === 'cd' ||
       accType === 'money_market' ||
-      accSubtype === 'money_market';
-
-    // 2. All types of Investments
-    const isInvestment =
-      ['investment', 'brokerage', 'taxable', '401k', '403b', 'ira', 'roth_ira', 'rothira', 'traditional_ira', 'traditionalira', 'sepira', 'simpleira', 'retirement', 'hsa', 'crypto', '529', 'pension', 'stock_option'].includes(accType) ||
-      ['investment', 'brokerage', 'retirement'].includes(accCategory);
-
-    // 3. All types of Assets
-    const isAsset =
-      ['asset', 'real_estate', 'realestate', 'primaryhome', 'vehicle', 'valuable', 'metals', 'other_asset'].includes(accType) ||
-      accCategory === 'asset';
-
-    // Exclude checking, credit cards, mortgages, loans
-    const isExcluded = ['checking', 'credit_card', 'credit', 'mortgage', 'loan', 'car_loan', 'auto_loan', 'student_loan', 'personal_loan', 'liability', 'hsachecking'].includes(accType);
-
-    if (isExcluded || (!isSavings && !isInvestment && !isAsset)) {
-      continue; // Skip checking accounts, credit cards, loans, and mortgages
-    }
+      accSubtype === 'money_market' ||
+      accType === 'cash';
 
     let type = 'taxable';
     if (isSavings) type = 'cash';
-    else if (['rothira', 'roth_ira'].includes(accType)) type = 'roth_ira';
-    else if (['traditionalira', 'traditional_ira'].includes(accType)) type = 'traditional_ira';
-    else if (['401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(accType)) type = 'traditional_401k';
+    else if (['rothira', 'roth_ira', 'roth'].some((t) => accType.includes(t))) type = 'roth_ira';
+    else if (['traditionalira', 'traditional_ira'].some((t) => accType.includes(t))) type = 'traditional_ira';
+    else if (['401k', '403b', 'sepira', 'simpleira', 'retirement'].some((t) => accType.includes(t))) type = 'traditional_401k';
     else if (accType === 'hsa') type = 'hsa';
     else if (accType === 'crypto') type = 'crypto';
-    else if (isAsset || isInvestment) type = 'taxable';
+    else type = 'taxable';
 
     let rothPct: number | undefined = undefined;
     if (acc.metadata) {
@@ -168,6 +174,15 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
       isSurplusDest = true;
     }
 
+    let isInc = true;
+    if (accountInclusions) {
+      if (accountInclusions[acc.id] !== undefined) {
+        isInc = Boolean(accountInclusions[acc.id]);
+      } else if (accountInclusions[acc.name] !== undefined) {
+        isInc = Boolean(accountInclusions[acc.name]);
+      }
+    }
+
     const encryptedAcc = await encryptRow('plan_accounts', {
       planId,
       userId: dataUserId,
@@ -181,7 +196,7 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
       reinvestDividends: true,
       qualifiedDividendRatio: '1.0',
       rothPercentage: rothPct,
-      isIncluded: true,
+      isIncluded: isInc,
       contributionMode: contribMode,
       contributionValue: contribVal,
       companyMatchRate: matchRate,
