@@ -237,7 +237,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Sub-Tab Bar */}
-      <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: 'milestones' as const, label: 'Milestones & Profile', icon: Flag },
           { id: 'social_security' as const, label: 'Social Security Planning', icon: HeartHandshake },

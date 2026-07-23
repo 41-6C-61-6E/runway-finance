@@ -10,26 +10,34 @@ import { useUserSettings } from '@/components/user-settings-provider';
  * @param cardId - Unique identifier for the card (e.g., 'netWorthSummary', 'incomeExpenseChart')
  * @returns [isCollapsed, setIsCollapsed] - Current collapsed state and setter function
  */
-export function useCardCollapsed(cardId: string): [boolean, (collapsed: boolean) => void] {
+export function useCardCollapsed(
+  cardId: string,
+  defaultCollapsed: boolean = false
+): [boolean, (collapsed: boolean) => void] {
   const context = useUserSettings();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load initial state from context
   useEffect(() => {
     if (context) {
       const cardCollapsedStates = context.settings?.cardCollapsedStates || {};
-      setIsCollapsed(cardCollapsedStates[cardId] === true);
+      if (cardCollapsedStates[cardId] !== undefined) {
+        setIsCollapsed(cardCollapsedStates[cardId] === true);
+      } else {
+        setIsCollapsed(defaultCollapsed);
+      }
       setIsLoaded(true);
     }
-  }, [context, cardId]);
+  }, [context, cardId, defaultCollapsed]);
 
   // Listen for changes in the context (e.g., from other tabs/components)
   useEffect(() => {
     if (context && isLoaded) {
       const cardCollapsedStates = context.settings?.cardCollapsedStates || {};
-      const newState = cardCollapsedStates[cardId] === true;
-      setIsCollapsed(newState);
+      if (cardCollapsedStates[cardId] !== undefined) {
+        setIsCollapsed(cardCollapsedStates[cardId] === true);
+      }
     }
   }, [context?.settings?.cardCollapsedStates, cardId, isLoaded]);
 
