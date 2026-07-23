@@ -110,7 +110,7 @@ export interface EnginePlan {
     realEstateLiquidationRate?: number;
     administrativeCostRate?: number;
     charitableGiving?: number;
-    withdrawalMethod?: 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order';
+    withdrawalMethod?: 'textbook' | 'proportional' | 'tax_deferred_first' | 'tax_optimized' | 'custom_order';
     enableRothConversions?: boolean;
     rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'irmaa_tier1';
     avoidIrmaaCliffs?: boolean;
@@ -689,6 +689,7 @@ export function runRetirementSimulation(
     const stateTaxRate = (plan.settings?.incomeTaxModifier || 0) / 100;
     let stateTax = taxableOrdinaryIncome * stateTaxRate;
     let taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax;
+    const initialTaxesPaid = taxesPaid;
     let effectiveTaxRate = grossIncome > 0 ? (taxesPaid / grossIncome) * 100 : 0;
 
     const netCashFlow = grossIncome - totalExpenses - taxesPaid - totalPreTaxContrib;
@@ -1030,16 +1031,28 @@ export function runRetirementSimulation(
           if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
             return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
           }
-          const orderMap: Record<string, number> = {
-            cash: 1,
-            taxable: 2,
-            crypto: 2,
-            traditional_ira: 3,
-            traditional_401k: 3,
-            roth_ira: 4,
-            roth_401k: 4,
-            hsa: 5,
-          };
+          const orderMap: Record<string, number> =
+            method === 'tax_deferred_first'
+              ? {
+                  cash: 1,
+                  traditional_ira: 2,
+                  traditional_401k: 2,
+                  taxable: 3,
+                  crypto: 3,
+                  roth_ira: 4,
+                  roth_401k: 4,
+                  hsa: 5,
+                }
+              : {
+                  cash: 1,
+                  taxable: 2,
+                  crypto: 2,
+                  traditional_ira: 3,
+                  traditional_401k: 3,
+                  roth_ira: 4,
+                  roth_401k: 4,
+                  hsa: 5,
+                };
           return accountsList
             .sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
         };

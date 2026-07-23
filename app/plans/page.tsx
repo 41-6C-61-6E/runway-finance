@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Flame, TrendingUp, ListChecks, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
+import { Flame, TrendingUp, ListChecks, BarChart3, Settings, Plus, Sparkles, HeartHandshake, ShieldCheck } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { ProjectionTab } from '@/components/plans/projection-tab';
 import { PlanDetailsTab } from '@/components/plans/plan-details-tab';
 import { ScenariosTab } from '@/components/plans/scenarios-tab';
+import { SocialSecurityTab } from '@/components/plans/social-security-tab';
+import { RothConversionTab } from '@/components/plans/roth-conversion-tab';
+import { IrmaaTab } from '@/components/plans/irmaa-tab';
 import { SettingsTab } from '@/components/plans/settings-tab';
 import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
 import { DeletePlanDialog } from '@/components/plans/delete-plan-dialog';
@@ -15,7 +18,7 @@ import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
 export default function PlansPage() {
-  const [activeTab, setActiveTab] = useState<'projection' | 'details' | 'scenarios' | 'settings'>('projection');
+  const [activeTab, setActiveTab] = useState<'projection' | 'details' | 'scenarios' | 'social-security' | 'roth-conversion' | 'irmaa' | 'settings'>('projection');
   const [plansList, setPlansList] = useState<any[]>([]);
   const [accountsList, setAccountsList] = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -242,6 +245,9 @@ export default function PlansPage() {
     { id: 'projection' as const, label: 'Projection', icon: TrendingUp },
     { id: 'details' as const, label: 'Plan Details', icon: ListChecks },
     { id: 'scenarios' as const, label: 'Scenarios', icon: BarChart3 },
+    { id: 'social-security' as const, label: 'Social Security', icon: HeartHandshake },
+    { id: 'roth-conversion' as const, label: 'Roth Conversion', icon: Flame },
+    { id: 'irmaa' as const, label: 'IRMAA Surcharges', icon: ShieldCheck },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
   ];
 
@@ -362,7 +368,28 @@ export default function PlansPage() {
           )}
 
           {activeTab === 'scenarios' && selectedPlan && (
-            <ScenariosTab plan={selectedPlan} allPlans={plansList} />
+            <ScenariosTab plan={selectedPlan} allPlans={plansList} onUpdatePlan={handleUpdatePlan} />
+          )}
+
+          {activeTab === 'social-security' && selectedPlan && (
+            <SocialSecurityTab
+              plan={selectedPlan}
+              onUpdatePlan={handleUpdatePlan}
+            />
+          )}
+
+          {activeTab === 'roth-conversion' && selectedPlan && (
+            <RothConversionTab
+              plan={selectedPlan}
+              onUpdatePlan={handleUpdatePlan}
+            />
+          )}
+
+          {activeTab === 'irmaa' && selectedPlan && (
+            <IrmaaTab
+              plan={selectedPlan}
+              onUpdatePlan={handleUpdatePlan}
+            />
           )}
 
           {activeTab === 'settings' && selectedPlan && (
