@@ -51,6 +51,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   const [expOwner, setExpOwner] = useState('primary');
   const [expAmount, setExpAmount] = useState('30000');
   const [expGrowth, setExpGrowth] = useState('2.5');
+  const [expStart, setExpStart] = useState('now');
+  const [expStartVal, setExpStartVal] = useState('');
+  const [expEnd, setExpEnd] = useState('end_of_plan');
+  const [expEndVal, setExpEndVal] = useState('');
 
   // Section collapsed states
   const [isAccountsCollapsed, setIsAccountsCollapsed] = useCardCollapsed('plan_details_accounts');
@@ -168,6 +172,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setExpOwner('primary');
     setExpAmount('30000');
     setExpGrowth('2.5');
+    setExpStart('now');
+    setExpStartVal('');
+    setExpEnd('end_of_plan');
+    setExpEndVal('');
     setModalType('expense');
   };
 
@@ -178,6 +186,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setExpOwner(safeString(exp.owner, 'primary'));
     setExpAmount(String(exp.amount || '30000'));
     setExpGrowth(String(exp.growthRate || '2.5'));
+    setExpStart(safeString(exp.startTriggerType, 'now'));
+    setExpStartVal(String(exp.startTriggerValue || ''));
+    setExpEnd(safeString(exp.endTriggerType, 'end_of_plan'));
+    setExpEndVal(String(exp.endTriggerValue || ''));
     setModalType('expense');
   };
 
@@ -237,6 +249,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           owner: expOwner,
           amount: parseFloat(expAmount) || 0,
           growthRate: parseFloat(expGrowth) || 0,
+          startTriggerType: expStart,
+          startTriggerValue: expStartVal,
+          endTriggerType: expEnd,
+          endTriggerValue: expEndVal,
         },
       });
     } else {
@@ -249,6 +265,11 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           amount: parseFloat(expAmount) || 0,
           frequency: 'yearly',
           growthRate: parseFloat(expGrowth) || 0,
+          adjustForInflation: true,
+          startTriggerType: expStart,
+          startTriggerValue: expStartVal,
+          endTriggerType: expEnd,
+          endTriggerValue: expEndVal,
         },
       });
     }
@@ -864,10 +885,23 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 let phaseBadge = { label: 'Lifetime', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
                 if (endType === 'retirement') {
                   phaseBadge = { label: 'Pre-Retirement Only', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+                } else if (endType === 'after_n_years' || endType === 'duration') {
+                  if (startType === 'retirement') {
+                    phaseBadge = { label: `Retirement (${endVal || 'N'} Years)`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  } else if (startType === 'now') {
+                    phaseBadge = { label: `Next ${endVal || 'N'} Years`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+                  } else if (startType === 'age' && startVal) {
+                    const endAge = parseInt(startVal, 10) + (parseInt(endVal, 10) || 0);
+                    phaseBadge = { label: `Ages ${startVal}–${endAge}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
+                  } else {
+                    phaseBadge = { label: `${endVal || 'N'} Years Duration`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+                  }
                 } else if (startType === 'retirement' || (startType === 'age' && parseInt(startVal, 10) >= (plan.retirementAge || 60))) {
                   phaseBadge = { label: 'Retirement Phase', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
                 } else if (startType === 'age' && startVal) {
                   phaseBadge = { label: `Starts Age ${startVal}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
+                } else if (startType === 'year' && startVal) {
+                  phaseBadge = { label: `Starts ${startVal}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
                 }
 
                 return (
@@ -882,9 +916,8 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
                         {incTypeStr === 'salary' ? 'Side Job / Pre-Retirement Wages' : incTypeStr.replace(/_/g, ' ')}
                         {inc.growthRate ? ` • ${inc.growthRate}% annual growth` : ''}
-                        {startType === 'age' && startVal ? ` • Starts Age ${startVal}` : ''}
-                        {endType === 'retirement' ? ' • Until Retirement' : ''}
-                        {endType === 'age' && endVal ? ` • Until Age ${endVal}` : ''}
+                        {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
+                        {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} years` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -983,17 +1016,41 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   const expNameStr = safeString(exp.name, 'Expense');
                   const expId = safeString(exp.id, `exp_${i}`);
                   const expTypeStr = safeString(exp.type);
-                  const startType = safeString(exp.startTriggerType);
+                  const startType = safeString(exp.startTriggerType, 'now');
                   const startVal = safeString(exp.startTriggerValue);
-                  const endType = safeString(exp.endTriggerType);
+                  const endType = safeString(exp.endTriggerType, 'end_of_plan');
                   const endVal = safeString(exp.endTriggerValue);
 
                   // Phase badge logic for expenses
                   let phaseBadge = { label: 'Lifetime Expense', color: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
                   if (endType === 'retirement') {
                     phaseBadge = { label: 'Pre-Retirement Only', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
-                  } else if (startType === 'retirement' || (startType === 'age' && parseInt(startVal, 10) >= (plan.retirementAge || 60))) {
-                    phaseBadge = { label: 'Retirement Phase Expense', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  } else if ((endType === 'after_n_years' || endType === 'duration') && endVal) {
+                    if (startType === 'retirement') {
+                      const endAge = (plan.retirementAge || 60) + (parseInt(endVal, 10) || 0);
+                      phaseBadge = { label: `Early Retirement (${plan.retirementAge || 60}–${endAge})`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                    } else if (startType === 'now') {
+                      phaseBadge = { label: `Next ${endVal} Years`, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+                    } else if (startType === 'age' && startVal) {
+                      const endAge = parseInt(startVal, 10) + (parseInt(endVal, 10) || 0);
+                      phaseBadge = { label: `Ages ${startVal}–${endAge}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
+                    } else {
+                      phaseBadge = { label: `${endVal} Years Duration`, color: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
+                    }
+                  } else if (startType === 'retirement' && endType === 'age' && endVal) {
+                    phaseBadge = { label: `Early Retirement (${plan.retirementAge || 60}–${endVal})`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  } else if (startType === 'retirement') {
+                    phaseBadge = { label: 'Retirement Phase', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  } else if (startType === 'age' && endType === 'age' && startVal && endVal) {
+                    phaseBadge = { label: `Ages ${startVal}–${endVal}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
+                  } else if (startType === 'age' && startVal) {
+                    const isPostRetirement = parseInt(startVal, 10) >= (plan.retirementAge || 60);
+                    phaseBadge = {
+                      label: isPostRetirement ? `Retirement (Starts Age ${startVal})` : `Starts Age ${startVal}`,
+                      color: isPostRetirement ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-violet-500/10 text-violet-500 border-violet-500/20'
+                    };
+                  } else if (startType === 'year' && startVal) {
+                    phaseBadge = { label: `Starts Year ${startVal}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
                   }
 
                   return (
@@ -1008,6 +1065,8 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                         <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
                           {expTypeStr.replace(/_/g, ' ')}
                           {exp.growthRate ? ` • ${exp.growthRate}% annual inflation` : ''}
+                          {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
+                          {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} years` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1127,12 +1186,14 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
                     >
                       <option value="now">Immediately (Now)</option>
+                      <option value="retirement">At Retirement</option>
                       <option value="age">At Specific Age</option>
+                      <option value="year">At Specific Year</option>
                     </select>
-                    {incStart === 'age' && (
+                    {(incStart === 'age' || incStart === 'year') && (
                       <input
                         type="number"
-                        placeholder="e.g. 67"
+                        placeholder={incStart === 'year' ? 'e.g. 2030' : 'e.g. 67'}
                         value={incStartVal}
                         onChange={(e) => setIncStartVal(e.target.value)}
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
@@ -1146,14 +1207,16 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       onChange={(e) => setIncEnd(e.target.value)}
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
                     >
-                      <option value="retirement">Until Retirement</option>
                       <option value="end_of_plan">End of Plan (Lifetime)</option>
+                      <option value="after_n_years">After N Years (Duration)</option>
+                      <option value="retirement">Until Retirement</option>
                       <option value="age">At Specific Age</option>
+                      <option value="year">At Specific Year</option>
                     </select>
-                    {incEnd === 'age' && (
+                    {(incEnd === 'age' || incEnd === 'year' || incEnd === 'after_n_years') && (
                       <input
                         type="number"
-                        placeholder="e.g. 65"
+                        placeholder={incEnd === 'year' ? 'e.g. 2040' : incEnd === 'after_n_years' ? 'e.g. 10 (years)' : 'e.g. 65'}
                         value={incEndVal}
                         onChange={(e) => setIncEndVal(e.target.value)}
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
@@ -1242,6 +1305,53 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
                       <option value="joint">Joint / Shared</option>
                     </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Start Condition</label>
+                    <select
+                      value={expStart}
+                      onChange={(e) => setExpStart(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="now">Immediately (Now)</option>
+                      <option value="retirement">At Retirement</option>
+                      <option value="age">At Specific Age</option>
+                      <option value="year">At Specific Year</option>
+                    </select>
+                    {(expStart === 'age' || expStart === 'year') && (
+                      <input
+                        type="number"
+                        placeholder={expStart === 'year' ? 'e.g. 2030' : `e.g. ${plan.retirementAge || 60}`}
+                        value={expStartVal}
+                        onChange={(e) => setExpStartVal(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">End Condition</label>
+                    <select
+                      value={expEnd}
+                      onChange={(e) => setExpEnd(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="end_of_plan">End of Plan (Lifetime)</option>
+                      <option value="after_n_years">After N Years (Duration)</option>
+                      <option value="retirement">Until Retirement</option>
+                      <option value="age">At Specific Age</option>
+                      <option value="year">At Specific Year</option>
+                    </select>
+                    {(expEnd === 'age' || expEnd === 'year' || expEnd === 'after_n_years') && (
+                      <input
+                        type="number"
+                        placeholder={expEnd === 'year' ? 'e.g. 2040' : expEnd === 'after_n_years' ? 'e.g. 10 (years)' : `e.g. ${(plan.retirementAge || 60) + 10}`}
+                        value={expEndVal}
+                        onChange={(e) => setExpEndVal(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">

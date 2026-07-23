@@ -374,7 +374,7 @@ export function runRetirementSimulation(
     for (const ev of plan.events) {
       if (ev.category !== 'income') continue;
       if (ev.type === 'salary') continue; // Primary/spouse salary comes from plan-level fields
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge)) continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge, yearOffset)) continue;
 
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
@@ -421,7 +421,7 @@ export function runRetirementSimulation(
     let livingExpenses = irmaaSurchargeAnnual;
     for (const ev of plan.events) {
       if (ev.category !== 'expense') continue;
-      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge)) continue;
+      if (!isEventActive(ev, simYear, primaryAge, plan.retirementAge, spouseAge, plan.spouseRetirementAge, yearOffset)) continue;
       const baseAmt = ev.amount * (ev.frequency === 'monthly' ? 12 : 1);
       const growthMult = Math.pow(1 + ev.growthRate / 100, yearOffset);
       const inflMult = ev.adjustForInflation ? compoundInflation : 1;
@@ -1443,7 +1443,8 @@ function isEventActive(
   primaryAge: number,
   primaryRetirementAge: number,
   spouseAge?: number,
-  spouseRetirementAge?: number
+  spouseRetirementAge?: number,
+  yearOffset: number = 0
 ): boolean {
   const isSpouseEvent = ev.owner === 'spouse';
   const evalAge = isSpouseEvent && spouseAge !== undefined ? spouseAge : primaryAge;
@@ -1453,6 +1454,8 @@ function isEventActive(
     if (evalAge < parseInt(ev.startTriggerValue, 10)) return false;
   } else if (ev.startTriggerType === 'year' && ev.startTriggerValue) {
     if (simYear < parseInt(ev.startTriggerValue, 10)) return false;
+  } else if (ev.startTriggerType === 'retirement') {
+    if (evalAge < evalRetirementAge) return false;
   }
 
   if (ev.endTriggerType === 'age' && ev.endTriggerValue) {
@@ -1461,6 +1464,21 @@ function isEventActive(
     if (simYear > parseInt(ev.endTriggerValue, 10)) return false;
   } else if (ev.endTriggerType === 'retirement') {
     if (evalAge >= evalRetirementAge) return false;
+  } else if ((ev.endTriggerType === 'after_n_years' || ev.endTriggerType === 'duration') && ev.endTriggerValue) {
+    const duration = parseInt(ev.endTriggerValue, 10);
+    if (!isNaN(duration) && duration > 0) {
+      if (ev.startTriggerType === 'retirement') {
+        if (evalAge >= evalRetirementAge + duration) return false;
+      } else if (ev.startTriggerType === 'age' && ev.startTriggerValue) {
+        const startAge = parseInt(ev.startTriggerValue, 10);
+        if (evalAge >= startAge + duration) return false;
+      } else if (ev.startTriggerType === 'year' && ev.startTriggerValue) {
+        const startYear = parseInt(ev.startTriggerValue, 10);
+        if (simYear >= startYear + duration) return false;
+      } else {
+        if (yearOffset >= duration) return false;
+      }
+    }
   }
 
   return true;

@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784782941582",
+  "buildNumber": "26.07.1784820100044",
   "commits": [
+    "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic",
     "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
     "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
     "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
-    "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
-    "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections."
+    "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals"
   ]
 }
