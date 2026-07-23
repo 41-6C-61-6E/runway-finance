@@ -11,15 +11,15 @@ export const authConfig = {
     cookies: {
       sessionToken: {
         name: "authjs.session-token",
-        options: { httpOnly: true, sameSite: "none", path: "/", secure: true }
+        options: { httpOnly: true, sameSite: "lax", path: "/", secure: false }
       },
       csrfToken: {
         name: "authjs.csrf-token",
-        options: { httpOnly: true, sameSite: "none", path: "/", secure: true }
+        options: { httpOnly: true, sameSite: "lax", path: "/", secure: false }
       },
       callbackUrl: {
         name: "authjs.callback-url",
-        options: { sameSite: "none", path: "/", secure: true }
+        options: { sameSite: "lax", path: "/", secure: false }
       }
     }
   } : {}),
