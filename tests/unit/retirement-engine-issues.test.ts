@@ -960,4 +960,194 @@ describe('FIRE Open Issues Fixes', () => {
     // Net worth should preserve assets (Total assets ~ $1,000,000 minus taxes/living expenses, NOT losing RMD)
     expect(firstYear.totalAssets).toBeGreaterThan(950000);
   });
+
+  it('supports expense start condition and end condition for early retirement expenses', () => {
+    const plan: EnginePlan = {
+      id: 'test-expense-triggers',
+      name: 'Travel Expense Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980, // Age 46 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 0,
+      },
+      accounts: [
+        {
+          id: 'acc-cash',
+          name: 'Cash',
+          type: 'cash',
+          owner: 'primary',
+          balance: 1000000,
+          costBasis: 1000000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'base-expense',
+          name: 'Base Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 40000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+        {
+          id: 'travel-expense',
+          name: 'Early Retirement Travel',
+          category: 'expense',
+          type: 'lump_sum',
+          owner: 'primary',
+          amount: 20000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'retirement', // Starts at retirement (age 60)
+          endTriggerType: 'age',
+          endTriggerValue: '70', // Ends at age 70 (first 10 years of retirement)
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+    
+    // Age 50 (Pre-retirement): only base expense active
+    const yearAge50 = sim.yearlyResults.find((r) => r.primaryAge === 50);
+    expect(yearAge50).toBeDefined();
+    expect(yearAge50!.livingExpenses).toBe(40000);
+
+    // Age 60 (Retirement start): travel expense active ($40,000 + $20,000)
+    const yearAge60 = sim.yearlyResults.find((r) => r.primaryAge === 60);
+    expect(yearAge60).toBeDefined();
+    expect(yearAge60!.livingExpenses).toBe(60000);
+
+    // Age 70 (Final year of travel): travel expense still active ($60,000)
+    const yearAge70 = sim.yearlyResults.find((r) => r.primaryAge === 70);
+    expect(yearAge70).toBeDefined();
+    expect(yearAge70!.livingExpenses).toBe(60000);
+
+    // Age 71 (Post-travel): travel expense ended ($40,000)
+    const yearAge71 = sim.yearlyResults.find((r) => r.primaryAge === 71);
+    expect(yearAge71).toBeDefined();
+    expect(yearAge71!.livingExpenses).toBe(40000);
+  });
+
+  it('supports "after_n_years" duration end condition for income and expenses', () => {
+    const plan: EnginePlan = {
+      id: 'test-after-n-years',
+      name: 'After N Years Test',
+      hasSpouse: false,
+      primaryBirthYear: 1980,
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 80,
+      withdrawalMethod: 'textbook',
+      settings: {
+        fixedInflationRate: 0,
+      },
+      accounts: [
+        {
+          id: 'acc-cash',
+          name: 'Cash',
+          type: 'cash',
+          owner: 'primary',
+          balance: 1000000,
+          costBasis: 1000000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'base-exp',
+          name: 'Base Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+        {
+          id: 'travel-10y',
+          name: 'Retirement Travel (10 Years)',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 15000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'retirement',
+          endTriggerType: 'after_n_years',
+          endTriggerValue: '10', // Active for 10 years (ages 60 to 69)
+        },
+        {
+          id: 'bridge-5y',
+          name: 'Bridge Annuity (5 Years)',
+          category: 'income',
+          type: 'passive',
+          owner: 'primary',
+          amount: 12000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'retirement',
+          endTriggerType: 'after_n_years',
+          endTriggerValue: '5', // Active for 5 years (ages 60 to 64)
+        },
+      ],
+      flows: [],
+    };
+
+    const sim = runRetirementSimulation(plan);
+
+    // Pre-retirement (age 55): base expense $30k, 0 bridge income
+    const r55 = sim.yearlyResults.find((r) => r.primaryAge === 55)!;
+    expect(r55.livingExpenses).toBe(30000);
+    expect(r55.otherIncome).toBe(0);
+
+    // Retirement year 1 (age 60): expenses = $30k + $15k = $45k; income = $12k
+    const r60 = sim.yearlyResults.find((r) => r.primaryAge === 60)!;
+    expect(r60.livingExpenses).toBe(45000);
+    expect(r60.otherIncome).toBe(12000);
+
+    // Year 5 of retirement (age 64): bridge income still active ($12k), travel expense still active ($45k)
+    const r64 = sim.yearlyResults.find((r) => r.primaryAge === 64)!;
+    expect(r64.livingExpenses).toBe(45000);
+    expect(r64.otherIncome).toBe(12000);
+
+    // Year 6 of retirement (age 65): 5-year bridge income expired ($0), travel expense still active ($45k)
+    const r65 = sim.yearlyResults.find((r) => r.primaryAge === 65)!;
+    expect(r65.livingExpenses).toBe(45000);
+    expect(r65.otherIncome).toBe(0);
+
+    // Year 10 of retirement (age 69): travel expense last active year ($45k)
+    const r69 = sim.yearlyResults.find((r) => r.primaryAge === 69)!;
+    expect(r69.livingExpenses).toBe(45000);
+
+    // Year 11 of retirement (age 70): 10-year travel expense expired -> back to $30k base expense
+    const r70 = sim.yearlyResults.find((r) => r.primaryAge === 70)!;
+    expect(r70.livingExpenses).toBe(30000);
+  });
 });
