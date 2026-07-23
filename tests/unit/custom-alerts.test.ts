@@ -1,15 +1,23 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-const { mockSendNotification } = vi.hoisted(() => ({
-  mockSendNotification: vi.fn<(sub: any, payload: string) => any>(async () => ({ statusCode: 201 })),
-}));
+const { mockSendNotification } = vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
+  process.env.VAPID_PRIVATE_KEY = 'test-private-key';
+  return {
+    mockSendNotification: vi.fn<(sub: any, payload: string) => any>(async () => ({ statusCode: 201 })),
+  };
+});
 
-vi.mock('web-push', () => ({
-  default: {
+vi.mock('web-push', () => {
+  const mockObj = {
     setVapidDetails: vi.fn(),
     sendNotification: mockSendNotification,
-  },
-}));
+  };
+  return {
+    ...mockObj,
+    default: mockObj,
+  };
+});
 
 vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
@@ -22,11 +30,16 @@ vi.mock('@/lib/crypto', () => ({
 
 function getTableName(table: any): string | null {
   if (!table) return null;
+  if (table[Symbol.for('drizzle:Name')]) return table[Symbol.for('drizzle:Name')];
   if (table.key && typeof table.key.name === 'string') return table.key.name;
   if (table._ && typeof table._.name === 'string') return table._.name;
   const symbols = Object.getOwnPropertySymbols(table);
-  const nameSymbol = symbols.find((s) => s.toString() === 'Symbol(drizzle:Name)');
-  if (nameSymbol) return table[nameSymbol];
+  for (const sym of symbols) {
+    const val = table[sym];
+    if (typeof val === 'string' && ['custom_alert_rules', 'accounts', 'monthly_cash_flow', 'push_subscriptions', 'sent_notifications', 'user_settings', 'user_notifications'].includes(val)) {
+      return val;
+    }
+  }
   return null;
 }
 
@@ -130,7 +143,7 @@ describe('Custom Event Alert Engine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRulesResponse = [];
-    mockAccountsResponse = [];
+    mockAccountsResponse = [{ isHidden: false, isExcludedFromNetWorth: false }];
     mockCashFlowResponse = [];
     mockSentResponse = [];
   });

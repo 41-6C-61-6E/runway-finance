@@ -29,26 +29,29 @@ vi.mock('@/lib/crypto', () => ({
 const mockAppends: Record<string, string> = {};
 
 vi.mock('archiver', () => {
-  return {
-    default: vi.fn().mockImplementation(() => {
-      const listeners: Record<string, Function[]> = {};
-      return {
-        on: (event: string, callback: Function) => {
-          listeners[event] = listeners[event] || [];
-          listeners[event].push(callback);
-        },
-        append: (content: string, options: { name: string }) => {
-          mockAppends[options.name] = content;
-        },
-        finalize: async () => {
-          if (listeners['end']) {
-            for (const cb of listeners['end']) {
-              cb();
-            }
+  function MockArchive(this: any) {
+    const listeners: Record<string, Function[]> = {};
+    return {
+      on: (event: string, callback: Function) => {
+        listeners[event] = listeners[event] || [];
+        listeners[event].push(callback);
+      },
+      append: (content: string, options: { name: string }) => {
+        mockAppends[options.name] = content;
+      },
+      finalize: async () => {
+        if (listeners['end']) {
+          for (const cb of listeners['end']) {
+            cb();
           }
         }
-      };
-    })
+      }
+    };
+  }
+  return {
+    default: MockArchive,
+    ZipArchive: MockArchive as any,
+    Archiver: MockArchive as any,
   };
 });
 

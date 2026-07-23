@@ -23,7 +23,7 @@ import {
   importLog,
   paystubs,
 } from '@/lib/db/schema';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 
 const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: accounts, dbName: 'accounts', label: 'accounts' },
@@ -151,7 +151,7 @@ export async function GET() {
     ],
   };
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
 
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));

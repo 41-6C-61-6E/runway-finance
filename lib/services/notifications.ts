@@ -15,21 +15,24 @@ const cleanEnv = (val?: string) => {
   return trimmed;
 };
 
-const publicKey = cleanEnv(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
-const privateKey = cleanEnv(process.env.VAPID_PRIVATE_KEY);
-const subject = cleanEnv(process.env.VAPID_SUBJECT) || 'mailto:admin@example.com';
-
 let isInitialized = false;
-if (publicKey && privateKey) {
-  try {
-    webpush.setVapidDetails(subject, publicKey, privateKey);
-    isInitialized = true;
-    logger.info('[notifications-service] VAPID details initialized successfully');
-  } catch (err) {
-    logger.error('[notifications-service] Failed to set VAPID details:', err);
+
+function ensureVapidInitialized(): boolean {
+  if (isInitialized) return true;
+  const publicKey = cleanEnv(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const privateKey = cleanEnv(process.env.VAPID_PRIVATE_KEY);
+  const subject = cleanEnv(process.env.VAPID_SUBJECT) || 'mailto:admin@example.com';
+
+  if (publicKey && privateKey) {
+    try {
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+      isInitialized = true;
+      logger.info('[notifications-service] VAPID details initialized successfully');
+    } catch (err) {
+      logger.error('[notifications-service] Failed to set VAPID details:', err);
+    }
   }
-} else {
-  logger.warn('[notifications-service] Web Push VAPID keys are missing from environment. Notifications will be disabled.');
+  return isInitialized;
 }
 
 export type PushResult = { sent: boolean; reason?: string };
@@ -136,7 +139,7 @@ export async function sendPushNotification(
   }
 
   // 5. Send push notification to all active devices (if configured)
-  if (!isInitialized) {
+  if (!ensureVapidInitialized()) {
     logger.warn('[notifications-service] VAPID keys missing. Saved in-app notification only.');
     return { sent: true, reason: 'VAPID keys not configured. Saved in-app only.' };
   }

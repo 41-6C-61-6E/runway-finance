@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1784761661855",
+  "buildNumber": "26.07.1784782941582",
   "commits": [
-    "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
-    "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
-    "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
-    "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
-    "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI"
+    "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
+    "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
+    "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
+    "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
+    "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections."
   ]
 }
