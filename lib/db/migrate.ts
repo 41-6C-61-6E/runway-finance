@@ -310,6 +310,21 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       }
     }
 
+    // 9f. Add allow_penalty_withdrawals column to plan_settings (migration 0074)
+    const planSettingsTableCheck = await client.query(`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_settings'
+    `);
+    if (planSettingsTableCheck.rows.length > 0) {
+      const colCheckPenalty = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'
+      `);
+      if (colCheckPenalty.rows.length === 0) {
+        logger.info('[migrate] [self-heal] Adding missing allow_penalty_withdrawals column to plan_settings...');
+        await client.query(`ALTER TABLE plan_settings ADD COLUMN IF NOT EXISTS allow_penalty_withdrawals BOOLEAN NOT NULL DEFAULT TRUE`);
+      }
+    }
+
     // Mark unapplied migrations as applied if their artifacts already exist.
     // The self-heal above may create tables/columns that later migrations expect
     // to create, causing "already exists" failures that block subsequent migrations.
@@ -327,6 +342,8 @@ async function runSelfHealingChecks(client: any): Promise<void> {
         { tag: '0069_kind_sabretooth', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_accounts'` },
         { tag: '0070_regular_aqueduct', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'spouse_name'` },
         { tag: '0071_famous_runaways', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_flows' AND column_name = 'salary_source'` },
+        { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
+        { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
       ];
       for (const { tag, check } of migrationArtifacts) {
         if (appliedTagsMap.has(tag)) continue;
