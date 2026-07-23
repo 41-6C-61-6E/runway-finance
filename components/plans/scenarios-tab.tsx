@@ -15,21 +15,17 @@ import {
   Legend,
 } from 'recharts';
 import {
-  TrendingUp,
   ShieldCheck,
   Check,
   CheckCircle2,
   Sparkles,
   Layers,
   HeartHandshake,
-  DollarSign,
   Calendar,
   Zap,
-  Sliders,
-  AlertTriangle,
   Flame,
-  ArrowUpRight,
-  RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -41,18 +37,12 @@ interface ScenariosTabProps {
 }
 
 export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
-  const [activeSection, setActiveSection] = useState<'strategies' | 'whatif' | 'tactics'>('strategies');
+  const [activeSection, setActiveSection] = useState<'strategies' | 'tactics'>('strategies');
+  const [expandedStrategyId, setExpandedStrategyId] = useState<string | null>(null);
 
   // Collapsible card states
   const [isStrategiesCollapsed, setIsStrategiesCollapsed] = useCardCollapsed('scenarios_strategies');
-  const [isWhatIfCollapsed, setIsWhatIfCollapsed] = useCardCollapsed('scenarios_whatif');
   const [isTacticsCollapsed, setIsTacticsCollapsed] = useCardCollapsed('scenarios_tactics');
-
-  // What-If Simulator State
-  const [whatIfRetirementAge, setWhatIfRetirementAge] = useState<number>(plan?.retirementAge || 60);
-  const [whatIfMarketScenario, setWhatIfMarketScenario] = useState<'baseline' | 'bull' | 'bear' | 'crash'>('baseline');
-  const [whatIfInflationRate, setWhatIfInflationRate] = useState<number>(parseFloat(plan?.settings?.fixedInflationRate || '3.0'));
-  const [whatIfExpenseModifier, setWhatIfExpenseModifier] = useState<number>(0); // % adjustment (-30% to +30%)
 
   // Applied Toast Feedback
   const [appliedMsg, setAppliedMsg] = useState<string>('');
@@ -216,6 +206,12 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRoth: false,
         summary: textSum,
         color: '#3b82f6', // blue
+        drawdownOrder: ['Cash Reserves', 'Taxable Brokerage', 'Pre-Tax 401(k)/IRA', 'Roth IRA/401(k)'],
+        phases: {
+          early: 'Spends cash reserves and taxable brokerage assets first. Avoids 10% early withdrawal penalties on pre-tax accounts.',
+          preRmd: 'Taxable accounts continue paying capital gains tax on dividends and sales, while traditional pre-tax accounts compound tax-deferred.',
+          rmd: 'Large mandatory RMDs begin at age 75+, pushing income into higher federal ordinary tax brackets.',
+        },
       },
       {
         id: 'proportional',
@@ -225,6 +221,12 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRoth: false,
         summary: propSum,
         color: '#8b5cf6', // purple
+        drawdownOrder: ['Pro-Rata Cash', 'Pro-Rata Taxable', 'Pro-Rata Pre-Tax', 'Pro-Rata Roth'],
+        phases: {
+          early: 'Pulls a proportional percentage across all non-penalized account buckets each year.',
+          preRmd: 'Balances all three tax buckets equally, smoothing tax bracket spikes before age 75.',
+          rmd: 'Moderate RMDs at age 75 due to partial spenddown of pre-tax assets during early retirement years.',
+        },
       },
       {
         id: 'tax_deferred_first',
@@ -234,6 +236,12 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRoth: false,
         summary: defSum,
         color: '#f59e0b', // amber
+        drawdownOrder: ['Cash Reserves', 'Pre-Tax 401(k)/IRA', 'Taxable Brokerage', 'Roth IRA/401(k)'],
+        phases: {
+          early: 'Withdraws from traditional pre-tax accounts first to drain traditional balances.',
+          preRmd: 'Aggressively drains pre-tax accounts to collapse future RMD tax liabilities before age 75.',
+          rmd: 'RMD tax drag is minimized at age 75+, leaving remaining wealth in tax-free Roth accounts.',
+        },
       },
       {
         id: 'tax_optimized',
@@ -243,6 +251,12 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRoth: false,
         summary: optSum,
         color: '#10b981', // emerald
+        drawdownOrder: ['Cash Reserves', 'Pre-Tax (Up to 12% Bracket)', 'Taxable Brokerage', 'Roth IRA/401(k)'],
+        phases: {
+          early: 'Fills low 10% and 12% ordinary tax brackets with pre-tax IRA withdrawals, drawing remainder from Roth.',
+          preRmd: 'Maintains low marginal tax rates every year while systematically shrinking pre-tax balances.',
+          rmd: 'Prevents RMD tax bombs by keeping pre-tax balances moderate, delivering high tax efficiency.',
+        },
       },
       {
         id: 'roth_ladder',
@@ -252,111 +266,35 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         enableRoth: true,
         summary: rothSum,
         color: '#ec4899', // pink
+        drawdownOrder: ['Cash Reserves', 'Taxable Brokerage', 'Roth Conversion Headroom', 'Roth IRA/401(k)'],
+        phases: {
+          early: 'Executes annual pre-tax conversions to Roth up to top of 12% tax bracket ($96.9k MFJ / $48.4k Single).',
+          preRmd: 'Converts pre-tax assets into tax-free Roth growth while avoiding Medicare IRMAA cliff surcharges.',
+          rmd: 'Pre-tax accounts are fully converted or minimized, producing zero taxable RMDs at age 75+.',
+        },
       },
     ];
   }, [primaryEnginePlan]);
 
   // Combined Chart Data for all 5 strategies
   const strategyChartData = useMemo(() => {
-    const length = strategiesList[0]?.summary.yearlyResults.length || 0;
-    const data = [];
+    const textRes = strategiesList.find((s) => s.id === 'textbook')?.summary.yearlyResults || [];
+    const propRes = strategiesList.find((s) => s.id === 'proportional')?.summary.yearlyResults || [];
+    const defRes = strategiesList.find((s) => s.id === 'tax_deferred_first')?.summary.yearlyResults || [];
+    const optRes = strategiesList.find((s) => s.id === 'tax_optimized')?.summary.yearlyResults || [];
+    const rothRes = strategiesList.find((s) => s.id === 'roth_ladder')?.summary.yearlyResults || [];
 
-    for (let i = 0; i < length; i++) {
-      const yearObj: any = {
-        year: strategiesList[0].summary.yearlyResults[i].year,
-        age: strategiesList[0].summary.yearlyResults[i].primaryAge,
-      };
-
-      strategiesList.forEach((strat) => {
-        const res = strat.summary.yearlyResults[i];
-        yearObj[strat.id] = Math.round(res?.netWorth || 0);
-      });
-
-      data.push(yearObj);
-    }
-    return data;
+    return textRes.map((y: any, idx: number) => ({
+      age: y.age,
+      textbook: Math.round(y.netWorth),
+      proportional: Math.round(propRes[idx]?.netWorth || 0),
+      tax_deferred_first: Math.round(defRes[idx]?.netWorth || 0),
+      tax_optimized: Math.round(optRes[idx]?.netWorth || 0),
+      roth_ladder: Math.round(rothRes[idx]?.netWorth || 0),
+    }));
   }, [strategiesList]);
 
-  // ── SECTION 2: WHAT-IF STRESS TESTER ──
-  const whatIfSim = useMemo(() => {
-    const enginePlan: EnginePlan = JSON.parse(JSON.stringify(primaryEnginePlan));
-
-    // Apply What-If Retirement Age
-    enginePlan.retirementAge = whatIfRetirementAge;
-
-    // Apply Inflation Rate
-    if (enginePlan.settings) {
-      enginePlan.settings.fixedInflationRate = whatIfInflationRate;
-    }
-
-    // Apply Expense Modifier
-    if (whatIfExpenseModifier !== 0) {
-      const mod = 1 + (whatIfExpenseModifier / 100);
-      enginePlan.events.forEach((ev) => {
-        if (ev.category === 'expense') {
-          ev.amount = Math.round(ev.amount * mod);
-        }
-      });
-    }
-
-    // Apply Market Return / Crash Scenario
-    if (whatIfMarketScenario === 'bull') {
-      enginePlan.accounts.forEach((a) => {
-        if (a.type !== 'cash') a.expectedGrowthRate = Math.min(15, a.expectedGrowthRate + 2.5);
-      });
-    } else if (whatIfMarketScenario === 'bear') {
-      enginePlan.accounts.forEach((a) => {
-        if (a.type !== 'cash') a.expectedGrowthRate = Math.max(1, a.expectedGrowthRate - 2.5);
-      });
-    } else if (whatIfMarketScenario === 'crash') {
-      // Early retirement crash: -25% market return in first 2 years of retirement
-      enginePlan.accounts.forEach((a) => {
-        if (a.type !== 'cash') a.expectedGrowthRate = 6.0;
-      });
-    }
-
-    const baselineSim = runRetirementSimulation(primaryEnginePlan);
-    const modifiedSim = runRetirementSimulation(enginePlan);
-
-    // If market crash scenario, simulate -25% hit at retirement year
-    if (whatIfMarketScenario === 'crash') {
-      const retYrIndex = modifiedSim.yearlyResults.findIndex((y) => y.primaryAge === whatIfRetirementAge);
-      if (retYrIndex !== -1) {
-        for (let i = retYrIndex; i < Math.min(retYrIndex + 2, modifiedSim.yearlyResults.length); i++) {
-          modifiedSim.yearlyResults[i].netWorth *= 0.75;
-        }
-      }
-    }
-
-    const baseEndNW = baselineSim.yearlyResults[baselineSim.yearlyResults.length - 1]?.netWorth || 0;
-    const modEndNW = modifiedSim.yearlyResults[modifiedSim.yearlyResults.length - 1]?.netWorth || 0;
-    const deltaNW = modEndNW - baseEndNW;
-
-    const baseTaxes = baselineSim.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
-    const modTaxes = modifiedSim.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
-    const deltaTaxes = modTaxes - baseTaxes;
-
-    const chartData = baselineSim.yearlyResults.map((y, idx) => ({
-      year: y.year,
-      age: y.primaryAge,
-      baselineNW: Math.round(y.netWorth),
-      whatIfNW: Math.round(modifiedSim.yearlyResults[idx]?.netWorth || 0),
-    }));
-
-    return {
-      baselineSim,
-      modifiedSim,
-      baseEndNW,
-      modEndNW,
-      deltaNW,
-      baseTaxes,
-      modTaxes,
-      deltaTaxes,
-      chartData,
-    };
-  }, [primaryEnginePlan, whatIfRetirementAge, whatIfMarketScenario, whatIfInflationRate, whatIfExpenseModifier]);
-
-  // ── SECTION 3: RETIREMENT TACTICS & TAX MATRIX ──
+  // ── SECTION 2: TACTICS MATRIX ENGINE ──
   const ssMatrix = useMemo(() => {
     const plan62 = { ...primaryEnginePlan, primarySsStartAge: 62 };
     const plan67 = { ...primaryEnginePlan, primarySsStartAge: 67 };
@@ -366,30 +304,26 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
     const sim67 = runRetirementSimulation(plan67);
     const sim70 = runRetirementSimulation(plan70);
 
-    const getSsMetrics = (sim: any, age: number) => {
+    const getSsSummary = (sim: any, startAge: number) => {
       const endNW = sim.yearlyResults[sim.yearlyResults.length - 1]?.netWorth || 0;
-      const totalTaxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
-      const monthly = (primaryEnginePlan.primarySsMonthlyAmount || 2500);
-      const multiplier = age === 62 ? 0.70 : age === 67 ? 1.0 : 1.24;
-      const annualBenefit = Math.round(monthly * 12 * multiplier);
-      const yearsClaimed = Math.max(0, primaryEnginePlan.lifeExpectancyAge - age);
-      const lifetimeBenefit = annualBenefit * yearsClaimed;
-      return { age, annualBenefit, lifetimeBenefit, endNW, totalTaxes };
+      const annualBenefit = (primaryEnginePlan.primarySsMonthlyAmount || 2500) * 12 * (startAge === 62 ? 0.70 : startAge === 70 ? 1.24 : 1.0);
+      const lifetimeBenefit = sim.yearlyResults.reduce((sum: number, y: any) => sum + (y.ssIncome || 0), 0);
+      return { endNW, annualBenefit, lifetimeBenefit };
     };
 
     return {
-      age62: getSsMetrics(sim62, 62),
-      age67: getSsMetrics(sim67, 67),
-      age70: getSsMetrics(sim70, 70),
+      age62: getSsSummary(sim62, 62),
+      age67: getSsSummary(sim67, 67),
+      age70: getSsSummary(sim70, 70),
     };
   }, [primaryEnginePlan]);
 
   const rothMatrix = useMemo(() => {
-    const planNoRoth = {
+    const noRothPlan = {
       ...primaryEnginePlan,
       settings: { ...primaryEnginePlan.settings, enableRothConversions: false },
     };
-    const plan12Pct = {
+    const top12Plan = {
       ...primaryEnginePlan,
       settings: {
         ...primaryEnginePlan.settings,
@@ -398,44 +332,28 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         avoidIrmaaCliffs: true,
       },
     };
-    const plan22Pct = {
-      ...primaryEnginePlan,
-      settings: {
-        ...primaryEnginePlan.settings,
-        enableRothConversions: true,
-        rothConversionTargetCeiling: 'top_of_22' as const,
-        avoidIrmaaCliffs: false,
-      },
-    };
 
-    const simNoRoth = runRetirementSimulation(planNoRoth);
-    const sim12 = runRetirementSimulation(plan12Pct);
-    const sim22 = runRetirementSimulation(plan22Pct);
-
-    const getRothSummary = (sim: any) => {
-      const endNW = sim.yearlyResults[sim.yearlyResults.length - 1]?.netWorth || 0;
-      const totalTaxes = sim.yearlyResults.reduce((s: number, y: any) => s + y.taxesPaid, 0);
-      const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdAmount || 0));
-      return { endNW, totalTaxes, maxRmd };
-    };
+    const simNoRoth = runRetirementSimulation(noRothPlan);
+    const simTop12 = runRetirementSimulation(top12Plan);
 
     return {
-      noRoth: getRothSummary(simNoRoth),
-      top12: getRothSummary(sim12),
-      top22: getRothSummary(sim22),
+      noRoth: {
+        endNW: simNoRoth.yearlyResults[simNoRoth.yearlyResults.length - 1]?.netWorth || 0,
+        maxRmd: Math.max(...simNoRoth.yearlyResults.map((y: any) => y.rmdAmount || 0)),
+      },
+      top12: {
+        endNW: simTop12.yearlyResults[simTop12.yearlyResults.length - 1]?.netWorth || 0,
+        maxRmd: Math.max(...simTop12.yearlyResults.map((y: any) => y.rmdAmount || 0)),
+      },
     };
   }, [primaryEnginePlan]);
 
-  // Handle Strategy Apply CTA
   const handleApplyStrategy = (strat: any) => {
     if (!onUpdatePlan) return;
-
-    if (strat.id === 'roth_ladder') {
+    if (strat.enableRoth) {
       onUpdatePlan({
-        withdrawalMethod: 'textbook',
+        withdrawalMethod: strat.method,
         settings: {
-          ...plan?.settings,
-          withdrawalMethod: 'textbook',
           enableRothConversions: true,
           rothConversionTargetCeiling: 'top_of_12',
           avoidIrmaaCliffs: true,
@@ -445,8 +363,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
       onUpdatePlan({
         withdrawalMethod: strat.method,
         settings: {
-          ...plan?.settings,
-          withdrawalMethod: strat.method,
+          enableRothConversions: false,
         },
       });
     }
@@ -489,17 +406,6 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
             Withdrawal Strategy Lab
           </button>
           <button
-            onClick={() => setActiveSection('whatif')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeSection === 'whatif'
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            What-If Stress Tester
-          </button>
-          <button
             onClick={() => setActiveSection('tactics')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeSection === 'tactics'
@@ -519,7 +425,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <CollapsibleCardHeader
               title="Withdrawal Sequencing Strategy Laboratory"
-              description="Simulate and compare 5 distinct withdrawal ordering methods directly on your plan"
+              description="Simulate and compare 5 distinct withdrawal ordering methods directly on your plan. Click any strategy row to expand its full sequencing breakdown."
               icon={Layers}
               isCollapsed={isStrategiesCollapsed}
               onToggle={() => setIsStrategiesCollapsed(!isStrategiesCollapsed)}
@@ -583,48 +489,169 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
                       {strategiesList.map((strat) => {
                         const isCurrentActive = plan?.withdrawalMethod === strat.method && (!strat.enableRoth || Boolean(plan?.settings?.enableRothConversions));
                         const isHighestNW = strat.summary.endNW === Math.max(...strategiesList.map((s) => s.summary.endNW));
+                        const isExpanded = expandedStrategyId === strat.id;
 
                         return (
-                          <tr key={strat.id} className={`hover:bg-muted/30 transition-colors ${isCurrentActive ? 'bg-primary/5 font-medium' : ''}`}>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: strat.color }} />
-                                <div>
-                                  <span className="font-bold text-foreground block">{strat.name}</span>
-                                  <span className="text-[10px] text-muted-foreground">{strat.description}</span>
+                          <tr key={strat.id} className="group">
+                            <td colSpan={6} className="p-0">
+                              {/* Main Strategy Header Row */}
+                              <div
+                                onClick={() => setExpandedStrategyId(isExpanded ? null : strat.id)}
+                                className={`flex flex-wrap items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
+                                  isCurrentActive ? 'bg-primary/5 font-medium' : 'hover:bg-muted/30'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedStrategyId(isExpanded ? null : strat.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-foreground transition-transform"
+                                  >
+                                    {isExpanded ? <ChevronUp className="w-4 h-4 text-primary" /> : <ChevronDown className="w-4 h-4" />}
+                                  </button>
+                                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: strat.color }} />
+                                  <div>
+                                    <span className="font-bold text-foreground block flex items-center gap-2">
+                                      {strat.name}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">{strat.description}</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-6 mt-2 sm:mt-0 ml-auto">
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-muted-foreground block sm:hidden">Ending NW</span>
+                                    <span className={`font-mono font-bold ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
+                                      {formatCurrency(strat.summary.endNW)}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-right hidden sm:block">
+                                    <span className="font-mono text-muted-foreground">{formatCurrency(strat.summary.totalTaxes)}</span>
+                                  </div>
+
+                                  <div className="text-right hidden md:block">
+                                    <span className="font-mono text-amber-500 font-semibold">{formatCurrency(strat.summary.maxRmd)}</span>
+                                  </div>
+
+                                  <div className="text-center min-w-[90px]">
+                                    {isCurrentActive ? (
+                                      <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        <Check className="w-3 h-3" /> Active
+                                      </span>
+                                    ) : isHighestNW ? (
+                                      <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        <Sparkles className="w-3 h-3" /> Highest Value
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground text-[10px]">Alternative</span>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    {!isCurrentActive && onUpdatePlan && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApplyStrategy(strat);
+                                        }}
+                                        className="bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                                      >
+                                        Apply
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </td>
-                            <td className={`px-3 py-3 text-right font-mono font-bold ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
-                              {formatCurrency(strat.summary.endNW)}
-                            </td>
-                            <td className="px-3 py-3 text-right font-mono text-muted-foreground">
-                              {formatCurrency(strat.summary.totalTaxes)}
-                            </td>
-                            <td className="px-3 py-3 text-right font-mono text-amber-500 font-semibold">
-                              {formatCurrency(strat.summary.maxRmd)}
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              {isCurrentActive ? (
-                                <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  <Check className="w-3 h-3" /> Active
-                                </span>
-                              ) : isHighestNW ? (
-                                <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  <Sparkles className="w-3 h-3" /> Highest Value
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground text-[10px]">Alternative</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {!isCurrentActive && onUpdatePlan && (
-                                <button
-                                  onClick={() => handleApplyStrategy(strat)}
-                                  className="bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                                >
-                                  Apply Strategy
-                                </button>
+
+                              {/* Expanded Strategy Sequencing Breakdown Panel */}
+                              {isExpanded && (
+                                <div className="bg-muted/20 p-5 border-t border-border space-y-5 animate-in fade-in duration-200">
+                                  {/* 1. Account Drawdown Priority Sequence Badges */}
+                                  <div className="flex flex-wrap items-center gap-2 bg-card p-3.5 rounded-xl border border-border">
+                                    <span className="font-bold text-foreground text-xs shrink-0">Drawdown Priority Order:</span>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {strat.drawdownOrder.map((step, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                          <span className="bg-primary/10 text-primary font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg border border-primary/20">
+                                            {idx + 1}. {step}
+                                          </span>
+                                          {idx < strat.drawdownOrder.length - 1 && (
+                                            <span className="text-muted-foreground text-xs">→</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* 2. Execution Steps Across Retirement Phases */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                      <h5 className="font-bold text-primary flex items-center gap-1.5 text-xs">
+                                        <Calendar className="w-3.5 h-3.5 text-primary" /> Phase 1: Early Retirement (Pre-59.5)
+                                      </h5>
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        {strat.phases.early}
+                                      </p>
+                                    </div>
+                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                      <h5 className="font-bold text-indigo-500 flex items-center gap-1.5 text-xs">
+                                        <Zap className="w-3.5 h-3.5 text-indigo-500" /> Phase 2: Pre-RMD Window (Ages 59.5 - 74)
+                                      </h5>
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        {strat.phases.preRmd}
+                                      </p>
+                                    </div>
+                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                      <h5 className="font-bold text-amber-500 flex items-center gap-1.5 text-xs">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> Phase 3: RMD & Legacy (Age 75+)
+                                      </h5>
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        {strat.phases.rmd}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* 3. Interactive Annual Drawdown & Tax Breakdown Log */}
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="font-bold text-foreground text-xs">Annual Drawdown & Tax Breakdown Log</h5>
+                                      <span className="text-[10px] text-muted-foreground">Retirement Phase Projections</span>
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto border border-border rounded-xl bg-card shadow-inner">
+                                      <table className="w-full text-[11px] text-left">
+                                        <thead className="bg-muted/80 text-muted-foreground font-semibold sticky top-0 backdrop-blur-sm">
+                                          <tr>
+                                            <th className="px-3 py-2">Age</th>
+                                            <th className="px-3 py-2 text-right">Cash Draw</th>
+                                            <th className="px-3 py-2 text-right">Taxable Draw</th>
+                                            <th className="px-3 py-2 text-right">Pre-Tax Draw</th>
+                                            <th className="px-3 py-2 text-right">Roth Draw</th>
+                                            <th className="px-3 py-2 text-right">Taxes Paid</th>
+                                            <th className="px-3 py-2 text-right">Ending Net Worth</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/40">
+                                          {strat.summary.yearlyResults
+                                            .filter((y: any) => y.age >= (primaryEnginePlan.retirementAge || 60))
+                                            .map((y: any) => (
+                                              <tr key={y.year} className="hover:bg-muted/40 font-mono">
+                                                <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.age}</td>
+                                                <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.cash || 0)}</td>
+                                                <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.taxable || 0)}</td>
+                                                <td className="px-3 py-1.5 text-right text-amber-500 font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
+                                                <td className="px-3 py-1.5 text-right text-purple-500 font-medium">{formatCurrency(y.drawdownsByType?.roth || 0)}</td>
+                                                <td className="px-3 py-1.5 text-right text-rose-400 font-medium">{formatCurrency(y.taxesPaid || 0)}</td>
+                                                <td className="px-3 py-1.5 text-right font-bold text-foreground">{formatCurrency(y.netWorth || 0)}</td>
+                                              </tr>
+                                            ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -639,152 +666,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         </div>
       )}
 
-      {/* SECTION 2: WHAT-IF INTERACTIVE STRESS TESTER */}
-      {activeSection === 'whatif' && (
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-            <CollapsibleCardHeader
-              title="What-If Real-Time Stress Simulator"
-              description="Test economic shocks, retirement age shifts, and expense changes on your plan"
-              icon={Sliders}
-              isCollapsed={isWhatIfCollapsed}
-              onToggle={() => setIsWhatIfCollapsed(!isWhatIfCollapsed)}
-            />
-
-            {!isWhatIfCollapsed && (
-              <div className="p-5 space-y-6">
-                {/* Interactive Controls Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 bg-muted/30 border border-border p-4 rounded-xl text-xs">
-                  {/* Slider 1: Target Retirement Age */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="font-semibold text-muted-foreground">Target Retirement Age</label>
-                      <span className="font-mono font-bold text-primary text-sm">{whatIfRetirementAge}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={45}
-                      max={75}
-                      step={1}
-                      value={whatIfRetirementAge}
-                      onChange={(e) => setWhatIfRetirementAge(parseInt(e.target.value, 10))}
-                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
-                    />
-                    <span className="text-[10px] text-muted-foreground block">Baseline: {primaryEnginePlan.retirementAge} yrs</span>
-                  </div>
-
-                  {/* Option 2: Market Scenario */}
-                  <div className="space-y-2">
-                    <label className="font-semibold text-muted-foreground block">Market Return Scenario</label>
-                    <select
-                      value={whatIfMarketScenario}
-                      onChange={(e: any) => setWhatIfMarketScenario(e.target.value)}
-                      className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="baseline">Baseline Expected (7.0%)</option>
-                      <option value="bull">Bull Market (+9.5%)</option>
-                      <option value="bear">Bear Market (+4.5%)</option>
-                      <option value="crash">Early Retirement Crash (-25% Shock)</option>
-                    </select>
-                    <span className="text-[10px] text-muted-foreground block">Simulates sequence of returns</span>
-                  </div>
-
-                  {/* Slider 3: Inflation Rate */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="font-semibold text-muted-foreground">Inflation Rate (%)</label>
-                      <span className="font-mono font-bold text-primary text-sm">{whatIfInflationRate.toFixed(1)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={1.5}
-                      max={6.5}
-                      step={0.5}
-                      value={whatIfInflationRate}
-                      onChange={(e) => setWhatIfInflationRate(parseFloat(e.target.value))}
-                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
-                    />
-                    <span className="text-[10px] text-muted-foreground block">Baseline: 3.0%</span>
-                  </div>
-
-                  {/* Slider 4: Expense Shock */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="font-semibold text-muted-foreground">Expense Modifier</label>
-                      <span className={`font-mono font-bold text-sm ${whatIfExpenseModifier > 0 ? 'text-rose-500' : whatIfExpenseModifier < 0 ? 'text-emerald-500' : 'text-primary'}`}>
-                        {whatIfExpenseModifier > 0 ? `+${whatIfExpenseModifier}%` : `${whatIfExpenseModifier}%`}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={-30}
-                      max={30}
-                      step={5}
-                      value={whatIfExpenseModifier}
-                      onChange={(e) => setWhatIfExpenseModifier(parseInt(e.target.value, 10))}
-                      className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
-                    />
-                    <span className="text-[10px] text-muted-foreground block">Adjusts living expenses</span>
-                  </div>
-                </div>
-
-                {/* What-If Summary Impact Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm">
-                    <span className="text-[11px] font-semibold text-muted-foreground">Ending Net Worth (Age {primaryEnginePlan.lifeExpectancyAge})</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-lg font-bold font-mono text-foreground">{formatCurrency(whatIfSim.modEndNW)}</span>
-                      <span className={`text-xs font-mono font-bold ${whatIfSim.deltaNW >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {whatIfSim.deltaNW >= 0 ? `+${formatCurrency(whatIfSim.deltaNW)}` : formatCurrency(whatIfSim.deltaNW)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm">
-                    <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Taxes Paid</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-lg font-bold font-mono text-foreground">{formatCurrency(whatIfSim.modTaxes)}</span>
-                      <span className={`text-xs font-mono font-bold ${whatIfSim.deltaTaxes <= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {whatIfSim.deltaTaxes <= 0 ? formatCurrency(whatIfSim.deltaTaxes) : `+${formatCurrency(whatIfSim.deltaTaxes)}`}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-card border border-border p-4 rounded-xl space-y-1 shadow-sm flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-semibold text-muted-foreground block">Plan Longevity</span>
-                      <span className={`text-base font-bold font-mono ${whatIfSim.modEndNW > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {whatIfSim.modEndNW > 0 ? '100% Fully Funded' : 'Depletes Before Target'}
-                      </span>
-                    </div>
-                    {whatIfSim.modEndNW <= 0 && <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />}
-                  </div>
-                </div>
-
-                {/* Trajectory Overlay Chart: Baseline vs What-If */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-foreground">Baseline vs What-If Trajectory</h4>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={whatIfSim.chartData}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                        <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />
-                        <YAxis stroke="#888888" fontSize={10} tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`} tickLine={false} />
-                        <Tooltip formatter={(value: any) => [formatCurrency(Number(value)), 'Net Worth']} labelFormatter={(l) => `Age ${l}`} />
-                        <Legend wrapperStyle={{ fontSize: '11px' }} />
-                        <Line type="monotone" dataKey="baselineNW" name="Baseline Plan" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={false} />
-                        <Line type="monotone" dataKey="whatIfNW" name="What-If Stress Scenario" stroke="#3b82f6" strokeWidth={3} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 3: RETIREMENT TACTICS & TAX MATRIX */}
+      {/* SECTION 2: RETIREMENT TACTICS & TAX MATRIX */}
       {activeSection === 'tactics' && (
         <div className="space-y-6">
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
