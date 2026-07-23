@@ -1,0 +1,1 @@
+ALTER TABLE "plan_settings" ADD COLUMN "allow_penalty_withdrawals" boolean DEFAULT true NOT NULL;

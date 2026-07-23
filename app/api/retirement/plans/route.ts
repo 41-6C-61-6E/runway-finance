@@ -185,6 +185,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       enableRothConversions: Boolean(sAny?.enableRothConversions),
       rothConversionTargetCeiling: sAny?.rothConversionTargetCeiling || 'top_of_12',
       avoidIrmaaCliffs: Boolean(sAny?.avoidIrmaaCliffs),
+      allowPenaltyWithdrawals: sAny?.allowPenaltyWithdrawals !== false,
     },
     rules: activeRules,
   };

@@ -135,7 +135,8 @@ export async function populatePlanWithUserFinances(planId: string, dataUserId: s
     let type = 'taxable';
     if (isSavings) type = 'cash';
     else if (['rothira', 'roth_ira'].includes(accType)) type = 'roth_ira';
-    else if (['traditionalira', '401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(accType)) type = 'traditional_401k';
+    else if (['traditionalira', 'traditional_ira'].includes(accType)) type = 'traditional_ira';
+    else if (['401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(accType)) type = 'traditional_401k';
     else if (accType === 'hsa') type = 'hsa';
     else if (accType === 'crypto') type = 'crypto';
     else if (isAsset || isInvestment) type = 'taxable';

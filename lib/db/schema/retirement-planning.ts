@@ -162,6 +162,7 @@ export const planSettings = pgTable('plan_settings', {
   administrativeCostRate: text('administrative_cost_rate').notNull().default('1.0'),
   charitableGiving: text('charitable_giving').notNull().default('0.0'),
   charitableAllocationStrategy: text('charitable_allocation_strategy').notNull().default('tax_inefficient_first'),
+  allowPenaltyWithdrawals: boolean('allow_penalty_withdrawals').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

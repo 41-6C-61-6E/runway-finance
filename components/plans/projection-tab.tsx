@@ -237,6 +237,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
         enableRothConversions: Boolean(plan.settings?.enableRothConversions),
         rothConversionTargetCeiling: plan.settings?.rothConversionTargetCeiling || 'top_of_12',
         avoidIrmaaCliffs: Boolean(plan.settings?.avoidIrmaaCliffs),
+        allowPenaltyWithdrawals: plan.settings?.allowPenaltyWithdrawals !== false,
       },
       rules: plan.rules || DEFAULT_2026_RULES,
     };
@@ -432,7 +433,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           accountBalances: rawAccountBalances,
           filteredAccountBalances,
           income: Math.round(y.grossIncome / discountFactor),
-          expenses: totExpenses,
+          expenses: y.primaryAge >= localRetirementAge ? totExpenses : null,
           isRetired: y.primaryAge >= localRetirementAge,
           salaryIncome: salInc,
           ssIncome: ssInc,
@@ -1101,32 +1102,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <Tooltip content={<DrawdownTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
               <Legend content={<GroupedLegend />} />
 
-              {(() => {
-                const retPt = chartData.find((d) => d.age === localRetirementAge);
-                if (!retPt) return null;
-                const totalAtRet = (retPt.salaryIncome || 0) + (retPt.ssIncome || 0) + (retPt.pensionIncome || 0) + (retPt.otherIncome || 0)
-                  + (retPt.cashDrawdown || 0) + (retPt.taxableDrawdown || 0) + (retPt.traditionalDrawdown || 0) + (retPt.rothDrawdown || 0) + (retPt.hsaDrawdown || 0);
-                return (
-                  <ReferenceDot
-                    x={localRetirementAge}
-                    y={totalAtRet}
-                    shape={(dotProps: any) => {
-                      const { cx, cy } = dotProps;
-                      if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
-                      return (
-                        <g transform={`translate(${cx - 14}, ${cy - 14})`} className="cursor-pointer group">
-                          <title>{`Retirement (Age ${localRetirementAge})`}</title>
-                          <circle cx={14} cy={14} r={13} fill="var(--card, #ffffff)" stroke="#10b981" strokeWidth={2.5} className="shadow-sm transition-transform group-hover:scale-125" />
-                          <g transform="translate(6, 6)">
-                            <Palmtree size={16} color="#10b981" />
-                          </g>
-                        </g>
-                      );
-                    }}
-                  />
-                );
-              })()}
-
               {/* Shortfall zone shading: solid transparent red area where expenses exceed earned income */}
               {chartData
                 .filter((d: any) => d.expenses != null && d.expenses > ((d.salaryIncome || 0) + (d.ssIncome || 0) + (d.pensionIncome || 0) + (d.otherIncome || 0)))
@@ -1156,7 +1131,9 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <Bar dataKey="rothDrawdown" name="Roth IRA/401k" stackId="sources" fill="#ec4899" />
               <Bar dataKey="hsaDrawdown" name="HSA Drawdown" stackId="sources" fill="#14b8a6" />
 
-              <Line type="monotone" dataKey="expenses" name="Annual Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+              {chartData.some((d: any) => d.isRetired) && (
+                <Line type="monotone" dataKey="expenses" name="Annual Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
