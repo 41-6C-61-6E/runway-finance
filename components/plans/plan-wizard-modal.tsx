@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sparkles,
   X,
@@ -16,7 +16,16 @@ import {
   Flame,
   ShieldAlert,
   HelpCircle,
+  HeartHandshake,
+  TrendingUp,
 } from 'lucide-react';
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+import {
+  calculateSocialSecurityPIA,
+  getSsClaimingMultiplier,
+  calculateAdjustedSsBenefit,
+} from '@/lib/utils/social-security';
+import { formatCurrency } from '@/lib/utils/format';
 
 export interface PlanWizardModalProps {
   isOpen: boolean;
@@ -39,6 +48,7 @@ export function PlanWizardModal({
 }: PlanWizardModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Form State - Core Profile
   const [name, setName] = useState('');
@@ -71,14 +81,14 @@ export function PlanWizardModal({
   const [primarySsStartAge, setPrimarySsStartAge] = useState<number | ''>(67);
   const [fiTargetMultiplier, setFiTargetMultiplier] = useState<number | ''>(25);
 
-  // Form State - Retirement Income & Expenses (NEW)
+  // Form State - Retirement Income & Expenses
   const [livingExpenseAmount, setLivingExpenseAmount] = useState<number | ''>(60000);
   const [livingExpenseAdjustForInflation, setLivingExpenseAdjustForInflation] = useState(true);
   const [healthcareExpenseAmount, setHealthcareExpenseAmount] = useState<number | ''>(8400);
   const [pensionIncomeAmount, setPensionIncomeAmount] = useState<number | ''>(0);
-  const [pensionStartAge, setPensionStartAge] = useState<number | ''>(65);
+  const [pensionStartAge, setPensionStartAge] = useState<number | ''>(60);
 
-  // Form State - Strategy & Tax Optimization Engine (NEW)
+  // Form State - Strategy & Tax Optimization Engine
   const [withdrawalMethod, setWithdrawalMethod] = useState<'textbook' | 'tax_optimized' | 'proportional'>('textbook');
   const [allowPenaltyWithdrawals, setAllowPenaltyWithdrawals] = useState(true);
   const [fixedInflationRate, setFixedInflationRate] = useState<number | ''>(3.0);
@@ -89,11 +99,52 @@ export function PlanWizardModal({
   // Accounts Inclusion Map
   const [accountInclusions, setAccountInclusions] = useState<Record<string, boolean>>({});
 
-  // Initialize or reset form state when modal opens or plan props change
-  useEffect(() => {
-    if (!isOpen) return;
+  // Dynamic step configuration based on partner presence
+  const steps = useMemo(() => [
+    { key: 'profile', title: 'Profile & Tax', icon: Building2 },
+    ...(hasSpouse ? [{ key: 'partner', title: 'Partner Details', icon: Users }] : []),
+    { key: 'accounts', title: 'Accounts & Assets', icon: Wallet },
+    { key: 'expenses', title: 'Expenses & Income', icon: DollarSign },
+    { key: 'strategy', title: 'Strategy & Engine', icon: Sliders },
+    { key: 'social_security', title: 'Social Security & FI', icon: ShieldCheck },
+  ], [hasSpouse]);
 
-    // Source plan: initialPlan (for edit mode) or defaultPlan (for create scenario pre-population)
+  // Ensure currentStep does not exceed steps length when steps array shrinks
+  useEffect(() => {
+    if (currentStep > steps.length) {
+      setCurrentStep(steps.length);
+    }
+  }, [steps.length, currentStep]);
+
+  const activeStep = steps[Math.min(currentStep - 1, steps.length - 1)] || steps[0];
+  const activeKey = activeStep.key;
+  const isLastStep = currentStep === steps.length;
+
+  const fireAvailableAccounts = useMemo(() => {
+    return (availableAccounts || []).filter(isFireEligibleAccount);
+  }, [availableAccounts]);
+
+  const accountsToDisplay = useMemo(() => {
+    const rawList = (initialPlan?.accounts && initialPlan.accounts.length > 0)
+      ? initialPlan.accounts
+      : (defaultPlan?.accounts && defaultPlan.accounts.length > 0)
+      ? defaultPlan.accounts
+      : fireAvailableAccounts;
+    return (rawList || []).filter(isFireEligibleAccount);
+  }, [initialPlan, defaultPlan, fireAvailableAccounts]);
+
+  const prevIsOpenRef = React.useRef(false);
+
+  // Initialize form state ONLY when modal transitions from closed to open
+  useEffect(() => {
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    if (!justOpened) return;
+
+    setErrorMsg(null);
+    setCurrentStep(1);
+
     const sourcePlan = mode === 'edit' ? initialPlan : (initialPlan || defaultPlan);
 
     if (sourcePlan) {
@@ -111,19 +162,23 @@ export function PlanWizardModal({
       setSpouseBirthMonth(Number(sourcePlan.spouseBirthMonth) || 1);
       setSpouseRetirementAge(Number(sourcePlan.spouseRetirementAge) || 60);
       setSpouseLifeExpectancyAge(Number(sourcePlan.spouseLifeExpectancyAge) || 100);
-      setSpouseSsMonthlyAmount(parseFloat(sourcePlan.spouseSsMonthlyAmount) || 2000);
-      setSpouseSsStartAge(Number(sourcePlan.spouseSsStartAge) || 67);
       setEnableSpousalSsBenefit(sourcePlan.enableSpousalSsBenefit !== false);
 
-      setPrimarySalary(parseFloat(sourcePlan.primarySalary) || 0);
-      setSpouseSalary(parseFloat(sourcePlan.spouseSalary) || 0);
+      const pSal = parseFloat(sourcePlan.primarySalary) || 0;
+      const sSal = parseFloat(sourcePlan.spouseSalary) || 0;
+      setPrimarySalary(pSal);
+      setSpouseSalary(sSal);
       setPrimarySalaryRaisePct(sourcePlan.primarySalaryRaisePct || '3.0');
       setSpouseSalaryRaisePct(sourcePlan.spouseSalaryRaisePct || '3.0');
-      setPrimarySsMonthlyAmount(parseFloat(sourcePlan.primarySsMonthlyAmount) || 2500);
+
+      const pSs = parseFloat(sourcePlan.primarySsMonthlyAmount) || calculateSocialSecurityPIA(pSal) || 2500;
+      const sSs = parseFloat(sourcePlan.spouseSsMonthlyAmount) || calculateSocialSecurityPIA(sSal) || 2000;
+      setPrimarySsMonthlyAmount(pSs);
+      setSpouseSsMonthlyAmount(sSs);
       setPrimarySsStartAge(Number(sourcePlan.primarySsStartAge) || 67);
+      setSpouseSsStartAge(Number(sourcePlan.spouseSsStartAge) || 67);
       setFiTargetMultiplier(Number(sourcePlan.fiTargetMultiplier) || 25);
 
-      // Pre-populate expenses & income events from sourcePlan
       if (Array.isArray(sourcePlan.events)) {
         const livingEv = sourcePlan.events.find((e: any) => e.type === 'living_expense' || e.category === 'expense');
         if (livingEv) {
@@ -154,7 +209,6 @@ export function PlanWizardModal({
         setPensionIncomeAmount(0);
       }
 
-      // Pre-populate withdrawal strategy & engine settings
       setWithdrawalMethod(sourcePlan.settings?.withdrawalMethod || sourcePlan.withdrawalMethod || 'textbook');
       setAllowPenaltyWithdrawals(sourcePlan.settings?.allowPenaltyWithdrawals !== false);
       setFixedInflationRate(parseFloat(sourcePlan.settings?.fixedInflationRate) || 3.0);
@@ -162,20 +216,12 @@ export function PlanWizardModal({
       setRothConversionTargetCeiling(sourcePlan.settings?.rothConversionTargetCeiling || 'top_of_12');
       setAvoidIrmaaCliffs(sourcePlan.settings?.avoidIrmaaCliffs !== false);
 
-      // Pre-populate account inclusions
       const incMap: Record<string, boolean> = {};
-      if (Array.isArray(sourcePlan.accounts)) {
-        sourcePlan.accounts.forEach((acc: any) => {
-          incMap[acc.id] = acc.isIncluded !== false;
-        });
-      } else if (availableAccounts.length > 0) {
-        availableAccounts.forEach((acc: any) => {
-          incMap[acc.id] = true;
-        });
-      }
+      accountsToDisplay.forEach((acc: any) => {
+        incMap[acc.id] = acc.isIncluded !== false;
+      });
       setAccountInclusions(incMap);
     } else {
-      // Clean slate default initialization
       setName('Default Plan');
       setIsDefault(true);
       setFilingStatus('single');
@@ -216,13 +262,47 @@ export function PlanWizardModal({
       setAvoidIrmaaCliffs(true);
 
       const incMap: Record<string, boolean> = {};
-      availableAccounts.forEach((acc: any) => {
+      accountsToDisplay.forEach((acc: any) => {
         incMap[acc.id] = true;
       });
       setAccountInclusions(incMap);
     }
-    setCurrentStep(1);
-  }, [isOpen, mode, initialPlan, defaultPlan, availableAccounts]);
+  }, [isOpen, mode, initialPlan, defaultPlan]);
+
+  // Sync accountInclusions when accountsToDisplay arrives
+  useEffect(() => {
+    if (!isOpen) return;
+    setAccountInclusions((prev) => {
+      if (Object.keys(prev).length > 0) return prev;
+      const incMap: Record<string, boolean> = {};
+      accountsToDisplay.forEach((acc: any) => {
+        incMap[acc.id] = acc.isIncluded !== false;
+      });
+      return incMap;
+    });
+  }, [isOpen, accountsToDisplay]);
+
+  // Auto-update Primary Social Security estimate when primary salary changes
+  const handlePrimarySalaryChange = (val: number | '') => {
+    setPrimarySalary(val);
+    if (typeof val === 'number' && val > 0) {
+      const estimatedPia = calculateSocialSecurityPIA(val);
+      if (estimatedPia > 0) {
+        setPrimarySsMonthlyAmount(estimatedPia);
+      }
+    }
+  };
+
+  // Auto-update Spouse Social Security estimate when spouse salary changes
+  const handleSpouseSalaryChange = (val: number | '') => {
+    setSpouseSalary(val);
+    if (typeof val === 'number' && val > 0) {
+      const estimatedPia = calculateSocialSecurityPIA(val);
+      if (estimatedPia > 0) {
+        setSpouseSsMonthlyAmount(estimatedPia);
+      }
+    }
+  };
 
   const handleFilingStatusChange = (status: 'single' | 'married_joint' | 'married_separate' | 'head_of_household') => {
     setFilingStatus(status);
@@ -246,19 +326,31 @@ export function PlanWizardModal({
     setAccountInclusions(nextMap);
   };
 
-  const accountsToDisplay = (initialPlan?.accounts && initialPlan.accounts.length > 0)
-    ? initialPlan.accounts
-    : (defaultPlan?.accounts && defaultPlan.accounts.length > 0)
-    ? defaultPlan.accounts
-    : availableAccounts;
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentStep((prev) => Math.min(prev + 1, steps.length));
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!name.trim() || saving) return;
 
+    // If Enter key was pressed on an input before reaching final step, advance step without submitting
+    if (currentStep < steps.length) {
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length));
+      return;
+    }
+
+    if (!name.trim() || saving) return;
     const sourcePlan = defaultPlan || initialPlan;
 
+    const pSalNum = parseFloat(String(primarySalary)) || 0;
+    const sSalNum = parseFloat(String(spouseSalary)) || 0;
+    const computedPrimarySs = calculateSocialSecurityPIA(pSalNum) || parseFloat(String(primarySsMonthlyAmount)) || 2500;
+    const computedSpouseSs = calculateSocialSecurityPIA(sSalNum) || parseFloat(String(spouseSsMonthlyAmount)) || 2000;
+
     setSaving(true);
+    setErrorMsg(null);
     try {
       await onSave({
         name: name.trim(),
@@ -274,16 +366,16 @@ export function PlanWizardModal({
         spouseBirthMonth,
         spouseRetirementAge: parseInt(String(spouseRetirementAge), 10) || 60,
         spouseLifeExpectancyAge: parseInt(String(spouseLifeExpectancyAge), 10) || 100,
-        spouseSsMonthlyAmount: parseFloat(String(spouseSsMonthlyAmount)) || 0,
+        spouseSsMonthlyAmount: computedSpouseSs,
         spouseSsStartAge: parseInt(String(spouseSsStartAge), 10) || 67,
         enableSpousalSsBenefit,
-        primarySalary: parseFloat(String(primarySalary)) || 0,
-        spouseSalary: parseFloat(String(spouseSalary)) || 0,
+        primarySalary: pSalNum,
+        spouseSalary: sSalNum,
         primarySalaryRaisePct,
         spouseSalaryRaisePct,
         primarySalaryYear: new Date().getFullYear(),
         spouseSalaryYear: new Date().getFullYear(),
-        primarySsMonthlyAmount: parseFloat(String(primarySsMonthlyAmount)) || 0,
+        primarySsMonthlyAmount: computedPrimarySs,
         primarySsStartAge: parseInt(String(primarySsStartAge), 10) || 67,
         fiTargetMultiplier: parseInt(String(fiTargetMultiplier), 10) || 25,
         withdrawalMethod,
@@ -304,23 +396,15 @@ export function PlanWizardModal({
         sourcePlanId: sourcePlan?.id,
       });
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Wizard save failed', err);
+      setErrorMsg(err?.message || 'Failed to save plan. Please check inputs and try again.');
     } finally {
       setSaving(false);
     }
   };
 
   if (!isOpen) return null;
-
-  const steps = [
-    { id: 1, title: 'Profile & Tax', icon: Building2 },
-    ...(hasSpouse ? [{ id: 2, title: 'Partner Details', icon: Users }] : []),
-    { id: 3, title: 'Accounts & Assets', icon: Wallet },
-    { id: 4, title: 'Expenses & Income', icon: DollarSign },
-    { id: 5, title: 'Strategy & Engine', icon: Sliders },
-    { id: 6, title: 'Social Security & FI', icon: ShieldCheck },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto">
@@ -343,6 +427,7 @@ export function PlanWizardModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg transition-colors cursor-pointer"
           >
@@ -350,17 +435,27 @@ export function PlanWizardModal({
           </button>
         </div>
 
+        {errorMsg && (
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-xs font-semibold flex items-center justify-between animate-in fade-in">
+            <span>{errorMsg}</span>
+            <button type="button" onClick={() => setErrorMsg(null)} className="text-muted-foreground hover:text-foreground font-bold">
+              &times;
+            </button>
+          </div>
+        )}
+
         {/* Step Indicator Pills */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-          {steps.map((s) => {
+        <div className={`grid gap-1.5 ${steps.length === 6 ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3 sm:grid-cols-5'}`}>
+          {steps.map((s, idx) => {
             const Icon = s.icon;
-            const isActive = currentStep === s.id;
-            const isDone = currentStep > s.id;
+            const stepNum = idx + 1;
+            const isActive = currentStep === stepNum;
+            const isDone = currentStep > stepNum;
             return (
               <button
-                key={s.id}
+                key={s.key}
                 type="button"
-                onClick={() => setCurrentStep(s.id)}
+                onClick={() => setCurrentStep(stepNum)}
                 className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-[11px] font-semibold transition-all cursor-pointer border ${
                   isActive
                     ? 'bg-primary text-primary-foreground border-primary shadow-sm'
@@ -379,7 +474,7 @@ export function PlanWizardModal({
         {/* Step Content Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* STEP 1: Core Profile & Tax Status */}
-          {currentStep === 1 && (
+          {activeKey === 'profile' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5 sm:col-span-2">
@@ -471,7 +566,7 @@ export function PlanWizardModal({
                     step={1000}
                     placeholder="e.g. 120000"
                     value={primarySalary === 0 ? '' : primarySalary}
-                    onChange={(e) => setPrimarySalary(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    onChange={(e) => handlePrimarySalaryChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -506,7 +601,7 @@ export function PlanWizardModal({
           )}
 
           {/* STEP 2: Partner Profile & Benefits (Conditional) */}
-          {currentStep === 2 && hasSpouse && (
+          {activeKey === 'partner' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-primary flex items-center gap-2">
                 <Users className="w-4 h-4 shrink-0" />
@@ -558,7 +653,7 @@ export function PlanWizardModal({
                     step={1000}
                     placeholder="e.g. 85000"
                     value={spouseSalary === 0 ? '' : spouseSalary}
-                    onChange={(e) => setSpouseSalary(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    onChange={(e) => handleSpouseSalaryChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -580,7 +675,7 @@ export function PlanWizardModal({
           )}
 
           {/* STEP 3: Accounts & Assets Selection */}
-          {currentStep === 3 && (
+          {activeKey === 'accounts' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -599,113 +694,83 @@ export function PlanWizardModal({
                   <button
                     type="button"
                     onClick={() => handleSelectAllAccounts(false)}
-                    className="text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                    className="text-muted-foreground hover:underline cursor-pointer"
                   >
                     Deselect All
                   </button>
                 </div>
               </div>
 
-              {accountsToDisplay.length === 0 ? (
-                <div className="p-6 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground">
-                  No accounts found. Default starter accounts will be created for this plan.
-                </div>
-              ) : (
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-1 border border-border rounded-xl p-3 bg-muted/10">
-                  {accountsToDisplay.map((acc: any) => {
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {accountsToDisplay.length === 0 ? (
+                  <div className="p-4 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground">
+                    No accounts found. Default starter accounts will be created for this plan.
+                  </div>
+                ) : (
+                  accountsToDisplay.map((acc: any) => {
                     const isInc = accountInclusions[acc.id] !== false;
-                    const bal = parseFloat(acc.balance) || 0;
                     return (
                       <div
                         key={acc.id}
                         onClick={() => toggleAccountInclusion(acc.id)}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                           isInc
-                            ? 'bg-card border-primary/40 shadow-2xs'
-                            : 'bg-muted/20 border-transparent opacity-60'
+                            ? 'bg-muted/30 border-primary/40 shadow-xs'
+                            : 'bg-muted/10 border-border opacity-50'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isInc}
-                            onChange={() => {}} // handled by parent container onClick
+                            onChange={() => toggleAccountInclusion(acc.id)}
                             className="w-4 h-4 accent-primary rounded cursor-pointer"
                           />
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-foreground block">{acc.name}</span>
-                              {acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100 && (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300">
-                                  {100 - acc.rothPercentage}% Pre-Tax / {acc.rothPercentage}% Roth
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-muted-foreground capitalize">
+                            <span className="text-xs font-bold text-foreground block">{acc.name || 'Account'}</span>
+                            <span className="text-[10px] uppercase font-semibold text-muted-foreground">
                               {(acc.type || 'account').replace(/_/g, ' ')}
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs font-mono font-bold text-foreground">
-                          ${bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className="font-mono text-xs font-bold text-foreground">
+                          ${(parseFloat(acc.balance) || 0).toLocaleString()}
                         </span>
                       </div>
                     );
-                  })}
-                </div>
-              )}
+                  })
+                )}
+              </div>
             </div>
           )}
 
-          {/* STEP 4: Retirement Expenses & Income Setup (NEW) */}
-          {currentStep === 4 && (
+          {/* STEP 4: Expenses & Passive Income */}
+          {activeKey === 'expenses' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-primary flex items-center gap-2">
-                <DollarSign className="w-4 h-4 shrink-0" />
-                <span>Configure baseline living expenses and guaranteed retirement income streams.</span>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Annual Baseline Living Expenses ($/year)</label>
+                  <label className="text-xs font-semibold text-muted-foreground">Annual Living Expenses ($/year)</label>
                   <input
                     type="number"
                     required
                     min={0}
                     step={1000}
-                    placeholder="e.g. 60000"
                     value={livingExpenseAmount}
                     onChange={(e) => setLivingExpenseAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3.5 py-2 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3.5 py-2 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-bold"
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Estimated annual expenses in retirement (housing, food, travel, lifestyle). Monthly equivalent: ${livingExpenseAmount ? Math.round(Number(livingExpenseAmount) / 12).toLocaleString() : '0'}/mo.
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">Base annual outflow required in retirement (excluding taxes & healthcare)</p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Annual Healthcare Costs ($/year)</label>
+                  <label className="text-xs font-semibold text-muted-foreground">Healthcare Expenses ($/year)</label>
                   <input
                     type="number"
                     min={0}
                     step={500}
-                    placeholder="e.g. 8400"
                     value={healthcareExpenseAmount}
                     onChange={(e) => setHealthcareExpenseAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2 mt-auto">
-                  <div>
-                    <span className="text-xs font-semibold text-foreground block">Adjust Expenses for Inflation</span>
-                    <span className="text-[10px] text-muted-foreground">Compound living expenses by inflation rate</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={livingExpenseAdjustForInflation}
-                    onChange={(e) => setLivingExpenseAdjustForInflation(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
                 </div>
 
@@ -715,21 +780,8 @@ export function PlanWizardModal({
                     type="number"
                     min={0}
                     step={1000}
-                    placeholder="e.g. 18000"
                     value={pensionIncomeAmount}
                     onChange={(e) => setPensionIncomeAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Pension Start Age</label>
-                  <input
-                    type="number"
-                    min={40}
-                    max={80}
-                    value={pensionStartAge}
-                    onChange={(e) => setPensionStartAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -737,14 +789,9 @@ export function PlanWizardModal({
             </div>
           )}
 
-          {/* STEP 5: Strategy & Tax Optimization Engine (NEW) */}
-          {currentStep === 5 && (
+          {/* STEP 5: Strategy & Tax Optimization Engine */}
+          {activeKey === 'strategy' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-primary flex items-center gap-2">
-                <Sliders className="w-4 h-4 shrink-0" />
-                <span>Select drawdown order strategy and configure tax optimization parameters.</span>
-              </div>
-
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-muted-foreground">Drawdown Sequence Strategy</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -849,62 +896,141 @@ export function PlanWizardModal({
           )}
 
           {/* STEP 6: Social Security, FI Target & Summary Review */}
-          {currentStep === 6 && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Primary Monthly SS Benefit ($/month)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={100}
-                    value={primarySsMonthlyAmount}
-                    onChange={(e) => setPrimarySsMonthlyAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Primary SS Claim Age</label>
-                  <input
-                    type="number"
-                    min={62}
-                    max={70}
-                    value={primarySsStartAge}
-                    onChange={(e) => setPrimarySsStartAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">FI Target Multiplier</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={15}
-                      max={40}
-                      value={fiTargetMultiplier}
-                      onChange={(e) => setFiTargetMultiplier(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                      className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                    <span className="text-xs text-muted-foreground shrink-0">x Expenses</span>
+          {activeKey === 'social_security' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              {/* Primary Social Security Planning Card */}
+              <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-border pb-2.5">
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <HeartHandshake className="w-4 h-4 text-emerald-500" />
+                      Primary Person Social Security Planning
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      PIA at Full Retirement Age (67): <span className="font-mono font-bold text-foreground">{formatCurrency(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500))}/mo</span> (from {formatCurrency(Number(primarySalary || 0))}/yr salary)
+                    </p>
                   </div>
                 </div>
 
-                {hasSpouse && (
-                  <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2 mt-auto">
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">Spousal SS Optimization</span>
-                      <span className="text-[10px] text-muted-foreground">Enable spousal benefit rules</span>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">Claiming Strategy</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
+                        { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
+                        { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.age}
+                          type="button"
+                          onClick={() => setPrimarySsStartAge(opt.age)}
+                          className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
+                            Number(primarySsStartAge) === opt.age
+                              ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                              : 'bg-muted/20 border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <span className="text-xs block font-semibold">{opt.label}</span>
+                          <span className="text-[10px] opacity-80 block">{opt.sub}</span>
+                        </button>
+                      ))}
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={enableSpousalSsBenefit}
-                      onChange={(e) => setEnableSpousalSsBenefit(e.target.checked)}
-                      className="w-4 h-4 accent-primary rounded cursor-pointer"
-                    />
                   </div>
-                )}
+
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Estimated Monthly Benefit at Age {primarySsStartAge || 67}:</span>
+                    <span className="font-mono font-bold text-emerald-500">
+                      {formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)))}/mo
+                      <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                        ({formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)) * 12)}/yr)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Partner / Spouse Social Security Planning Card (Conditional) */}
+              {hasSpouse && (
+                <div className="bg-card border border-primary/30 rounded-xl p-4 space-y-3 bg-primary/[0.02]">
+                  <div className="flex items-center justify-between border-b border-border pb-2.5">
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-primary" />
+                        Partner Social Security Planning ({spouseName || 'Spouse'})
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        PIA at Full Retirement Age (67): <span className="font-mono font-bold text-foreground">{formatCurrency(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000))}/mo</span> (from {formatCurrency(Number(spouseSalary || 0))}/yr salary)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Partner Claiming Strategy</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
+                          { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
+                          { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.age}
+                            type="button"
+                            onClick={() => setSpouseSsStartAge(opt.age)}
+                            className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
+                              Number(spouseSsStartAge) === opt.age
+                                ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                                : 'bg-muted/20 border-border text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <span className="text-xs block font-semibold">{opt.label}</span>
+                            <span className="text-[10px] opacity-80 block">{opt.sub}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-primary/10 border border-primary/20 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Partner Estimated Monthly Benefit at Age {spouseSsStartAge || 67}:</span>
+                      <span className="font-mono font-bold text-primary">
+                        {formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)))}/mo
+                        <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                          ({formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)) * 12)}/yr)
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3 py-2">
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">Spousal SS Benefit Optimization</span>
+                        <span className="text-[10px] text-muted-foreground">Ensure partner receives at least 50% of primary benefit</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enableSpousalSsBenefit}
+                        onChange={(e) => setEnableSpousalSsBenefit(e.target.checked)}
+                        className="w-4 h-4 accent-primary rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* FI Target Multiplier Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">FI Target Multiplier</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={15}
+                    max={40}
+                    value={fiTargetMultiplier}
+                    onChange={(e) => setFiTargetMultiplier(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0">x Expenses</span>
+                </div>
               </div>
 
               {/* Summary Configuration Card */}
@@ -927,15 +1053,17 @@ export function PlanWizardModal({
                     <span className="font-bold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground block">Penalty Withdrawals:</span>
-                    <span className="font-bold text-foreground">{allowPenaltyWithdrawals ? 'Allowed' : 'Disabled'}</span>
+                    <span className="text-muted-foreground block">Primary SS Benefit:</span>
+                    <span className="font-bold text-emerald-500">{formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)))}/mo (Age {primarySsStartAge})</span>
                   </div>
+                  {hasSpouse && (
+                    <div>
+                      <span className="text-muted-foreground block">Partner SS Benefit:</span>
+                      <span className="font-bold text-primary">{formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)))}/mo (Age {spouseSsStartAge})</span>
+                    </div>
+                  )}
                   <div>
-                    <span className="text-muted-foreground block">Roth Conversions:</span>
-                    <span className="font-bold text-foreground">{enableRothConversions ? `Active (${rothConversionTargetCeiling})` : 'Disabled'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block">FI Target (25x):</span>
+                    <span className="text-muted-foreground block">FI Target ({fiTargetMultiplier || 25}x):</span>
                     <span className="font-bold text-foreground">${(Number(livingExpenseAmount || 60000) * Number(fiTargetMultiplier || 25)).toLocaleString()}</span>
                   </div>
                 </div>
@@ -948,7 +1076,7 @@ export function PlanWizardModal({
             {currentStep > 1 ? (
               <button
                 type="button"
-                onClick={() => setCurrentStep((prev) => prev - 1)}
+                onClick={() => setCurrentStep((prev) => Math.max(prev - 1, 1))}
                 className="flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground px-3 py-2 rounded-xl transition-colors cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -967,10 +1095,10 @@ export function PlanWizardModal({
                 Cancel
               </button>
 
-              {currentStep < steps.length ? (
+              {!isLastStep ? (
                 <button
                   type="button"
-                  onClick={() => setCurrentStep((prev) => prev + 1)}
+                  onClick={handleNextStep}
                   className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
                 >
                   <span>Next</span>

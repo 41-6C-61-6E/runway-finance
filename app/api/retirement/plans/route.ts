@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
     const newPlanId = inserted[0].id;
     
     // Auto-populate accounts, income, expenses, and flows (cloning from source plan if available)
-    await populatePlanWithUserFinances(newPlanId, dataUserId, dek, effectiveSourcePlanId);
+    await populatePlanWithUserFinances(newPlanId, dataUserId, dek, effectiveSourcePlanId, accountInclusions);
 
     // Apply specific settings overrides if passed from the wizard
     if (body.settings && typeof body.settings === 'object') {

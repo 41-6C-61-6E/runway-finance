@@ -11,6 +11,8 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/comp
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
+import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+
 interface PlanDetailsTabProps {
   plan: any;
   onUpdatePlan: (updates: any) => void;
@@ -69,7 +71,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     );
   }
 
-  const planAccounts = Array.isArray(plan.accounts) ? plan.accounts : [];
+  const planAccounts = (Array.isArray(plan.accounts) ? plan.accounts : []).filter(isFireEligibleAccount);
   const events = Array.isArray(plan.events) ? plan.events : [];
   const incomes = events.filter((e: any) => safeString(e.category) === 'income');
   const expenses = events.filter((e: any) => safeString(e.category) === 'expense');

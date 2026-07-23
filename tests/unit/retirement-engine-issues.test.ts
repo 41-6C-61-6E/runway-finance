@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
+import { calculateSocialSecurityPIA, calculateAdjustedSsBenefit } from '@/lib/utils/social-security';
 
 describe('FIRE Open Issues Fixes', () => {
   it('Issue 8ed50c46: obeys rothPercentage on mixed 401(k) accounts', () => {
@@ -1150,4 +1151,28 @@ describe('FIRE Open Issues Fixes', () => {
     const r70 = sim.yearlyResults.find((r) => r.primaryAge === 70)!;
     expect(r70.livingExpenses).toBe(30000);
   });
+
+  it('accurately estimates Social Security PIA and claiming age adjustments using 2026 SSA parameters', () => {
+    // Salary $120,000 / yr -> AIME = $10,000 / mo
+    // Tier 1 (90% up to $1226) = $1,103.40
+    // Tier 2 (32% $1226-$7391) = $1,972.80
+    // Tier 3 (15% $7391-$10000) = $391.35
+    // Total PIA at FRA (Age 67) ~ $3,468
+    const pia120k = calculateSocialSecurityPIA(120000);
+    expect(pia120k).toBeGreaterThan(3400);
+    expect(pia120k).toBeLessThan(3550);
+
+    // Early claiming at 62 (70% multiplier)
+    const early62 = calculateAdjustedSsBenefit(pia120k, 62);
+    expect(early62).toBe(Math.round(pia120k * 0.70));
+
+    // Full claiming at 67 (100% multiplier)
+    const full67 = calculateAdjustedSsBenefit(pia120k, 67);
+    expect(full67).toBe(pia120k);
+
+    // Late claiming at 70 (124% multiplier)
+    const late70 = calculateAdjustedSsBenefit(pia120k, 70);
+    expect(late70).toBe(Math.round(pia120k * 1.24));
+  });
 });
+
