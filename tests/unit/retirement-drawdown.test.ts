@@ -10,12 +10,12 @@ describe('Retirement Engine Advanced Drawdowns, Conversions & IRMAA', () => {
     primaryBirthYear: 1970, // Age 56 in 2026
     primaryBirthMonth: 1,
     filingStatus: 'single',
-      retirementAge: 60, // Retirement in 4 years (2030)
-      lifeExpectancyAge: 85,
-      primarySalary: 100000,
-      primarySalaryYear: 2026,
-      primarySalaryRaisePct: 2.0,
-      withdrawalMethod: 'textbook',
+    retirementAge: 60, // Retirement in 4 years (2030)
+    lifeExpectancyAge: 85,
+    primarySalary: 100000,
+    primarySalaryYear: 2026,
+    primarySalaryRaisePct: 2.0,
+    withdrawalMethod: 'textbook',
     accounts: [
       {
         id: 'acc_cash',
@@ -117,6 +117,7 @@ describe('Retirement Engine Advanced Drawdowns, Conversions & IRMAA', () => {
   it('executes Tax-Bracket Shielding drawdown strategy filling low tax brackets', () => {
     const taxOptPlan: EnginePlan = {
       ...basePlan,
+      withdrawalMethod: 'tax_optimized',
       settings: {
         ...basePlan.settings,
         withdrawalMethod: 'tax_optimized',
@@ -146,6 +147,55 @@ describe('Retirement Engine Advanced Drawdowns, Conversions & IRMAA', () => {
 
     expect(earlyRetirementYear).toBeDefined();
     expect(earlyRetirementYear?.rothConversionAmount).toBeGreaterThan(0);
+  });
+
+  it('supports top_of_24 and top_of_32 conversion target ceilings with higher conversion amounts', () => {
+    const roth12Plan: EnginePlan = {
+      ...basePlan,
+      settings: {
+        ...basePlan.settings,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'top_of_12',
+      },
+    };
+
+    const roth24Plan: EnginePlan = {
+      ...basePlan,
+      settings: {
+        ...basePlan.settings,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'top_of_24',
+      },
+    };
+
+    const sim12 = runRetirementSimulation(roth12Plan);
+    const sim24 = runRetirementSimulation(roth24Plan);
+
+    const year12 = sim12.yearlyResults.find((y) => y.primaryAge === 62);
+    const year24 = sim24.yearlyResults.find((y) => y.primaryAge === 62);
+
+    expect(year24?.rothConversionAmount).toBeGreaterThan(year12?.rothConversionAmount || 0);
+  });
+
+  it('debits conversion taxes from portfolio accounts during conversion years', () => {
+    const noRothPlan: EnginePlan = {
+      ...basePlan,
+      settings: { ...basePlan.settings, enableRothConversions: false },
+    };
+
+    const rothPlan: EnginePlan = {
+      ...basePlan,
+      settings: { ...basePlan.settings, enableRothConversions: true, rothConversionTargetCeiling: 'top_of_12' },
+    };
+
+    const simNoRoth = runRetirementSimulation(noRothPlan);
+    const simRoth = runRetirementSimulation(rothPlan);
+
+    const yrNoRoth = simNoRoth.yearlyResults.find((y) => y.primaryAge === 61);
+    const yrRoth = simRoth.yearlyResults.find((y) => y.primaryAge === 61);
+
+    expect(yrRoth?.rothConversionAmount).toBeGreaterThan(0);
+    expect(yrRoth?.taxesPaid).toBeGreaterThan(yrNoRoth?.taxesPaid || 0);
   });
 
   it('computes MAGI and queues IRMAA surcharges lookback correctly', () => {

@@ -128,4 +128,42 @@ describe('Withdrawal Sequencing Strategies Comparison', () => {
     // Ensure strategies differ in drawdown patterns and metrics
     expect(yrText.drawdownsByType.traditional).not.toBe(yrWater.drawdownsByType.traditional);
   });
+
+  it('respects root plan.withdrawalMethod even if plan.settings.withdrawalMethod is different', () => {
+    // mockPlan has settings.withdrawalMethod = 'textbook'
+    const planWithRootOverride: EnginePlan = {
+      ...mockPlan,
+      withdrawalMethod: 'proportional',
+      settings: { ...mockPlan.settings, withdrawalMethod: 'textbook' },
+    };
+
+    const res = runRetirementSimulation(planWithRootOverride);
+    const firstRetirementYear = res.yearlyResults.find((y) => y.primaryAge >= 60)!;
+
+    // Proportional draw will draw from both taxable and traditional, whereas textbook draws taxable only
+    expect(firstRetirementYear.drawdownsByType.taxable).toBeGreaterThan(0);
+    expect(firstRetirementYear.drawdownsByType.traditional).toBeGreaterThan(0);
+  });
+
+  it('produces distinct net worth and lifetime taxes for all laboratory strategies', () => {
+    const stratTextbook = { ...mockPlan, withdrawalMethod: 'textbook' as const, settings: { ...mockPlan.settings, withdrawalMethod: 'textbook' as const, enableRothConversions: false } };
+    const stratProportional = { ...mockPlan, withdrawalMethod: 'proportional' as const, settings: { ...mockPlan.settings, withdrawalMethod: 'proportional' as const, enableRothConversions: false } };
+    const stratTaxDeferred = { ...mockPlan, withdrawalMethod: 'tax_deferred_first' as const, settings: { ...mockPlan.settings, withdrawalMethod: 'tax_deferred_first' as const, enableRothConversions: false } };
+    const stratTaxOptimized = { ...mockPlan, withdrawalMethod: 'tax_optimized' as const, settings: { ...mockPlan.settings, withdrawalMethod: 'tax_optimized' as const, enableRothConversions: false } };
+    const stratRothLadder = { ...mockPlan, withdrawalMethod: 'textbook' as const, settings: { ...mockPlan.settings, withdrawalMethod: 'textbook' as const, enableRothConversions: true } };
+
+    const simTextbook = runRetirementSimulation(stratTextbook);
+    const simProportional = runRetirementSimulation(stratProportional);
+    const simTaxDeferred = runRetirementSimulation(stratTaxDeferred);
+    const simTaxOptimized = runRetirementSimulation(stratTaxOptimized);
+    const simRothLadder = runRetirementSimulation(stratRothLadder);
+
+    const taxesTextbook = simTextbook.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+    const taxesTaxDeferred = simTaxDeferred.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
+    const endNWTextbook = simTextbook.yearlyResults[simTextbook.yearlyResults.length - 1].netWorth;
+    const endNWTaxDeferred = simTaxDeferred.yearlyResults[simTaxDeferred.yearlyResults.length - 1].netWorth;
+
+    expect(taxesTextbook).not.toBe(taxesTaxDeferred);
+    expect(endNWTextbook).not.toBe(endNWTaxDeferred);
+  });
 });
