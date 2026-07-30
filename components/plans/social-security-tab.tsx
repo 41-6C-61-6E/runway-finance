@@ -27,12 +27,25 @@ import {
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
+import { ProjectionOptionsPopover } from './projection-options-popover';
+
 interface SocialSecurityTabProps {
   plan: any;
   onUpdatePlan?: (updates: any) => void;
+  dollarMode?: 'real' | 'nominal';
+  onToggleDollarMode?: (mode: 'real' | 'nominal') => void;
+  viewMode?: 'deterministic' | 'monte_carlo';
+  onToggleViewMode?: (mode: 'deterministic' | 'monte_carlo') => void;
 }
 
-export function SocialSecurityTab({ plan, onUpdatePlan }: SocialSecurityTabProps) {
+export function SocialSecurityTab({
+  plan,
+  onUpdatePlan,
+  dollarMode = 'real',
+  onToggleDollarMode = () => {},
+  viewMode = 'deterministic',
+  onToggleViewMode = () => {},
+}: SocialSecurityTabProps) {
   const [primaryAge, setPrimaryAge] = useState<number>(Number(plan?.primarySsStartAge) || 67);
   const [spouseAge, setSpouseAge] = useState<number>(Number(plan?.spouseSsStartAge) || 67);
   const [enableSpousal, setEnableSpousal] = useState<boolean>(plan?.enableSpousalSsBenefit !== false);
@@ -85,6 +98,7 @@ export function SocialSecurityTab({ plan, onUpdatePlan }: SocialSecurityTabProps
         dividendYield: parseFloat(a.dividendYield) || 2.5,
         reinvestDividends: a.reinvestDividends ?? true,
         qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
+        rothPercentage: a.rothPercentage,
       })),
       liabilities: [],
       events: (plan?.events || []).map((e: any) => ({
@@ -334,6 +348,14 @@ export function SocialSecurityTab({ plan, onUpdatePlan }: SocialSecurityTabProps
           icon={TrendingUp}
           isCollapsed={isTrajectoryCollapsed}
           onToggle={() => setIsTrajectoryCollapsed(!isTrajectoryCollapsed)}
+          actions={
+            <ProjectionOptionsPopover
+              dollarMode={dollarMode}
+              onToggleDollarMode={onToggleDollarMode}
+              viewMode={viewMode}
+              onToggleViewMode={onToggleViewMode}
+            />
+          }
         />
 
         {!isTrajectoryCollapsed && (
@@ -349,11 +371,7 @@ export function SocialSecurityTab({ plan, onUpdatePlan }: SocialSecurityTabProps
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tickLine={false}
                   />
-                  <Tooltip
-                    formatter={(value: any) => [formatCurrency(Number(value)), 'Cumulative Payout']}
-                    labelFormatter={(label) => `Age ${label}`}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
-                  />
+                  <Tooltip content={<SocialSecurityTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Line type="monotone" dataKey="claim62" name="Claim at Age 62" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
                   <Line type="monotone" dataKey="claim67" name="Claim at Age 67 (FRA)" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
@@ -430,6 +448,50 @@ export function SocialSecurityTab({ plan, onUpdatePlan }: SocialSecurityTabProps
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SocialSecurityTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const age = data.age;
+
+  return (
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+      <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
+        <span className="text-foreground font-mono">Age {age}</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 font-sans">
+          Social Security
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-mono">
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans pb-0.5 border-b border-border/50">
+          Cumulative Payout
+        </div>
+        <div className="space-y-1 text-[11px] font-sans">
+          {payload.map((entry: any) => {
+            const isSelected = entry.dataKey === 'selected';
+            return (
+              <div
+                key={entry.dataKey}
+                className={`flex justify-between items-center py-0.5 rounded px-1 -mx-1 ${
+                  isSelected ? 'bg-pink-500/10 font-medium' : ''
+                }`}
+              >
+                <span className="flex items-center gap-1.5 truncate max-w-[170px]" style={{ color: entry.color }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  <span className="truncate">{entry.name}</span>
+                </span>
+                <span className="font-bold text-foreground font-mono shrink-0">
+                  {formatCurrency(Number(entry.value))}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

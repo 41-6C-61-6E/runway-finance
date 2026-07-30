@@ -61,13 +61,27 @@ import {
   ArrowUpCircle,
 } from 'lucide-react';
 
+import { ProjectionOptionsPopover } from './projection-options-popover';
+
 interface ProjectionTabProps {
   plan: any;
   accounts: any[];
   onUpdatePlan: (updates: any) => void;
+  dollarMode?: 'real' | 'nominal';
+  onToggleDollarMode?: (mode: 'real' | 'nominal') => void;
+  viewMode?: 'deterministic' | 'monte_carlo';
+  onToggleViewMode?: (mode: 'deterministic' | 'monte_carlo') => void;
 }
 
-export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabProps) {
+export function ProjectionTab({
+  plan,
+  accounts,
+  onUpdatePlan,
+  dollarMode: propDollarMode,
+  onToggleDollarMode,
+  viewMode: propViewMode,
+  onToggleViewMode,
+}: ProjectionTabProps) {
   const [showYearlyTable, setShowYearlyTable] = useState(false);
   const [showDrawdownDetails, setShowDrawdownDetails] = useState(true);
   const [localRetirementAge, setLocalRetirementAge] = useState(Number(plan?.retirementAge) || 60);
@@ -76,12 +90,25 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
   const [localInflationRate, setLocalInflationRate] = useState(3.0);
   const [localExpenseModifier, setLocalExpenseModifier] = useState(0);
 
-  // UX Toggles: Dollar Mode, View Mode, Chart Type, Milestones Visibility, Asset Category Filters
-  const [dollarMode, setDollarMode] = useState<'nominal' | 'real'>('nominal');
-  const [viewMode, setViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
+  // UX Toggles: Dollar Mode, View Mode
+  const [internalDollarMode, setInternalDollarMode] = useState<'real' | 'nominal'>('real');
+  const [internalViewMode, setInternalViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
+
+  const dollarMode = propDollarMode ?? internalDollarMode;
+  const setDollarMode = (mode: 'real' | 'nominal') => {
+    if (onToggleDollarMode) onToggleDollarMode(mode);
+    else setInternalDollarMode(mode);
+  };
+
+  const viewMode = propViewMode ?? internalViewMode;
+  const setViewMode = (mode: 'deterministic' | 'monte_carlo') => {
+    if (onToggleViewMode) onToggleViewMode(mode);
+    else setInternalViewMode(mode);
+  };
   const [chartType, setChartType] = useState<'total' | 'stacked_category' | 'stacked_account'>('stacked_category');
   const [showMilestones, setShowMilestones] = useState(true);
   const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
+  const [isOptionsPopoverOpen, setIsOptionsPopoverOpen] = useState(false);
   const [selectedYearDetail, setSelectedYearDetail] = useState<any>(null);
   const [activeAssetCategories, setActiveAssetCategories] = useState<Record<string, boolean>>({
     taxable: true,
@@ -517,6 +544,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           earlyWithdrawalWarnings: y.earlyWithdrawalWarnings || [],
           earlyPenaltyDetails: y.earlyPenaltyDetails || [],
           irmaaSurchargeAnnual: Math.round((y.irmaaSurchargeAnnual || 0) / discountFactor),
+          capitalGains0PctRoom: Math.round((y.capitalGains0PctRoom || 0) / discountFactor),
+          niitHeadroom: Math.round((y.niitHeadroom || 0) / discountFactor),
           accountDrawdowns: y.accountDrawdowns || [],
           milestone: milestoneMap[y.primaryAge],
         };
@@ -551,8 +580,9 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
   const fireNumber = totalAnnualExpensesFromPlan * (plan?.fiTargetMultiplier || 25);
   const fireProgress = fireNumber > 0 ? Math.min(100, (currentNetWorth / fireNumber) * 100) : 0;
-  const yearsToFire = chartData.findIndex((d) => d.netWorth >= fireNumber);
-  const yearsToFireDisplay = yearsToFire >= 0 ? yearsToFire : '—';
+  const isPlanDepleted = simulation?.depletionAge !== undefined || simulation?.success === false;
+  const yearsToFire = !isPlanDepleted ? chartData.findIndex((d) => d.netWorth >= fireNumber) : -1;
+  const yearsToFireDisplay = isPlanDepleted ? 'Depletes' : (yearsToFire >= 0 ? yearsToFire : '—');
   // Use discretionary withdrawal rate for peak withdrawal rate risk assessment
   const peakWithdrawalRate = Math.max(0, ...chartData.filter((d) => d.isRetired).map((d) => d.withdrawalRate));
 
@@ -610,104 +640,6 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Projection Engine Controls (Collapsible, Collapsed by Default) */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-        <CollapsibleCardHeader
-          isCollapsed={isControlsCollapsed}
-          onToggle={setIsControlsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary shrink-0" />
-              <div>
-                <h3 className="text-xs font-bold text-foreground">Projection Engine Controls</h3>
-                <p className="text-[10px] text-muted-foreground">Adjust valuation currency & model simulation type</p>
-              </div>
-            </div>
-          }
-          actions={
-            <div className="flex items-center gap-1.5 text-xs font-mono">
-              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold">
-                {dollarMode === 'real' ? "Real ($)" : "Nominal ($)"}
-              </span>
-              <span className="bg-muted text-muted-foreground border border-border px-2 py-0.5 rounded text-[10px] font-semibold">
-                {viewMode === 'monte_carlo' ? 'Monte Carlo' : 'Deterministic'}
-              </span>
-            </div>
-          }
-        />
-
-        {!isControlsCollapsed && (
-          <div className="p-3.5 sm:p-4 border-t border-border">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* Quick Strategy Selector */}
-              <div className="flex items-center justify-between bg-muted/30 rounded-lg px-2.5 py-1.5 border border-border">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-2">Strategy</span>
-                <select
-                  value={plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook'}
-                  onChange={(e) => onUpdatePlan({ withdrawalMethod: e.target.value })}
-                  className="bg-card text-foreground text-[11px] font-bold rounded px-2 py-1 border border-border cursor-pointer focus:ring-1 focus:ring-primary w-full text-right"
-                >
-                  <option value="textbook">Textbook Waterfall</option>
-                  <option value="proportional">Proportional</option>
-                  <option value="tax_optimized">Tax-Optimized (12%)</option>
-                  <option value="custom_order">Custom Order</option>
-                </select>
-              </div>
-
-              {/* Valuation Currency Mode Toggle */}
-              <div className="flex items-center justify-between bg-muted/30 rounded-lg p-1 border border-border">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1.5 hidden sm:inline">Valuation</span>
-                <div className="grid grid-cols-2 gap-1 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setDollarMode('nominal')}
-                    className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
-                      dollarMode === 'nominal' ? 'bg-card text-foreground shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Nominal ($)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDollarMode('real')}
-                    className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
-                      dollarMode === 'real' ? 'bg-card text-primary shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Real (Today's $)
-                  </button>
-                </div>
-              </div>
-
-              {/* Simulation Model Toggle */}
-              <div className="flex items-center justify-between bg-muted/30 rounded-lg p-1 border border-border">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1.5 hidden sm:inline">Model</span>
-                <div className="grid grid-cols-2 gap-1 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('deterministic')}
-                    className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
-                      viewMode === 'deterministic' ? 'bg-card text-foreground shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Deterministic
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('monte_carlo')}
-                    className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer text-center ${
-                      viewMode === 'monte_carlo' ? 'bg-card text-amber-500 shadow-2xs border border-border' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Monte Carlo
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Engine Diagnostic Warnings Banner */}
       {diagnosticWarnings.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 space-y-1.5">
@@ -851,13 +783,21 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
             </div>
           }
           actions={
-            viewMode === 'monte_carlo' && monteCarloOutput ? (
-              <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg text-xs font-mono">
-                <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
-                <span className="text-muted-foreground">|</span>
-                <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
-              </div>
-            ) : null
+            <div className="flex items-center gap-3">
+              {viewMode === 'monte_carlo' && monteCarloOutput ? (
+                <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg text-xs font-mono">
+                  <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
+                </div>
+              ) : null}
+              <ProjectionOptionsPopover
+                dollarMode={dollarMode}
+                onToggleDollarMode={setDollarMode}
+                viewMode={viewMode}
+                onToggleViewMode={setViewMode}
+              />
+            </div>
           }
         />
 
@@ -1014,18 +954,11 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
 
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
 
-                {/* Retirement Phase Background Shading */}
-                <ReferenceArea
-                  x1={localRetirementAge}
-                  x2={plan?.lifeExpectancyAge || 100}
-                  fill="#f59e0b"
-                  fillOpacity={0.04}
-                />
-
                 <XAxis
                   dataKey="age"
                   stroke="currentColor"
                   className="text-xs text-muted-foreground"
+                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(age) => `${age}`}
@@ -1033,6 +966,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                 <YAxis
                   stroke="currentColor"
                   className="text-xs text-muted-foreground"
+                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
@@ -1047,8 +981,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                     name="Retirement Portfolio"
                     stroke="#10b981"
                     strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#accumulationGrad)"
+                    fillOpacity={0}
+                    fill="none"
                   />
                 ) : chartType === 'stacked_account' ? (
                   accountSeries.map((acc) => (
@@ -1128,7 +1062,7 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   const hasPenalty = dataPoint && dataPoint.earlyPenaltyTax > 0;
                   return (
                     <g transform={`translate(${x},${y})`}>
-                      <text x={0} y={0} dy={14} textAnchor="middle" fill="currentColor" fontSize={10} className="text-muted-foreground">
+                      <text x={0} y={0} dy={14} textAnchor="middle" fill="currentColor" fontSize={11} className="text-muted-foreground">
                         {payload.value}
                       </text>
                       {hasPenalty && (
@@ -1142,8 +1076,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
                   );
                 }}
               />
-                <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
-                <Tooltip />
+                <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
+                <Tooltip content={<MonteCarloTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                 <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile" />
                 <Area type="monotone" dataKey="p75" stroke="#3b82f6" strokeWidth={1.5} fill="none" name="75th Percentile" />
                 <Area type="monotone" dataKey="p50" stroke="#10b981" strokeWidth={2.5} fill="none" name="Median (P50)" />
@@ -1230,6 +1164,12 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
               <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
                 {activeStrategyLabel}
               </span>
+              <ProjectionOptionsPopover
+                dollarMode={dollarMode}
+                onToggleDollarMode={setDollarMode}
+                viewMode={viewMode}
+                onToggleViewMode={setViewMode}
+              />
             </div>
           }
         />
@@ -1241,8 +1181,8 @@ export function ProjectionTab({ plan, accounts, onUpdatePlan }: ProjectionTabPro
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} maxBarSize={40} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
-              <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} />
-              <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
+              <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} />
+              <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
               <Tooltip content={<DrawdownTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
               <Legend content={<GroupedLegend />} />
 
@@ -1754,125 +1694,265 @@ function GroupedLegend({ payload }: any) {
   );
 }
 
+function MonteCarloTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const isRetired = data.isRetired ?? false;
+
+  return (
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+      <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
+        <span className="text-foreground font-mono">Year {data.year} (Age {data.age})</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
+          isRetired
+            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        }`}>
+          {isRetired ? '🌴 Retired' : '📈 Accumulation'}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-mono">
+        <div className="flex justify-between items-center text-sm font-extrabold pb-1 border-b border-border/50">
+          <span className="text-muted-foreground text-xs font-semibold font-sans">Median Outcome (P50):</span>
+          <span className="text-emerald-500 font-mono">{formatCurrency(data.p50)}</span>
+        </div>
+
+        <div className="space-y-1 text-[11px] pt-0.5 font-sans">
+          <div className="flex justify-between items-center">
+            <span className="text-amber-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              90th Percentile (Best):
+            </span>
+            <span className="font-bold text-foreground font-mono">{formatCurrency(data.p90)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-blue-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              75th Percentile:
+            </span>
+            <span className="font-bold text-foreground font-mono">{formatCurrency(data.p75)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-emerald-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              50th Percentile (Median):
+            </span>
+            <span className="font-bold text-foreground font-mono">{formatCurrency(data.p50)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-purple-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              25th Percentile:
+            </span>
+            <span className="font-bold text-foreground font-mono">{formatCurrency(data.p25)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-rose-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              10th Percentile (Worst):
+            </span>
+            <span className="font-bold text-foreground font-mono">{formatCurrency(data.p10)}</span>
+          </div>
+        </div>
+      </div>
+
+      {data.earlyPenaltyTax > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 space-y-1 font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-amber-500 text-[11px]">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>Early Withdrawal Penalty: {formatCurrency(data.earlyPenaltyTax)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DrawdownTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const incomeTotal = (data.salaryIncome || 0) + (data.ssIncome || 0) + (data.pensionIncome || 0) + (data.otherIncome || 0);
+
   return (
-    <div className="bg-background border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2 min-w-[240px]">
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
-        <span>Year {data.year} (Age {data.age})</span>
-        <span className="text-primary">{data.isRetired ? 'Retirement Phase' : 'Accumulation'}</span>
+        <span className="text-foreground font-mono">Year {data.year} (Age {data.age})</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
+          data.isRetired
+            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        }`}>
+          {data.isRetired ? '🌴 Retired' : '📈 Accumulation'}
+        </span>
       </div>
-      <div className="space-y-1 font-mono">
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pt-0.5">Income Sources</p>
-        {data.salaryIncome > 0 && (
-          <div className="flex justify-between text-emerald-500">
-            <span>Salary:</span>
-            <span>{formatCurrency(data.salaryIncome)}</span>
-          </div>
-        )}
-        {data.ssIncome > 0 && (
-          <div className="flex justify-between text-cyan-500">
-            <span>Social Security:</span>
-            <span>{formatCurrency(data.ssIncome)}</span>
-          </div>
-        )}
-        {data.pensionIncome > 0 && (
-          <div className="flex justify-between text-blue-500">
-            <span>Pension:</span>
-            <span>{formatCurrency(data.pensionIncome)}</span>
-          </div>
-        )}
-        {data.otherIncome > 0 && (
-          <div className="flex justify-between text-violet-500">
-            <span>Other Income:</span>
-            <span>{formatCurrency(data.otherIncome)}</span>
-          </div>
-        )}
-        <div className="flex justify-between font-bold text-foreground border-t border-border/40 pt-1">
-          <span>Total Income:</span>
-          <span>{formatCurrency(incomeTotal)}</span>
-        </div>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pt-1 border-t border-border/40">Portfolio Drawdowns</p>
-        {data.cashDrawdown > 0 && (
-          <div className="flex justify-between text-slate-400">
-            <span>Cash:</span>
-            <span>{formatCurrency(data.cashDrawdown)}</span>
-          </div>
-        )}
-        {data.taxableDrawdown > 0 && (
-          <div className="flex justify-between text-amber-500">
-            <span>Taxable Brokerage:</span>
-            <span>{formatCurrency(data.taxableDrawdown)}</span>
-          </div>
-        )}
-        {data.traditionalDrawdown > 0 && (
-          <div className="flex justify-between text-purple-500">
-            <span>Traditional IRA/401k:</span>
-            <span>{formatCurrency(data.traditionalDrawdown)}</span>
-          </div>
-        )}
-        {data.rothDrawdown > 0 && (
-          <div className="flex justify-between text-pink-500">
-            <span>Roth IRA/401k:</span>
-            <span>{formatCurrency(data.rothDrawdown)}</span>
-          </div>
-        )}
-        {data.hsaDrawdown > 0 && (
-          <div className="flex justify-between text-teal-500">
-            <span>HSA:</span>
-            <span>{formatCurrency(data.hsaDrawdown)}</span>
-          </div>
-        )}
-        {data.shortfall > 0 && (
-          <div className="flex justify-between text-rose-500 font-bold border-t border-rose-500/30 pt-1">
-            <span>⚠ Unfunded Shortfall:</span>
-            <span>{formatCurrency(data.shortfall)}</span>
-          </div>
-        )}
-        {data.rothConversionAmount > 0 && (
-          <div className="flex justify-between text-orange-400 font-bold border-t border-border/40 pt-1">
-            <span>Roth Conversion:</span>
-            <span>{formatCurrency(data.rothConversionAmount)}</span>
-          </div>
-        )}
-        {data.earlyPenaltyTax > 0 && (
-          <div className="border-t border-amber-500/30 pt-1 space-y-0.5">
-            <div className="flex justify-between text-amber-500 font-bold">
-              <span>⚠ Early Withdrawal Penalty:</span>
-              <span>{formatCurrency(data.earlyPenaltyTax)}</span>
-            </div>
-            {data.earlyPenaltyDetails?.map((d: any, i: number) => (
-              <div key={i} className="text-[10px] text-amber-600 dark:text-amber-400 font-mono pl-2">
-                Age {d.age}: {formatCurrency(d.amount)} from {d.accountName} → {d.accountType.includes('hsa') ? '20%' : '10%'} penalty ({formatCurrency(d.penalty)})
-              </div>
-            ))}
-          </div>
-        )}
-        {data.actualDrawdowns > 0 && (
-          <div className="border-t border-border/40 pt-1 space-y-1">
-            <div className="flex justify-between font-bold text-foreground">
-              <span>Total Drawn:</span>
-              <span>{formatCurrency(data.actualDrawdowns)}</span>
-            </div>
-            <div className="flex justify-between font-bold">
-              <span>Withdraw Rate:</span>
-              <span className={data.withdrawalRate > 5 ? 'text-rose-500' : data.withdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}>
-                {data.withdrawalRate.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        )}
+
+      <div className="space-y-2 font-mono">
+        {/* Expenses Line */}
         {data.expenses != null && (
-          <div className="border-t border-border/40 pt-1">
-            <div className="flex justify-between text-rose-500">
-              <span>Expenses:</span>
-              <span>{formatCurrency(data.expenses)}</span>
-            </div>
+          <div className="flex justify-between items-center text-[11.5px] pb-1.5 border-b border-border/50">
+            <span className="text-rose-500 font-sans font-semibold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              Annual Expenses:
+            </span>
+            <span className="font-bold text-rose-500 font-mono">{formatCurrency(data.expenses)}</span>
+          </div>
+        )}
+
+        {/* Income Sources Section */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans">
+            <span>Income Sources</span>
+            <span className="font-mono text-foreground font-semibold">{formatCurrency(incomeTotal)}</span>
+          </div>
+          <div className="space-y-1 text-[11px] font-sans">
+            {data.salaryIncome > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-emerald-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Salary / Earned:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.salaryIncome)}</span>
+              </div>
+            )}
+            {data.ssIncome > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-cyan-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                  Social Security:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.ssIncome)}</span>
+              </div>
+            )}
+            {data.pensionIncome > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-blue-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Pension:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.pensionIncome)}</span>
+              </div>
+            )}
+            {data.otherIncome > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-violet-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                  Other Income:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.otherIncome)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Portfolio Drawdowns Section */}
+        <div className="space-y-1 pt-1.5 border-t border-border/50">
+          <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans">
+            <span>Portfolio Drawdowns</span>
+            {data.actualDrawdowns > 0 && (
+              <span className="font-mono text-foreground font-semibold">{formatCurrency(data.actualDrawdowns)}</span>
+            )}
+          </div>
+          <div className="space-y-1 text-[11px] font-sans">
+            {data.cashDrawdown > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  Cash Drawdown:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.cashDrawdown)}</span>
+              </div>
+            )}
+            {data.taxableDrawdown > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-amber-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Taxable Brokerage:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.taxableDrawdown)}</span>
+              </div>
+            )}
+            {data.traditionalDrawdown > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-purple-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Traditional IRA/401k:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.traditionalDrawdown)}</span>
+              </div>
+            )}
+            {data.rothDrawdown > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-pink-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                  Roth IRA/401k:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.rothDrawdown)}</span>
+              </div>
+            )}
+            {data.hsaDrawdown > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-teal-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                  HSA Drawdown:
+                </span>
+                <span className="font-bold text-foreground font-mono">{formatCurrency(data.hsaDrawdown)}</span>
+              </div>
+            )}
+            {data.rothConversionAmount > 0 && (
+              <div className="flex justify-between items-center pt-0.5">
+                <span className="text-amber-400 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Roth Conversion:
+                </span>
+                <span className="font-bold text-amber-400 font-mono">{formatCurrency(data.rothConversionAmount)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Withdrawal Rate summary */}
+        {data.actualDrawdowns > 0 && data.withdrawalRate > 0 && (
+          <div className="flex justify-between items-center pt-1.5 border-t border-border/50 font-sans text-xs">
+            <span className="text-muted-foreground font-semibold">Withdrawal Rate:</span>
+            <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
+              data.withdrawalRate > 5
+                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                : data.withdrawalRate > 3.5
+                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+            }`}>
+              {data.withdrawalRate.toFixed(1)}%
+            </span>
           </div>
         )}
       </div>
+
+      {/* Callouts */}
+      {data.shortfall > 0 && (
+        <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 space-y-0.5 font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-rose-500 text-[11px]">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>Unfunded Shortfall: {formatCurrency(data.shortfall)}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Expenses exceed total income and available liquid portfolio balance.</p>
+        </div>
+      )}
+
+      {data.earlyPenaltyTax > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 space-y-1 font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-amber-500 text-[11px]">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>Early Withdrawal Penalty: {formatCurrency(data.earlyPenaltyTax)}</span>
+          </div>
+          {data.earlyPenaltyDetails?.map((d: any, i: number) => (
+            <p key={i} className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">
+              Age {d.age}: {formatCurrency(d.amount)} from {d.accountName} → {d.accountType.includes('hsa') ? '20%' : '10%'} penalty ({formatCurrency(d.penalty)})
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
