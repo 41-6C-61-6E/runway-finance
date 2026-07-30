@@ -169,6 +169,10 @@ function MultiSelectDropdown({
 
 const DEFAULT_PRESETS: TransactionPreset[] = [
   { id: 'all', name: 'All Transactions', filters: {} },
+  { id: 'banking', name: 'Banking', filters: { accountTypes: 'checking,savings,cash,other,hsachecking' } },
+  { id: 'investments', name: 'Investments', filters: { accountTypes: 'investment,brokerage,retirement,otherinvestment,otherInvestment,rothira,traditionalira,401k,403b,sepira,simpleira,529,hsa,health' } },
+  { id: 'credit', name: 'Credit', filters: { accountTypes: 'credit,loan,mortgage,studentloan,autoloan,otherloan,otherLiability' } },
+  { id: 'assets', name: 'Assets', filters: { accountTypes: 'vehicle,crypto,metals,realestate,primaryhome,secondaryhome,rentalproperty,commercial,land,otherrealestate,single-family,condo,townhouse,multi-family,otherAsset,otherasset' } },
   { id: 'pending', name: 'Pending', filters: { pending: 'true' } },
   { id: 'uncategorized', name: 'Uncategorized', filters: { categoryIds: 'uncategorized' } },
 ];
@@ -684,32 +688,55 @@ export default function FilterBar({
             </button>
             {accountTypesOpen && (
               <div className="absolute top-full left-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
-                {groupedAccountTypes.map((group) => (
-                  <div key={group.group}>
-                    <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/20 border-b border-border/50">
-                      {group.group}
+                {groupedAccountTypes.map((group) => {
+                  const groupValues = group.types.map((t) => t.value);
+                  const isAllSelected = groupValues.every((v) => selectedAccountTypes.includes(v));
+
+                  const toggleGroup = () => {
+                    if (isAllSelected) {
+                      handleAccountTypesChange(selectedAccountTypes.filter((v) => !groupValues.includes(v)));
+                    } else {
+                      const combined = Array.from(new Set([...selectedAccountTypes, ...groupValues]));
+                      handleAccountTypesChange(combined);
+                    }
+                  };
+
+                  return (
+                    <div key={group.group}>
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border/50">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                          {group.group}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={toggleGroup}
+                          className="text-[10px] font-semibold text-primary hover:underline cursor-pointer"
+                        >
+                          {isAllSelected ? 'Deselect' : 'Select'}
+                        </button>
+                      </div>
+                      {group.types.map((t) => (
+                        <label
+                          key={t.value}
+                          className="flex items-center gap-3 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedAccountTypes.includes(t.value)}
+                            onChange={() => {
+                              const next = selectedAccountTypes.includes(t.value)
+                                ? selectedAccountTypes.filter((v) => v !== t.value)
+                                : [...selectedAccountTypes, t.value];
+                              handleAccountTypesChange(next);
+                            }}
+                            className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                          />
+                          <span className="text-sm">{t.label}</span>
+                        </label>
+                      ))}
                     </div>
-                    {group.types.map((t) => (
-                      <label
-                        key={t.value}
-                        className="flex items-center gap-3 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedAccountTypes.includes(t.value)}
-                          onChange={() => {
-                            const next = selectedAccountTypes.includes(t.value)
-                              ? selectedAccountTypes.filter((v) => v !== t.value)
-                              : [...selectedAccountTypes, t.value];
-                            handleAccountTypesChange(next);
-                          }}
-                          className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                        />
-                        <span className="text-sm">{t.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ))}
+                  );
+                })}
                 {groupedAccountTypes.length === 0 && (
                   <div className="px-3 py-4 text-xs text-muted-foreground text-center">No account types</div>
                 )}

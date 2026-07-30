@@ -352,7 +352,7 @@ export async function analyzeUncategorized(
             userId,
             `AI Proposals Ready`,
             `AI has generated ${pendingCount} new suggestion${pendingCount > 1 ? 's' : ''} for your transactions.`,
-            '/settings?tab=ai',
+            '/transactions?aiSuggestions=true',
             'ai_proposals',
             uniqueKey
           );
