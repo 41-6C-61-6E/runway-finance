@@ -32,6 +32,7 @@ import {
 } from "@/lib/validations/transaction";
 import { logger } from "@/lib/logger";
 import { getSessionDEK } from "@/lib/crypto-context";
+import { getAccountGroupTypes } from "@/lib/constants/account-types";
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from "@/lib/crypto";
 import { sanitizeText } from "@/lib/utils/sanitize";
 import {
@@ -198,7 +199,10 @@ export async function GET(request: Request) {
     accountTypes:
       searchParams.get("accountTypes") ??
       searchParams.get("accountType") ??
-      undefined,
+      (searchParams.get("accountGroup")
+        ? getAccountGroupTypes(searchParams.get("accountGroup")!).join(",")
+        : undefined),
+    accountGroup: searchParams.get("accountGroup") ?? undefined,
     startDate: searchParams.get("startDate") ?? undefined,
     endDate: searchParams.get("endDate") ?? undefined,
     categoryId: searchParams.get("categoryId") ?? undefined,
@@ -437,6 +441,7 @@ export async function GET(request: Request) {
         notes: transactions.notes,
         categoryName: categories.name,
         categoryType: categories.categoryType,
+        categoryIsIncome: categories.isIncome,
         accountName: accounts.name,
       })
       .from(transactions)
@@ -481,9 +486,9 @@ export async function GET(request: Request) {
         }
         let matchesType = true;
         if (filters.type === "income") {
-          matchesType = (decryptedAmt > 0 || row.categoryType === 'compound') && row.categoryType !== 'transfer';
+          matchesType = (row.categoryIsIncome === true || row.categoryType === 'compound') && row.categoryType !== 'transfer';
         } else if (filters.type === "expense") {
-          matchesType = (decryptedAmt < 0 || row.categoryType === 'compound') && row.categoryType !== 'transfer';
+          matchesType = (row.categoryIsIncome === false || decryptedAmt < 0) && row.categoryIsIncome !== true && row.categoryType !== 'transfer';
         }
         return { id: row.id, amount, matchesSearch, matchesType, categoryType: row.categoryType };
       }),
@@ -508,11 +513,13 @@ export async function GET(request: Request) {
   // Optimized path for calculating total amount of matching transactions (Option A)
   if (filters.totalAmountOnly) {
     const selectFields: any = { amount: transactions.amount };
-    if (filters.search) {
+    if (filters.search || filters.type) {
       selectFields.description = transactions.description;
       selectFields.payee = transactions.payee;
       selectFields.notes = transactions.notes;
       selectFields.categoryName = categories.name;
+      selectFields.categoryType = categories.categoryType;
+      selectFields.categoryIsIncome = categories.isIncome;
       selectFields.accountName = accounts.name;
     }
 
@@ -521,7 +528,7 @@ export async function GET(request: Request) {
       .from(transactions)
       .leftJoin(accounts, eq(transactions.accountId, accounts.id));
 
-    if (filters.search) {
+    if (filters.search || filters.type) {
       query = query.leftJoin(
         categories,
         eq(transactions.categoryId, categories.id),
@@ -566,9 +573,9 @@ export async function GET(request: Request) {
         }
         let matchesType = true;
         if (filters.type === "income") {
-          matchesType = decryptedAmt > 0;
+          matchesType = (row.categoryIsIncome === true || row.categoryType === 'compound') && row.categoryType !== 'transfer';
         } else if (filters.type === "expense") {
-          matchesType = decryptedAmt < 0;
+          matchesType = (row.categoryIsIncome === false || decryptedAmt < 0) && row.categoryIsIncome !== true && row.categoryType !== 'transfer';
         }
         return { amount, matchesSearch, matchesType };
       }),
@@ -647,11 +654,14 @@ export async function GET(request: Request) {
         transaction: transactions,
         account: {
           name: accounts.name,
+          type: accounts.type,
         },
         category: {
           id: categories.id,
           name: categories.name,
           color: categories.color,
+          isIncome: categories.isIncome,
+          categoryType: categories.categoryType,
         },
       })
       .from(transactions)
@@ -677,7 +687,7 @@ export async function GET(request: Request) {
             name: await decryptField(category.name, dek),
           };
         }
-        return { ...tx, accountName, category };
+        return { ...tx, accountName, accountType: row.account?.type, category };
       }),
     );
 
@@ -755,11 +765,14 @@ export async function GET(request: Request) {
       transaction: transactions,
       account: {
         name: accounts.name,
+        type: accounts.type,
       },
       category: {
         id: categories.id,
         name: categories.name,
         color: categories.color,
+        isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
       },
     })
     .from(transactions)
@@ -783,7 +796,7 @@ export async function GET(request: Request) {
           name: await decryptField(category.name, dek),
         };
       }
-      return { ...tx, accountName, category };
+      return { ...tx, accountName, accountType: row.account?.type, category };
     }),
   );
 
@@ -808,9 +821,16 @@ export async function GET(request: Request) {
 
   // Apply type filter in memory
   if (filters.type === "income") {
-    filtered = filtered.filter((t: any) => parseFloat(t.amount) > 0);
+    filtered = filtered.filter((t: any) =>
+      (t.category?.isIncome === true || t.category?.categoryType === 'compound') &&
+      t.category?.categoryType !== 'transfer'
+    );
   } else if (filters.type === "expense") {
-    filtered = filtered.filter((t: any) => parseFloat(t.amount) < 0);
+    filtered = filtered.filter((t: any) =>
+      (t.category?.isIncome === false || parseFloat(t.amount) < 0) &&
+      t.category?.isIncome !== true &&
+      t.category?.categoryType !== 'transfer'
+    );
   }
 
   // Apply amount filters in memory

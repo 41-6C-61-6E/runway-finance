@@ -2,6 +2,7 @@ import { getDb } from '@/lib/db';
 import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow, userNotifications } from '@/lib/db/schema';
 import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
+import { calculateWealthFlow } from '@/lib/services/wealth-flow';
 import { logger } from '@/lib/logger';
 import webpush from 'web-push';
 
@@ -477,16 +478,13 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
       return;
     }
 
-    const currentNetWorth = parseFloat(await decryptField(snapshots[0].netWorth, dek));
-    const previousNetWorth = parseFloat(await decryptField(snapshots[1].netWorth, dek));
-
-    if (isNaN(currentNetWorth) || isNaN(previousNetWorth)) return;
-
-    const diff = currentNetWorth - previousNetWorth;
-    // Use a 1-cent threshold to avoid floating-point noise producing "$0.00" alerts
-    if (Math.abs(diff) < 0.01) return;
-
     const snapshotDateStr = snapshots[0].snapshotDate; // e.g. YYYY-MM-DD
+    const flowData = await calculateWealthFlow(userId, snapshotDateStr, snapshotDateStr, dek, [], '1d_discrete');
+    const diff = flowData.summary.netWorthChange;
+
+    // Use a 1-cent threshold to avoid floating-point noise producing "$0.00" alerts
+    if (isNaN(diff) || Math.abs(diff) < 0.01) return;
+
     const key = `daily_net_worth_change:${snapshotDateStr}`;
 
     const formattedDiff = new Intl.NumberFormat(settings.locale || 'en-US', {
@@ -497,14 +495,22 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     const direction = diff > 0 ? 'increased' : 'decreased';
     const arrow = diff > 0 ? '📈' : '📉';
 
+    const [y, m, d] = snapshotDateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const formattedDate = dateObj.toLocaleDateString(settings.locale || 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
     const actualToday = new Date().toISOString().split('T')[0];
-    const timePhrase = snapshotDateStr === actualToday ? 'in the last Day' : `on ${snapshotDateStr}`;
+    const timePhrase = snapshotDateStr === actualToday ? 'in the last Day' : `on ${formattedDate}`;
 
     await sendPushNotification(
       userId,
       `Daily Net Worth Alert ${arrow}`,
       `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
-      '/flows?timeframe=1d',
+      `/flows?timeframe=1d_discrete&date=${snapshotDateStr}`,
       'daily_net_worth_change',
       key
     );

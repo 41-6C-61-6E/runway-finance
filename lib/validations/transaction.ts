@@ -4,6 +4,7 @@ export const TransactionFilterSchema = z.object({
   accountId: z.string().uuid().optional(),
   accountIds: z.string().optional(),
   accountTypes: z.string().optional(),
+  accountGroup: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   categoryId: z
