@@ -112,7 +112,7 @@ export interface EnginePlan {
     charitableGiving?: number;
     withdrawalMethod?: 'textbook' | 'proportional' | 'tax_deferred_first' | 'tax_optimized' | 'custom_order';
     enableRothConversions?: boolean;
-    rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'irmaa_tier1';
+    rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'top_of_24' | 'top_of_32' | 'irmaa_tier1';
     avoidIrmaaCliffs?: boolean;
     allowPenaltyWithdrawals?: boolean;
   };
@@ -214,10 +214,13 @@ export interface YearlySimulationResult {
     hsa: number;
   };
   rothConversionAmount: number;
+  rothBracketHeadroom?: number;
   magi: number;
   irmaaTier: number;
   irmaaSurchargeAnnual: number;
   irmaaNotice?: { tier: number; surcharge: number; magi: number; threshold: number };
+  capitalGains0PctRoom?: number;
+  niitHeadroom?: number;
   earlyWithdrawalWarnings?: string[];
   earlyPenaltyDetails?: { age: number; accountId: string; accountName: string; accountType: string; amount: number; penalty: number }[];
   shortfall?: number;
@@ -338,10 +341,12 @@ export function runRetirementSimulation(
     }
 
     // Additional Milestones
+    if (primaryAge === plan.retirementAge && primaryAge < 65) milestonesReached.push(`ACA Premium Tax Credit Subsidy Window Begins (Age ${primaryAge})`);
     if (primaryAge === 50) milestonesReached.push('Catch-up Contribution Limits Unlocked (Age 50)');
     if (primaryAge === 55) milestonesReached.push('Rule of 55 Access & HSA Catch-up Unlocked (Age 55)');
     if (primaryAge === 59 || primaryAge === 60) milestonesReached.push('Penalty-Free Retirement Access (Age 59½)');
     if (primaryAge === 62) milestonesReached.push('Early Social Security Eligibility (Age 62)');
+    if (primaryAge === 63) milestonesReached.push('Medicare IRMAA 2-Year MAGI Lookback Window Begins (Age 63)');
     if (primaryAge === 65) milestonesReached.push('Medicare Eligibility & ACA Transition (Age 65)');
     if (primaryAge === 67) milestonesReached.push('Full Social Security Retirement Age (Age 67)');
     if (primaryAge === 70) milestonesReached.push('Maximum Social Security Benefit Age (Age 70)');
@@ -1132,10 +1137,15 @@ export function runRetirementSimulation(
     }
 
     // 5b. Roth Conversion Ladder Engine (Retired, before RMD age)
+    let rothBracketHeadroom = 0;
     if (plan.settings?.enableRothConversions && isRetired && primaryAge < rmdStartAge) {
+      const ceilingSetting = plan.settings.rothConversionTargetCeiling || 'top_of_12';
       let targetCeilingRate = 0.12;
-      if (plan.settings.rothConversionTargetCeiling === 'top_of_10') targetCeilingRate = 0.10;
-      else if (plan.settings.rothConversionTargetCeiling === 'top_of_22') targetCeilingRate = 0.22;
+      if (ceilingSetting === 'top_of_10') targetCeilingRate = 0.10;
+      else if (ceilingSetting === 'top_of_12') targetCeilingRate = 0.12;
+      else if (ceilingSetting === 'top_of_22') targetCeilingRate = 0.22;
+      else if (ceilingSetting === 'top_of_24') targetCeilingRate = 0.24;
+      else if (ceilingSetting === 'top_of_32') targetCeilingRate = 0.32;
 
       const targetBracketIdx = rules.ordinaryTaxBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
       const nextBracketObj = rules.ordinaryTaxBrackets[targetBracketIdx + 1];
@@ -1156,6 +1166,8 @@ export function runRetirementSimulation(
           }
         }
       }
+
+      rothBracketHeadroom = convHeadroom;
 
       if (convHeadroom > 500) {
         const tradAccs = Object.values(accountsState).filter(
@@ -1252,6 +1264,29 @@ export function runRetirementSimulation(
     }
 
     taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + earlyPenaltyTax;
+
+    // Deduct incremental taxes resulting from drawdowns and Roth conversions from cash/taxable accounts
+    const taxDelta = Math.max(0, taxesPaid - initialTaxesPaid);
+    if (taxDelta > 0) {
+      let remTaxDelta = taxDelta;
+      const liquidAccs = Object.values(accountsState).filter(
+        (a) => a.balance > 0 && (a.type === 'cash' || a.type === 'taxable' || a.type === 'brokerage' || a.type === 'crypto')
+      );
+      for (const acc of liquidAccs) {
+        if (remTaxDelta <= 0) break;
+        const w = Math.min(acc.balance, remTaxDelta);
+        acc.balance -= w;
+        remTaxDelta -= w;
+      }
+      if (remTaxDelta > 0) {
+        const otherAccs = Object.values(accountsState).filter((a) => a.balance > 0);
+        for (const acc of otherAccs) {
+          if (remTaxDelta <= 0) break;
+          const w = withdrawFromAcc(acc, remTaxDelta, true);
+          remTaxDelta -= w;
+        }
+      }
+    }
     const totalTaxBase = grossIncome + additionalOrdinaryIncome + totalTaxableGains;
     effectiveTaxRate = totalTaxBase > 0 ? (taxesPaid / totalTaxBase) * 100 : 0;
 
@@ -1376,6 +1411,11 @@ export function runRetirementSimulation(
       depletionAge = primaryAge;
     }
 
+    // 0% Long-Term Capital Gains tax headroom and NIIT headroom
+    const ltcg0PctLimit = (rules.capitalGainsBrackets?.[0]?.threshold || 47025) * bracketMult * compoundInflation;
+    const capitalGains0PctRoom = Math.max(0, ltcg0PctLimit - ordinaryTax);
+    const niitHeadroom = Math.max(0, niitThresh - magi);
+
     yearlyResults.push({
       year: simYear,
       primaryAge,
@@ -1421,10 +1461,13 @@ export function runRetirementSimulation(
       accountDrawdowns,
       drawdownsByType,
       rothConversionAmount,
+      rothBracketHeadroom,
       magi,
       irmaaTier,
       irmaaSurchargeAnnual,
       irmaaNotice,
+      capitalGains0PctRoom,
+      niitHeadroom,
       earlyWithdrawalWarnings,
       earlyPenaltyDetails,
       shortfall: shortfall > 0 ? shortfall : undefined,

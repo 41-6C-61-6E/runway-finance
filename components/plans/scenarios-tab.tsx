@@ -29,20 +29,35 @@ import {
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { SocialSecurityTab } from '@/components/plans/social-security-tab';
+import { RothConversionTab } from '@/components/plans/roth-conversion-tab';
+import { IrmaaTab } from '@/components/plans/irmaa-tab';
+
+import { ProjectionOptionsPopover } from './projection-options-popover';
 
 interface ScenariosTabProps {
   plan: any;
   allPlans?: any[];
   onUpdatePlan?: (updates: any) => void;
+  dollarMode?: 'real' | 'nominal';
+  onToggleDollarMode?: (mode: 'real' | 'nominal') => void;
+  viewMode?: 'deterministic' | 'monte_carlo';
+  onToggleViewMode?: (mode: 'deterministic' | 'monte_carlo') => void;
 }
 
-export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
-  const [activeSection, setActiveSection] = useState<'strategies' | 'tactics'>('strategies');
+export function ScenariosTab({
+  plan,
+  onUpdatePlan,
+  dollarMode = 'real',
+  onToggleDollarMode = () => {},
+  viewMode = 'deterministic',
+  onToggleViewMode = () => {},
+}: ScenariosTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'withdraw' | 'social-security' | 'roth-conversion' | 'irmaa'>('withdraw');
   const [expandedStrategyId, setExpandedStrategyId] = useState<string | null>(null);
 
   // Collapsible card states
   const [isStrategiesCollapsed, setIsStrategiesCollapsed] = useCardCollapsed('scenarios_strategies');
-  const [isTacticsCollapsed, setIsTacticsCollapsed] = useCardCollapsed('scenarios_tactics');
 
   // Applied Toast Feedback
   const [appliedMsg, setAppliedMsg] = useState<string>('');
@@ -157,19 +172,36 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
     const baseline = primaryEnginePlan;
 
     // 1. Textbook / Taxable First
-    const stratTextbook = { ...baseline, withdrawalMethod: 'textbook' as const };
+    const stratTextbook = {
+      ...baseline,
+      withdrawalMethod: 'textbook' as const,
+      settings: { ...baseline.settings, withdrawalMethod: 'textbook' as const, enableRothConversions: false },
+    };
     // 2. Proportional / Pro-Rata
-    const stratProportional = { ...baseline, withdrawalMethod: 'proportional' as const };
+    const stratProportional = {
+      ...baseline,
+      withdrawalMethod: 'proportional' as const,
+      settings: { ...baseline.settings, withdrawalMethod: 'proportional' as const, enableRothConversions: false },
+    };
     // 3. Tax-Deferred First / Waterfall
-    const stratTaxDeferred = { ...baseline, withdrawalMethod: 'tax_deferred_first' as const };
+    const stratTaxDeferred = {
+      ...baseline,
+      withdrawalMethod: 'tax_deferred_first' as const,
+      settings: { ...baseline.settings, withdrawalMethod: 'tax_deferred_first' as const, enableRothConversions: false },
+    };
     // 4. Tax-Optimized Bracket Filling
-    const stratTaxOptimized = { ...baseline, withdrawalMethod: 'tax_optimized' as const };
+    const stratTaxOptimized = {
+      ...baseline,
+      withdrawalMethod: 'tax_optimized' as const,
+      settings: { ...baseline.settings, withdrawalMethod: 'tax_optimized' as const, enableRothConversions: false },
+    };
     // 5. Roth Conversion Ladder Strategy
     const stratRothLadder = {
       ...baseline,
       withdrawalMethod: 'textbook' as const,
       settings: {
         ...baseline.settings,
+        withdrawalMethod: 'textbook' as const,
         enableRothConversions: true,
         rothConversionTargetCeiling: 'top_of_12' as const,
         avoidIrmaaCliffs: true,
@@ -186,7 +218,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
       const lastYr = sim.yearlyResults[sim.yearlyResults.length - 1];
       const endNW = lastYr?.netWorth || 0;
       const totalTaxes = sim.yearlyResults.reduce((sum: number, y: any) => sum + (y.taxesPaid || 0), 0);
-      const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdAmount || 0));
+      const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdMandatoryDrawdown || y.rmdAmount || 0));
       const ranOutOfMoney = sim.yearlyResults.some((y: any) => y.netWorth <= 0);
       return { endNW, totalTaxes, maxRmd, ranOutOfMoney, yearlyResults: sim.yearlyResults };
     };
@@ -285,7 +317,7 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
     const rothRes = strategiesList.find((s) => s.id === 'roth_ladder')?.summary.yearlyResults || [];
 
     return textRes.map((y: any, idx: number) => ({
-      age: y.age,
+      age: y.primaryAge ?? y.age,
       textbook: Math.round(y.netWorth),
       proportional: Math.round(propRes[idx]?.netWorth || 0),
       tax_deferred_first: Math.round(defRes[idx]?.netWorth || 0),
@@ -294,59 +326,12 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
     }));
   }, [strategiesList]);
 
-  // ── SECTION 2: TACTICS MATRIX ENGINE ──
-  const ssMatrix = useMemo(() => {
-    const plan62 = { ...primaryEnginePlan, primarySsStartAge: 62 };
-    const plan67 = { ...primaryEnginePlan, primarySsStartAge: 67 };
-    const plan70 = { ...primaryEnginePlan, primarySsStartAge: 70 };
-
-    const sim62 = runRetirementSimulation(plan62);
-    const sim67 = runRetirementSimulation(plan67);
-    const sim70 = runRetirementSimulation(plan70);
-
-    const getSsSummary = (sim: any, startAge: number) => {
-      const endNW = sim.yearlyResults[sim.yearlyResults.length - 1]?.netWorth || 0;
-      const annualBenefit = (primaryEnginePlan.primarySsMonthlyAmount || 2500) * 12 * (startAge === 62 ? 0.70 : startAge === 70 ? 1.24 : 1.0);
-      const lifetimeBenefit = sim.yearlyResults.reduce((sum: number, y: any) => sum + (y.ssIncome || 0), 0);
-      return { endNW, annualBenefit, lifetimeBenefit };
-    };
-
-    return {
-      age62: getSsSummary(sim62, 62),
-      age67: getSsSummary(sim67, 67),
-      age70: getSsSummary(sim70, 70),
-    };
-  }, [primaryEnginePlan]);
-
-  const rothMatrix = useMemo(() => {
-    const noRothPlan = {
-      ...primaryEnginePlan,
-      settings: { ...primaryEnginePlan.settings, enableRothConversions: false },
-    };
-    const top12Plan = {
-      ...primaryEnginePlan,
-      settings: {
-        ...primaryEnginePlan.settings,
-        enableRothConversions: true,
-        rothConversionTargetCeiling: 'top_of_12' as const,
-        avoidIrmaaCliffs: true,
-      },
-    };
-
-    const simNoRoth = runRetirementSimulation(noRothPlan);
-    const simTop12 = runRetirementSimulation(top12Plan);
-
-    return {
-      noRoth: {
-        endNW: simNoRoth.yearlyResults[simNoRoth.yearlyResults.length - 1]?.netWorth || 0,
-        maxRmd: Math.max(...simNoRoth.yearlyResults.map((y: any) => y.rmdAmount || 0)),
-      },
-      top12: {
-        endNW: simTop12.yearlyResults[simTop12.yearlyResults.length - 1]?.netWorth || 0,
-        maxRmd: Math.max(...simTop12.yearlyResults.map((y: any) => y.rmdAmount || 0)),
-      },
-    };
-  }, [primaryEnginePlan]);
+  const subTabs = [
+    { id: 'withdraw' as const, label: 'Withdraw Strategy', icon: Layers },
+    { id: 'social-security' as const, label: 'Social Security', icon: HeartHandshake },
+    { id: 'roth-conversion' as const, label: 'Roth Conversions', icon: Flame },
+    { id: 'irmaa' as const, label: 'IRMAA Surcharges', icon: ShieldCheck },
+  ];
 
   const handleApplyStrategy = (strat: any) => {
     if (!onUpdatePlan) return;
@@ -354,6 +339,8 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
       onUpdatePlan({
         withdrawalMethod: strat.method,
         settings: {
+          ...plan?.settings,
+          withdrawalMethod: strat.method,
           enableRothConversions: true,
           rothConversionTargetCeiling: 'top_of_12',
           avoidIrmaaCliffs: true,
@@ -363,19 +350,14 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
       onUpdatePlan({
         withdrawalMethod: strat.method,
         settings: {
+          ...plan?.settings,
+          withdrawalMethod: strat.method,
           enableRothConversions: false,
         },
       });
     }
 
     setAppliedMsg(`Applied ${strat.name} strategy to active plan!`);
-    setTimeout(() => setAppliedMsg(''), 4000);
-  };
-
-  const handleApplySsAge = (age: number) => {
-    if (!onUpdatePlan) return;
-    onUpdatePlan({ primarySsStartAge: age });
-    setAppliedMsg(`Set Primary Social Security claiming age to ${age}!`);
     setTimeout(() => setAppliedMsg(''), 4000);
   };
 
@@ -391,36 +373,32 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         </div>
       )}
 
-      {/* Scenarios Section Header Navigation */}
+      {/* Scenarios Sub-Tab Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-card border border-border rounded-2xl p-3 shadow-sm">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <button
-            onClick={() => setActiveSection('strategies')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeSection === 'strategies'
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Withdrawal Strategy Lab
-          </button>
-          <button
-            onClick={() => setActiveSection('tactics')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeSection === 'tactics'
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            Retirement Tactics Matrix
-          </button>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {subTabs.map((subTab) => {
+            const Icon = subTab.icon;
+            const isActive = activeSubTab === subTab.id;
+            return (
+              <button
+                key={subTab.id}
+                onClick={() => setActiveSubTab(subTab.id)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {subTab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* SECTION 1: WITHDRAWAL STRATEGY COMPARISON LAB */}
-      {activeSection === 'strategies' && (
+      {/* SUB-TAB 1: WITHDRAW STRATEGY */}
+      {activeSubTab === 'withdraw' && (
         <div className="space-y-6">
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <CollapsibleCardHeader
@@ -429,6 +407,14 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
               icon={Layers}
               isCollapsed={isStrategiesCollapsed}
               onToggle={() => setIsStrategiesCollapsed(!isStrategiesCollapsed)}
+              actions={
+                <ProjectionOptionsPopover
+                  dollarMode={dollarMode}
+                  onToggleDollarMode={onToggleDollarMode}
+                  viewMode={viewMode}
+                  onToggleViewMode={onToggleViewMode}
+                />
+              }
             />
 
             {!isStrategiesCollapsed && (
@@ -451,9 +437,13 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
                           tickLine={false}
                         />
                         <Tooltip
-                          formatter={(value: any) => [formatCurrency(Number(value)), 'Net Worth']}
-                          labelFormatter={(label) => `Age ${label}`}
-                          contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                          content={
+                            <ScenarioStrategyTooltip
+                              activeMethod={plan?.withdrawalMethod}
+                              activeRoth={Boolean(plan?.settings?.enableRothConversions)}
+                            />
+                          }
+                          wrapperStyle={{ zIndex: 100, opacity: 1 }}
                         />
                         <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                         {strategiesList.map((strat) => (
@@ -635,10 +625,10 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
                                         </thead>
                                         <tbody className="divide-y divide-border/40">
                                           {strat.summary.yearlyResults
-                                            .filter((y: any) => y.age >= (primaryEnginePlan.retirementAge || 60))
+                                            .filter((y: any) => (y.primaryAge ?? y.age) >= (primaryEnginePlan.retirementAge || 60))
                                             .map((y: any) => (
                                               <tr key={y.year} className="hover:bg-muted/40 font-mono">
-                                                <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.age}</td>
+                                                <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.primaryAge ?? y.age}</td>
                                                 <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.cash || 0)}</td>
                                                 <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.taxable || 0)}</td>
                                                 <td className="px-3 py-1.5 text-right text-amber-500 font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
@@ -666,131 +656,94 @@ export function ScenariosTab({ plan, onUpdatePlan }: ScenariosTabProps) {
         </div>
       )}
 
-      {/* SECTION 2: RETIREMENT TACTICS & TAX MATRIX */}
-      {activeSection === 'tactics' && (
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-            <CollapsibleCardHeader
-              title="Retirement Tactics & Tax Optimization Matrix"
-              description="Calculate outcomes for Social Security timing, Roth conversion ceilings, and IRMAA cliffs"
-              icon={Zap}
-              isCollapsed={isTacticsCollapsed}
-              onToggle={() => setIsTacticsCollapsed(!isTacticsCollapsed)}
-            />
-
-            {!isTacticsCollapsed && (
-              <div className="p-5 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* TACTIC 1: Social Security Claiming Strategy */}
-                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <HeartHandshake className="w-4 h-4 text-emerald-500" />
-                        Social Security Claiming Strategy
-                      </h4>
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                        Current: Age {primaryEnginePlan.primarySsStartAge}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground">
-                      Compare lifetime benefits and portfolio preservation across claiming ages 62, 67, and 70.
-                    </p>
-
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      {/* Age 62 */}
-                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 62 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
-                        <span className="text-[10px] font-bold text-muted-foreground block">Age 62 (Early)</span>
-                        <span className="text-xs font-bold font-mono text-foreground block mt-1">{formatCurrency(ssMatrix.age62.annualBenefit)}/yr</span>
-                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age62.lifetimeBenefit)}</span>
-                        {onUpdatePlan && (
-                          <button
-                            onClick={() => handleApplySsAge(62)}
-                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                          >
-                            Set Age 62
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Age 67 */}
-                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 67 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
-                        <span className="text-[10px] font-bold text-muted-foreground block">Age 67 (FRA)</span>
-                        <span className="text-xs font-bold font-mono text-foreground block mt-1">{formatCurrency(ssMatrix.age67.annualBenefit)}/yr</span>
-                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age67.lifetimeBenefit)}</span>
-                        {onUpdatePlan && (
-                          <button
-                            onClick={() => handleApplySsAge(67)}
-                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                          >
-                            Set Age 67
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Age 70 */}
-                      <div className={`p-3 rounded-xl border transition-all ${primaryEnginePlan.primarySsStartAge === 70 ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}>
-                        <span className="text-[10px] font-bold text-muted-foreground block">Age 70 (Delayed)</span>
-                        <span className="text-xs font-bold font-mono text-emerald-500 block mt-1">{formatCurrency(ssMatrix.age70.annualBenefit)}/yr</span>
-                        <span className="text-[10px] font-mono text-muted-foreground block mt-0.5">Total: {formatCurrency(ssMatrix.age70.lifetimeBenefit)}</span>
-                        {onUpdatePlan && (
-                          <button
-                            onClick={() => handleApplySsAge(70)}
-                            className="mt-2 text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                          >
-                            Set Age 70
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* TACTIC 2: Roth Conversions & IRMAA Protection */}
-                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <Flame className="w-4 h-4 text-rose-500" />
-                        Roth Conversion & IRMAA Strategy
-                      </h4>
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">
-                        IRMAA Safe
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground">
-                      Proactively convert traditional IRA/401(k) funds to tax-free Roth during early retirement to eliminate future RMD tax spikes.
-                    </p>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border">
-                        <div>
-                          <span className="font-bold text-foreground block">No Conversions</span>
-                          <span className="text-[10px] text-muted-foreground">Standard RMD trajectory</span>
-                        </div>
-                        <div className="text-right font-mono">
-                          <span className="font-bold text-foreground block">{formatCurrency(rothMatrix.noRoth.endNW)}</span>
-                          <span className="text-[10px] text-muted-foreground">Max RMD: {formatCurrency(rothMatrix.noRoth.maxRmd)}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                        <div>
-                          <span className="font-bold text-emerald-500 block">Top of 12% Bracket + IRMAA Safe</span>
-                          <span className="text-[10px] text-muted-foreground">Optimal tax-bracket filling</span>
-                        </div>
-                        <div className="text-right font-mono">
-                          <span className="font-bold text-emerald-500 block">{formatCurrency(rothMatrix.top12.endNW)}</span>
-                          <span className="text-[10px] text-muted-foreground">Max RMD: {formatCurrency(rothMatrix.top12.maxRmd)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* SUB-TAB 2: SOCIAL SECURITY */}
+      {activeSubTab === 'social-security' && (
+        <SocialSecurityTab
+          plan={plan}
+          onUpdatePlan={onUpdatePlan}
+          dollarMode={dollarMode}
+          onToggleDollarMode={onToggleDollarMode}
+          viewMode={viewMode}
+          onToggleViewMode={onToggleViewMode}
+        />
       )}
+
+      {/* SUB-TAB 3: ROTH CONVERSIONS */}
+      {activeSubTab === 'roth-conversion' && (
+        <RothConversionTab
+          plan={plan}
+          onUpdatePlan={onUpdatePlan}
+          dollarMode={dollarMode}
+          onToggleDollarMode={onToggleDollarMode}
+          viewMode={viewMode}
+          onToggleViewMode={onToggleViewMode}
+        />
+      )}
+
+      {/* SUB-TAB 4: IRMAA SURCHARGES */}
+      {activeSubTab === 'irmaa' && (
+        <IrmaaTab
+          plan={plan}
+          onUpdatePlan={onUpdatePlan}
+          dollarMode={dollarMode}
+          onToggleDollarMode={onToggleDollarMode}
+          viewMode={viewMode}
+          onToggleViewMode={onToggleViewMode}
+        />
+      )}
+    </div>
+  );
+}
+
+function ScenarioStrategyTooltip({ active, payload, activeMethod, activeRoth }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const age = data.age;
+
+  return (
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+      <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
+        <span className="text-foreground font-mono">Age {age}</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary font-sans">
+          Strategy Comparison
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-mono">
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans pb-0.5 border-b border-border/50">
+          Projected Net Worth
+        </div>
+        <div className="space-y-1 text-[11px] font-sans">
+          {payload.map((entry: any) => {
+            const isCurrentActive =
+              (entry.dataKey === 'roth_ladder' && activeRoth) ||
+              (entry.dataKey !== 'roth_ladder' && !activeRoth && entry.dataKey === activeMethod) ||
+              (entry.dataKey === 'textbook' && activeMethod === 'textbook' && !activeRoth);
+
+            return (
+              <div
+                key={entry.dataKey}
+                className={`flex justify-between items-center py-0.5 rounded px-1 -mx-1 ${
+                  isCurrentActive ? 'bg-primary/10 font-medium' : ''
+                }`}
+              >
+                <span className="flex items-center gap-1.5 truncate max-w-[170px]" style={{ color: entry.color }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  <span className="truncate">{entry.name}</span>
+                  {isCurrentActive && (
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-primary text-primary-foreground font-sans font-bold uppercase shrink-0">
+                      Active
+                    </span>
+                  )}
+                </span>
+                <span className="font-bold text-foreground font-mono shrink-0">
+                  {formatCurrency(Number(entry.value))}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

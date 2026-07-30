@@ -27,12 +27,25 @@ import {
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
+import { ProjectionOptionsPopover } from './projection-options-popover';
+
 interface IrmaaTabProps {
   plan: any;
   onUpdatePlan?: (updates: any) => void;
+  dollarMode?: 'real' | 'nominal';
+  onToggleDollarMode?: (mode: 'real' | 'nominal') => void;
+  viewMode?: 'deterministic' | 'monte_carlo';
+  onToggleViewMode?: (mode: 'deterministic' | 'monte_carlo') => void;
 }
 
-export function IrmaaTab({ plan, onUpdatePlan }: IrmaaTabProps) {
+export function IrmaaTab({
+  plan,
+  onUpdatePlan,
+  dollarMode = 'real',
+  onToggleDollarMode = () => {},
+  viewMode = 'deterministic',
+  onToggleViewMode = () => {},
+}: IrmaaTabProps) {
   const [avoidIrmaa, setAvoidIrmaa] = useState<boolean>(plan?.settings?.avoidIrmaaCliffs !== false);
   const [customTestMagi, setCustomTestMagi] = useState<number>(120000);
 
@@ -84,6 +97,7 @@ export function IrmaaTab({ plan, onUpdatePlan }: IrmaaTabProps) {
         dividendYield: parseFloat(a.dividendYield) || 2.5,
         reinvestDividends: a.reinvestDividends ?? true,
         qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
+        rothPercentage: a.rothPercentage,
       })),
       liabilities: [],
       events: (plan?.events || []).map((e: any) => ({
@@ -309,6 +323,14 @@ export function IrmaaTab({ plan, onUpdatePlan }: IrmaaTabProps) {
           icon={TrendingUp}
           isCollapsed={isTimelineCollapsed}
           onToggle={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
+          actions={
+            <ProjectionOptionsPopover
+              dollarMode={dollarMode}
+              onToggleDollarMode={onToggleDollarMode}
+              viewMode={viewMode}
+              onToggleViewMode={onToggleViewMode}
+            />
+          }
         />
 
         {!isTimelineCollapsed && (
@@ -324,11 +346,7 @@ export function IrmaaTab({ plan, onUpdatePlan }: IrmaaTabProps) {
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tickLine={false}
                   />
-                  <Tooltip
-                    formatter={(value: any) => [formatCurrency(Number(value)), 'Amount']}
-                    labelFormatter={(label) => `Age ${label}`}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
-                  />
+                  <Tooltip content={<IrmaaTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Line type="monotone" dataKey="magi" name="Projected MAGI" stroke="#3b82f6" strokeWidth={3} dot={false} />
                   <Line type="monotone" dataKey="tier1Cliff" name="IRMAA Tier 1 Cliff" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
@@ -388,6 +406,74 @@ export function IrmaaTab({ plan, onUpdatePlan }: IrmaaTabProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function IrmaaTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const age = data.age;
+  const magi = Number(data.magi || 0);
+  const tier1 = Number(data.tier1Cliff || 0);
+  const tier2 = Number(data.tier2Cliff || 0);
+
+  const breachesTier1 = magi > tier1 && tier1 > 0;
+  const breachesTier2 = magi > tier2 && tier2 > 0;
+
+  return (
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+      <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
+        <span className="text-foreground font-mono">Age {age}</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
+          breachesTier2
+            ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+            : breachesTier1
+            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        }`}>
+          {breachesTier2 ? '⚠️ Tier 2 Cliff' : breachesTier1 ? '⚠️ Tier 1 Cliff' : '✅ Standard Premium'}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-mono">
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans pb-0.5 border-b border-border/50">
+          MAGI & IRMAA Thresholds
+        </div>
+        <div className="space-y-1 text-[11px] font-sans">
+          {payload.map((entry: any) => {
+            const isMagi = entry.dataKey === 'magi';
+            return (
+              <div
+                key={entry.dataKey}
+                className={`flex justify-between items-center py-0.5 rounded px-1 -mx-1 ${
+                  isMagi ? 'bg-blue-500/10 font-medium' : ''
+                }`}
+              >
+                <span className="flex items-center gap-1.5 truncate max-w-[180px]" style={{ color: entry.color }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  <span className="truncate">{entry.name}</span>
+                </span>
+                <span className="font-bold text-foreground font-mono shrink-0">
+                  {formatCurrency(Number(entry.value))}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {(breachesTier1 || breachesTier2) && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 space-y-0.5 font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-amber-500 text-[11px]">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>IRMAA Surcharge Warning</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Projected MAGI exceeds Medicare Part B & Part D premium surcharge threshold.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
