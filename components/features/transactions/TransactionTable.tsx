@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { getAccountGroupKey } from "@/lib/constants/account-types";
 import { toast } from "sonner";
 import {
   ChevronUp,
@@ -57,6 +58,7 @@ type Transaction = {
   categoryName: string | null;
   categoryColor: string | null;
   accountName: string | null;
+  accountType?: string | null;
   reviewed: boolean | null;
   categorizedByAi: boolean;
   source?: string;
@@ -1041,8 +1043,18 @@ export default function TransactionTable({
         ),
         cell: ({ row }) => {
           const tx = row.original;
+          const groupKey = getAccountGroupKey(tx.accountType);
+          const groupBadgeStyles: Record<string, string> = {
+            BANKING: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            INVESTMENTS: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+            CREDIT: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+            ASSETS: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+          };
           return (
             <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+              <span className={`text-[9px] font-bold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
+                {groupKey}
+              </span>
               <span className="text-sm text-muted-foreground truncate block">
                 {tx.accountName || "—"}
               </span>

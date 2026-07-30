@@ -112,3 +112,26 @@ export function getTypesByGroup(): { group: string; types: { value: string; labe
 
   return ordered;
 }
+
+export const ACCOUNT_GROUP_MAP: Record<string, string[]> = {
+  BANKING: ['checking', 'savings', 'cash', 'other', 'hsachecking'],
+  INVESTMENTS: ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529', 'hsa', 'health'],
+  CREDIT: ['credit', 'loan', 'mortgage', 'studentloan', 'autoloan', 'otherloan', 'otherLiability'],
+  ASSETS: ['vehicle', 'crypto', 'metals', 'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'single-family', 'condo', 'townhouse', 'multi-family', 'otherAsset', 'otherasset'],
+};
+
+export function getAccountGroupTypes(groupKey: string): string[] {
+  const normalized = groupKey.toUpperCase();
+  return ACCOUNT_GROUP_MAP[normalized] || [];
+}
+
+export function getAccountGroupKey(type?: string | null): 'BANKING' | 'INVESTMENTS' | 'CREDIT' | 'ASSETS' {
+  if (!type) return 'BANKING';
+  const t = type.toLowerCase();
+  if (ACCOUNT_GROUP_MAP.BANKING.includes(t)) return 'BANKING';
+  if (ACCOUNT_GROUP_MAP.INVESTMENTS.map(x => x.toLowerCase()).includes(t)) return 'INVESTMENTS';
+  if (ACCOUNT_GROUP_MAP.CREDIT.map(x => x.toLowerCase()).includes(t)) return 'CREDIT';
+  if (ACCOUNT_GROUP_MAP.ASSETS.map(x => x.toLowerCase()).includes(t)) return 'ASSETS';
+  return 'BANKING';
+}
+

@@ -20,6 +20,15 @@ vi.mock('@/lib/crypto', () => ({
   encryptField: vi.fn(async (val) => val),
 }));
 
+vi.mock('@/lib/services/wealth-flow', () => ({
+  calculateWealthFlow: vi.fn(async () => {
+    if (mockSnapshotsResponse.length < 2) return { summary: { netWorthChange: 0 } };
+    const cur = parseFloat(mockSnapshotsResponse[0].netWorth);
+    const prev = parseFloat(mockSnapshotsResponse[1].netWorth);
+    return { summary: { netWorthChange: cur - prev } };
+  }),
+}));
+
 function getTableName(table: any): string | null {
   if (!table) return null;
   if (table.key && typeof table.key.name === 'string') return table.key.name;
