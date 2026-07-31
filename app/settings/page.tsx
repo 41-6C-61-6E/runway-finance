@@ -119,7 +119,7 @@ const SETTINGS_TABS = [
   { id: 'tags' as const, label: 'Tags', description: 'Labels for transactional tagging and filtering', icon: Tag },
   { id: 'analytics' as const, label: 'Analytics', description: 'Chart color schemes and forecasting bounds', icon: BarChart3 },
   { id: 'ai' as const, label: 'AI Suggestions', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
-  { id: 'import' as const, label: 'Import / Export', description: 'Import bank statement files (CSV/OFX) and custom export financial data', icon: UploadCloud },
+  { id: 'import' as const, label: 'Import / Export', description: 'Import bank statements, export financial data, and manage full backups', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
   { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
   { id: 'notifications' as const, label: 'Notifications', description: 'Configure push notifications and alert preferences', icon: Bell },
