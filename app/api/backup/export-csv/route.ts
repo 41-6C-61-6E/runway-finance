@@ -24,6 +24,7 @@ import {
   paystubs,
 } from '@/lib/db/schema';
 import { ZipArchive } from 'archiver';
+import { toCsv } from '@/lib/utils/export-formatter';
 
 const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: accounts, dbName: 'accounts', label: 'accounts' },
@@ -42,24 +43,7 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: aiProviders, dbName: 'ai_providers', label: 'ai_providers' },
 ];
 
-function toCsv(rows: Record<string, unknown>[]): string {
-  if (rows.length === 0) return '';
-  const headers = Object.keys(rows[0]);
-  const lines = [headers.join(',')];
-  for (const row of rows) {
-    const vals = headers.map((h) => {
-      const v = row[h];
-      if (v === null || v === undefined) return '';
-      const s = String(typeof v === 'object' ? JSON.stringify(v) : v);
-      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    });
-    lines.push(vals.join(','));
-  }
-  return lines.join('\n');
-}
+
 
 export async function GET() {
   const session = await auth();

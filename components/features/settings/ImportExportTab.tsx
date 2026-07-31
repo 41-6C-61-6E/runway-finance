@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { UploadCloud, DownloadCloud, FileText, Table, Check, Loader2, Calendar, Filter, Archive, Layers, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { UploadCloud, DownloadCloud, FileText, Table, Check, Loader2, Calendar, Filter, Archive, Layers, ShieldCheck, Upload, FileArchive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUserSettings } from '@/components/user-settings-provider';
 import ImportTab from './ImportTab';
 
 type SubTab = 'import' | 'export';
@@ -69,6 +72,15 @@ export default function ImportExportTab() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
 
+  // Backup & Restore state
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const [backupBusy, setBackupBusy] = useState<'export' | 'csv' | 'import' | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
+
+  const queryClient = useQueryClient();
+  const { refreshSettings } = useUserSettings() || {};
+
   // Load lookup data for filters when Export tab is selected
   const loadLookupData = useCallback(async () => {
     setLoadingLookups(true);
@@ -103,6 +115,12 @@ export default function ImportExportTab() {
       loadLookupData();
     }
   }, [subTab, loadLookupData]);
+
+  // Clear feedback messages when switching sub-tabs (#5)
+  useEffect(() => {
+    setExportError(null);
+    setExportSuccess(null);
+  }, [subTab]);
 
   // Download helper
   const triggerDownload = (blob: Blob, filename: string) => {
@@ -164,6 +182,7 @@ export default function ImportExportTab() {
       const dateStr = new Date().toISOString().split('T')[0];
       triggerDownload(blob, `transactions_export_${dateStr}.csv`);
       setExportSuccess('Transactions CSV downloaded successfully!');
+      setTimeout(() => setExportSuccess(null), 5000);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -189,6 +208,7 @@ export default function ImportExportTab() {
       const dateStr = new Date().toISOString().split('T')[0];
       triggerDownload(blob, `${snapType}_snapshots_${dateStr}.csv`);
       setExportSuccess(`${snapType.replace('_', ' ')} snapshots exported successfully!`);
+      setTimeout(() => setExportSuccess(null), 5000);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -211,6 +231,7 @@ export default function ImportExportTab() {
       const ext = planFormat === 'csv' ? 'csv' : 'txt';
       triggerDownload(blob, `fire_plan_export_${dateStr}.${ext}`);
       setExportSuccess(`FIRE plan exported as .${ext} successfully!`);
+      setTimeout(() => setExportSuccess(null), 5000);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -246,6 +267,7 @@ export default function ImportExportTab() {
       const dateStr = new Date().toISOString().split('T')[0];
       triggerDownload(blob, `custom_finance_export_${dateStr}.zip`);
       setExportSuccess('Custom dataset ZIP archive downloaded successfully!');
+      setTimeout(() => setExportSuccess(null), 5000);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -258,6 +280,97 @@ export default function ImportExportTab() {
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
     );
   };
+
+  const allDatasetIds = ['transactions', 'accounts', 'categories', 'snapshots', 'budgets', 'fire_plans', 'paystubs'];
+  const toggleAllDatasets = () => {
+    setSelectedDatasets((prev) => prev.length === allDatasetIds.length ? [] : [...allDatasetIds]);
+  };
+
+  // Backup handlers
+  const handleBackupExport = useCallback(async () => {
+    setBackupBusy('export');
+    setExportError(null);
+    setExportSuccess(null);
+    try {
+      const res = await fetch('/api/backup/export', { credentials: 'include' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      triggerDownload(blob, `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`);
+      setExportSuccess('Full backup downloaded successfully.');
+      setTimeout(() => setExportSuccess(null), 5000);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setBackupBusy(null);
+    }
+  }, []);
+
+  const handleBackupExportCsv = useCallback(async () => {
+    setBackupBusy('csv');
+    setExportError(null);
+    setExportSuccess(null);
+    try {
+      const res = await fetch('/api/backup/export-csv', { credentials: 'include' });
+      if (!res.ok) throw new Error('CSV export failed');
+      const blob = await res.blob();
+      triggerDownload(blob, `personal-finance-export-${new Date().toISOString().split('T')[0]}.zip`);
+      setExportSuccess('Full CSV archive downloaded successfully.');
+      setTimeout(() => setExportSuccess(null), 5000);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'CSV export failed');
+    } finally {
+      setBackupBusy(null);
+    }
+  }, []);
+
+  const handleBackupFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024 * 1024) {
+      setExportError('Backup file too large. Maximum size is 100MB.');
+      return;
+    }
+    setRestoreFile(file);
+    setConfirmRestoreOpen(true);
+    if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+  }, []);
+
+  const handleConfirmRestore = useCallback(async () => {
+    if (!restoreFile) return;
+    setConfirmRestoreOpen(false);
+    setBackupBusy('import');
+    setExportError(null);
+    setExportSuccess(null);
+    try {
+      const text = await restoreFile.text();
+      const res = await fetch('/api/backup/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: text,
+      });
+      let data: any = null;
+      try {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await res.json();
+        }
+      } catch {
+        // Ignore JSON parse errors from non-JSON error pages
+      }
+      if (!res.ok) throw new Error((data && (data.message || data.error)) || `Restore failed with status ${res.status}`);
+      setExportSuccess((data && data.message) || 'Backup restored successfully. Refreshing data...');
+      setTimeout(() => setExportSuccess(null), 8000);
+      // Invalidate all cached queries so the UI refreshes (#3)
+      queryClient.invalidateQueries();
+      refreshSettings?.();
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Restore failed');
+    } finally {
+      setBackupBusy(null);
+      setRestoreFile(null);
+    }
+  }, [restoreFile, queryClient, refreshSettings]);
 
   return (
     <div className="space-y-6">
@@ -321,6 +434,66 @@ export default function ImportExportTab() {
               {exportSuccess}
             </div>
           )}
+
+          {/* Full Backup & Restore Section */}
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Full Backup & Restore</h3>
+                <p className="text-xs text-muted-foreground">Download a complete backup of all your data and settings, or restore from a previous backup.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={handleBackupExport}
+                disabled={backupBusy !== null}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
+                Download Backup (JSON)
+              </Button>
+
+              <Button
+                onClick={handleBackupExportCsv}
+                disabled={backupBusy !== null}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {backupBusy === 'csv' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+                Export All Data (CSV)
+              </Button>
+
+              <Button
+                onClick={() => backupFileInputRef.current?.click()}
+                disabled={backupBusy !== null}
+                variant="outline"
+                className="flex items-center gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+              >
+                {backupBusy === 'import' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Restore from Backup
+              </Button>
+
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleBackupFileSelect}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          {/* Filtered Exports Section Header */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtered Exports</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* CARD 1: TRANSACTIONS EXPORT (CSV) */}
@@ -419,6 +592,7 @@ export default function ImportExportTab() {
               <Button
                 onClick={handleExportTransactions}
                 disabled={exportingTx}
+                variant="outline"
                 className="w-full flex items-center justify-center gap-2 mt-4"
               >
                 {exportingTx ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
@@ -474,7 +648,7 @@ export default function ImportExportTab() {
                     </div>
                   </div>
 
-                  {snapType === 'account' && (
+                  {(snapType === 'account' || snapType === 'holding') && (
                     <div className="pt-1">
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Account Filter</label>
                       <select
@@ -598,7 +772,16 @@ export default function ImportExportTab() {
                 </div>
 
                 <div className="space-y-3 mt-4 text-sm">
-                  <label className="block text-xs font-medium text-muted-foreground">Select Datasets to Include</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-muted-foreground">Select Datasets to Include</label>
+                    <button
+                      type="button"
+                      onClick={toggleAllDatasets}
+                      className="text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {selectedDatasets.length === allDatasetIds.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2 bg-muted/40 p-2.5 rounded-lg border border-border/50 text-xs">
                     {[
@@ -651,8 +834,8 @@ export default function ImportExportTab() {
               <Button
                 onClick={handleExportCustom}
                 disabled={exportingCustom || selectedDatasets.length === 0}
-                variant="default"
-                className="w-full flex items-center justify-center gap-2 mt-4 bg-amber-600 hover:bg-amber-700 text-white"
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2 mt-4"
               >
                 {exportingCustom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
                 Download Custom Package (.zip)
@@ -661,6 +844,41 @@ export default function ImportExportTab() {
           </div>
         </div>
       )}
+
+      {/* Restore Confirmation Dialog (#2) */}
+      <AlertDialog open={confirmRestoreOpen} onOpenChange={(open) => { if (!open) { setConfirmRestoreOpen(false); setRestoreFile(null); } }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore from Backup?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will <strong className="text-foreground">permanently replace all your current data</strong> with the data from the backup file:
+                </p>
+                {restoreFile && (
+                  <div className="rounded-lg bg-muted/50 border border-border p-3 text-xs font-mono">
+                    {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+                <p className="text-destructive">
+                  This action cannot be undone. All existing transactions, accounts, categories, budgets, and other data will be deleted before restoration.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={handleConfirmRestore}
+              disabled={backupBusy === 'import'}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {backupBusy === 'import' ? 'Restoring...' : 'Yes, Replace All Data'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

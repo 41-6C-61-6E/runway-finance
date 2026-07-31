@@ -82,6 +82,7 @@ export default function ImportTab() {
   const [activeCategoryDropdown, setActiveCategoryDropdown] = useState<string | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: boolean; recordsImported: number; recordsSkipped: number; recordsErrored: number; status: string; warnings?: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,9 +125,11 @@ export default function ImportTab() {
   };
 
   // Step 2: Upload CSV
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processFile = async (file: File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      setError('File too large. Maximum file size is 50MB.');
+      return;
+    }
 
     setUploading(true);
     setError(null);
@@ -152,9 +155,9 @@ export default function ImportTab() {
 
       // Initialize column mapping with auto-detection
       const mapping: ColumnMapping = {};
-      const systemFields = importType === 'transactions' ? SYSTEM_FIELDS_TRANSACTIONS : SYSTEM_FIELDS_SNAPSHOTS;
+      const sysFields = importType === 'transactions' ? SYSTEM_FIELDS_TRANSACTIONS : SYSTEM_FIELDS_SNAPSHOTS;
 
-      for (const field of systemFields) {
+      for (const field of sysFields) {
         const match = data.headers.find(
           (h: string) => h.toLowerCase().replace(/[\s_-]/g, '') === field.key.toLowerCase().replace(/[\s_-]/g, '')
         );
@@ -169,6 +172,37 @@ export default function ImportTab() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setError('Only .csv files are supported.');
+      return;
+    }
+    processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
   };
 
   // Step 3: Column mapping
@@ -464,7 +498,7 @@ export default function ImportTab() {
           <h2 className="text-lg font-semibold text-foreground">Import Data</h2>
           {step > 1 && step < 7 && (
             <span className="text-xs text-muted-foreground shrink-0">
-              Step {step - 1} of {importType === 'transactions' ? 6 : 5}
+              Step {step - 1} of {importType === 'transactions' ? (uniqueCategoryNames.length > 0 ? 5 : 4) : 4}
             </span>
           )}
         </div>
@@ -530,10 +564,21 @@ export default function ImportTab() {
             <p className="text-sm text-muted-foreground">
               Upload a CSV file containing your {importType === 'transactions' ? 'transactions' : 'account snapshots'}.
             </p>
-            <label className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors bg-muted/20">
-              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Click to upload CSV</span>
-              <span className="text-xs text-muted-foreground mt-1">.csv files only</span>
+            <label
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                isDragging
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50 bg-muted/20'
+              }`}
+            >
+              <Upload className={`w-8 h-8 mb-2 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+              <span className={`text-sm ${isDragging ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                {isDragging ? 'Drop your CSV file here' : 'Click or drag & drop to upload CSV'}
+              </span>
+              <span className="text-xs text-muted-foreground mt-1">.csv files up to 50MB</span>
               <input
                 type="file"
                 accept=".csv"
