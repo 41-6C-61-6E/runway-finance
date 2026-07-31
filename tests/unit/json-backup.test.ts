@@ -100,6 +100,7 @@ describe('JSON Backup Export / Import API', () => {
       data: {
         import_log: [{ id: 'imp-1', fileName: 'test.csv', fileContent: 'mocked-csv-content' }],
         accounts: [{ id: 'acc-1', name: 'Chase Checking' }],
+        plan_settings: [{ planId: 'plan-1', fixedInflationRate: '3.0' }],
         transaction_tags: [{ transactionId: 'tx-1', tagId: 'tag-1' }],
       },
     };
@@ -114,6 +115,7 @@ describe('JSON Backup Export / Import API', () => {
 
     const body = await response.json();
     expect(body.success).toBe(true);
+    expect(mockDb.delete).toHaveBeenCalled();
     expect(mockDb.insert).toHaveBeenCalled();
   });
 });
