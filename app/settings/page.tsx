@@ -49,7 +49,7 @@ import ManualAccountsSection from '@/components/features/settings/ManualAccounts
 import AiTab from '@/components/features/settings/AiTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import NotificationsTab from '@/components/features/settings/NotificationsTab';
-import ImportTab from '@/components/features/settings/ImportTab';
+import ImportExportTab from '@/components/features/settings/ImportExportTab';
 import PayrollTab from '@/components/features/settings/PayrollTab';
 import TagsTab from '@/components/features/settings/TagsTab';
 import SharingTab from '@/components/features/settings/SharingTab';
@@ -119,7 +119,7 @@ const SETTINGS_TABS = [
   { id: 'tags' as const, label: 'Tags', description: 'Labels for transactional tagging and filtering', icon: Tag },
   { id: 'analytics' as const, label: 'Analytics', description: 'Chart color schemes and forecasting bounds', icon: BarChart3 },
   { id: 'ai' as const, label: 'AI Suggestions', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
-  { id: 'import' as const, label: 'Import', description: 'Manually upload statement files (CSV/OFX)', icon: UploadCloud },
+  { id: 'import' as const, label: 'Import / Export', description: 'Import bank statement files (CSV/OFX) and custom export financial data', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
   { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
   { id: 'notifications' as const, label: 'Notifications', description: 'Configure push notifications and alert preferences', icon: Bell },
@@ -2472,7 +2472,7 @@ function SettingsPageBody() {
       )}
 
       {activeTab === 'import' && (
-        <ImportTab />
+        <ImportExportTab />
       )}
 
       {activeTab === 'payroll' && (

@@ -640,6 +640,11 @@ export async function GET(request: Request) {
         filters.order === "asc"
           ? asc(accounts.displayOrder)
           : desc(accounts.displayOrder);
+    } else if (filters.sort === "accountType") {
+      orderByClause =
+        filters.order === "asc"
+          ? asc(accounts.type)
+          : desc(accounts.type);
     } else if (filters.sort === "category") {
       orderByClause =
         filters.order === "asc"
@@ -862,6 +867,10 @@ export async function GET(request: Request) {
       case "account":
         aVal = String(a.accountName ?? "").toLowerCase();
         bVal = String(b.accountName ?? "").toLowerCase();
+        break;
+      case "accountType":
+        aVal = String(a.accountType ?? "").toLowerCase();
+        bVal = String(b.accountType ?? "").toLowerCase();
         break;
       case "category":
         aVal = String(a.category?.name ?? "").toLowerCase();

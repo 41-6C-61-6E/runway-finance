@@ -53,6 +53,7 @@ export const TransactionFilterSchema = z.object({
       "amount",
       "description",
       "account",
+      "accountType",
       "category",
       "postedDate",
       "ai",
