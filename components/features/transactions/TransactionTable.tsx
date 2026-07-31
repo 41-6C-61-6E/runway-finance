@@ -115,6 +115,7 @@ const ALL_COLUMNS: string[] = [
   "description",
   "ai",
   "account",
+  "accountType",
   "category",
   "tags",
   "amount",
@@ -127,6 +128,7 @@ const COLUMN_LABELS: Record<string, string> = {
   description: "Description",
   ai: "AI",
   account: "Account",
+  accountType: "Account Type",
   category: "Category",
   tags: "Tags",
   amount: "Amount",
@@ -139,6 +141,7 @@ const COLUMN_MIN_WIDTHS: Record<string, number> = {
   description: 80,
   ai: 30,
   account: 60,
+  accountType: 60,
   category: 80,
   tags: 50,
   amount: 70,
@@ -267,6 +270,7 @@ export default function TransactionTable({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     select: true,
     account: true,
+    accountType: true,
     category: true,
     postedDate: false,
     ai: false,
@@ -307,6 +311,7 @@ export default function TransactionTable({
         ...prev,
         select: false,
         account: false,
+        accountType: false,
         tags: false,
       }));
     }
@@ -408,6 +413,7 @@ export default function TransactionTable({
       ai: 40,
       category: categoryWidth,
       amount: amountWidth,
+      accountType: 90,
     };
     if (isMobileSize) {
       const hasDesc = visibleCols.includes("description");
@@ -419,6 +425,7 @@ export default function TransactionTable({
         dateWidth +
         (visibleCols.includes("postedDate") ? 90 : 0) +
         (visibleCols.includes("ai") ? 40 : 0) +
+        (visibleCols.includes("accountType") ? 90 : 0) +
         categoryWidth +
         amountWidth;
       const availableForFlex = containerWidth - otherFixedTotal;
@@ -455,6 +462,7 @@ export default function TransactionTable({
       postedDate: 1,
       description: clientWidth < 1024 ? (clientWidth < 900 ? 1.2 : 1.6) : 2.5,
       account: clientWidth < 1024 ? (clientWidth < 900 ? 0.6 : 0.8) : 1.2,
+      accountType: 0.8,
       category: 1.5,
       tags: clientWidth < 1024 ? (clientWidth < 900 ? 0.5 : 0.8) : 1.0,
       amount: 1,
@@ -1043,18 +1051,8 @@ export default function TransactionTable({
         ),
         cell: ({ row }) => {
           const tx = row.original;
-          const groupKey = getAccountGroupKey(tx.accountType);
-          const groupBadgeStyles: Record<string, string> = {
-            BANKING: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-            INVESTMENTS: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-            CREDIT: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-            ASSETS: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-          };
           return (
             <div className="flex items-center gap-1.5 min-w-0 max-w-full">
-              <span className={`text-[9px] font-bold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
-                {groupKey}
-              </span>
               <span className="text-sm text-muted-foreground truncate block">
                 {tx.accountName || "—"}
               </span>
@@ -1070,6 +1068,33 @@ export default function TransactionTable({
                   ))}
                 </div>
               )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "accountType",
+        accessorKey: "accountType",
+        header: ({ column }) => (
+          <SortableHeader column={column} title="Account Type" />
+        ),
+        cell: ({ row }) => {
+          const tx = row.original;
+          const groupKey = getAccountGroupKey(tx.accountType);
+          const groupBadgeStyles: Record<string, string> = {
+            BANKING: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            INVESTMENTS: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+            CREDIT: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+            ASSETS: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+          };
+          if (!groupKey && !tx.accountType) {
+            return <span className="text-sm text-muted-foreground">—</span>;
+          }
+          return (
+            <div className="flex items-center min-w-0 max-w-full">
+              <span className={`text-[9px] font-bold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
+                {groupKey || tx.accountType}
+              </span>
             </div>
           );
         },
