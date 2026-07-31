@@ -214,6 +214,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
 };
 
 export async function encryptRow<T extends Record<string, any>>(table: string, row: T, key: Uint8Array): Promise<T> {
+  if (!row || typeof row !== 'object') return row;
   const fields = ENCRYPTED_FIELDS[table];
   if (!fields) return row;
   const result: any = { ...row };
@@ -236,6 +237,7 @@ export async function encryptRow<T extends Record<string, any>>(table: string, r
 }
 
 export async function decryptRow<T extends Record<string, any>>(table: string, row: T, key: Uint8Array): Promise<T> {
+  if (!row || typeof row !== 'object') return row;
   const fields = ENCRYPTED_FIELDS[table];
   if (!fields) return row;
   const result: any = { ...row };
