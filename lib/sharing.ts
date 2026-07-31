@@ -82,6 +82,28 @@ export async function resolveDataUserId(userId: string): Promise<string> {
 }
 
 /**
+ * Given a data user ID (the primary), return all user IDs in the share group
+ * (primary + active members). Returns [dataUserId] if no share group exists.
+ *
+ * This is useful for the notification service: alert rules are stored per-user,
+ * so we need to check rules from all group members during background evaluation.
+ */
+export async function getShareGroupUserIds(dataUserId: string): Promise<string[]> {
+  const db = getDb();
+  const members = await db
+    .select({ memberUserId: accountShareMembers.memberUserId })
+    .from(accountShareMembers)
+    .where(
+      and(
+        eq(accountShareMembers.primaryUserId, dataUserId),
+        eq(accountShareMembers.status, 'active')
+      )
+    );
+
+  return [dataUserId, ...members.map((m) => m.memberUserId)];
+}
+
+/**
  * Return the full share-group info for a given user (primary or member).
  * Returns null if the user is not in any share group.
  */
