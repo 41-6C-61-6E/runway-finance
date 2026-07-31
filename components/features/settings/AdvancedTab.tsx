@@ -308,7 +308,7 @@ export default function AdvancedTab() {
       } catch {
         // Ignore JSON parse errors from non-JSON error pages
       }
-      if (!res.ok) throw new Error((data && data.error) || `Import failed with status ${res.status}`);
+      if (!res.ok) throw new Error((data && (data.message || data.error)) || `Import failed with status ${res.status}`);
       setBackupSuccess((data && data.message) || 'Backup restored successfully.');
     } catch (err) {
       setBackupError(err instanceof Error ? err.message : 'Import failed');

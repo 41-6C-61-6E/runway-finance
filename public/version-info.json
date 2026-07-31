@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1785428921942",
+  "buildNumber": "26.07.1785514559110",
   "commits": [
+    "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
+    "feat: implement account grouping logic and unify transaction filtering by asset class",
+    "feat: add projection options popover and integrate simulation controls across planning tabs",
     "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
-    "feat: make projection controls collapsible and optimize tab navigation styling",
-    "feat: add Social Security utility for benefit calculations and restrict account scope to FIRE-eligible assets across UI components",
-    "refactor: remove outdated documentation specs and update retirement engine logic",
-    "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic"
+    "feat: make projection controls collapsible and optimize tab navigation styling"
   ]
 }

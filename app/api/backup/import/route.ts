@@ -160,18 +160,12 @@ export async function POST(request: Request) {
       // Delete existing data
       for (const { table, dbName } of DELETE_ORDER) {
         const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
-        const ids = await tx
-          .select({ id: table.id })
-          .from(table)
-          .where(eq(table.userId, targetUserId));
-        if (ids.length > 0) {
-          await tx.delete(table).where(eq(table.userId, targetUserId));
-        }
+        await tx.delete(table).where(eq(table.userId, targetUserId));
       }
 
       // Parse user_settings from backup
       const settingsRows = backup.data.user_settings as Record<string, unknown>[] | undefined;
-      if (settingsRows && settingsRows.length > 0) {
+      if (settingsRows && settingsRows.length > 0 && settingsRows[0] && typeof settingsRows[0] === 'object') {
         const rawSettings = { ...settingsRows[0] };
         delete rawSettings.id;
         delete rawSettings.userId;
@@ -188,7 +182,7 @@ export async function POST(request: Request) {
       // Insert data in dependency order
       for (const { table, dbName } of INSERT_ORDER) {
         let rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
-        if (!rows || rows.length === 0) continue;
+        if (!rows || !Array.isArray(rows) || rows.length === 0) continue;
 
         if (dbName === 'categories') {
           rows = sortCategories(rows);
@@ -217,7 +211,7 @@ export async function POST(request: Request) {
 
       for (const { table, dbName } of joinTables) {
         const rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
-        if (!rows || rows.length === 0) continue;
+        if (!rows || !Array.isArray(rows) || rows.length === 0) continue;
         
         for (let i = 0; i < rows.length; i += 50) {
           const batch = rows.slice(i, i + 50);
@@ -237,9 +231,10 @@ export async function POST(request: Request) {
 }
 
 function sortCategories(categories: Record<string, any>[]) {
+  if (!Array.isArray(categories)) return [];
   const sorted: Record<string, any>[] = [];
   const inserted = new Set<string>();
-  let remaining = [...categories];
+  let remaining = categories.filter((c) => c && typeof c === 'object');
 
   let progress = true;
   while (remaining.length > 0 && progress) {
@@ -313,6 +308,7 @@ const TIMESTAMP_KEYS = new Set([
 ]);
 
 function restoreTimestamps<T extends Record<string, any>>(row: T): T {
+  if (!row || typeof row !== 'object') return row;
   const result = { ...row } as Record<string, any>;
   for (const key of Object.keys(result)) {
     if (TIMESTAMP_KEYS.has(key) && typeof result[key] === 'string' && result[key] !== '') {
