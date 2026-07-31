@@ -36,6 +36,14 @@ import {
   accountTags,
   budgetTags,
   goalTags,
+
+  plans,
+  planAccounts,
+  planEvents,
+  planFlows,
+  planSettings,
+  planLiabilities,
+  retirementRules,
 } from '@/lib/db/schema';
 
 const USER_TABLES: { table: any; dbName: string }[] = [
@@ -64,6 +72,13 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: paystubLineItems, dbName: 'paystub_line_items' },
   { table: paystubFieldMappings, dbName: 'paystub_field_mappings' },
   { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings' },
+  { table: retirementRules, dbName: 'retirement_rules' },
+  { table: plans, dbName: 'plans' },
+  { table: planAccounts, dbName: 'plan_accounts' },
+  { table: planEvents, dbName: 'plan_events' },
+  { table: planFlows, dbName: 'plan_flows' },
+  { table: planSettings, dbName: 'plan_settings' },
+  { table: planLiabilities, dbName: 'plan_liabilities' },
 ];
 
 export async function GET() {

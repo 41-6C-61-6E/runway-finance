@@ -4,6 +4,7 @@ import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
 import { logger } from '@/lib/logger';
+import { getShareGroupUserIds } from '@/lib/sharing';
 import webpush from 'web-push';
 
 // Initialize web-push if VAPID keys are available in process.env
@@ -771,12 +772,14 @@ export async function checkTransactionAlerts(
 
     if (!acct || acct.isHidden || acct.isExcludedFromNetWorth) return;
 
+    // Query alert rules for all share group members (not just the data owner)
+    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          eq(customAlertRules.userId, userId),
+          inArray(customAlertRules.userId, groupUserIds),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'transaction')
         )
@@ -835,7 +838,7 @@ export async function checkTransactionAlerts(
           ? `/transactions?search=${encodedDesc}&startDate=${tx.date}&endDate=${tx.date}`
           : `/transactions?search=${encodedDesc}`;
         await sendPushNotification(
-          userId,
+          rule.userId,
           `Transaction Alert: ${rule.name}`,
           `New transaction of $${amountStr} at ${tx.description} matched your alert criteria.`,
           linkUrl,
@@ -857,12 +860,14 @@ export async function checkAccountBalanceAlerts(
 ) {
   try {
     const db = getDb();
+    // Query alert rules for all share group members (not just the data owner)
+    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          eq(customAlertRules.userId, userId),
+          inArray(customAlertRules.userId, groupUserIds),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'account_balance')
         )
@@ -1004,7 +1009,7 @@ export async function checkAccountBalanceAlerts(
 
       if (matched) {
         await sendPushNotification(
-          userId,
+          rule.userId,
           `Balance Alert: ${rule.name}`,
           `Account "${accName}" balance ($${currentBalance.toFixed(2)}) ${compareDescription}.`,
           '/accounts',
@@ -1016,7 +1021,7 @@ export async function checkAccountBalanceAlerts(
         try {
           await db.delete(sentNotifications).where(
             and(
-              eq(sentNotifications.userId, userId),
+              eq(sentNotifications.userId, rule.userId),
               eq(sentNotifications.key, crossingKey)
             )
           );
@@ -1040,12 +1045,14 @@ export async function checkSavingsGoalAlerts(
 ) {
   try {
     const db = getDb();
+    // Query alert rules for all share group members (not just the data owner)
+    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          eq(customAlertRules.userId, userId),
+          inArray(customAlertRules.userId, groupUserIds),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'savings_goal')
         )
@@ -1129,7 +1136,7 @@ export async function checkSavingsGoalAlerts(
         }
         const key = `custom_goal_alert:${rule.id}:${dedupSuffix}`;
         await sendPushNotification(
-          userId,
+          rule.userId,
           `Goal Alert: ${rule.name}`,
           `Savings Goal "${goalName}" has ${reason} (current: $${allocatedAmount.toFixed(2)}).`,
           '/goals',
@@ -1146,12 +1153,14 @@ export async function checkSavingsGoalAlerts(
 export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
   try {
     const db = getDb();
+    // Query alert rules for all share group members (not just the data owner)
+    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          eq(customAlertRules.userId, userId),
+          inArray(customAlertRules.userId, groupUserIds),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'cash_flow')
         )
@@ -1263,7 +1272,7 @@ export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
         const key = `custom_cash_flow_alert:${rule.id}:${mostRecentMonth}`;
 
         await sendPushNotification(
-          userId,
+          rule.userId,
           `Cash Flow Alert: ${rule.name}`,
           notificationBody,
           '/flows',

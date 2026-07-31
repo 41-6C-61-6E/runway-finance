@@ -37,6 +37,14 @@ import {
   accountTags,
   budgetTags,
   goalTags,
+
+  plans,
+  planAccounts,
+  planEvents,
+  planFlows,
+  planSettings,
+  planLiabilities,
+  retirementRules,
 } from '@/lib/db/schema';
 
 interface BackupPayload {
@@ -62,6 +70,14 @@ const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: budgets, dbName: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals' },
   { table: categoryRules, dbName: 'category_rules' },
+  // FIRE tables: delete sub-tables before parent (plans)
+  { table: planFlows, dbName: 'plan_flows' },
+  { table: planLiabilities, dbName: 'plan_liabilities' },
+  { table: planEvents, dbName: 'plan_events' },
+  { table: planAccounts, dbName: 'plan_accounts' },
+  { table: planSettings, dbName: 'plan_settings' },
+  { table: plans, dbName: 'plans' },
+  { table: retirementRules, dbName: 'retirement_rules' },
   { table: accounts, dbName: 'accounts' },
   { table: simplifinConnections, dbName: 'simplefin_connections' },
   { table: plaidConnections, dbName: 'plaid_connections' },
@@ -99,6 +115,14 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: accountSnapshots, dbName: 'account_snapshots' },
   { table: paystubLineItems, dbName: 'paystub_line_items' },
   { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings' },
+  // FIRE tables: insert parent (plans) before sub-tables
+  { table: retirementRules, dbName: 'retirement_rules' },
+  { table: plans, dbName: 'plans' },
+  { table: planAccounts, dbName: 'plan_accounts' },
+  { table: planEvents, dbName: 'plan_events' },
+  { table: planFlows, dbName: 'plan_flows' },
+  { table: planSettings, dbName: 'plan_settings' },
+  { table: planLiabilities, dbName: 'plan_liabilities' },
 ];
 
 export async function POST(request: Request) {
