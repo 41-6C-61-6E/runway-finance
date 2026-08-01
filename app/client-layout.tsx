@@ -6,6 +6,7 @@ import { SessionProvider } from 'next-auth/react';
 import { ReactQueryProvider } from '@/lib/query-client';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PWARegister } from '@/components/pwa-register';
+import { ChangelogModal } from '@/components/changelog-modal';
 import { Analytics } from '@vercel/analytics/next';
 import { ChartColorSchemeInitializer } from '@/components/chart-color-scheme-initializer';
 import { ClientErrorReporter } from '@/components/client-error-reporter';
@@ -34,6 +35,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
                 </Suspense>
               </div>
               <PWARegister />
+              <ChangelogModal />
               <Analytics />
             </ClientErrorReporter>
           </TooltipProvider>
