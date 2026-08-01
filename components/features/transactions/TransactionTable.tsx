@@ -1082,17 +1082,17 @@ export default function TransactionTable({
           const tx = row.original;
           const groupKey = getAccountGroupKey(tx.accountType);
           const groupBadgeStyles: Record<string, string> = {
-            BANKING: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-            INVESTMENTS: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-            CREDIT: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-            ASSETS: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+            BANKING: 'bg-emerald-500/10 text-emerald-700/80 dark:text-emerald-400/80 border-emerald-500/20',
+            INVESTMENTS: 'bg-purple-500/10 text-purple-700/80 dark:text-purple-400/80 border-purple-500/20',
+            CREDIT: 'bg-amber-500/10 text-amber-700/80 dark:text-amber-400/75 border-amber-500/20',
+            ASSETS: 'bg-blue-500/10 text-blue-700/80 dark:text-blue-400/80 border-blue-500/20',
           };
           if (!groupKey && !tx.accountType) {
             return <span className="text-sm text-muted-foreground">—</span>;
           }
           return (
             <div className="flex items-center min-w-0 max-w-full">
-              <span className={`text-[9px] font-bold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
+              <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
                 {groupKey || tx.accountType}
               </span>
             </div>
