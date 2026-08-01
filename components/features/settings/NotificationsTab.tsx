@@ -380,7 +380,7 @@ export default function NotificationsTab() {
               <div className="space-y-1 pr-4">
                 <Label htmlFor="notify-sync" className="font-medium text-sm text-foreground cursor-pointer">Account Sync Issues</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Receive notifications when Plaid, RentCast, or background synchronization jobs encounter credential expirations or execution errors.
+                  Receive notifications when Plaid, Redfin, or background synchronization jobs encounter credential expirations or execution errors.
                 </p>
               </div>
               <Switch

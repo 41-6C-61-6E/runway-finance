@@ -65,7 +65,7 @@ Visualize wealth movements with interactive Sankey diagrams and track investment
 
 ### 🏢 Real Estate & Budgets
 
-Track property portfolios with RentCast/FRED integrations and manage monthly budgets using detailed period forecasts and allocation views.
+Track property portfolios with Redfin/FRED integrations and manage monthly budgets using detailed period forecasts and allocation views.
 
 <table>
   <tr>
@@ -144,7 +144,7 @@ Manage your personal finance on the go with a fully optimized mobile responsive 
 
 ### 📊 Budgeting & Planning
 - **Budgets** — Category-based budgets with period selection, visual budget vs. actual charts, and cash flow forecasting.
-- **Real Estate** — Property portfolio tracking with equity-over-time charts, allocation views, and integration with FRED/RentCast APIs for valuations.
+- **Real Estate** — Property portfolio tracking with equity-over-time charts, allocation views, and integration with FRED/Redfin APIs for valuations.
 - **Investments** — Comprehensive investments tracker for stocks, mutual funds, and crypto holdings, with live stock quotes, cost basis calculations, unrealized gain/loss tracking, and tax breakdowns.
 - **Goals** — Track savings goals with progress percentages, reserve calculations, and goal allocation/projections.
 - **Plans** — Planning and projections engine (coming soon).
@@ -270,7 +270,6 @@ All variables are defined in `.env.example`. Copy it to `.env.local` and configu
 | `ALLOW_REGISTRATION` | ✅ | `true` | Set to `false` after creating the first user |
 | `REGISTRATION_PIN` | ❌ | — | PIN required for new account creation |
 | `FRED_API_KEY` | ❌ | — | Federal Reserve Economic Data API key (optional — for historical home price estimation) |
-| `RENTCAST_API_KEY` | ❌ | — | RentCast API key (optional — for real estate property valuation) |
 | `BUG_REPORTING` | ❌ | `false` | Enable collaborative bug reporting dropdown |
 | `GOOGLE_CLIENT_ID` | ❌ | — | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | ❌ | — | Google OAuth client secret (optional) |
