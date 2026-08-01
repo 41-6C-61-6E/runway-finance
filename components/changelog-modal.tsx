@@ -49,10 +49,17 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [hasUpdate, setHasUpdate] = useState(false);
 
   // Listen to custom open-changelog window event
   useEffect(() => {
-    const handleOpen = () => setIsOpen(true);
+    const handleOpen = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail?.hasUpdate !== undefined) {
+        setHasUpdate(Boolean(customEv.detail.hasUpdate));
+      }
+      setIsOpen(true);
+    };
     window.addEventListener('open-changelog', handleOpen);
     return () => window.removeEventListener('open-changelog', handleOpen);
   }, []);
@@ -183,6 +190,24 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
               )}
             </div>
           )}
+
+          {hasUpdate && (
+            <div className="mt-3 p-2.5 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-foreground font-medium">
+                <Sparkles className="w-4 h-4 text-primary shrink-0 animate-pulse" />
+                <span>A new version update is ready for installation.</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="text-xs shrink-0 font-semibold gap-1.5 h-8"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Update Now
+              </Button>
+            </div>
+          )}
         </DialogHeader>
 
         {/* Filter Controls */}
@@ -289,15 +314,28 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
           <span className="text-[11px] text-muted-foreground">
             Personal Finance Dashboard • Version History
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsOpen(false)}
-            className="text-xs"
-          >
-            Close
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasUpdate && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="text-xs font-semibold gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Update Now
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsOpen(false)}
+              className="text-xs"
+            >
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
