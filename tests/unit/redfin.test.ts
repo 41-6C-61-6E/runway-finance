@@ -183,6 +183,25 @@ describe('Redfin fetchRedfinValue', () => {
     expect(price).toBe(750000);
   });
 
+  it('throws a rate limit error if AVM returns 403', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('search.yahoo.com')) {
+        return {
+          ok: true,
+          text: async () => '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2Fhome%2F446533">Link</a>',
+        } as Response;
+      }
+      if (url.includes('api/home/details/avm')) {
+        return { ok: false, status: 403 } as Response;
+      }
+      return { ok: false, status: 404 } as Response;
+    });
+
+    await expect(
+      fetchRedfinValue({ address: '446533' }, apiConfig)
+    ).rejects.toThrow('Redfin rate limit reached for "446533". Please chill and wait a few minutes before validating again, or enter the value manually.');
+  });
+
   it('throws an error if estimate is unavailable', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
