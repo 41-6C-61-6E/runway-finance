@@ -214,6 +214,7 @@ export async function fetchRedfinValuationDetails(
   let normalPrice: number | undefined;
   let lowPrice: number | undefined;
   let highPrice: number | undefined;
+  let isRateLimited = false;
 
   const targetPropId = propertyId || matchedHome?.propertyId;
 
@@ -228,7 +229,10 @@ export async function fetchRedfinValuationDetails(
           'Referer': 'https://www.redfin.com/',
         },
       });
-      if (avmRes.ok) {
+      if (avmRes.status === 403 || avmRes.status === 429) {
+        isRateLimited = true;
+        logger.warn(`${LOG_TAG} Redfin AVM rate limited (HTTP ${avmRes.status})`, { propertyId: targetPropId });
+      } else if (avmRes.ok) {
         const text = await avmRes.text();
         const json = cleanRedfinJson(text);
         const p = json.payload || {};
@@ -247,6 +251,9 @@ export async function fetchRedfinValuationDetails(
   }
 
   if (!normalPrice) {
+    if (isRateLimited) {
+      throw new Error(`Redfin rate limit reached for "${address}". Please chill and wait a few minutes before validating again, or enter the value manually.`);
+    }
     throw new Error(`Redfin estimate unavailable for address "${address}". Please check the address, paste the Redfin property link (e.g. redfin.com/.../home/446533), or enter value manually.`);
   }
 
