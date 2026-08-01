@@ -692,7 +692,7 @@ export default function ManualAccountsSection() {
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
         <select
-          value={meta.syncFrequency || 'manual'}
+          value={meta.syncFrequency === 'best' ? 'daily' : (meta.syncFrequency || 'manual')}
           onChange={(e) => setMeta({ ...meta, syncFrequency: e.target.value })}
           className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
@@ -1086,9 +1086,10 @@ export default function ManualAccountsSection() {
             const fmt = formatCurrency(account.balance, account.currency);
             const isLiability = isLiabilityAccount(account.type);
             const isSimpleFin = !!account.connectionId;
-            const syncFrequency = canSync(account) && account.metadata
+            const rawFreq = canSync(account) && account.metadata
               ? String((account.metadata as Record<string, unknown>).syncFrequency ?? 'manual')
               : 'manual';
+            const syncFrequency = rawFreq === 'best' ? 'daily' : rawFreq;
             const nextSync = computeNextSync(syncFrequency, account.balanceDate);
             return (
               <div
@@ -1207,12 +1208,9 @@ export default function ManualAccountsSection() {
                         className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="manual">Manual</option>
-                        {!REAL_ESTATE_TYPES.includes(account.type) && <option value="daily">Daily</option>}
+                        <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
-                        {REAL_ESTATE_TYPES.includes(account.type) && (
-                          <option value="best">Best (Auto-calculated)</option>
-                        )}
                       </select>
                     </div>
                   </div>
