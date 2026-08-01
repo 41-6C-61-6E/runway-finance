@@ -261,7 +261,12 @@ export default function ManualAccountsSection() {
 
   // Address validation states
   const [validatingAddress, setValidatingAddress] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ status: 'success' | 'error'; message: string; price?: number } | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    status: 'success' | 'error';
+    message: string;
+    price?: number;
+    estimates?: { normal: number; conservative: number; optimistic: number };
+  } | null>(null);
 
   // Tags state
 
@@ -329,8 +334,9 @@ export default function ManualAccountsSection() {
       } else {
         setValidationResult({
           status: 'success',
-          message: `Valid address! RentCast Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
+          message: `Valid address! Redfin Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
           price: data.price,
+          estimates: data.estimates,
         });
         if (!isEdit) {
           setCreateInitialValue(String(data.price));
@@ -674,21 +680,13 @@ export default function ManualAccountsSection() {
     return !canSync(account) || account.type === 'metals';
   };
 
-  const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void, accountType?: string) => {
-    const isRealEstate = accountType && REAL_ESTATE_TYPES.includes(accountType);
-    const frequencies = isRealEstate
-      ? [
-          { value: 'manual', label: 'Manual only' },
-          { value: 'weekly', label: 'Weekly' },
-          { value: 'monthly', label: 'Monthly' },
-          { value: 'best', label: 'Best (Auto-calculated)' },
-        ]
-      : [
-          { value: 'manual', label: 'Manual only' },
-          { value: 'daily', label: 'Daily' },
-          { value: 'weekly', label: 'Weekly' },
-          { value: 'monthly', label: 'Monthly' },
-        ];
+  const syncFrequencyField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void, _accountType?: string) => {
+    const frequencies = [
+      { value: 'manual', label: 'Manual only' },
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' },
+      { value: 'monthly', label: 'Monthly' },
+    ];
 
     return (
       <div>
@@ -706,20 +704,35 @@ export default function ManualAccountsSection() {
     );
   };
 
-  const valuationMethodField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => (
-    <div>
-      <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (RentCast)</label>
-      <select
-        value={meta.valuationMethod || 'normal'}
-        onChange={(e) => setMeta({ ...meta, valuationMethod: e.target.value })}
-        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-      >
-        <option value="conservative">Conservative (Low Range)</option>
-        <option value="normal">Normal (Estimated Value)</option>
-        <option value="optimistic">Optimistic (High Range)</option>
-      </select>
-    </div>
-  );
+  const valuationMethodField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => {
+    const est = validationResult?.estimates;
+    return (
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (Redfin)</label>
+        <select
+          value={meta.valuationMethod || 'normal'}
+          onChange={(e) => setMeta({ ...meta, valuationMethod: e.target.value })}
+          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="conservative">
+            {est?.conservative
+              ? `Conservative - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(est.conservative)}`
+              : 'Conservative (Low Range)'}
+          </option>
+          <option value="normal">
+            {est?.normal
+              ? `Normal - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(est.normal)}`
+              : 'Normal (Estimated Value)'}
+          </option>
+          <option value="optimistic">
+            {est?.optimistic
+              ? `Optimistic - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(est.optimistic)}`
+              : 'Optimistic (High Range)'}
+          </option>
+        </select>
+      </div>
+    );
+  };
   const linkedMortgageField = (meta: Record<string, string>, setMeta: (m: Record<string, string>) => void) => {
     const alreadyLinked = new Set(
       realEstateAccounts.flatMap((re) => {
@@ -788,13 +801,13 @@ export default function ManualAccountsSection() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
             <div className="flex gap-2">
               <div className="relative flex-grow">
                 <Input
                   value={createMeta.address || ''}
                   onChange={(e) => setCreateMeta((m) => ({ ...m, address: e.target.value }))}
-                  placeholder="e.g., 123 Main St, San Francisco, CA"
+                  placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
                 />
               </div>
               <button
@@ -1452,13 +1465,13 @@ export default function ManualAccountsSection() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
                   <div className="flex gap-2">
                     <div className="relative flex-grow">
                       <Input
                         value={editMeta.address || ''}
                         onChange={(e) => setEditMeta((m) => ({ ...m, address: e.target.value }))}
-                        placeholder="e.g., 123 Main St, San Francisco, CA"
+                        placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
                       />
                     </div>
                     <button

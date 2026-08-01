@@ -37,8 +37,7 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
     return {
       metalsApiUrl: keys.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl,
       metalsApiKey: keys.metalsApiKey || '',
-      rentcastApiUrl: keys.rentcastApiUrl || DEFAULT_API_CONFIG.rentcastApiUrl,
-      rentcastApiKey: keys.rentcastApiKey || (typeof process !== 'undefined' ? (process.env.RENTCAST_API_KEY ?? '') : ''),
+      redfinApiUrl: keys.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl,
       fredApiUrl: keys.fredApiUrl || DEFAULT_API_CONFIG.fredApiUrl,
       fredApiKey: keys.fredApiKey || (typeof process !== 'undefined' ? (process.env.FRED_API_KEY ?? '') : ''),
       btcApiUrl: keys.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl,
@@ -82,15 +81,182 @@ function manualExternalId(): string {
   return `manual-${randomUUID()}`;
 }
 
-const rentcastPropertyTypeMap: Record<string, string> = {
-  'single-family': 'Single Family',
-  'condo': 'Condo',
-  'townhouse': 'Townhouse',
-  'multi-family': 'Multi-Family',
-  'land': 'Land',
-};
+function cleanRedfinJson(text: string): any {
+  const cleanText = text.replace(/^\{\}&&/, '');
+  return JSON.parse(cleanText);
+}
 
-export async function fetchRentcastValue(
+export interface RedfinEstimates {
+  normal: number;
+  conservative: number;
+  optimistic: number;
+}
+
+export async function fetchRedfinValuationDetails(
+  params: {
+    address: string;
+    propertyType?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    squareFootage?: number;
+  },
+  apiConfig?: ApiConfig
+): Promise<RedfinEstimates> {
+  const address = params.address.trim();
+  const baseUrl = apiConfig?.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl || 'https://www.redfin.com/stingray';
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  let propertyId: string | undefined;
+
+  // Step 1: Support direct Redfin property URL or numeric Property ID in address input
+  const urlMatch = address.match(/\/home\/(\d+)/) || address.match(/^(\d+)$/);
+  if (urlMatch) {
+    propertyId = urlMatch[1];
+    logger.info(`${LOG_TAG} Extracted Redfin property ID directly from input`, { propertyId, address });
+  }
+
+  // Step 2: Search web for exact Redfin property URL if address is text
+  if (!propertyId) {
+    try {
+      const yahooUrl = `https://search.yahoo.com/search?p=site:redfin.com+${encodeURIComponent(address)}`;
+      logger.info(`${LOG_TAG} Web search lookup for Redfin property URL`, { address, url: yahooUrl });
+      const res = await fetch(yahooUrl, {
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+
+      if (res.ok) {
+        const html = await res.text();
+        const matches = html.match(/RU=([^&"'>]+)/gi) || [];
+        for (const m of matches) {
+          const decoded = decodeURIComponent(m.replace(/^RU=/i, ''));
+          if (decoded.includes('redfin.com') && decoded.includes('/home/')) {
+            const propIdMatch = decoded.match(/\/home\/(\d+)/);
+            if (propIdMatch) {
+              propertyId = propIdMatch[1];
+              logger.info(`${LOG_TAG} Resolved Redfin property ID via web search`, { propertyId, address, url: decoded });
+              break;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn(`${LOG_TAG} Web search lookup error`, { address, error: String(err) });
+    }
+  }
+
+  let matchedHome: any;
+
+  // Step 3: US Census Geocoder + GIS spatial query ONLY if exact street line matches
+  if (!propertyId) {
+    let lat: number | undefined;
+    let lon: number | undefined;
+
+    try {
+      const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`;
+      logger.info(`${LOG_TAG} US Census geocoding call`, { address, url: censusUrl });
+      const censusRes = await fetch(censusUrl, {
+        headers: { 'User-Agent': 'RunwayFinance/1.0' },
+      });
+      if (censusRes.ok) {
+        const censusJson = await censusRes.json() as any;
+        const match = censusJson.result?.addressMatches?.[0];
+        if (match?.coordinates) {
+          lon = parseFloat(match.coordinates.x);
+          lat = parseFloat(match.coordinates.y);
+        }
+      }
+    } catch (err) {
+      logger.warn(`${LOG_TAG} US Census geocoding error`, { address, error: String(err) });
+    }
+
+    if (lat !== undefined && lon !== undefined && !isNaN(lat) && !isNaN(lon)) {
+      const d = 0.005;
+      const poly = `${lon - d}+${lat - d},${lon + d}+${lat - d},${lon + d}+${lat + d},${lon - d}+${lat + d},${lon - d}+${lat - d}`;
+      const gisUrl = `${baseUrl}/api/gis?al=1&poly=${poly}&v=8`;
+      logger.info(`${LOG_TAG} Redfin GIS call`, { address, url: gisUrl });
+
+      try {
+        const gisRes = await fetch(gisUrl, {
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.redfin.com/',
+          },
+        });
+
+        if (gisRes.ok) {
+          const text = await gisRes.text();
+          const json = cleanRedfinJson(text);
+          const homes = json.payload?.homes || [];
+          const streetPart = address.split(',')[0].toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+          for (const h of homes) {
+            const s = (h.streetLine?.value || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+            // Strict match ONLY - never fallback to arbitrary homes[0]
+            if (s && (s.includes(streetPart) || streetPart.includes(s))) {
+              matchedHome = h;
+              propertyId = String(h.propertyId);
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn(`${LOG_TAG} GIS query error`, { address, error: String(err) });
+      }
+    }
+  }
+
+  // Step 3: Query Redfin AVM endpoint if propertyId found
+  let normalPrice: number | undefined;
+  let lowPrice: number | undefined;
+  let highPrice: number | undefined;
+
+  const targetPropId = propertyId || matchedHome?.propertyId;
+
+  if (targetPropId) {
+    try {
+      const avmUrl = `${baseUrl}/api/home/details/avm?propertyId=${targetPropId}&accessLevel=1`;
+      logger.info(`${LOG_TAG} Redfin AVM call`, { propertyId: targetPropId, url: avmUrl });
+      const avmRes = await fetch(avmUrl, {
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'application/json, text/plain, */*',
+          'Referer': 'https://www.redfin.com/',
+        },
+      });
+      if (avmRes.ok) {
+        const text = await avmRes.text();
+        const json = cleanRedfinJson(text);
+        const p = json.payload || {};
+        normalPrice = p.predictedValue ?? p.value ?? p.price;
+        lowPrice = p.priceRangeLow ?? p.predictedValueMin ?? p.priceRangeMin;
+        highPrice = p.priceRangeHigh ?? p.predictedValueMax ?? p.priceRangeMax;
+      }
+    } catch (err) {
+      logger.warn(`${LOG_TAG} AVM query error`, { propertyId: targetPropId, error: String(err) });
+    }
+  }
+
+  // Fallback to GIS price if AVM response is not available
+  if (!normalPrice && matchedHome?.price?.value) {
+    normalPrice = matchedHome.price.value;
+  }
+
+  if (!normalPrice) {
+    throw new Error(`Redfin estimate unavailable for address "${address}". Please check the address, paste the Redfin property link (e.g. redfin.com/.../home/446533), or enter value manually.`);
+  }
+
+  const conservative = (lowPrice !== undefined && lowPrice !== null) ? Math.round((lowPrice + normalPrice) / 2) : Math.round(normalPrice * 0.95);
+  const optimistic = (highPrice !== undefined && highPrice !== null) ? Math.round((highPrice + normalPrice) / 2) : Math.round(normalPrice * 1.05);
+
+  return { normal: normalPrice, conservative, optimistic };
+}
+
+export async function fetchRedfinValue(
   params: {
     address: string;
     propertyType?: string;
@@ -101,74 +267,12 @@ export async function fetchRentcastValue(
   },
   apiConfig?: ApiConfig
 ): Promise<number> {
-  const baseUrl = apiConfig?.rentcastApiUrl || DEFAULT_API_CONFIG.rentcastApiUrl || 'https://api.rentcast.io/v1/avm/value';
-  const apiKey = apiConfig?.rentcastApiKey || (typeof process !== 'undefined' ? (process.env.RENTCAST_API_KEY ?? '') : '');
+  const estimates = await fetchRedfinValuationDetails(params, apiConfig);
+  const method = params.valuationMethod || 'normal';
+  const selectedValue = estimates[method];
 
-  if (!apiKey) {
-    throw new Error('RentCast API key is not configured. Please add it to your environment variables or user settings.');
-  }
-
-  const queryParams = new URLSearchParams();
-  queryParams.append('address', params.address);
-  if (params.propertyType) {
-    const mappedType = rentcastPropertyTypeMap[params.propertyType];
-    if (mappedType) {
-      queryParams.append('propertyType', mappedType);
-    }
-  }
-  if (params.bedrooms !== undefined && params.bedrooms !== null && !isNaN(params.bedrooms)) {
-    queryParams.append('bedrooms', String(params.bedrooms));
-  }
-  if (params.bathrooms !== undefined && params.bathrooms !== null && !isNaN(params.bathrooms)) {
-    queryParams.append('bathrooms', String(params.bathrooms));
-  }
-  if (params.squareFootage !== undefined && params.squareFootage !== null && !isNaN(params.squareFootage)) {
-    queryParams.append('squareFootage', String(params.squareFootage));
-  }
-
-  const url = `${baseUrl}?${queryParams.toString()}`;
-  const curlCmd = `curl -s -H "X-Api-Key: [REDACTED]" '${url}'`;
-  logger.info(`${LOG_TAG} RentCast API call`, { address: params.address, url });
-  logger.debug(`${LOG_TAG} RentCast curl: ${curlCmd}`);
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'X-Api-Key': apiKey,
-      },
-    });
-  } catch (err) {
-    throw new Error(`RentCast network error\n  URL: ${url}\n  error: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`RentCast HTTP ${res.status}\n  URL: ${url}\n  response: ${body.slice(0, 300)}`);
-  }
-
-  const data = await res.json() as { price?: number; priceRangeLow?: number; priceRangeHigh?: number };
-  
-  let selectedValue: number | undefined;
-  if (params.valuationMethod === 'conservative') {
-    if (data.priceRangeLow !== undefined && data.priceRangeLow !== null && data.price !== undefined && data.price !== null) {
-      selectedValue = (data.priceRangeLow + data.price) / 2;
-    } else {
-      selectedValue = data.priceRangeLow ?? data.price;
-    }
-  } else if (params.valuationMethod === 'optimistic') {
-    if (data.priceRangeHigh !== undefined && data.priceRangeHigh !== null && data.price !== undefined && data.price !== null) {
-      selectedValue = (data.priceRangeHigh + data.price) / 2;
-    } else {
-      selectedValue = data.priceRangeHigh ?? data.price;
-    }
-  } else {
-    selectedValue = data.price;
-  }
-
-  if (selectedValue === undefined || selectedValue === null) {
-    throw new Error(`RentCast parse error: No valid valuation field returned in response.\n  Response: ${JSON.stringify(data).slice(0, 300)}`);
+  if (selectedValue === undefined || selectedValue === null || isNaN(selectedValue)) {
+    throw new Error(`Redfin parse error: No valid valuation field returned in response.`);
   }
 
   return selectedValue;
@@ -360,9 +464,6 @@ export async function createManualAccount(input: {
   const isRealEstate = REAL_ESTATE_TYPES.includes(accountType);
 
   const meta = input.metadata ? { ...input.metadata } : {};
-  if (isRealEstate && meta.syncFrequency === 'daily') {
-    meta.syncFrequency = 'best';
-  }
 
   const rawValues = {
     userId: input.userId,
@@ -480,9 +581,9 @@ export async function syncManualAccount(
       case 'other': {
         const address = meta.address as string | undefined;
         if (!address) {
-          throw new Error('No property address in metadata. Please edit the account to provide a property address for RentCast sync.');
+          throw new Error('No property address in metadata. Please edit the account to provide a property address for Redfin sync.');
         }
-        newValue = await fetchRentcastValue({
+        newValue = await fetchRedfinValue({
           address,
           propertyType: meta.propertyType as string | undefined,
           bedrooms: meta.bedrooms !== undefined && meta.bedrooms !== null ? parseFloat(String(meta.bedrooms)) : undefined,

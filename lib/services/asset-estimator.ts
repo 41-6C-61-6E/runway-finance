@@ -13,14 +13,12 @@ const LOG_TAG = '[asset-estimator]';
 export interface ApiConfig {
   metalsApiUrl?: string;
   metalsApiKey?: string;
-  rentcastApiUrl?: string;
-  rentcastApiKey?: string;
+  redfinApiUrl?: string;
   fredApiUrl?: string;
   fredApiKey?: string;
   btcApiUrl?: string;
   btcApiKey?: string;
   btcXpubApiUrl?: string;
-
 }
 
 // Re-export pure amortization functions (client-safe)

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { readApiConfig, fetchRentcastValue } from '@/lib/services/manual-accounts';
+import { readApiConfig, fetchRedfinValuationDetails } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
@@ -41,16 +41,18 @@ export async function POST(request: Request) {
 
     logger.info('Address validation request', { userId: dataUserId, address });
 
-    const price = await fetchRentcastValue({
+    const estimates = await fetchRedfinValuationDetails({
       address,
       propertyType: body.propertyType || undefined,
       bedrooms,
       bathrooms,
       squareFootage,
-      valuationMethod: body.valuationMethod || undefined,
     }, apiConfig);
 
-    return NextResponse.json({ valid: true, price });
+    const method = body.valuationMethod || 'normal';
+    const price = estimates[method];
+
+    return NextResponse.json({ valid: true, price, estimates });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Address validation failed';
     logger.warn('Address validation failed', { userId: dataUserId, address, error: errMsg });

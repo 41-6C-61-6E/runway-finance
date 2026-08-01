@@ -102,15 +102,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.displayOrder !== undefined) updateData.displayOrder = body.displayOrder;
   if (body.balance !== undefined) updateData.balance = String(body.balance);
   if (body.metadata !== undefined) {
-    const REAL_ESTATE_TYPES = [
-      'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-      'single-family', 'condo', 'townhouse', 'multi-family'
-    ];
-    const isRealEstate = REAL_ESTATE_TYPES.includes(account.type);
     const meta = { ...(body.metadata as Record<string, unknown>) };
-    if (isRealEstate && meta.syncFrequency === 'daily') {
-      meta.syncFrequency = 'best';
-    }
     updateData.metadata = meta;
   }
 

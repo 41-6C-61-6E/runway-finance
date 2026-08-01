@@ -90,8 +90,7 @@ export const NOTIFICATION_DEFAULTS = {
 export const API_KEY_DEFAULTS: Record<string, string> = {
   metalsApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart',
   metalsApiKey: '',
-  rentcastApiUrl: 'https://api.rentcast.io/v1/avm/value',
-  rentcastApiKey: '',
+  redfinApiUrl: 'https://www.redfin.com/stingray',
   fredApiUrl: 'https://api.stlouisfed.org/fred/series/observations',
   fredApiKey: '',
   btcApiUrl: 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD',
@@ -244,8 +243,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // ── API Keys & Endpoints ──
   { key: 'metalsApiUrl', label: 'Metals API URL', description: 'Endpoint URL for gold/silver spot prices (Yahoo Finance by default)', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.metalsApiUrl },
   { key: 'metalsApiKey', label: 'Metals API Key', description: 'API key for metals price endpoint (not required for Yahoo Finance)', type: 'password', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.metalsApiKey },
-  { key: 'rentcastApiUrl', label: 'RentCast API URL', description: 'Endpoint URL for real estate property values', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.rentcastApiUrl },
-  { key: 'rentcastApiKey', label: 'RentCast API Key', description: 'API key for RentCast property endpoint', type: 'password', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.rentcastApiKey },
+  { key: 'redfinApiUrl', label: 'Redfin API Base URL', description: 'Base endpoint URL for Redfin property estimates', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.redfinApiUrl },
   { key: 'fredApiUrl', label: 'FRED API URL', description: 'Endpoint URL for Federal Reserve economic data (Home Price Index)', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.fredApiUrl },
   { key: 'fredApiKey', label: 'FRED API Key', description: 'FRED API key for historical home price estimation', type: 'password', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.fredApiKey },
   { key: 'btcApiUrl', label: 'Bitcoin/Crypto API URL', description: 'Endpoint URL for BTC spot price', type: 'string', group: 'API Keys & Endpoints', defaultValue: API_KEY_DEFAULTS.btcApiUrl },

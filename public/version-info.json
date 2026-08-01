@@ -1,10 +1,10 @@
 {
-  "buildNumber": "26.07.1785514559110",
+  "buildNumber": "26.08.1785600477201",
   "commits": [
+    "refactor: migrate backup and restore functionality from AdvancedTab to ImportExportTab",
+    "feat: implement comprehensive user data export system with custom CSV and report generation capabilities",
+    "refactor: harden CSRF protection with expanded proxy validation and improve backup import data integrity checks",
     "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
-    "feat: implement account grouping logic and unify transaction filtering by asset class",
-    "feat: add projection options popover and integrate simulation controls across planning tabs",
-    "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
-    "feat: make projection controls collapsible and optimize tab navigation styling"
+    "feat: implement account grouping logic and unify transaction filtering by asset class"
   ]
 }
