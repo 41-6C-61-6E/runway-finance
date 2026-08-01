@@ -102,10 +102,16 @@ export function PropertyCards() {
 
   // Address validation states
   const [validatingAddress, setValidatingAddress] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ status: 'success' | 'error'; message: string; price?: number } | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    status: 'success' | 'error';
+    message: string;
+    price?: number;
+    estimates?: { normal: number; conservative: number; optimistic: number };
+  } | null>(null);
 
-  const handleValidateAddress = async () => {
-    const address = propertyEditMeta.address?.trim();
+  const handleValidateAddress = async (metaToValidate?: Record<string, string>) => {
+    const meta = metaToValidate || propertyEditMeta;
+    const address = meta.address?.trim();
     if (!address) {
       setValidationResult({ status: 'error', message: 'Please enter a property address to validate.' });
       return;
@@ -119,11 +125,11 @@ export function PropertyCards() {
         credentials: 'include',
         body: JSON.stringify({
           address,
-          propertyType: propertyEditMeta.propertyType || undefined,
-          bedrooms: propertyEditMeta.bedrooms || undefined,
-          bathrooms: propertyEditMeta.bathrooms || undefined,
-          squareFootage: propertyEditMeta.squareFootage || undefined,
-          valuationMethod: propertyEditMeta.valuationMethod || undefined,
+          propertyType: meta.propertyType || undefined,
+          bedrooms: meta.bedrooms || undefined,
+          bathrooms: meta.bathrooms || undefined,
+          squareFootage: meta.squareFootage || undefined,
+          valuationMethod: meta.valuationMethod || undefined,
         }),
       });
       const data = await res.json();
@@ -132,8 +138,9 @@ export function PropertyCards() {
       } else {
         setValidationResult({
           status: 'success',
-          message: `Valid address! RentCast Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
+          message: `Valid address! Redfin Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
           price: data.price,
+          estimates: data.estimates,
         });
       }
     } catch {
@@ -218,6 +225,7 @@ export function PropertyCards() {
   const openEditProperty = (property: Property) => {
     setEditingProperty(property);
     setPropertyEditError(null);
+    setValidationResult(null);
     const meta = property.metadata ?? {};
     const flat: Record<string, string> = {};
     Object.entries(meta).forEach(([k, v]) => {
@@ -227,6 +235,9 @@ export function PropertyCards() {
     const mortgageIds = (meta.mortgageAccountIds as string[]) ?? [];
     setSelectedMortgageIds(mortgageIds);
     setPropertyEditMeta(flat);
+    if (flat.address) {
+      handleValidateAddress(flat);
+    }
   };
 
   const handleSavePropertyDetails = async () => {
@@ -493,18 +504,18 @@ export function PropertyCards() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
               <div className="flex gap-2">
                 <div className="relative flex-grow">
                   <Input
                     value={propertyEditMeta.address || ''}
                     onChange={(e) => setPropertyEditMeta((m) => ({ ...m, address: e.target.value }))}
-                    placeholder="e.g., 123 Main St, San Francisco, CA"
+                    placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
                   />
                 </div>
                 <button
                   type="button"
-                  onClick={handleValidateAddress}
+                  onClick={() => handleValidateAddress()}
                   disabled={validatingAddress}
                   className="px-3 py-2 text-xs font-semibold bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground rounded-lg transition-all"
                 >
@@ -518,15 +529,27 @@ export function PropertyCards() {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (RentCast)</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (Redfin)</label>
               <select
                 value={propertyEditMeta.valuationMethod || 'normal'}
                 onChange={(e) => setPropertyEditMeta((m) => ({ ...m, valuationMethod: e.target.value }))}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="conservative">Conservative (Low Range)</option>
-                <option value="normal">Normal (Estimated Value)</option>
-                <option value="optimistic">Optimistic (High Range)</option>
+                <option value="conservative">
+                  {validationResult?.estimates?.conservative
+                    ? `Conservative - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.conservative)}`
+                    : 'Conservative (Low Range)'}
+                </option>
+                <option value="normal">
+                  {validationResult?.estimates?.normal
+                    ? `Normal - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.normal)}`
+                    : 'Normal (Estimated Value)'}
+                </option>
+                <option value="optimistic">
+                  {validationResult?.estimates?.optimistic
+                    ? `Optimistic - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.optimistic)}`
+                    : 'Optimistic (High Range)'}
+                </option>
               </select>
             </div>
             <div className="grid grid-cols-3 gap-3">

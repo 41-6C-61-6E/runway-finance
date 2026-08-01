@@ -33,7 +33,6 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}      # Admin set KEY used for passowrd resets and data recovery
       - REGISTRATION_PIN=${REGISTRATION_PIN}  # PIN needed to register a new account, set to empty string to disable new registration
       - FRED_API_KEY=${FRED_API_KEY}
-      - RENTCAST_API_KEY=${RENTCAST_API_KEY}
       - BUG_REPORTING=${BUG_REPORTING:-false}
 
 
