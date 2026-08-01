@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Star, Key, LogOut, RefreshCw } from 'lucide-react';
+import { Sun, Moon, Star, Key, LogOut, RefreshCw, History } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { SEMANTIC } from '@/lib/colors/palette';
@@ -323,7 +323,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
 
           <div className="h-px bg-border mx-2" />
 
-          <div className="px-3 py-2 text-[10px] text-muted-foreground space-y-1 bg-muted/20">
+          <div className="px-3 py-2 text-[10px] text-muted-foreground space-y-1.5 bg-muted/20">
             <div className="flex justify-between items-center gap-2 font-mono">
               <span className="opacity-55">Build:</span>
               <div className="flex items-center gap-1.5 truncate max-w-[70%]">
@@ -356,6 +356,19 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
               <span className="text-right truncate max-w-[70%]" title={process.env.NEXT_PUBLIC_BUILD_TIME}>
                 {formatBuildTime(process.env.NEXT_PUBLIC_BUILD_TIME)}
               </span>
+            </div>
+            <div className="pt-1.5 border-t border-border/40 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  window.dispatchEvent(new CustomEvent('open-changelog'));
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium text-[11px] transition-colors cursor-pointer"
+              >
+                <History className="w-3 h-3" />
+                View Changelog
+              </button>
             </div>
           </div>
         </div>
