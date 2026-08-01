@@ -50,6 +50,15 @@ export function PWARegister() {
                               </ul>
                             </div>
                           )}
+                          <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => window.dispatchEvent(new CustomEvent("open-changelog"))}
+                              className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                              View full changelog &rarr;
+                            </button>
+                          </div>
                         </div>
                       ),
                       action: {
@@ -63,7 +72,20 @@ export function PWARegister() {
                     if (cancelled) return;
                     toast.info("A new version of Personal Finance is available!", {
                       id: "pwa-update",
-                      description: "Click update to load the latest changes.",
+                      description: (
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          <span>Click update to load the latest changes.</span>
+                          <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => window.dispatchEvent(new CustomEvent("open-changelog"))}
+                              className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                              View full changelog &rarr;
+                            </button>
+                          </div>
+                        </div>
+                      ),
                       action: {
                         label: "Update",
                         onClick: () => window.location.reload(),

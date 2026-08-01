@@ -1,10 +1,278 @@
 {
-  "buildNumber": "26.08.1785600477201",
+  "buildNumber": "26.08.1785610476901",
+  "buildTime": "2026-08-01T18:54:36.901Z",
   "commits": [
+    "refactor: migrate 'best' sync frequency to 'daily' and remove auto-calculation option",
+    "feat: handle Redfin AVM rate limiting by throwing a descriptive error and add corresponding unit test",
+    "feat: migrate property valuation service from RentCast to Redfin and clean up unused scratch files.",
     "refactor: migrate backup and restore functionality from AdvancedTab to ImportExportTab",
     "feat: implement comprehensive user data export system with custom CSV and report generation capabilities",
     "refactor: harden CSRF protection with expanded proxy validation and improve backup import data integrity checks",
     "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
-    "feat: implement account grouping logic and unify transaction filtering by asset class"
+    "feat: implement account grouping logic and unify transaction filtering by asset class",
+    "feat: add projection options popover and integrate simulation controls across planning tabs",
+    "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
+    "feat: make projection controls collapsible and optimize tab navigation styling",
+    "feat: add Social Security utility for benefit calculations and restrict account scope to FIRE-eligible assets across UI components",
+    "refactor: remove outdated documentation specs and update retirement engine logic",
+    "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic",
+    "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
+    "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
+    "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
+    "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
+    "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections.",
+    "feat: add retirement planning contribution configurations and projection dashboard enhancements",
+    "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
+    "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
+    "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
+    "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
+    "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI",
+    "feat: migrate salary tracking from event-based to native plan properties with salary raise overrides.",
+    "feat: add salary-based account contribution logic and configurable employer matching settings to the retirement planning engine",
+    "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
+    "feat: add salary_source column to plan_flows table",
+    "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging"
+  ],
+  "history": [
+    {
+      "hash": "37ae46b",
+      "fullHash": "37ae46bb0e9e5b1194839c8a19913f1e7115c5f6",
+      "author": "Alan Racek",
+      "date": "2026-08-01T10:58:09-07:00",
+      "message": "refactor: migrate 'best' sync frequency to 'daily' and remove auto-calculation option",
+      "type": "refactor"
+    },
+    {
+      "hash": "a6d3366",
+      "fullHash": "a6d3366d28b095c666b5406d224ae43258868136",
+      "author": "Alan Racek",
+      "date": "2026-08-01T09:53:10-07:00",
+      "message": "feat: handle Redfin AVM rate limiting by throwing a descriptive error and add corresponding unit test",
+      "type": "feat"
+    },
+    {
+      "hash": "427b56a",
+      "fullHash": "427b56aa8f528d3fd7fe1ab2567d5b641a200438",
+      "author": "Alan Racek",
+      "date": "2026-08-01T09:49:57-07:00",
+      "message": "feat: migrate property valuation service from RentCast to Redfin and clean up unused scratch files.",
+      "type": "feat"
+    },
+    {
+      "hash": "4938d27",
+      "fullHash": "4938d276a5f6394335a316716d054443fb758419",
+      "author": "Alan Racek",
+      "date": "2026-07-31T10:17:30-07:00",
+      "message": "refactor: migrate backup and restore functionality from AdvancedTab to ImportExportTab",
+      "type": "refactor"
+    },
+    {
+      "hash": "a2aa3e2",
+      "fullHash": "a2aa3e24baaa73b164ff47882117bffa2e47aa70",
+      "author": "Alan Racek",
+      "date": "2026-07-31T09:33:58-07:00",
+      "message": "feat: implement comprehensive user data export system with custom CSV and report generation capabilities",
+      "type": "feat"
+    },
+    {
+      "hash": "d80c62b",
+      "fullHash": "d80c62bf75c5e8e1eb4377e42fad1f11d18eb91e",
+      "author": "Alan Racek",
+      "date": "2026-07-31T09:19:41-07:00",
+      "message": "refactor: harden CSRF protection with expanded proxy validation and improve backup import data integrity checks",
+      "type": "refactor"
+    },
+    {
+      "hash": "70f8cfe",
+      "fullHash": "70f8cfec5334ab6d65dd956ff9b6e5c010283b6a",
+      "author": "Alan Racek",
+      "date": "2026-07-30T17:13:46-07:00",
+      "message": "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
+      "type": "feat"
+    },
+    {
+      "hash": "d053156",
+      "fullHash": "d053156eae2075b107f0a543b3ba2d605712d758",
+      "author": "Alan Racek",
+      "date": "2026-07-30T11:10:03-07:00",
+      "message": "feat: implement account grouping logic and unify transaction filtering by asset class",
+      "type": "feat"
+    },
+    {
+      "hash": "899f31a",
+      "fullHash": "899f31ab434bb18d7be9bae3e7bea1635a49c274",
+      "author": "Alan Racek",
+      "date": "2026-07-30T09:52:03-07:00",
+      "message": "feat: add projection options popover and integrate simulation controls across planning tabs",
+      "type": "feat"
+    },
+    {
+      "hash": "66c3b8c",
+      "fullHash": "66c3b8cecf001ccacf54de8ce5656db63d11bef5",
+      "author": "Alan Racek",
+      "date": "2026-07-23T16:04:25-07:00",
+      "message": "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
+      "type": "feat"
+    },
+    {
+      "hash": "484168e",
+      "fullHash": "484168ef6c7229db6ed0f68fade3572694c1b6ec",
+      "author": "Alan Racek",
+      "date": "2026-07-23T10:52:57-07:00",
+      "message": "feat: make projection controls collapsible and optimize tab navigation styling",
+      "type": "feat"
+    },
+    {
+      "hash": "0c85c91",
+      "fullHash": "0c85c91e976d4747009f86de9531837a351fcb1b",
+      "author": "Alan Racek",
+      "date": "2026-07-23T10:41:29-07:00",
+      "message": "feat: add Social Security utility for benefit calculations and restrict account scope to FIRE-eligible assets across UI components",
+      "type": "feat"
+    },
+    {
+      "hash": "e2742c5",
+      "fullHash": "e2742c5e7e497e8613bd907471dc2d75a4d7d3e4",
+      "author": "Alan Racek",
+      "date": "2026-07-23T08:53:11-07:00",
+      "message": "refactor: remove outdated documentation specs and update retirement engine logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "7cd65a2",
+      "fullHash": "7cd65a2ca70dfaed039ab0549de4972a41eb2664",
+      "author": "Alan Racek",
+      "date": "2026-07-22T22:03:27-07:00",
+      "message": "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic",
+      "type": "chore"
+    },
+    {
+      "hash": "da7e22c",
+      "fullHash": "da7e22c57e11da570d47d6a6b43f5733556de991",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:41:36-07:00",
+      "message": "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
+      "type": "feat"
+    },
+    {
+      "hash": "6887c31",
+      "fullHash": "6887c3194be0c83598b513e3e4d8b5203721d449",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:36:53-07:00",
+      "message": "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
+      "type": "feat"
+    },
+    {
+      "hash": "2a2342a",
+      "fullHash": "2a2342afd2a5b0dd7b4f4c3fef07612a9923a670",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:28:24-07:00",
+      "message": "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
+      "type": "fix"
+    },
+    {
+      "hash": "70425fa",
+      "fullHash": "70425fa15d145d783ed1b7012419d20e195fdb22",
+      "author": "Alan Racek",
+      "date": "2026-07-22T20:54:55-07:00",
+      "message": "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
+      "type": "chore"
+    },
+    {
+      "hash": "07e136a",
+      "fullHash": "07e136ab4cbe9d6f8d0240e7bc56d25f23eb7a65",
+      "author": "Alan Racek",
+      "date": "2026-07-22T17:54:24-07:00",
+      "message": "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections.",
+      "type": "feat"
+    },
+    {
+      "hash": "b084cb6",
+      "fullHash": "b084cb6cb7c31113c07be7fbc4fb707c237e231c",
+      "author": "Alan Racek",
+      "date": "2026-07-22T16:37:03-07:00",
+      "message": "feat: add retirement planning contribution configurations and projection dashboard enhancements",
+      "type": "feat"
+    },
+    {
+      "hash": "7f33310",
+      "fullHash": "7f33310f0d954018f41fb894a117b8c34743d802",
+      "author": "Alan Racek",
+      "date": "2026-07-22T15:53:09-07:00",
+      "message": "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
+      "type": "feat"
+    },
+    {
+      "hash": "51184c0",
+      "fullHash": "51184c0e12d7ffad15534d792b75beba519db1a5",
+      "author": "Alan Racek",
+      "date": "2026-07-22T15:24:39-07:00",
+      "message": "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
+      "type": "refactor"
+    },
+    {
+      "hash": "f69b500",
+      "fullHash": "f69b500de5670b33efb1319b6e462c9a020394d8",
+      "author": "Alan Racek",
+      "date": "2026-07-22T14:02:15-07:00",
+      "message": "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
+      "type": "refactor"
+    },
+    {
+      "hash": "555ad05",
+      "fullHash": "555ad059bf08cc587172d8951456067bc61df03f",
+      "author": "Alan Racek",
+      "date": "2026-07-22T13:45:12-07:00",
+      "message": "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
+      "type": "feat"
+    },
+    {
+      "hash": "a028631",
+      "fullHash": "a028631dd970ecf75d7447b520180ebf852ae748",
+      "author": "Alan Racek",
+      "date": "2026-07-22T12:32:42-07:00",
+      "message": "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI",
+      "type": "feat"
+    },
+    {
+      "hash": "aac2375",
+      "fullHash": "aac23756f9e9b5ae763436a4ca2d83ffdab25151",
+      "author": "Alan Racek",
+      "date": "2026-07-22T11:01:16-07:00",
+      "message": "feat: migrate salary tracking from event-based to native plan properties with salary raise overrides.",
+      "type": "feat"
+    },
+    {
+      "hash": "a76dd7e",
+      "fullHash": "a76dd7e75d7c64820c6577096243299699e0b7be",
+      "author": "Alan Racek",
+      "date": "2026-07-22T09:24:43-07:00",
+      "message": "feat: add salary-based account contribution logic and configurable employer matching settings to the retirement planning engine",
+      "type": "feat"
+    },
+    {
+      "hash": "f94c381",
+      "fullHash": "f94c3810f9b4b63463df6fd34b77960087188c5b",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:43:51-07:00",
+      "message": "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
+      "type": "refactor"
+    },
+    {
+      "hash": "16b4fea",
+      "fullHash": "16b4fea7d871f5843ad10721e6d5519e75573258",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:26:39-07:00",
+      "message": "feat: add salary_source column to plan_flows table",
+      "type": "feat"
+    },
+    {
+      "hash": "4b7d51f",
+      "fullHash": "4b7d51f66a42425d109ca1251e46762f8c86923c",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:10:08-07:00",
+      "message": "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging",
+      "type": "refactor"
+    }
   ]
 }
