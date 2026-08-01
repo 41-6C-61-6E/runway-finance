@@ -53,7 +53,12 @@ export function PWARegister() {
                           <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
                             <button
                               type="button"
-                              onClick={() => window.dispatchEvent(new CustomEvent("open-changelog"))}
+                              onClick={() => {
+                                toast.dismiss("pwa-update");
+                                window.dispatchEvent(
+                                  new CustomEvent("open-changelog", { detail: { hasUpdate: true } })
+                                );
+                              }}
                               className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
                             >
                               View full changelog &rarr;
@@ -78,7 +83,12 @@ export function PWARegister() {
                           <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
                             <button
                               type="button"
-                              onClick={() => window.dispatchEvent(new CustomEvent("open-changelog"))}
+                              onClick={() => {
+                                toast.dismiss("pwa-update");
+                                window.dispatchEvent(
+                                  new CustomEvent("open-changelog", { detail: { hasUpdate: true } })
+                                );
+                              }}
                               className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
                             >
                               View full changelog &rarr;
