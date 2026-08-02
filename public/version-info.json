@@ -1,7 +1,9 @@
 {
-  "buildNumber": "26.08.1785689122895",
-  "buildTime": "2026-08-02T16:45:22.895Z",
+  "buildNumber": "26.08.1785690339608",
+  "buildTime": "2026-08-02T17:05:39.608Z",
   "commits": [
+    "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
+    "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
     "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
     "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
     "feat: add PWA update prompt to changelog modal and update dialog z-index and overlay style",
@@ -199,11 +201,25 @@
     "sync improvements",
     "sync improvements",
     "backup fix",
-    "investments improvements",
-    "visual improvements",
-    "layout"
+    "investments improvements"
   ],
   "history": [
+    {
+      "hash": "cc7b898",
+      "fullHash": "cc7b8980f7c3e09b4ec4f08fa5c158d5dac74f6c",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:01:22-07:00",
+      "message": "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
+      "type": "refactor"
+    },
+    {
+      "hash": "7e50922",
+      "fullHash": "7e509223402d6ef80c3cf1fe4cf3d0fa52e345c6",
+      "author": "Alan Racek",
+      "date": "2026-08-02T09:45:41-07:00",
+      "message": "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
+      "type": "feat"
+    },
     {
       "hash": "5cf2260",
       "fullHash": "5cf2260a1cb025df07b8760e0877ab774364c061",
@@ -1786,22 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-10T16:45:36-07:00",
       "message": "investments improvements",
-      "type": "other"
-    },
-    {
-      "hash": "a8cfaf9",
-      "fullHash": "a8cfaf929afe934bef3b5ec44113b506b6d12791",
-      "author": "Alan Racek",
-      "date": "2026-06-10T16:01:08-07:00",
-      "message": "visual improvements",
-      "type": "other"
-    },
-    {
-      "hash": "584b692",
-      "fullHash": "584b692d54f5077b35a7c33afc4580318f5f9a0c",
-      "author": "Alan Racek",
-      "date": "2026-06-10T15:36:59-07:00",
-      "message": "layout",
       "type": "other"
     }
   ]

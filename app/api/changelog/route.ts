@@ -7,8 +7,7 @@ export async function GET() {
   try {
     let buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || 'dev';
     let buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
-    let commits: string[] = [];
-    let history: Array<{
+    let gitHistory: Array<{
       hash: string;
       fullHash: string;
       author: string;
@@ -39,7 +38,7 @@ export async function GET() {
             type = match[1].toLowerCase();
           }
 
-          history.push({
+          gitHistory.push({
             hash,
             fullHash,
             author,
@@ -47,12 +46,13 @@ export async function GET() {
             message,
             type,
           });
-          commits.push(message);
         }
       });
     } catch {
-      // Fallback: read version-info.json if git execution fails
+      // Fallback: git execution failed
     }
+
+    let fileHistory: typeof gitHistory = [];
 
     // Read version-info.json for fallback history or extra build details
     const versionInfoPath = path.join(process.cwd(), 'public', 'version-info.json');
@@ -66,16 +66,44 @@ export async function GET() {
         if (info.buildTime) {
           buildTime = info.buildTime;
         }
-        if (Array.isArray(info.history) && info.history.length > history.length) {
-          history = info.history;
-        }
-        if (Array.isArray(info.commits) && info.commits.length > commits.length) {
-          commits = info.commits;
+        if (Array.isArray(info.history)) {
+          fileHistory = info.history;
         }
       } catch {
         // file reading error ignored
       }
     }
+
+    // Merge gitHistory and fileHistory, prioritizing gitHistory but preserving fileHistory for shallow clones
+    const mergedHistory = [...gitHistory];
+    const knownHashes = new Set<string>();
+
+    mergedHistory.forEach((item) => {
+      if (item.hash) knownHashes.add(item.hash.toLowerCase());
+      if (item.fullHash) knownHashes.add(item.fullHash.toLowerCase());
+      if (item.message && item.date) knownHashes.add(`${item.message.toLowerCase()}|${item.date}`);
+    });
+
+    fileHistory.forEach((item) => {
+      const hashKey = item.hash ? item.hash.toLowerCase() : null;
+      const fullHashKey = item.fullHash ? item.fullHash.toLowerCase() : null;
+      const msgDateKey = item.message && item.date ? `${item.message.toLowerCase()}|${item.date}` : null;
+
+      const isKnown =
+        (hashKey && knownHashes.has(hashKey)) ||
+        (fullHashKey && knownHashes.has(fullHashKey)) ||
+        (msgDateKey && knownHashes.has(msgDateKey));
+
+      if (!isKnown) {
+        if (hashKey) knownHashes.add(hashKey);
+        if (fullHashKey) knownHashes.add(fullHashKey);
+        if (msgDateKey) knownHashes.add(msgDateKey);
+        mergedHistory.push(item);
+      }
+    });
+
+    const history = mergedHistory.slice(0, 200);
+    const commits = history.map((item) => item.message);
 
     return NextResponse.json({
       buildNumber,

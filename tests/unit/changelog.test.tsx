@@ -125,4 +125,10 @@ describe('Changelog Feature', () => {
       expect(screen.getByText('fix: payment calculations')).not.toBeNull();
     });
   });
+
+  it('GET /api/changelog preserves stored history when git log is shallow', async () => {
+    const response = await GET();
+    const data = await response.json();
+    expect(data.history.length).toBeGreaterThan(1);
+  });
 });
