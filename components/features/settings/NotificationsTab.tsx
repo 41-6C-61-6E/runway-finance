@@ -54,8 +54,8 @@ export default function NotificationsTab() {
   const notifyGoalMilestones = settings.notifyGoalMilestones !== false;
   const notifyNetWorthMilestones = settings.notifyNetWorthMilestones !== false;
   const netWorthMilestoneInterval = settings.netWorthMilestoneInterval ?? 100000;
-  const notifyDailyNetWorthChange = settings.notifyDailyNetWorthChange !== false;
-  const dailyNetWorthAlertTime = (settings.dailyNetWorthAlertTime as string) || '18:00';
+  const notifyWeeklyNetWorthChange = settings.notifyWeeklyNetWorthChange !== false;
+  const weeklyNetWorthAlertDay = (settings.weeklyNetWorthAlertDay as string) || 'sunday';
   const userTimezone = (settings.timezone as string) || 'America/New_York';
   const notifyAiProposals = settings.notifyAiProposals !== false;
   const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
@@ -503,38 +503,42 @@ export default function NotificationsTab() {
             </div>
 
 
-            {/* Daily Net Worth Change Toggle */}
+            {/* Weekly Net Worth Change Toggle */}
             <div className="flex items-center justify-between py-4">
               <div className="space-y-1 pr-4">
-                <Label htmlFor="notify-daily-networth" className="font-medium text-sm text-foreground cursor-pointer">Daily Net Worth Change Alert</Label>
+                <Label htmlFor="notify-weekly-networth" className="font-medium text-sm text-foreground cursor-pointer">Weekly Net Worth Change Alert</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Receive an alert when your net worth changes from the previous day.
+                  Receive an alert on your chosen day of the week with net worth changes over the past 7 days.
                 </p>
               </div>
               <Switch
-                id="notify-daily-networth"
-                checked={notifyDailyNetWorthChange}
-                onCheckedChange={(checked) => handleUpdateSetting('notifyDailyNetWorthChange', checked)}
+                id="notify-weekly-networth"
+                checked={notifyWeeklyNetWorthChange}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyWeeklyNetWorthChange', checked)}
               />
             </div>
-            {notifyDailyNetWorthChange && (
+            {notifyWeeklyNetWorthChange && (
               <div className="flex flex-col gap-1.5 pl-1 -mt-2 pb-2">
                 <div className="flex items-center gap-3">
-                  <Label htmlFor="daily-networth-time" className="text-xs text-muted-foreground whitespace-nowrap">Alert time</Label>
-                  <Input
-                    id="daily-networth-time"
-                    type="time"
-                    value={dailyNetWorthAlertTime}
-                    onChange={(e) => handleUpdateSetting('dailyNetWorthAlertTime', e.target.value)}
-                    className="w-[120px] h-8 text-xs"
-                  />
+                  <Label htmlFor="weekly-networth-day" className="text-xs text-muted-foreground whitespace-nowrap">Alert day</Label>
+                  <select
+                    id="weekly-networth-day"
+                    value={weeklyNetWorthAlertDay}
+                    onChange={(e) => handleUpdateSetting('weeklyNetWorthAlertDay', e.target.value)}
+                    className="h-8 text-xs bg-background border border-input rounded-md px-2 py-1 font-medium text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring capitalize"
+                  >
+                    <option value="sunday">Sunday</option>
+                    <option value="monday">Monday</option>
+                    <option value="tuesday">Tuesday</option>
+                    <option value="wednesday">Wednesday</option>
+                    <option value="thursday">Thursday</option>
+                    <option value="friday">Friday</option>
+                    <option value="saturday">Saturday</option>
+                  </select>
                   <span className="text-xs text-muted-foreground">
-                    Sent daily at this time (<span className="font-mono">{userTimezone}</span>)
+                    Sent weekly on this day (<span className="font-mono">{userTimezone}</span>)
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed max-w-md">
-                  Note: Daily connection syncs are automatically scheduled to run 1 hour before this alert time to ensure you receive fresh, updated data.
-                </p>
               </div>
             )}
 

@@ -453,5 +453,91 @@ body:has(input:focus, textarea:focus, select:focus) nav.fixed {
   }
 }
 
+/* ── Touch & iOS Safari Range Slider Enhancements ────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: pan-y !important;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+/* Track styling */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+}
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+}
+
+/* Thumb styling: enlarged touch hit area, smooth shadow, active scale transform */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--slider-thumb-bg, var(--primary));
+  border: 2.5px solid var(--background);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  margin-top: -8px;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--slider-thumb-bg, var(--primary));
+  border: 2.5px solid var(--background);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+input[type="range"]:active::-moz-range-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+/* ── Global Mobile & Touch Usability Enhancements ───────────────────────────── */
+/* Remove grey tap overlay on iOS Safari */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="tab"],
+[role="switch"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth WebKit momentum scrolling for all scroll containers */
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent double-tap zoom delay on interactive touch elements */
+button,
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+
 
 

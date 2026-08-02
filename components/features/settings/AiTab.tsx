@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defaults';
+import { Slider } from '@/components/ui/slider';
 
 type Provider = {
   id: string;
@@ -690,15 +691,13 @@ export default function AiTab() {
             <label className="block text-sm font-medium text-foreground mb-1">
               Auto-approve confidence threshold: {automation.aiAutoApproveThreshold}%
             </label>
-            <input
-              type="range"
+            <Slider
               min={0}
               max={100}
               value={automation.aiAutoApproveThreshold}
-              onChange={(e) => setAutomation((s) => ({ ...s, aiAutoApproveThreshold: parseInt(e.target.value) }))}
-              onMouseUp={(e) => saveSetting({ aiAutoApproveThreshold: parseInt((e.target as HTMLInputElement).value) })}
-              onTouchEnd={(e) => saveSetting({ aiAutoApproveThreshold: parseInt((e.target as HTMLInputElement).value) })}
-              className="w-full accent-primary"
+              onChange={(val) => setAutomation((s) => ({ ...s, aiAutoApproveThreshold: Math.round(val) }))}
+              onRelease={(val) => saveSetting({ aiAutoApproveThreshold: Math.round(val) })}
+              ariaLabel="Auto-approve confidence threshold"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
               <span>0% — All suggestions require review</span>

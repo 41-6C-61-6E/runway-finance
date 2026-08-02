@@ -25,6 +25,7 @@ import {
   Info,
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
@@ -281,14 +282,13 @@ export function IrmaaTab({
                   <label className="font-bold text-foreground">Interactive MAGI Surcharge Estimator</label>
                   <span className="font-mono text-primary font-bold">{formatCurrency(customTestMagi)}</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={80000}
                   max={400000}
                   step={5000}
                   value={customTestMagi}
-                  onChange={(e) => setCustomTestMagi(parseInt(e.target.value, 10))}
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-muted rounded-lg"
+                  onChange={(val) => setCustomTestMagi(Math.round(val))}
+                  ariaLabel="MAGI Surcharge Estimator"
                 />
                 <div className="flex items-center justify-between text-[11px] font-mono">
                   <span className="text-muted-foreground">Result: <strong>Tier {testMagiCalc.tier}</strong></span>

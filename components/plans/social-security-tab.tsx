@@ -25,6 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
@@ -275,14 +276,13 @@ export function SocialSecurityTab({
                     {primaryAge === 67 ? 'Full Retirement Age (100%)' : primaryAge < 67 ? `Early Claim (${(getSsMult(primaryAge) * 100).toFixed(0)}%)` : `Delayed Credit (${(getSsMult(primaryAge) * 100).toFixed(0)}%)`}
                   </span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={62}
                   max={70}
                   step={1}
                   value={primaryAge}
-                  onChange={(e) => setPrimaryAge(parseInt(e.target.value, 10))}
-                  className="w-full accent-primary cursor-pointer h-2 bg-muted rounded-lg"
+                  onChange={(val) => setPrimaryAge(Math.round(val))}
+                  ariaLabel="Primary Claiming Age"
                 />
                 <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
                   <span>Age 62 (70%)</span>
@@ -302,14 +302,14 @@ export function SocialSecurityTab({
                       {spouseAge === 67 ? 'Full Retirement Age (100%)' : spouseAge < 67 ? `Early Claim (${(getSsMult(spouseAge) * 100).toFixed(0)}%)` : `Delayed Credit (${(getSsMult(spouseAge) * 100).toFixed(0)}%)`}
                     </span>
                   </div>
-                  <input
-                    type="range"
+                  <Slider
                     min={62}
                     max={70}
                     step={1}
                     value={spouseAge}
-                    onChange={(e) => setSpouseAge(parseInt(e.target.value, 10))}
-                    className="w-full accent-purple-500 cursor-pointer h-2 bg-muted rounded-lg"
+                    onChange={(val) => setSpouseAge(Math.round(val))}
+                    accentClass="accent-purple-500"
+                    ariaLabel="Spouse Claiming Age"
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
                     <span>Age 62 (70%)</span>

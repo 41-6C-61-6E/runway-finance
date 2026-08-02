@@ -2,13 +2,13 @@ import { getDb } from '@/lib/db';
 import { userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
-import { checkDailyNetWorthChangeAndNotify } from '@/lib/services/notifications';
+import { checkWeeklyNetWorthChangeAndNotify } from '@/lib/services/notifications';
 import { logger } from '@/lib/logger';
 
-const LOG_TAG = '[daily-networth-scheduler]';
-const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+const LOG_TAG = '[weekly-networth-scheduler]';
+const CHECK_INTERVAL_MS = 15 * 60 * 1000; // Check every 15 minutes
 
-class DailyNetWorthScheduler {
+class WeeklyNetWorthScheduler {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private _isRunning = false;
 
@@ -18,7 +18,7 @@ class DailyNetWorthScheduler {
 
   async init(): Promise<void> {
     this._isRunning = true;
-    logger.info(`${LOG_TAG} Daily Net Worth Alert Scheduler initialized`);
+    logger.info(`${LOG_TAG} Weekly Net Worth Alert Scheduler initialized`);
     this.scheduleCheck();
   }
 
@@ -35,39 +35,31 @@ class DailyNetWorthScheduler {
         .select({
           userId: userSettings.userId,
           timezone: userSettings.timezone,
-          dailyNetWorthAlertTime: userSettings.dailyNetWorthAlertTime,
+          weeklyNetWorthAlertDay: userSettings.weeklyNetWorthAlertDay,
         })
         .from(userSettings)
-        .where(eq(userSettings.notifyDailyNetWorthChange, true));
+        .where(eq(userSettings.notifyWeeklyNetWorthChange, true));
 
       for (const settings of settingsList) {
         try {
           const userTz = settings.timezone || 'America/New_York';
-          const alertTime = settings.dailyNetWorthAlertTime || '18:00';
-          const [alertHour, alertMinute] = alertTime.split(':').map(Number);
+          const alertDay = (settings.weeklyNetWorthAlertDay || 'sunday').toLowerCase();
 
-          const formatter = new Intl.DateTimeFormat('en-US', {
+          const currentDay = new Date().toLocaleDateString('en-US', {
             timeZone: userTz,
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          });
-          const parts = formatter.formatToParts(new Date());
-          const hourStr = parts.find(p => p.type === 'hour')?.value || '0';
-          const minStr = parts.find(p => p.type === 'minute')?.value || '0';
-          const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
-          const alertMinutes = alertHour * 60 + alertMinute;
+            weekday: 'long',
+          }).toLowerCase();
 
-          // If current time has reached or passed the alert time, run the alert check.
-          // Database deduplication (sentNotifications table) prevents duplicate notifications.
-          if (currentMinutes >= alertMinutes) {
+          // If current day matches configured alert day (e.g. sunday), run the alert check.
+          // Database deduplication (sentNotifications table) prevents duplicate notifications within the same period.
+          if (currentDay === alertDay) {
             const dek = await getServerDEK(settings.userId);
-            await checkDailyNetWorthChangeAndNotify(settings.userId, dek);
+            await checkWeeklyNetWorthChangeAndNotify(settings.userId, dek);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (!msg.includes('No server-wrapped') && !msg.includes('No encryption keys')) {
-            logger.error(`${LOG_TAG} Error checking daily net worth alert for user ${settings.userId}:`, err);
+            logger.error(`${LOG_TAG} Error checking weekly net worth alert for user ${settings.userId}:`, err);
           }
         }
       }
@@ -90,4 +82,4 @@ class DailyNetWorthScheduler {
   }
 }
 
-export const dailyNetWorthScheduler = new DailyNetWorthScheduler();
+export const weeklyNetWorthScheduler = new WeeklyNetWorthScheduler();

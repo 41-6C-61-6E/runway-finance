@@ -151,7 +151,7 @@ export async function calculateWealthFlow(
   );
 
   let dayBeforeStr: string;
-  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
+  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d' || timeframe === '7d_discrete') {
     dayBeforeStr = startDateStr;
   } else {
     const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');

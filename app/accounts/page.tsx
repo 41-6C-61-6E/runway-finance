@@ -1371,6 +1371,7 @@ export default function AccountsPage() {
       '1d': '1d',
       ytd: '3m',
       '1d_discrete': '1d_discrete',
+      '7d_discrete': '7d_discrete',
     };
     const nextTimeframe = zoomMap[timeframe];
     if (nextTimeframe === timeframe) return; // already at minimum zoom level
@@ -1638,7 +1639,7 @@ export default function AccountsPage() {
     <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
       <PageHeader title="Accounts" icon={Landmark} />
 
-      <PageContent maxWidth="max-w-6xl" className="space-y-5 sm:space-y-6">
+      <PageContent maxWidth="max-w-7xl" className="space-y-5 sm:space-y-6">
         <>
             {/* ── Graphics / Chart Card ── */}
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
@@ -1660,7 +1661,7 @@ export default function AccountsPage() {
                     feedback={
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                          {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
+                          {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
                         </span>
                         <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                           {chartType === 'line' ? 'Area' : 'Bar'}
