@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth/session';
+import { apiSuccess, apiError } from '@/lib/api/response';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
 import { eq, and, isNull, asc, inArray, ne } from 'drizzle-orm';
@@ -10,14 +11,14 @@ import { decryptRows, decryptField } from '@/lib/crypto';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
+  const authUser = await getAuthUser();
+  if (!authUser) {
+    return apiError('Authentication required', 401);
   }
 
-  const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const { userId, dataUserId } = authUser;
   const dek = await getSessionDEK();
+
 
   const result = await getDb()
     .select()
@@ -68,14 +69,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
+  const authUser = await getAuthUser();
+  if (!authUser) {
+    return apiError('Authentication required', 401);
   }
 
-  const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const { userId, dataUserId } = authUser;
   const dek = await getSessionDEK();
+
 
   let body: {
     name?: string;
