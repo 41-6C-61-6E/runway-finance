@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactEstimate, formatRedfinSuccessMessage } from './estimate-helpers';
 
 const PROPERTY_TYPES = [
   { value: 'single-family', label: 'Single Family Home' },
@@ -138,7 +139,7 @@ export function PropertyCards() {
       } else {
         setValidationResult({
           status: 'success',
-          message: `Valid address! Redfin Estimate: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.price)}`,
+          message: formatRedfinSuccessMessage(data.price),
           price: data.price,
           estimates: data.estimates,
         });
@@ -536,19 +537,13 @@ export function PropertyCards() {
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="conservative">
-                  {validationResult?.estimates?.conservative
-                    ? `Conservative - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.conservative)}`
-                    : 'Conservative (Low Range)'}
+                  {formatCompactEstimate('Conservative', validationResult?.estimates?.conservative) || 'Conservative (Low Range)'}
                 </option>
                 <option value="normal">
-                  {validationResult?.estimates?.normal
-                    ? `Normal - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.normal)}`
-                    : 'Normal (Estimated Value)'}
+                  {formatCompactEstimate('Normal', validationResult?.estimates?.normal) || 'Normal (Estimated Value)'}
                 </option>
                 <option value="optimistic">
-                  {validationResult?.estimates?.optimistic
-                    ? `Optimistic - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(validationResult.estimates.optimistic)}`
-                    : 'Optimistic (High Range)'}
+                  {formatCompactEstimate('Optimistic', validationResult?.estimates?.optimistic) || 'Optimistic (High Range)'}
                 </option>
               </select>
             </div>

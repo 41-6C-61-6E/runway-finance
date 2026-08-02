@@ -1,21 +1,39 @@
+const formatterCache = new Map<string, Intl.NumberFormat>();
+
+function getCachedFormatter(
+  locale: string,
+  currency: string,
+  options?: Intl.NumberFormatOptions
+): Intl.NumberFormat {
+  const key = `${locale}-${currency}-${JSON.stringify(options || {})}`;
+  let formatter = formatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      ...options,
+    });
+    formatterCache.set(key, formatter);
+  }
+  return formatter;
+}
+
 /**
- * Format a number as currency
+ * Format a number as currency with options caching
  */
 export function formatCurrency(
   amount: number | string | undefined | null,
   currency = 'USD',
-  locale = 'en-US'
+  locale = 'en-US',
+  options?: Intl.NumberFormatOptions
 ): string {
   const val = amount === undefined || amount === null ? 0 : amount;
   const num = typeof val === 'string' ? parseFloat(val) : val;
   const validNum = isNaN(num) ? 0 : num;
   
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(validNum);
+  return getCachedFormatter(locale, currency, options).format(validNum);
 }
 
 /**
@@ -39,8 +57,6 @@ export function formatPercent(
 export function formatDate(date: Date | string, locale = 'en-US'): string {
   let d: Date;
   if (typeof date === 'string') {
-    // Append T00:00:00 to parse as local time, not UTC
-    // This prevents toLocaleDateString() from shifting the date by a timezone offset
     d = new Date(date + 'T00:00:00');
   } else {
     d = date;

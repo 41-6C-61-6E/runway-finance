@@ -21,7 +21,6 @@ export const ASSET_ACCOUNT_TYPES = [
   'condo',
   'townhouse',
   'multi-family',
-  'other',
   'otherinvestment',
   'otherInvestment',
   'rothira',
@@ -35,6 +34,54 @@ export const ASSET_ACCOUNT_TYPES = [
   'hsachecking',
   'health',
 ];
+
+export const REAL_ESTATE_TYPES = [
+  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+  'single-family', 'condo', 'townhouse', 'multi-family'
+];
+
+export const SYNCABLE_TYPES = [
+  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'
+] as const;
+
+export const ASSET_CATEGORY_MAP: Record<string, string> = {
+  checking: 'Cash & Checking',
+  savings: 'Savings',
+  hsachecking: 'HSA (Checking)',
+  investment: 'Taxable Brokerage',
+  brokerage: 'Taxable Brokerage',
+  otherinvestment: 'Other Investments',
+  retirement: 'Retirement',
+  rothira: 'Retirement',
+  traditionalira: 'Retirement',
+  '401k': 'Retirement',
+  '403b': 'Retirement',
+  sepira: 'Retirement',
+  simpleira: 'Retirement',
+  hsa: 'HSA (Investment)',
+  health: 'HSA (Investment)',
+  realestate: 'Real Estate',
+  primaryhome: 'Real Estate',
+  secondaryhome: 'Real Estate',
+  rentalproperty: 'Real Estate',
+  commercial: 'Real Estate',
+  land: 'Real Estate',
+  otherrealestate: 'Real Estate',
+  vehicle: 'Vehicle',
+  crypto: 'Other Investments',
+  metals: 'Other Investments',
+  '529': 'Other Investments',
+  otherAsset: 'Other Investments',
+  other: 'Other Investments',
+};
+
+export const LIABILITY_CATEGORY_MAP: Record<string, string> = {
+  credit: 'Credit Cards',
+  loan: 'Loans',
+  mortgage: 'Mortgages',
+  otherLiability: 'Other Debt',
+  otherliability: 'Other Debt',
+};
 
 export const isInvestmentAccount = (type: string) => ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
   'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529',
@@ -176,4 +223,3 @@ export function isFireEligibleAccount(acc: any): boolean {
       rawCategory.includes(kw)
   );
 }
-

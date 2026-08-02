@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
-import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
+import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, ASSET_CATEGORY_MAP, LIABILITY_CATEGORY_MAP } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/services/account-history';
 
 type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
@@ -25,45 +25,6 @@ function formatInTimezone(date: Date, tz: string): string {
   const day = parts.find(p => p.type === 'day')?.value;
   return `${year}-${month}-${day}`;
 }
-
-const assetCategoryMap: Record<string, string> = {
-  checking: 'Cash & Checking',
-  savings: 'Savings',
-  hsachecking: 'HSA (Checking)',
-  investment: 'Taxable Brokerage',
-  brokerage: 'Taxable Brokerage',
-  otherinvestment: 'Other Investments',
-  retirement: 'Retirement',
-  rothira: 'Retirement',
-  traditionalira: 'Retirement',
-  '401k': 'Retirement',
-  '403b': 'Retirement',
-  sepira: 'Retirement',
-  simpleira: 'Retirement',
-  hsa: 'HSA (Investment)',
-  health: 'HSA (Investment)',
-  realestate: 'Real Estate',
-  primaryhome: 'Real Estate',
-  secondaryhome: 'Real Estate',
-  rentalproperty: 'Real Estate',
-  commercial: 'Real Estate',
-  land: 'Real Estate',
-  otherrealestate: 'Real Estate',
-  vehicle: 'Vehicle',
-  crypto: 'Other Investments',
-  metals: 'Other Investments',
-  '529': 'Other Investments',
-  otherAsset: 'Other Investments',
-  other: 'Other Investments',
-};
-
-const liabilityCategoryMap: Record<string, string> = {
-  credit: 'Credit Cards',
-  loan: 'Loans',
-  mortgage: 'Mortgages',
-  otherLiability: 'Other Debt',
-  otherliability: 'Other Debt',
-};
 
 function getDateRange(timeframe: TimeFrame): [Date, Date] {
   const endDate = new Date();
@@ -207,12 +168,12 @@ export async function GET(request: Request) {
         let categoryName = 'Other';
 
         if (isAssetAccount(accountType)) {
-          categoryName = assetCategoryMap[accountType] || 'Other Investments';
+          categoryName = ASSET_CATEGORY_MAP[accountType] || 'Other Investments';
           breakdown[categoryName] = (breakdown[categoryName] || 0) + convertedBal;
           totalAssets += convertedBal;
           allBreakdownCategories.add(categoryName);
         } else if (isLiabilityAccount(accountType)) {
-          categoryName = liabilityCategoryMap[accountType] || 'Other Debt';
+          categoryName = LIABILITY_CATEGORY_MAP[accountType] || 'Other Debt';
           breakdown[categoryName] = (breakdown[categoryName] || 0) + Math.abs(convertedBal);
           totalLiabilities += Math.abs(convertedBal);
           allBreakdownCategories.add(categoryName);
