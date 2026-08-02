@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { ChartErrorBoundary } from '@/components/chart-error-boundary';
+import { AppTabs } from '@/components/ui/app-tabs';
 
 type Tab = 'wealth' | 'cash';
 
@@ -18,30 +19,16 @@ function FlowsContent() {
     <div className="min-h-screen w-full">
       <PageHeader title="Flows" icon={ArrowLeftRight} />
       <PageContent>
-        <div className="flex border-b border-border w-full sm:w-auto gap-6 mb-5 sm:mb-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab('wealth')}
-            className={`pb-2 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-              activeTab === 'wealth'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Wealth Flow
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('cash')}
-            className={`pb-2 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-              activeTab === 'cash'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Cash Flow
-          </button>
-        </div>
+        <AppTabs
+          tabs={[
+            { id: 'wealth', label: 'Wealth Flow' },
+            { id: 'cash', label: 'Cash Flow' },
+          ]}
+          activeTab={activeTab}
+          onChange={(tabId) => setActiveTab(tabId as Tab)}
+          variant="underline"
+          className="mb-5 sm:mb-6"
+        />
 
         {activeTab === 'wealth' && (
           <Suspense fallback={<LoadingSpinner category="chart" />}>

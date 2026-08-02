@@ -50,7 +50,7 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
         &larr;
       </button>
       <div className="group relative font-sans" ref={ref}>
-        {timeframe === '1d_discrete' ? (
+        {timeframe === '1d_discrete' || timeframe === '7d_discrete' ? (
           <>
             <button
               className="text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 sm:px-1.5 sm:py-0.5 rounded transition-colors group-hover:bg-muted cursor-pointer"

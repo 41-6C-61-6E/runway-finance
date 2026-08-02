@@ -8,6 +8,7 @@ import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
@@ -1248,15 +1249,14 @@ export function ProjectionTab({
               <span className="font-semibold text-muted-foreground">Retirement Age</span>
               <span className="font-mono font-bold text-primary text-sm">{localRetirementAge}</span>
             </div>
-            <input
-              type="range"
-              min="40"
-              max="75"
-              step="1"
+            <Slider
+              min={40}
+              max={75}
+              step={1}
               value={localRetirementAge}
-              onChange={(e) => setLocalRetirementAge(parseInt(e.target.value, 10))}
-              onPointerUp={() => onUpdatePlan({ retirementAge: localRetirementAge })}
-              className="w-full accent-primary h-2 cursor-pointer"
+              onChange={(val) => setLocalRetirementAge(Math.round(val))}
+              onRelease={(val) => onUpdatePlan({ retirementAge: Math.round(val) })}
+              ariaLabel="Primary Retirement Age"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>40</span>
@@ -1273,15 +1273,14 @@ export function ProjectionTab({
                 <span className="font-semibold text-muted-foreground">{plan?.spouseName || 'Spouse'} Retirement</span>
                 <span className="font-mono font-bold text-primary text-sm">{localSpouseRetirementAge}</span>
               </div>
-              <input
-                type="range"
-                min="40"
-                max="75"
-                step="1"
+              <Slider
+                min={40}
+                max={75}
+                step={1}
                 value={localSpouseRetirementAge}
-                onChange={(e) => setLocalSpouseRetirementAge(parseInt(e.target.value, 10))}
-                onPointerUp={() => onUpdatePlan({ spouseRetirementAge: localSpouseRetirementAge })}
-                className="w-full accent-primary h-2 cursor-pointer"
+                onChange={(val) => setLocalSpouseRetirementAge(Math.round(val))}
+                onRelease={(val) => onUpdatePlan({ spouseRetirementAge: Math.round(val) })}
+                ariaLabel="Spouse Retirement Age"
               />
               <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
                 <span>40</span>
@@ -1298,14 +1297,13 @@ export function ProjectionTab({
               <span className="font-semibold text-muted-foreground">Expected Annual Return</span>
               <span className="font-mono font-bold text-primary text-sm">{localReturnRate > 0 ? `+${localReturnRate}%` : `${localReturnRate}%`}</span>
             </div>
-            <input
-              type="range"
-              min="1"
-              max="12"
-              step="0.5"
+            <Slider
+              min={1}
+              max={12}
+              step={0.5}
               value={localReturnRate}
-              onChange={(e) => setLocalReturnRate(parseFloat(e.target.value))}
-              className="w-full accent-primary h-2 cursor-pointer"
+              onChange={(val) => setLocalReturnRate(val)}
+              ariaLabel="Expected Annual Return Rate"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>1%</span>
@@ -1321,14 +1319,13 @@ export function ProjectionTab({
               <span className="font-semibold text-muted-foreground">Inflation Rate</span>
               <span className="font-mono font-bold text-primary text-sm">{localInflationRate.toFixed(1)}%</span>
             </div>
-            <input
-              type="range"
-              min="1.0"
-              max="6.0"
-              step="0.25"
+            <Slider
+              min={1.0}
+              max={6.0}
+              step={0.25}
               value={localInflationRate}
-              onChange={(e) => setLocalInflationRate(parseFloat(e.target.value))}
-              className="w-full accent-primary h-2 cursor-pointer"
+              onChange={(val) => setLocalInflationRate(val)}
+              ariaLabel="Inflation Rate"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>1.0%</span>
@@ -1343,14 +1340,13 @@ export function ProjectionTab({
               <span className="font-semibold text-muted-foreground">Expense Adjustment</span>
               <span className="font-mono font-bold text-primary text-sm">{localExpenseModifier > 0 ? `+${localExpenseModifier}%` : `${localExpenseModifier}%`}</span>
             </div>
-            <input
-              type="range"
-              min="-30"
-              max="30"
-              step="5"
+            <Slider
+              min={-30}
+              max={30}
+              step={5}
               value={localExpenseModifier}
-              onChange={(e) => setLocalExpenseModifier(parseInt(e.target.value, 10))}
-              className="w-full accent-primary h-2 cursor-pointer"
+              onChange={(val) => setLocalExpenseModifier(Math.round(val))}
+              ariaLabel="Expense Adjustment Percentage"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>-30%</span>

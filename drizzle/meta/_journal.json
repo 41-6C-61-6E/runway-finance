@@ -526,6 +526,13 @@
       "when": 1753238400000,
       "tag": "0074_add_allow_penalty_withdrawals",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1785688666870,
+      "tag": "0075_naive_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

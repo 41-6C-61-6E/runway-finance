@@ -9,6 +9,7 @@ import DataCleanup from './DataCleanup';
 import ContentWrapper from '@/components/content-wrapper';
 import { PageHeader } from '@/components/page-header';
 import { Database } from 'lucide-react';
+import { AppTabs } from '@/components/ui/app-tabs';
 
 type ColumnMeta = {
   field: string;
@@ -262,28 +263,16 @@ export default function DataExplorerPage() {
         <ContentWrapper>
           <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
             {/* Tabs */}
-            <div className="flex border-b border-border w-full gap-6 mb-5 sm:mb-6">
-              <button
-                onClick={() => setActiveTab('explore')}
-                className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-                  activeTab === 'explore'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Explore Data
-              </button>
-              <button
-                onClick={() => setActiveTab('cleanup')}
-                className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-                  activeTab === 'cleanup'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Data Cleanup
-              </button>
-            </div>
+            <AppTabs
+              tabs={[
+                { id: 'explore', label: 'Explore Data' },
+                { id: 'cleanup', label: 'Data Cleanup' },
+              ]}
+              activeTab={activeTab}
+              onChange={(tabId) => setActiveTab(tabId as 'explore' | 'cleanup')}
+              variant="underline"
+              className="mb-5 sm:mb-6"
+            />
 
             {error && activeTab === 'explore' && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg mb-4">
