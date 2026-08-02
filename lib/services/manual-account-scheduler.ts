@@ -7,9 +7,10 @@ import { logger } from '@/lib/logger';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
-const LOG_TAG = '[manual-account-scheduler]';
+import { BaseScheduler } from '@/lib/services/base-scheduler';
+import { REAL_ESTATE_TYPES, SYNCABLE_TYPES } from '@/lib/utils/account-scope';
 
-const SYNCABLE_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'] as const;
+const LOG_TAG = '[manual-account-scheduler]';
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
@@ -20,22 +21,8 @@ const SYNC_INTERVALS: Record<string, number> = {
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
-const REAL_ESTATE_TYPES = [
-  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-  'single-family', 'condo', 'townhouse', 'multi-family'
-];
-
 export function isRealEstateType(type: string): boolean {
   return REAL_ESTATE_TYPES.includes(type);
-}
-
-async function canSyncUser(userId: string): Promise<boolean> {
-  try {
-    await getServerDEK(userId);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<string> {
@@ -59,13 +46,7 @@ async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<s
   }
 }
 
-class ManualAccountScheduler {
-  private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  private _isRunning = false;
-
-  get isRunning(): boolean {
-    return this._isRunning;
-  }
+class ManualAccountScheduler extends BaseScheduler<string> {
 
   async init(): Promise<void> {
     const db = getDb();
@@ -89,7 +70,7 @@ class ManualAccountScheduler {
     for (const row of accountRows) {
       if (!SYNCABLE_TYPES.includes(row.type as typeof SYNCABLE_TYPES[number])) continue;
 
-      if (!(await canSyncUser(row.userId))) {
+      if (!(await this.canSyncUser(row.userId))) {
         logger.warn(`${LOG_TAG} Skipping account — server DEK unavailable`, {
           accountId: row.id,
           userId: row.userId,

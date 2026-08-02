@@ -6,16 +6,13 @@ import { runAutoGenerate } from '@/lib/services/paystub-auto-generate';
 import { logger } from '@/lib/logger';
 import { logJobStart, logJobEnd } from '@/lib/services/scheduler-logger';
 
+import { BaseScheduler } from '@/lib/services/base-scheduler';
+
 const LOG_TAG = '[paystub-auto-generate-scheduler]';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-class PaystubAutoGenerateScheduler {
+class PaystubAutoGenerateScheduler extends BaseScheduler<string> {
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private _isRunning = false;
-
-  get isRunning(): boolean {
-    return this._isRunning;
-  }
 
   async init(): Promise<void> {
     this._isRunning = true;
