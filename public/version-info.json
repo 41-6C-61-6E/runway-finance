@@ -1,7 +1,8 @@
 {
-  "buildNumber": "26.08.1785639399702",
-  "buildTime": "2026-08-02T02:56:39.702Z",
+  "buildNumber": "26.08.1785688947833",
+  "buildTime": "2026-08-02T16:42:27.833Z",
   "commits": [
+    "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
     "feat: add PWA update prompt to changelog modal and update dialog z-index and overlay style",
     "style: update transaction account badge colors and decrease font weight to semi-bold",
     "feat: implement changelog modal to display version history and recent commits",
@@ -200,10 +201,17 @@
     "investments improvements",
     "visual improvements",
     "layout",
-    "investment holdings sync fix",
-    "better UI contrast"
+    "investment holdings sync fix"
   ],
   "history": [
+    {
+      "hash": "ad04903",
+      "fullHash": "ad049037410b7b98967b592f28e55364803b89a6",
+      "author": "Alan Racek",
+      "date": "2026-08-01T19:57:57-07:00",
+      "message": "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
+      "type": "feat"
+    },
     {
       "hash": "04d1c73",
       "fullHash": "04d1c73d9ffa65de23770dbcf89121c2fcf4dc3c",
@@ -1794,14 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-10T14:58:46-07:00",
       "message": "investment holdings sync fix",
-      "type": "other"
-    },
-    {
-      "hash": "c8b52bc",
-      "fullHash": "c8b52bcfaa714a174309504018a0deeb66b77e40",
-      "author": "Alan Racek",
-      "date": "2026-06-10T13:07:10-07:00",
-      "message": "better UI contrast",
       "type": "other"
     }
   ]

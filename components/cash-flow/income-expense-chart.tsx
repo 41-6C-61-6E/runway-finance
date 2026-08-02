@@ -61,6 +61,7 @@ const MONTH_MAP: Record<TimeRange, number> = {
   '1d': 1, '7d': 1, '30d': 1, '365d': 12,
   '1m': 1, '3m': 3, '6m': 6, '1y': 12, '5y': 60, 'ytd': 12, 'all': 120,
   '1d_discrete': 1,
+  '7d_discrete': 1,
 };
 
 const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', 'ytd', 'all', '30d', '365d', '5y'].includes(p.value));
@@ -506,7 +507,7 @@ export function IncomeExpenseChart() {
             }
             feedbackItems={[
               <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
+                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
               </span>,
               <span key="chartType" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {chartType.toUpperCase()}

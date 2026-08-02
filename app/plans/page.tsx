@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Flame, TrendingUp, ListChecks, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { ProjectionTab } from '@/components/plans/projection-tab';
 import { PlanDetailsTab } from '@/components/plans/plan-details-tab';
 import { ScenariosTab } from '@/components/plans/scenarios-tab';
@@ -251,7 +252,7 @@ export default function PlansPage() {
   if (loading) {
     return (
       <div className="min-h-screen w-full pb-12">
-        <PageHeader title="FIRE Engine & Projections" icon={Flame} />
+        <PageHeader title="FIRE" icon={Flame} />
         <PageContent>
           <div className="flex items-center justify-center py-24">
             <div className="flex flex-col items-center gap-3">
@@ -268,7 +269,7 @@ export default function PlansPage() {
   if (plansList.length === 0) {
     return (
       <div className="min-h-screen w-full pb-12">
-        <PageHeader title="FIRE Engine & Projections" icon={Flame} />
+        <PageHeader title="FIRE" icon={Flame} />
         <PageContent>
           <div className="flex items-center justify-center py-24">
             <div className="flex flex-col items-center gap-4 max-w-md text-center">
@@ -303,33 +304,19 @@ export default function PlansPage() {
 
   return (
     <div className="min-h-screen w-full pb-12">
-      <PageHeader title="FIRE Engine & Projections" icon={Flame} />
+      <PageHeader title="FIRE" icon={Flame} />
 
       <PageContent>
         <div className="space-y-6">
           {/* App Consistent Tab Navigation Bar with Enhanced Plan Selector */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-6 gap-4">
-            {/* App Style Tabs */}
-            <div className="flex items-center gap-6 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`pb-2.5 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      isActive
-                        ? 'border-primary text-primary font-bold'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
+            <AppTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={(tabId) => setActiveTab(tabId as any)}
+              variant="underline"
+              className="border-b-0 -mb-1"
+            />
 
             {/* Plan Selector & Management Controls */}
             <PlanManagementMenu

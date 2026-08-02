@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { InvestmentsSummary } from '@/components/investments/investments-summary';
 import { PerformanceChart } from '@/components/investments/performance-chart';
@@ -140,25 +141,17 @@ export default function InvestmentsPage() {
             )}
 
             {/* ── Tabs Selector ── */}
-            <div className="flex border-b border-border w-full overflow-x-auto scrollbar-none snap-x snap-mandatory gap-6 mb-5 sm:mb-6">
-              {([
+            <AppTabs
+              tabs={[
                 { id: 'overview', label: 'Overview' },
                 { id: 'holdings', label: 'Holdings & Portfolio' },
                 { id: 'income', label: 'Income & Activity' },
-              ] as const).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`pb-2.5 px-1 snap-start text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-                    activeTab === tab.id
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+              ]}
+              activeTab={activeTab}
+              onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+              variant="underline"
+              className="mb-5 sm:mb-6"
+            />
 
             {/* ── Overview Tab Content ── */}
             {activeTab === 'overview' && (

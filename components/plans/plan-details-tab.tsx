@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
@@ -712,14 +713,13 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                 </span>
                               </div>
                               <div className="flex items-center gap-3">
-                                <input
-                                  type="range"
+                                <Slider
                                   min={0}
                                   max={100}
                                   step={5}
                                   value={acc.rothPercentage ?? 0}
-                                  onChange={(e) => handleUpdateContribution(accId, { rothPercentage: parseInt(e.target.value, 10) })}
-                                  className="w-full accent-primary h-1.5 bg-muted rounded-lg cursor-pointer"
+                                  onChange={(val) => handleUpdateContribution(accId, { rothPercentage: Math.round(val) })}
+                                  ariaLabel="Roth vs Traditional Split Percentage"
                                 />
                                 <div className="relative w-24 shrink-0">
                                   <input

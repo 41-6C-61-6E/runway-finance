@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function AiSuggestionsPage() {
   const router = useRouter();
@@ -11,8 +12,8 @@ export default function AiSuggestionsPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-      Redirecting to Transactions AI Suggestions...
+    <div className="min-h-screen flex items-center justify-center">
+      <LoadingSpinner category="default" />
     </div>
   );
 }

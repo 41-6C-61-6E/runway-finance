@@ -415,7 +415,7 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
   }
 }
 
-export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uint8Array) {
+export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Uint8Array) {
   try {
     const db = getDb();
     const [settings] = await db
@@ -424,29 +424,21 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
       .where(eq(userSettings.userId, userId))
       .limit(1);
 
-    if (!settings || !settings.notifyDailyNetWorthChange) return;
+    if (!settings || !settings.notifyWeeklyNetWorthChange) return;
 
-    // Gate on the user's preferred alert time — skip if current time hasn't reached it yet.
-    // The next sync after the alert time will trigger the notification (dedup key prevents duplicates).
-    const alertTime = settings.dailyNetWorthAlertTime || '18:00';
+    // Gate on the user's preferred alert day (default sunday)
+    const alertDay = (settings.weeklyNetWorthAlertDay || 'sunday').toLowerCase();
     const userTz = settings.timezone || 'America/New_York';
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const currentDay = new Date().toLocaleDateString('en-US', {
       timeZone: userTz,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(new Date());
-    const hourStr = parts.find(p => p.type === 'hour')?.value || '0';
-    const minStr = parts.find(p => p.type === 'minute')?.value || '0';
-    const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
-    const [alertHour, alertMinute] = alertTime.split(':').map(Number);
-    const alertMinutes = alertHour * 60 + alertMinute;
-    if (currentMinutes < alertMinutes) {
-      logger.debug('[notifications-service] Skipping daily net worth change alert: before configured alert time', {
+      weekday: 'long',
+    }).toLowerCase();
+
+    if (currentDay !== alertDay) {
+      logger.debug('[notifications-service] Skipping weekly net worth change alert: not configured alert day', {
         userId,
-        alertTime,
-        currentTime: `${hourStr}:${minStr}`,
+        alertDay,
+        currentDay,
       });
       return;
     }
@@ -464,29 +456,18 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
 
     if (snapshots.length < 2) return;
 
-    // Enforce that the two snapshots are consecutive days (at most 2 days apart to handle timezone/DST offsets)
-    const date0 = new Date(snapshots[0].snapshotDate);
-    const date1 = new Date(snapshots[1].snapshotDate);
-    const diffTime = Math.abs(date0.getTime() - date1.getTime());
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    if (diffDays > 2) {
-      logger.info('[notifications-service] Skipping daily net worth change alert: snapshots are not consecutive', {
-        userId,
-        date0: snapshots[0].snapshotDate,
-        date1: snapshots[1].snapshotDate,
-        diffDays,
-      });
-      return;
-    }
-
     const snapshotDateStr = snapshots[0].snapshotDate; // e.g. YYYY-MM-DD
-    const flowData = await calculateWealthFlow(userId, snapshotDateStr, snapshotDateStr, dek, [], '1d_discrete');
+    const snapshotDate = new Date(snapshotDateStr + 'T00:00:00Z');
+    const startDateDate = new Date(snapshotDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startDateStr = startDateDate.toISOString().split('T')[0];
+
+    const flowData = await calculateWealthFlow(userId, startDateStr, snapshotDateStr, dek, [], '7d_discrete');
     const diff = flowData.summary.netWorthChange;
 
     // Use a 1-cent threshold to avoid floating-point noise producing "$0.00" alerts
     if (isNaN(diff) || Math.abs(diff) < 0.01) return;
 
-    const key = `daily_net_worth_change:${snapshotDateStr}`;
+    const key = `weekly_net_worth_change:${snapshotDateStr}`;
 
     const formattedDiff = new Intl.NumberFormat(settings.locale || 'en-US', {
       style: 'currency',
@@ -505,18 +486,18 @@ export async function checkDailyNetWorthChangeAndNotify(userId: string, dek: Uin
     });
 
     const actualToday = new Date().toISOString().split('T')[0];
-    const timePhrase = snapshotDateStr === actualToday ? 'in the last Day' : `on ${formattedDate}`;
+    const timePhrase = snapshotDateStr === actualToday ? 'in the last week' : `for week ending ${formattedDate}`;
 
     await sendPushNotification(
       userId,
-      `Daily Net Worth Alert ${arrow}`,
+      `Weekly Net Worth Alert ${arrow}`,
       `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
-      `/flows?timeframe=1d_discrete&date=${snapshotDateStr}`,
-      'daily_net_worth_change',
+      `/flows?timeframe=7d_discrete&date=${snapshotDateStr}`,
+      'weekly_net_worth_change',
       key
     );
   } catch (err) {
-    logger.error('[notifications-service] Error checking daily net worth changes:', err);
+    logger.error('[notifications-service] Error checking weekly net worth changes:', err);
   }
 }
 

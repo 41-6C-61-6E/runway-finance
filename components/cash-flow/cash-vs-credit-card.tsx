@@ -345,7 +345,7 @@ export function CashVsCreditCard() {
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
               <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : timeframe.toUpperCase()}
+                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
               </span>
             }
             rightActions={

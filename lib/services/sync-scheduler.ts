@@ -150,16 +150,12 @@ class SyncScheduler {
       if (finalUserId) {
         const db = getDb();
         const [settings] = await db
-          .select({
-            timezone: userSettings.timezone,
-            dailyNetWorthAlertTime: userSettings.dailyNetWorthAlertTime,
-          })
+          .select({ timezone: userSettings.timezone })
           .from(userSettings)
           .where(eq(userSettings.userId, finalUserId))
           .limit(1);
-
         const userTz = settings?.timezone || 'America/New_York';
-        const alertTime = settings?.dailyNetWorthAlertTime || '18:00';
+        const alertTime = '18:00';
         const [alertHour, alertMinute] = alertTime.split(':').map(Number);
 
         // Target time is 1 hour before the alert time

@@ -8,7 +8,7 @@ export function getCurrentMonth(): string {
 export function snapToPeriod(ym: string, timeframe: TimeRange): string {
   if (timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return ym;
   
-  if (timeframe === '1d_discrete') {
+  if (timeframe === '1d_discrete' || timeframe === '7d_discrete') {
     if (/^\d{4}-\d{2}-\d{2}$/.test(ym)) return ym;
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -72,7 +72,7 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
     return { start: `${cy}-01`, end: currentYm };
   }
 
-  if (timeframe === '1d_discrete') {
+  if (timeframe === '1d_discrete' || timeframe === '7d_discrete') {
     const baseEnd = end.slice(0, 7);
     return { start: baseEnd, end: baseEnd };
   }
@@ -96,6 +96,17 @@ export function getPreciseDateRange(timeframe: TimeRange, windowEnd?: string): {
     const dateStr = windowEnd || todayStr;
     const cleanDateStr = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : `${dateStr.slice(0, 7)}-01`;
     return { start: cleanDateStr, end: cleanDateStr };
+  }
+
+  if (timeframe === '7d_discrete') {
+    const today = new Date();
+    const todayStr = formatDate(today);
+    const dateStr = windowEnd || todayStr;
+    const cleanEndStr = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : `${dateStr.slice(0, 7)}-01`;
+    const [ey, em, ed] = cleanEndStr.split('-').map(Number);
+    const endDate = new Date(ey, em - 1, ed);
+    const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return { start: formatDate(startDate), end: cleanEndStr };
   }
 
   if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
@@ -128,6 +139,17 @@ export function getPeriodLabel(ym: string, timeframe: TimeRange): string {
     const cleanDateStr = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : `${dateStr.slice(0, 7)}-01`;
     const [y, m, d] = cleanDateStr.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  if (timeframe === '7d_discrete') {
+    const dateStr = ym;
+    const cleanEndStr = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : `${dateStr.slice(0, 7)}-01`;
+    const [ey, em, ed] = cleanEndStr.split('-').map(Number);
+    const endDate = new Date(ey, em - 1, ed);
+    const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startLabel} – ${endLabel}`;
   }
 
   const base = ym.includes('-') && ym.split('-').length === 3 ? ym.slice(0, 7) : ym;

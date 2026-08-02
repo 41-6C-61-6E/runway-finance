@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell, Loader2 } from 'lucide-react';
@@ -774,13 +775,12 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                       </div>
                     </div>
 
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
+                    <Slider
+                      min={0}
+                      max={100}
                       value={rothPercentage}
-                      onChange={(e) => setRothPercentage(parseInt(e.target.value, 10))}
-                      className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                      onChange={(val) => setRothPercentage(Math.round(val))}
+                      ariaLabel="Roth Percentage Split"
                     />
 
                     {/* Split preview */}

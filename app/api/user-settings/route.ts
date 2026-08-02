@@ -69,8 +69,8 @@ export async function GET() {
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
-      notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
-      dailyNetWorthAlertTime: created?.dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
+      notifyWeeklyNetWorthChange: created?.notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
+      weeklyNetWorthAlertDay: created?.weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -126,8 +126,8 @@ export async function GET() {
     notifyGoalMilestones: settings[0].notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
     notifyNetWorthMilestones: settings[0].notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
     netWorthMilestoneInterval: settings[0].netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
-    notifyDailyNetWorthChange: settings[0].notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
-    dailyNetWorthAlertTime: settings[0].dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
+    notifyWeeklyNetWorthChange: settings[0].notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
+    weeklyNetWorthAlertDay: settings[0].weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -180,8 +180,8 @@ export async function PATCH(request: Request) {
 	const notifyGoalMilestones = body.notifyGoalMilestones;
 	const notifyNetWorthMilestones = body.notifyNetWorthMilestones;
 	const netWorthMilestoneInterval = body.netWorthMilestoneInterval;
-	const notifyDailyNetWorthChange = body.notifyDailyNetWorthChange;
-	const dailyNetWorthAlertTime = body.dailyNetWorthAlertTime;
+	const notifyWeeklyNetWorthChange = body.notifyWeeklyNetWorthChange;
+	const weeklyNetWorthAlertDay = body.weeklyNetWorthAlertDay;
 	const notifyAiProposals = body.notifyAiProposals;
 	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
@@ -358,11 +358,12 @@ export async function PATCH(request: Request) {
 	if (netWorthMilestoneInterval !== undefined && (typeof netWorthMilestoneInterval !== 'number' || netWorthMilestoneInterval <= 0)) {
 		return Response.json({ error: 'Invalid netWorthMilestoneInterval value' }, { status: 400 });
 	}
-	if (notifyDailyNetWorthChange !== undefined && typeof notifyDailyNetWorthChange !== 'boolean') {
-		return Response.json({ error: 'Invalid notifyDailyNetWorthChange value' }, { status: 400 });
+	if (notifyWeeklyNetWorthChange !== undefined && typeof notifyWeeklyNetWorthChange !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyWeeklyNetWorthChange value' }, { status: 400 });
 	}
-	if (dailyNetWorthAlertTime !== undefined && (typeof dailyNetWorthAlertTime !== 'string' || !/^\d{2}:\d{2}$/.test(dailyNetWorthAlertTime))) {
-		return Response.json({ error: 'Invalid dailyNetWorthAlertTime value. Expected HH:MM format.' }, { status: 400 });
+	const VALID_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+	if (weeklyNetWorthAlertDay !== undefined && (typeof weeklyNetWorthAlertDay !== 'string' || !VALID_DAYS.includes(weeklyNetWorthAlertDay.toLowerCase()))) {
+		return Response.json({ error: 'Invalid weeklyNetWorthAlertDay value. Expected day of week.' }, { status: 400 });
 	}
 	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
@@ -424,8 +425,8 @@ export async function PATCH(request: Request) {
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
       notifyNetWorthMilestones: created?.notifyNetWorthMilestones ?? DEFAULTS.notifyNetWorthMilestones,
       netWorthMilestoneInterval: created?.netWorthMilestoneInterval ?? DEFAULTS.netWorthMilestoneInterval,
-      notifyDailyNetWorthChange: created?.notifyDailyNetWorthChange ?? DEFAULTS.notifyDailyNetWorthChange,
-      dailyNetWorthAlertTime: created?.dailyNetWorthAlertTime ?? DEFAULTS.dailyNetWorthAlertTime,
+      notifyWeeklyNetWorthChange: created?.notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
+      weeklyNetWorthAlertDay: created?.weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
@@ -480,8 +481,8 @@ export async function PATCH(request: Request) {
 	if (notifyGoalMilestones !== undefined) updates.notifyGoalMilestones = notifyGoalMilestones;
 	if (notifyNetWorthMilestones !== undefined) updates.notifyNetWorthMilestones = notifyNetWorthMilestones;
 	if (netWorthMilestoneInterval !== undefined) updates.netWorthMilestoneInterval = netWorthMilestoneInterval;
-	if (notifyDailyNetWorthChange !== undefined) updates.notifyDailyNetWorthChange = notifyDailyNetWorthChange;
-	if (dailyNetWorthAlertTime !== undefined) updates.dailyNetWorthAlertTime = dailyNetWorthAlertTime;
+	if (notifyWeeklyNetWorthChange !== undefined) updates.notifyWeeklyNetWorthChange = notifyWeeklyNetWorthChange;
+	if (weeklyNetWorthAlertDay !== undefined) updates.weeklyNetWorthAlertDay = weeklyNetWorthAlertDay.toLowerCase();
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
 	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
 	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
@@ -633,7 +634,7 @@ export async function PATCH(request: Request) {
     });
   }
 
-  if (timezone !== undefined || dailyNetWorthAlertTime !== undefined) {
+  if (timezone !== undefined || weeklyNetWorthAlertDay !== undefined) {
     try {
       const { syncScheduler } = await import('@/lib/services/sync-scheduler');
       if (syncScheduler.isRunning) {
@@ -689,8 +690,8 @@ export async function PATCH(request: Request) {
     notifyGoalMilestones: updated.notifyGoalMilestones,
     notifyNetWorthMilestones: updated.notifyNetWorthMilestones,
     netWorthMilestoneInterval: updated.netWorthMilestoneInterval,
-    notifyDailyNetWorthChange: updated.notifyDailyNetWorthChange,
-    dailyNetWorthAlertTime: updated.dailyNetWorthAlertTime,
+    notifyWeeklyNetWorthChange: updated.notifyWeeklyNetWorthChange,
+    weeklyNetWorthAlertDay: updated.weeklyNetWorthAlertDay,
     notifyAiProposals: updated.notifyAiProposals,
     maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,

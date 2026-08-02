@@ -130,6 +130,10 @@ describe('date-window utilities', () => {
     it('returns formatted date for "1d_discrete"', () => {
       expect(getPeriodLabel('2026-06-15', '1d_discrete')).toBe('Jun 15, 2026');
     });
+
+    it('returns formatted date range for "7d_discrete"', () => {
+      expect(getPeriodLabel('2026-06-15', '7d_discrete')).toBe('Jun 8 – Jun 15, 2026');
+    });
   });
 
   describe('getPreciseDateRange', () => {
@@ -147,6 +151,11 @@ describe('date-window utilities', () => {
     it('returns single day range for "1d_discrete"', () => {
       const range = getPreciseDateRange('1d_discrete', '2026-06-12');
       expect(range).toEqual({ start: '2026-06-12', end: '2026-06-12' });
+    });
+
+    it('returns 7 day range ending on windowEnd for "7d_discrete"', () => {
+      const range = getPreciseDateRange('7d_discrete', '2026-06-12');
+      expect(range).toEqual({ start: '2026-06-05', end: '2026-06-12' });
     });
   });
 });
