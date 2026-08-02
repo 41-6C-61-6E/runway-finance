@@ -43,22 +43,9 @@ function getUtcTimestamp(year: number, month: number, day: number, hour: number,
   return utcDate.getTime() + diffMs;
 }
 
-async function canSyncUser(userId: string): Promise<boolean> {
-  try {
-    await getServerDEK(userId);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { BaseScheduler } from '@/lib/services/base-scheduler';
 
-class SyncScheduler {
-  private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  private _isRunning = false;
-
-  get isRunning(): boolean {
-    return this._isRunning;
-  }
+class SyncScheduler extends BaseScheduler<string> {
 
   async init(): Promise<void> {
     // 1. Fetch SimpleFIN connections
@@ -89,7 +76,7 @@ class SyncScheduler {
     let scheduled = 0;
     let skipped = 0;
     for (const conn of allConnections) {
-      if (!(await canSyncUser(conn.userId))) {
+      if (!(await this.canSyncUser(conn.userId))) {
         logger.warn(`${LOG_TAG} Skipping connection — server DEK unavailable`, {
           connectionId: conn.id,
           userId: conn.userId,

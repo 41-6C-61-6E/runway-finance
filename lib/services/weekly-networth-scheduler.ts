@@ -5,16 +5,13 @@ import { getServerDEK } from '@/lib/crypto-context';
 import { checkWeeklyNetWorthChangeAndNotify } from '@/lib/services/notifications';
 import { logger } from '@/lib/logger';
 
+import { BaseScheduler } from '@/lib/services/base-scheduler';
+
 const LOG_TAG = '[weekly-networth-scheduler]';
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // Check every 15 minutes
 
-class WeeklyNetWorthScheduler {
+class WeeklyNetWorthScheduler extends BaseScheduler<string> {
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private _isRunning = false;
-
-  get isRunning(): boolean {
-    return this._isRunning;
-  }
 
   async init(): Promise<void> {
     this._isRunning = true;
