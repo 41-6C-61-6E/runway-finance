@@ -35,10 +35,9 @@ export const ASSET_ACCOUNT_TYPES = [
   'health',
 ];
 
-export const REAL_ESTATE_TYPES = [
-  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-  'single-family', 'condo', 'townhouse', 'multi-family'
-];
+import { REAL_ESTATE_SUBTYPES } from '@/lib/constants/account-types';
+
+export const REAL_ESTATE_TYPES = REAL_ESTATE_SUBTYPES;
 
 export const SYNCABLE_TYPES = [
   'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'crypto', 'metals'

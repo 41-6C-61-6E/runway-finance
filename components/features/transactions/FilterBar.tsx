@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Columns2, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
-import { getTypesByGroup } from '@/lib/constants/account-types';
+import { getTypesByGroup, ACCOUNT_GROUP_MAP } from '@/lib/constants/account-types';
 
 type FilterState = {
   accountId: string | null;
@@ -169,10 +169,10 @@ function MultiSelectDropdown({
 
 const DEFAULT_PRESETS: TransactionPreset[] = [
   { id: 'all', name: 'All Transactions', filters: {} },
-  { id: 'banking', name: 'Banking', filters: { accountTypes: 'checking,savings,cash,other,hsachecking' } },
-  { id: 'investments', name: 'Investments', filters: { accountTypes: 'investment,brokerage,retirement,otherinvestment,otherInvestment,rothira,traditionalira,401k,403b,sepira,simpleira,529,hsa,health' } },
-  { id: 'credit', name: 'Credit', filters: { accountTypes: 'credit,loan,mortgage,studentloan,autoloan,otherloan,otherLiability' } },
-  { id: 'assets', name: 'Assets', filters: { accountTypes: 'vehicle,crypto,metals,realestate,primaryhome,secondaryhome,rentalproperty,commercial,land,otherrealestate,single-family,condo,townhouse,multi-family,otherAsset,otherasset' } },
+  { id: 'banking', name: 'Banking', filters: { accountTypes: ACCOUNT_GROUP_MAP.BANKING.join(',') } },
+  { id: 'investments', name: 'Investments', filters: { accountTypes: ACCOUNT_GROUP_MAP.INVESTMENTS.join(',') } },
+  { id: 'credit', name: 'Credit', filters: { accountTypes: ACCOUNT_GROUP_MAP.CREDIT.join(',') } },
+  { id: 'assets', name: 'Assets', filters: { accountTypes: ACCOUNT_GROUP_MAP.ASSETS.join(',') } },
   { id: 'pending', name: 'Pending', filters: { pending: 'true' } },
   { id: 'uncategorized', name: 'Uncategorized', filters: { categoryIds: 'uncategorized' } },
 ];

@@ -1,7 +1,8 @@
 {
-  "buildNumber": "26.08.1785690339608",
-  "buildTime": "2026-08-02T17:05:39.608Z",
+  "buildNumber": "26.08.1785692977217",
+  "buildTime": "2026-08-02T17:49:37.217Z",
   "commits": [
+    "refactor: implement history merging in changelog API and build script to preserve commit logs in shallow clones",
     "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
     "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
     "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
@@ -200,10 +201,17 @@
     "db migration fix",
     "sync improvements",
     "sync improvements",
-    "backup fix",
-    "investments improvements"
+    "backup fix"
   ],
   "history": [
+    {
+      "hash": "ecf12aa",
+      "fullHash": "ecf12aa25bef6823bb06c3a69ff43b20481a4c08",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:06:30-07:00",
+      "message": "refactor: implement history merging in changelog API and build script to preserve commit logs in shallow clones",
+      "type": "refactor"
+    },
     {
       "hash": "cc7b898",
       "fullHash": "cc7b8980f7c3e09b4ec4f08fa5c158d5dac74f6c",
@@ -1794,14 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T09:56:14-07:00",
       "message": "backup fix",
-      "type": "other"
-    },
-    {
-      "hash": "45f3e7f",
-      "fullHash": "45f3e7ff872f3d79f03f7cb2c1260a9ca518e276",
-      "author": "Alan Racek",
-      "date": "2026-06-10T16:45:36-07:00",
-      "message": "investments improvements",
       "type": "other"
     }
   ]
