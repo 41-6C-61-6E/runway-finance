@@ -10,6 +10,7 @@ import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactEstimate, formatRedfinSuccessMessage } from './estimate-helpers';
+import { RealEstateFormFields, extractZipCodeFromAddress } from './real-estate-form';
 
 const PROPERTY_TYPES = [
   { value: 'single-family', label: 'Single Family Home' },
@@ -504,109 +505,14 @@ export function PropertyCards() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
-              <div className="flex gap-2">
-                <div className="relative flex-grow">
-                  <Input
-                    value={propertyEditMeta.address || ''}
-                    onChange={(e) => setPropertyEditMeta((m) => ({ ...m, address: e.target.value }))}
-                    placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleValidateAddress()}
-                  disabled={validatingAddress}
-                  className="px-3 py-2 text-xs font-semibold bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground rounded-lg transition-all"
-                >
-                  {validatingAddress ? 'Checking...' : 'Validate'}
-                </button>
-              </div>
-              {validationResult && (
-                <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
-                  {validationResult.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (Redfin)</label>
-              <select
-                value={propertyEditMeta.valuationMethod || 'normal'}
-                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, valuationMethod: e.target.value }))}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="conservative">
-                  {formatCompactEstimate('Conservative', validationResult?.estimates?.conservative) || 'Conservative (Low Range)'}
-                </option>
-                <option value="normal">
-                  {formatCompactEstimate('Normal', validationResult?.estimates?.normal) || 'Normal (Estimated Value)'}
-                </option>
-                <option value="optimistic">
-                  {formatCompactEstimate('Optimistic', validationResult?.estimates?.optimistic) || 'Optimistic (High Range)'}
-                </option>
-              </select>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Beds</label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={propertyEditMeta.bedrooms || ''}
-                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, bedrooms: e.target.value }))}
-                  placeholder="e.g., 3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Baths</label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={propertyEditMeta.bathrooms || ''}
-                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, bathrooms: e.target.value }))}
-                  placeholder="e.g., 2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Sq Ft</label>
-                <Input
-                  type="number"
-                  value={propertyEditMeta.squareFootage || ''}
-                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, squareFootage: e.target.value }))}
-                  placeholder="e.g., 1500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Purchase Price</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={propertyEditMeta.purchasePrice || ''}
-                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, purchasePrice: e.target.value }))}
-                  placeholder="e.g., 350000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Purchase Date</label>
-                <Input
-                  type="date"
-                  value={propertyEditMeta.purchaseDate || ''}
-                  onChange={(e) => setPropertyEditMeta((m) => ({ ...m, purchaseDate: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">ZIP Code (for HPI estimation)</label>
-              <Input
-                value={propertyEditMeta.zipCode || ''}
-                onChange={(e) => setPropertyEditMeta((m) => ({ ...m, zipCode: e.target.value }))}
-                placeholder="e.g., 94105"
-              />
-            </div>
+            <RealEstateFormFields
+              meta={propertyEditMeta}
+              onChange={(updated) => setPropertyEditMeta(updated)}
+              validatingAddress={validatingAddress}
+              onValidateAddress={handleValidateAddress}
+              validationResult={validationResult}
+              showSyncFrequency={false}
+            />
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Initial Value (optional)</label>
               <Input

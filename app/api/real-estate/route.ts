@@ -6,6 +6,7 @@ import { eq, and, inArray, asc, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
+import { isRealEstateType } from '@/lib/constants/account-types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -27,6 +28,8 @@ function parseMetadata(value: unknown): Record<string, unknown> {
 function getStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -73,16 +76,10 @@ export async function GET(request: Request) {
 
     const isImportRealEstateEnabled = importSettings.global !== false && importSettings.realEstate !== false;
 
-    const REAL_ESTATE_TYPES = [
-      'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty',
-      'commercial', 'land', 'otherrealestate', 'single-family',
-      'condo', 'townhouse', 'multi-family'
-    ];
-
     const realEstateAccounts = decryptedAccounts.filter((a: any) => {
       const isImported = a.externalId?.startsWith('imported-');
       if (isImported && !isImportRealEstateEnabled) return false;
-      return REAL_ESTATE_TYPES.includes(a.type);
+      return isRealEstateType(a.type);
     });
     const mortgageAccounts = decryptedAccounts.filter((a: any) => {
       const isImported = a.externalId?.startsWith('imported-');

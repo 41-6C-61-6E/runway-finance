@@ -10,6 +10,7 @@ import { SEMANTIC } from '@/lib/colors/palette';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
 import { toast } from 'sonner';
+import { isRealEstateType } from '@/lib/constants/account-types';
 
 interface UserDropdownProps {
   onOpenChange?: (open: boolean) => void;
@@ -101,10 +102,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
     const type = acc.type;
     const meta = acc.metadata || {};
 
-    const isRealEstate = [
-      'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-      'single-family', 'condo', 'townhouse', 'multi-family'
-    ].includes(type);
+    const isRealEstate = isRealEstateType(type);
     if (isRealEstate && meta.address) return true;
     if (type === 'crypto' && meta.xpub) return true;
     if (type === 'metals' && meta.amountOz && parseFloat(meta.amountOz) > 0) return true;

@@ -5,6 +5,7 @@ import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
 import { getBalancesOnDate, getEarliestBalances } from '@/lib/services/snapshot-balances';
 import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
+import { isRealEstateType } from '@/lib/constants/account-types';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
 interface AccountGroupConfig {
@@ -71,7 +72,7 @@ function getAccountGroup(type: string): string {
   const t = type.toLowerCase();
   if (['checking', 'savings', 'cash', 'hsachecking'].includes(t)) return 'cash';
   if (['investment', 'brokerage', 'retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', 'hsa', 'health', '529', 'crypto', 'metals', 'otherinvestment', 'otherInvestment'].includes(t)) return 'investments';
-  if (['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'single-family', 'condo', 'townhouse', 'multi-family'].includes(t)) return 'real_estate';
+  if (isRealEstateType(t)) return 'real_estate';
   if (t === 'mortgage') return 'mortgage';
   if (['credit', 'loan', 'studentloan', 'autoloan', 'otherloan', 'otherliability', 'otherLiability', 'personal_loan', 'heloc'].includes(t)) return 'credit_loans';
   if (['vehicle', 'other', 'otherasset', 'otherAsset'].includes(t) && isAssetAccount(t)) return 'other_assets';

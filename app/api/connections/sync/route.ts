@@ -9,6 +9,7 @@ import { getShareGroup } from '@/lib/sharing';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
+import { isRealEstateType } from '@/lib/constants/account-types';
 
 export async function POST(request: Request) {
   try {
@@ -70,10 +71,7 @@ export async function POST(request: Request) {
       const type = acc.type;
       const meta = acc.metadata || {};
 
-      const isRealEstate = [
-        'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-        'single-family', 'condo', 'townhouse', 'multi-family'
-      ].includes(type);
+      const isRealEstate = isRealEstateType(type);
       if (isRealEstate && typeof meta.address === 'string' && meta.address.trim() !== '') {
         return true;
       }
