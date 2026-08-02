@@ -1,7 +1,8 @@
 {
-  "buildNumber": "26.08.1785688947833",
-  "buildTime": "2026-08-02T16:42:27.833Z",
+  "buildNumber": "26.08.1785689122895",
+  "buildTime": "2026-08-02T16:45:22.895Z",
   "commits": [
+    "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
     "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
     "feat: add PWA update prompt to changelog modal and update dialog z-index and overlay style",
     "style: update transaction account badge colors and decrease font weight to semi-bold",
@@ -200,10 +201,17 @@
     "backup fix",
     "investments improvements",
     "visual improvements",
-    "layout",
-    "investment holdings sync fix"
+    "layout"
   ],
   "history": [
+    {
+      "hash": "5cf2260",
+      "fullHash": "5cf2260a1cb025df07b8760e0877ab774364c061",
+      "author": "Alan Racek",
+      "date": "2026-08-02T09:43:03-07:00",
+      "message": "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
+      "type": "feat"
+    },
     {
       "hash": "ad04903",
       "fullHash": "ad049037410b7b98967b592f28e55364803b89a6",
@@ -1794,14 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-10T15:36:59-07:00",
       "message": "layout",
-      "type": "other"
-    },
-    {
-      "hash": "e814728",
-      "fullHash": "e814728c5eec24a474405efb7d70a40d5899834a",
-      "author": "Alan Racek",
-      "date": "2026-06-10T14:58:46-07:00",
-      "message": "investment holdings sync fix",
       "type": "other"
     }
   ]

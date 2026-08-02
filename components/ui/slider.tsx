@@ -2,11 +2,17 @@
 
 import * as React from 'react';
 
+export interface SliderTick {
+  value: number;
+  label?: string;
+}
+
 export interface SliderProps {
   min: number;
   max: number;
   step?: number;
   value: number;
+  ticks?: (number | SliderTick)[];
   onChange?: (value: number) => void;
   onValueChange?: (value: number) => void;
   onRelease?: (value: number) => void;
@@ -25,6 +31,7 @@ export function Slider({
   max,
   step = 1,
   value,
+  ticks,
   onChange,
   onValueChange,
   onRelease,
@@ -79,26 +86,60 @@ export function Slider({
     ? '#f43f5e'
     : 'var(--primary)';
 
+  const normalizedTicks = ticks?.map((t) =>
+    typeof t === 'number' ? { value: t, label: String(t) } : t
+  );
+
   return (
-    <div className="relative flex items-center w-full touch-pan-y py-1 select-none">
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        aria-label={ariaLabel}
-        onChange={handleChange}
-        onPointerUp={handlePointerUp}
-        onTouchEnd={handleTouchEnd}
-        onMouseUp={handleMouseUp}
-        style={{
-          background: `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${percentage}%, var(--muted) ${percentage}%, var(--muted) 100%)`,
-        }}
-        className={`w-full h-2 rounded-lg cursor-pointer ${accentClass} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-      />
+    <div className="flex flex-col w-full select-none">
+      <div className="relative flex items-center w-full touch-pan-y py-1">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          disabled={disabled}
+          aria-label={ariaLabel}
+          onChange={handleChange}
+          onPointerUp={handlePointerUp}
+          onTouchEnd={handleTouchEnd}
+          onMouseUp={handleMouseUp}
+          style={{
+            background: `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${percentage}%, var(--muted) ${percentage}%, var(--muted) 100%)`,
+          }}
+          className={`w-full h-2 rounded-lg cursor-pointer ${accentClass} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        />
+      </div>
+
+      {normalizedTicks && normalizedTicks.length > 0 && (
+        <div className="relative w-full h-4 mt-0.5 pointer-events-none overflow-hidden">
+          {normalizedTicks.map((t) => {
+            const pct = Math.max(0, Math.min(100, ((t.value - min) / (max - min || 1)) * 100));
+            const ratio = pct / 100;
+
+            const style: React.CSSProperties = {
+              left: `calc(12px + (100% - 24px) * ${ratio})`,
+              transform: `translateX(-${pct}%)`,
+            };
+
+            const isCurrent = Math.abs(value - t.value) < 0.001;
+
+            return (
+              <span
+                key={t.value}
+                style={style}
+                className={`absolute text-[10px] font-mono whitespace-nowrap transition-colors ${
+                  isCurrent ? 'font-bold text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                {t.label ?? t.value}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
