@@ -281,14 +281,14 @@ export function SocialSecurityTab({
                   max={70}
                   step={1}
                   value={primaryAge}
+                  ticks={[
+                    { value: 62, label: '62 (70%)' },
+                    { value: 67, label: '67 (FRA)' },
+                    { value: 70, label: '70 (124%)' },
+                  ]}
                   onChange={(val) => setPrimaryAge(Math.round(val))}
                   ariaLabel="Primary Claiming Age"
                 />
-                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                  <span>Age 62 (70%)</span>
-                  <span>Age 67 (100% FRA)</span>
-                  <span>Age 70 (124%)</span>
-                </div>
               </div>
 
               {/* Spouse Claiming Age Slider (if MFJ) */}
@@ -307,15 +307,15 @@ export function SocialSecurityTab({
                     max={70}
                     step={1}
                     value={spouseAge}
+                    ticks={[
+                      { value: 62, label: '62 (70%)' },
+                      { value: 67, label: '67 (FRA)' },
+                      { value: 70, label: '70 (124%)' },
+                    ]}
                     onChange={(val) => setSpouseAge(Math.round(val))}
                     accentClass="accent-purple-500"
                     ariaLabel="Spouse Claiming Age"
                   />
-                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>Age 62 (70%)</span>
-                    <span>Age 67 (100% FRA)</span>
-                    <span>Age 70 (124%)</span>
-                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center p-4 bg-card rounded-lg border border-border text-xs text-muted-foreground">

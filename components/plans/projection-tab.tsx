@@ -1254,16 +1254,11 @@ export function ProjectionTab({
               max={75}
               step={1}
               value={localRetirementAge}
+              ticks={[40, 55, 75]}
               onChange={(val) => setLocalRetirementAge(Math.round(val))}
               onRelease={(val) => onUpdatePlan({ retirementAge: Math.round(val) })}
               ariaLabel="Primary Retirement Age"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-              <span>40</span>
-              <span>55</span>
-              <span>65</span>
-              <span>75</span>
-            </div>
           </div>
 
           {/* Spouse Retirement Age Slider */}
@@ -1278,16 +1273,11 @@ export function ProjectionTab({
                 max={75}
                 step={1}
                 value={localSpouseRetirementAge}
+                ticks={[40, 55, 75]}
                 onChange={(val) => setLocalSpouseRetirementAge(Math.round(val))}
                 onRelease={(val) => onUpdatePlan({ spouseRetirementAge: Math.round(val) })}
                 ariaLabel="Spouse Retirement Age"
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>40</span>
-                <span>55</span>
-                <span>65</span>
-                <span>75</span>
-              </div>
             </div>
           )}
 
@@ -1302,15 +1292,10 @@ export function ProjectionTab({
               max={12}
               step={0.5}
               value={localReturnRate}
+              ticks={[{ value: 1, label: '1%' }, { value: 6, label: '6%' }, { value: 12, label: '12%' }]}
               onChange={(val) => setLocalReturnRate(val)}
               ariaLabel="Expected Annual Return Rate"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-              <span>1%</span>
-              <span>6%</span>
-              <span>8%</span>
-              <span>12%</span>
-            </div>
           </div>
 
           {/* Inflation Rate Slider */}
@@ -1324,14 +1309,10 @@ export function ProjectionTab({
               max={6.0}
               step={0.25}
               value={localInflationRate}
+              ticks={[{ value: 1.0, label: '1.0%' }, { value: 3.0, label: '3.0%' }, { value: 6.0, label: '6.0%' }]}
               onChange={(val) => setLocalInflationRate(val)}
               ariaLabel="Inflation Rate"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-              <span>1.0%</span>
-              <span>3.0%</span>
-              <span>6.0%</span>
-            </div>
           </div>
 
           {/* Annual Expenses Modifier Slider */}
@@ -1345,14 +1326,10 @@ export function ProjectionTab({
               max={30}
               step={5}
               value={localExpenseModifier}
+              ticks={[{ value: -30, label: '-30%' }, { value: 0, label: '0%' }, { value: 30, label: '+30%' }]}
               onChange={(val) => setLocalExpenseModifier(Math.round(val))}
               ariaLabel="Expense Adjustment Percentage"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-              <span>-30%</span>
-              <span>0%</span>
-              <span>+30%</span>
-            </div>
           </div>
         </div>
           </div>

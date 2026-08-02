@@ -287,6 +287,11 @@ export function IrmaaTab({
                   max={400000}
                   step={5000}
                   value={customTestMagi}
+                  ticks={[
+                    { value: 80000, label: '$80k' },
+                    { value: 200000, label: '$200k' },
+                    { value: 400000, label: '$400k' },
+                  ]}
                   onChange={(val) => setCustomTestMagi(Math.round(val))}
                   ariaLabel="MAGI Surcharge Estimator"
                 />
