@@ -33,42 +33,57 @@ export function PWARegister() {
                   })
                   .then((data) => {
                     if (cancelled) return;
+
+                    const currentBuild = typeof window !== 'undefined'
+                      ? localStorage.getItem('pf_installed_build') || process.env.NEXT_PUBLIC_BUILD_NUMBER
+                      : null;
+
+                    let deltaCommits: string[] = [];
+                    if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+                      if (currentBuild) {
+                        const matchedIndex = data.history.findIndex(
+                          (item: any) =>
+                            item.hash === currentBuild ||
+                            item.fullHash === currentBuild ||
+                            item.message === currentBuild
+                        );
+                        if (matchedIndex > 0) {
+                          deltaCommits = data.history.slice(0, matchedIndex).map((item: any) => item.message);
+                        }
+                      }
+                    }
+
+                    if (deltaCommits.length === 0 && Array.isArray(data.commits)) {
+                      deltaCommits = data.commits;
+                    }
+
                     toast.info("A new version of Personal Finance is available!", {
                       id: "pwa-update",
                       description: (
                         <div className="flex flex-col gap-1.5 mt-1">
                           <span>Click update to load the latest changes.</span>
-                          {data.commits && data.commits.length > 0 && (
+                          {deltaCommits.length > 0 && (
                             <div className="border-t border-border/50 pt-1.5 mt-1.5">
                               <span className="font-semibold text-xs text-muted-foreground block mb-1">
-                                What's new:
+                                New changes ({deltaCommits.length}):
                               </span>
-                              <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5 max-h-24 overflow-y-auto">
-                                {data.commits.map((commit: string, index: number) => (
+                              <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5 max-h-36 overflow-y-auto">
+                                {deltaCommits.map((commit: string, index: number) => (
                                   <li key={index}>{commit}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
-                          <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                toast.dismiss("pwa-update");
-                                window.dispatchEvent(
-                                  new CustomEvent("open-changelog", { detail: { hasUpdate: true } })
-                                );
-                              }}
-                              className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                            >
-                              View full changelog &rarr;
-                            </button>
-                          </div>
                         </div>
                       ),
                       action: {
                         label: "Update",
-                        onClick: () => window.location.reload(),
+                        onClick: () => {
+                          if (data.buildNumber) {
+                            localStorage.setItem('pf_installed_build', data.buildNumber);
+                          }
+                          window.location.reload();
+                        },
                       },
                       duration: Infinity,
                     });
@@ -77,25 +92,7 @@ export function PWARegister() {
                     if (cancelled) return;
                     toast.info("A new version of Personal Finance is available!", {
                       id: "pwa-update",
-                      description: (
-                        <div className="flex flex-col gap-1.5 mt-1">
-                          <span>Click update to load the latest changes.</span>
-                          <div className="pt-1.5 mt-1.5 border-t border-border/40 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                toast.dismiss("pwa-update");
-                                window.dispatchEvent(
-                                  new CustomEvent("open-changelog", { detail: { hasUpdate: true } })
-                                );
-                              }}
-                              className="text-xs font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                            >
-                              View full changelog &rarr;
-                            </button>
-                          </div>
-                        </div>
-                      ),
+                      description: "Click update to load the latest changes.",
                       action: {
                         label: "Update",
                         onClick: () => window.location.reload(),
