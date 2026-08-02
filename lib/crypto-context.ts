@@ -14,8 +14,9 @@ export async function getSessionDEK(): Promise<Uint8Array> {
     return hexToBytes(process.env.TEST_DEK_HEX);
   }
   const session = await auth();
-  const dekHex = (session?.user as Record<string, unknown> | undefined)?.dek;
-  if (!dekHex || typeof dekHex !== 'string') {
+  const dekHex = (session?.user as unknown as Record<string, unknown> | undefined)?.dek;
+
+  if (typeof dekHex !== 'string') {
     throw new Error('No encryption key available — user may not be authenticated');
   }
   return hexToBytes(dekHex);

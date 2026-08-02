@@ -22,8 +22,9 @@ const SYNC_INTERVALS: Record<string, number> = {
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
 export function isRealEstateType(type: string): boolean {
-  return REAL_ESTATE_TYPES.includes(type);
+  return (REAL_ESTATE_TYPES as readonly string[]).includes(type);
 }
+
 
 async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<string> {
   if (!accountRow.metadata) return 'manual';
