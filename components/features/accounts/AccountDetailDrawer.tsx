@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell, Loader2 } from 'lucide-react';
+import { isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-types';
 
 type Account = {
   id: string;
@@ -137,23 +138,10 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [syncingAccount, setSyncingAccount] = useState(false);
   const [muteSyncWarnings, setMuteSyncWarnings] = useState(false);
 
-  let metaObj: Record<string, any> = {};
-  if (account) {
-    const rawMeta = account.metadata as any;
-    if (typeof rawMeta === 'string' && rawMeta.trim() !== '') {
-      try {
-        metaObj = JSON.parse(rawMeta);
-      } catch {}
-    } else if (typeof rawMeta === 'object' && rawMeta !== null) {
-      metaObj = rawMeta;
-    }
-  }
+  const metaObj = account ? parseAccountMetadata(account.metadata) : {};
   const isCryptoApi = account?.type === 'crypto' && typeof metaObj.xpub === 'string' && metaObj.xpub.trim() !== '';
   const isMetalsApi = account?.type === 'metals' && typeof metaObj.amountOz !== 'undefined' && parseFloat(String(metaObj.amountOz)) > 0;
-  const isRealEstateApi = [
-    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-    'single-family', 'condo', 'townhouse', 'multi-family'
-  ].includes(account?.type || '') && typeof metaObj.address === 'string' && metaObj.address.trim() !== '';
+  const isRealEstateApi = isRealEstateType(account?.type) && typeof metaObj.address === 'string' && metaObj.address.trim() !== '';
   const isApiDrivenManual = isCryptoApi || isMetalsApi || isRealEstateApi;
 
   const handleSyncConnection = async () => {

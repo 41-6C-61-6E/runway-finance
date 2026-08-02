@@ -10,10 +10,14 @@ import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { readApiConfig } from '@/lib/services/manual-accounts';
 import { logger } from '@/lib/logger';
 
+import { REAL_ESTATE_SUBTYPES } from '@/lib/constants/account-types';
+
 const MODEL_SNAPSHOT_TYPES = [
-  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-  'single-family', 'condo', 'townhouse', 'multi-family', 'other',
-  'vehicle', 'metals', 'mortgage'
+  ...REAL_ESTATE_SUBTYPES,
+  'other',
+  'vehicle',
+  'metals',
+  'mortgage'
 ];
 
 function formatRecalculationError(err: unknown): string {

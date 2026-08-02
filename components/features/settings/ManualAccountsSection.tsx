@@ -7,10 +7,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
-import { getTypesByGroup, ACCOUNT_TYPE_LABELS, TYPE_HIERARCHY } from '@/lib/constants/account-types';
+import { getTypesByGroup, ACCOUNT_TYPE_LABELS, TYPE_HIERARCHY, isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-types';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCompactEstimate, formatRedfinSuccessMessage } from '@/components/real-estate/estimate-helpers';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
+import { RealEstateFormFields, extractZipCodeFromAddress } from '@/components/real-estate/real-estate-form';
 
 type ManualAccount = {
   id: string;

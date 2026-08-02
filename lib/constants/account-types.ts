@@ -135,3 +135,38 @@ export function getAccountGroupKey(type?: string | null): 'BANKING' | 'INVESTMEN
   return 'BANKING';
 }
 
+export const REAL_ESTATE_SUBTYPES = [
+  'realestate',
+  'primaryhome',
+  'secondaryhome',
+  'rentalproperty',
+  'commercial',
+  'land',
+  'otherrealestate',
+  'single-family',
+  'condo',
+  'townhouse',
+  'multi-family',
+] as const;
+
+export function isRealEstateType(type?: string | null): boolean {
+  if (!type) return false;
+  const t = type.toLowerCase();
+  return (REAL_ESTATE_SUBTYPES as readonly string[]).includes(t);
+}
+
+export function parseAccountMetadata<T = Record<string, any>>(metadata: unknown): T {
+  if (!metadata) return {} as T;
+  if (typeof metadata === 'string') {
+    try {
+      return JSON.parse(metadata) as T;
+    } catch {
+      return {} as T;
+    }
+  }
+  if (typeof metadata === 'object' && metadata !== null) {
+    return metadata as T;
+  }
+  return {} as T;
+}
+
