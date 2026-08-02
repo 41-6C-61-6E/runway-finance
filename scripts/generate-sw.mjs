@@ -26,7 +26,7 @@ try {
   let commits = [];
   let history = [];
   try {
-    const gitLogRaw = execSync('git log -n 30 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', { encoding: 'utf8' });
+    const gitLogRaw = execSync('git log -n 200 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', { encoding: 'utf8' });
     const lines = gitLogRaw.split('\n').filter(Boolean);
     
     lines.forEach((line) => {

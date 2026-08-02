@@ -50,6 +50,12 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [hasUpdate, setHasUpdate] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(20);
+
+  // Reset pagination limit when search query or category filter changes
+  useEffect(() => {
+    setVisibleLimit(20);
+  }, [searchQuery, selectedType]);
 
   // Listen to custom open-changelog window event
   useEffect(() => {
@@ -108,6 +114,19 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
     });
   }, [data?.history, searchQuery, selectedType]);
 
+  const visibleHistory = useMemo(() => {
+    return filteredHistory.slice(0, visibleLimit);
+  }, [filteredHistory, visibleLimit]);
+
+  const filteredCommits = useMemo(() => {
+    if (!data?.commits) return [];
+    return data.commits.filter((msg) => msg.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [data?.commits, searchQuery]);
+
+  const visibleCommits = useMemo(() => {
+    return filteredCommits.slice(0, visibleLimit);
+  }, [filteredCommits, visibleLimit]);
+
   const getTypeBadge = (type: string) => {
     switch (type.toLowerCase()) {
       case 'feat':
@@ -159,8 +178,8 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-card shadow-2xl rounded-xl">
-        <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/30">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-card shadow-2xl rounded-xl opacity-100">
+        <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -211,7 +230,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         </DialogHeader>
 
         {/* Filter Controls */}
-        <div className="p-4 border-b border-border/40 bg-muted/10 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="p-4 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -255,44 +274,59 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
               <span className="text-xs font-medium">Loading changelog data...</span>
             </div>
           ) : filteredHistory.length > 0 ? (
-            <div className="relative pl-6 border-l-2 border-border/50 space-y-6">
-              {filteredHistory.map((item, index) => (
-                <div key={item.hash + index} className="relative group">
-                  <div className="absolute -left-[31px] top-1.5 w-3 h-3 rounded-full bg-border group-hover:bg-primary transition-colors border-2 border-card" />
-                  
-                  <div className="flex flex-col gap-1.5 bg-muted/20 hover:bg-muted/40 p-3.5 rounded-lg border border-border/50 transition-colors">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {getTypeBadge(item.type)}
-                        <span className="font-mono text-[11px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-                          #{item.hash}
+            <div className="space-y-6">
+              <div className="relative pl-6 border-l-2 border-border/50 space-y-6">
+                {visibleHistory.map((item, index) => (
+                  <div key={item.hash + index} className="relative group">
+                    <div className="absolute -left-[31px] top-1.5 w-3 h-3 rounded-full bg-border group-hover:bg-primary transition-colors border-2 border-card" />
+                    
+                    <div className="flex flex-col gap-1.5 bg-muted/20 hover:bg-muted/40 p-3.5 rounded-lg border border-border/50 transition-colors">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {getTypeBadge(item.type)}
+                          <span className="font-mono text-[11px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+                            #{item.hash}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {formatDate(item.date)}
                         </span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground font-medium">
-                        {formatDate(item.date)}
-                      </span>
+
+                      <p className="text-xs font-medium text-foreground leading-relaxed mt-0.5">
+                        {item.message}
+                      </p>
+
+                      {item.author && (
+                        <div className="text-[11px] text-muted-foreground/75 font-mono pt-1 border-t border-border/30 flex items-center justify-between">
+                          <span>By {item.author}</span>
+                        </div>
+                      )}
                     </div>
-
-                    <p className="text-xs font-medium text-foreground leading-relaxed mt-0.5">
-                      {item.message}
-                    </p>
-
-                    {item.author && (
-                      <div className="text-[11px] text-muted-foreground/75 font-mono pt-1 border-t border-border/30 flex items-center justify-between">
-                        <span>By {item.author}</span>
-                      </div>
-                    )}
                   </div>
+                ))}
+              </div>
+
+              {filteredHistory.length > visibleLimit && (
+                <div className="pt-2 pb-2 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVisibleLimit((prev) => prev + 20)}
+                    className="text-xs font-semibold gap-2 border-border/80 hover:bg-muted"
+                  >
+                    Load More Changes ({filteredHistory.length - visibleLimit} remaining)
+                  </Button>
                 </div>
-              ))}
+              )}
             </div>
-          ) : data?.commits && data.commits.length > 0 ? (
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-muted-foreground">Recent Changes:</span>
-              <ul className="space-y-2">
-                {data.commits
-                  .filter((msg) => msg.toLowerCase().includes(searchQuery.toLowerCase()))
-                  .map((msg, index) => (
+          ) : visibleCommits.length > 0 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-muted-foreground">Recent Changes:</span>
+                <ul className="space-y-2">
+                  {visibleCommits.map((msg, index) => (
                     <li
                       key={index}
                       className="text-xs p-3 rounded-lg bg-muted/30 border border-border/40 text-foreground font-medium"
@@ -300,7 +334,22 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
                       {msg}
                     </li>
                   ))}
-              </ul>
+                </ul>
+              </div>
+
+              {filteredCommits.length > visibleLimit && (
+                <div className="pt-2 pb-2 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVisibleLimit((prev) => prev + 20)}
+                    className="text-xs font-semibold gap-2 border-border/80 hover:bg-muted"
+                  >
+                    Load More Changes ({filteredCommits.length - visibleLimit} remaining)
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground text-xs">

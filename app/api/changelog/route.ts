@@ -19,7 +19,7 @@ export async function GET() {
 
     // Attempt to read git log directly
     try {
-      const gitLogRaw = execSync('git log -n 50 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', {
+      const gitLogRaw = execSync('git log -n 200 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', {
         encoding: 'utf8',
       });
       const lines = gitLogRaw.split('\n').filter(Boolean);
@@ -66,10 +66,10 @@ export async function GET() {
         if (info.buildTime) {
           buildTime = info.buildTime;
         }
-        if (history.length === 0 && Array.isArray(info.history)) {
+        if (Array.isArray(info.history) && info.history.length > history.length) {
           history = info.history;
         }
-        if (commits.length === 0 && Array.isArray(info.commits)) {
+        if (Array.isArray(info.commits) && info.commits.length > commits.length) {
           commits = info.commits;
         }
       } catch {
