@@ -59,27 +59,28 @@ export function BudgetTable() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+  const { data: budgetData, isLoading: budgetsLoading, error: queryError, refetch } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
     queryFn: async () => {
-      const [budgetRes, acctRes] = await Promise.all([
-        fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' }),
-        fetch('/api/accounts', { credentials: 'include' }),
-      ]);
-      if (!budgetRes.ok) throw new Error('Failed to fetch budgets');
-      const resData = await budgetRes.json();
-      const accountsData = acctRes.ok ? await acctRes.json() : [];
-      return {
-        budgets: resData.budgets ?? [],
-        categories: resData.categories ?? [],
-        accounts: accountsData,
-      };
+      const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch budgets');
+      return await res.json();
     },
   });
 
-  const budgets = data?.budgets ?? [];
-  const categories = data?.categories ?? [];
-  const accounts = data?.accounts ?? [];
+  const { data: accountsData, isLoading: accountsLoading } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts', { credentials: 'include' });
+      if (!res.ok) return [];
+      return await res.json();
+    },
+  });
+
+  const budgets = budgetData?.budgets ?? [];
+  const categories = budgetData?.categories ?? [];
+  const accounts = accountsData ?? [];
+  const loading = budgetsLoading || accountsLoading;
   const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
 
   const [showForm, setShowForm] = useState(false);
