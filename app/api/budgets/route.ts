@@ -103,7 +103,11 @@ export async function GET(request: Request) {
             and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
           ),
           eq(categories.excludeFromReports, false),
-          periodType ? eq(budgets.periodType, periodType) : undefined,
+          periodType
+            ? (periodType === 'quarterly' || periodType === 'yearly'
+                ? inArray(budgets.periodType, [periodType, 'monthly'])
+                : eq(budgets.periodType, periodType))
+            : undefined,
         )
       );
 
@@ -224,7 +228,12 @@ export async function GET(request: Request) {
     ]);
 
     const data = decryptedBudgetRows.map((row) => {
-      const budgeted = parseFloat(row.amount);
+      let budgeted = parseFloat(row.amount);
+      if (row.isRecurring && row.periodType === 'monthly') {
+        if (periodType === 'quarterly') budgeted *= 3;
+        else if (periodType === 'yearly') budgeted *= 12;
+      }
+
       const isIncome = row.isIncome ?? false;
       const isCompound = row.categoryType === 'compound';
       // Compound budgets track expense-side amounts
@@ -239,6 +248,8 @@ export async function GET(request: Request) {
         categoryName: row.categoryName,
         categoryColor: row.categoryColor || '#6366f1',
         periodType: row.periodType,
+        periodKey: row.periodKey || row.yearMonth || null,
+        yearMonth: row.yearMonth || null,
         isRecurring: row.isRecurring,
         fundingAccountId: row.fundingAccountId,
         rollover: row.rollover,
@@ -284,12 +295,36 @@ export async function POST(request: Request) {
 
   const db = getDb();
   try {
+    const targetPeriodKey = (body.periodKey as string) ?? null;
+    const targetPeriodType = (body.periodType as string) || 'monthly';
+    const targetCategoryId = body.categoryId as string;
+
+    const [existing] = await db
+      .select()
+      .from(budgets)
+      .where(
+        and(
+          eq(budgets.userId, dataUserId),
+          eq(budgets.categoryId, targetCategoryId),
+          eq(budgets.periodType, targetPeriodType),
+          targetPeriodKey ? eq(budgets.yearMonth, targetPeriodKey) : isNull(budgets.yearMonth)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'duplicate_budget', message: 'A budget already exists for this category and period' },
+        { status: 400 }
+      );
+    }
+
     const encryptedValues = await encryptRow('budgets', {
       userId: dataUserId,
-      categoryId: body.categoryId as string,
-      periodType: (body.periodType as string) || 'monthly',
-      yearMonth: body.periodKey as string ?? null,
-      periodKey: body.periodKey as string ?? null,
+      categoryId: targetCategoryId,
+      periodType: targetPeriodType,
+      yearMonth: targetPeriodKey,
+      periodKey: targetPeriodKey,
       amount: formatToCents(parseFloat(String(body.amount ?? 0)) || 0),
       isRecurring: body.isRecurring !== false,
       fundingAccountId: (body.fundingAccountId as string) ?? null,
@@ -305,6 +340,66 @@ export async function POST(request: Request) {
     return NextResponse.json(budget, { status: 201 });
   } catch (error) {
     logger.error('Error creating budget', { error });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const dek = await getSessionDEK();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
+  }
+
+  const id = (searchParams.get('id') || body.id) as string;
+  if (!id) {
+    return NextResponse.json({ error: 'missing_id' }, { status: 400 });
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(budgets)
+    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
+    .limit(1);
+
+  if (!existing) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
+  let updateData: Record<string, unknown> = {};
+  if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
+  if (body.periodType !== undefined) updateData.periodType = body.periodType;
+  if (body.amount !== undefined) updateData.amount = formatToCents(parseFloat(String(body.amount)) || 0);
+  if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring;
+  if (body.periodKey !== undefined) {
+    updateData.yearMonth = body.periodKey || null;
+    updateData.periodKey = body.periodKey || null;
+  }
+  if (body.fundingAccountId !== undefined) updateData.fundingAccountId = body.fundingAccountId || null;
+  if (body.rollover !== undefined) updateData.rollover = body.rollover;
+  if (body.notes !== undefined) updateData.notes = body.notes || null;
+  updateData.updatedAt = new Date();
+
+  updateData = await encryptRow('budgets', updateData, dek);
+
+  try {
+    const [updated] = await db
+      .update(budgets)
+      .set(updateData)
+      .where(eq(budgets.id, id))
+      .returning();
+    return NextResponse.json(updated);
+  } catch (error) {
+    logger.error('Error updating budget', { error });
     return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 }

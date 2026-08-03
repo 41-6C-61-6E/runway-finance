@@ -40,6 +40,7 @@ interface BudgetFormDialogProps {
     id: string;
     categoryId: string;
     periodType: string;
+    periodKey?: string | null;
     amount: string;
     isRecurring: boolean;
     fundingAccountId: string | null;
@@ -81,7 +82,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         periodType: editBudget.periodType as PeriodType,
         amount: editBudget.amount,
         isRecurring: editBudget.isRecurring,
-        periodKey,
+        periodKey: editBudget.periodKey ?? periodKey,
         fundingAccountId: editBudget.fundingAccountId ?? '',
         rollover: editBudget.rollover,
         notes: editBudget.notes ?? '',
@@ -106,6 +107,11 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
       setError('Category and amount are required');
       return;
     }
+    const numAmount = parseFloat(form.amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setError('Amount must be a positive number');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -120,7 +126,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         notes: form.notes || null,
       };
 
-      const url = editBudget ? `/api/budgets?id=${editBudget.id}` : '/api/budgets';
+      const url = editBudget ? `/api/budgets/${editBudget.id}` : '/api/budgets';
       const res = await fetch(url, {
         method: editBudget ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,8 +135,14 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to save budget');
+        let errorMessage = 'Failed to save budget';
+        try {
+          const data = await res.json();
+          if (data.message || data.error) errorMessage = data.message || data.error;
+        } catch {
+          errorMessage = `Failed to save budget (${res.status} ${res.statusText})`;
+        }
+        throw new Error(errorMessage);
       }
       onSuccess();
       onClose();

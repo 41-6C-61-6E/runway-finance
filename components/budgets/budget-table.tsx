@@ -10,12 +10,16 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useUserSettings } from '@/components/user-settings-provider';
 
+import { toast } from 'sonner';
+
 interface BudgetData {
   id: string;
   categoryId: string;
   categoryName: string;
   categoryColor: string;
   periodType: string;
+  periodKey?: string | null;
+  yearMonth?: string | null;
   isRecurring: boolean;
   fundingAccountId: string | null;
   rollover: boolean;
@@ -91,10 +95,14 @@ export function BudgetTable() {
     if (!deleteBudget) return;
     setDeleteLoading(true);
     try {
-      await fetch(`/api/budgets/${deleteBudget.id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`/api/budgets/${deleteBudget.id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to delete budget');
       setDeleteBudget(null);
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
-    } catch {} finally {
+      toast.success('Budget deleted successfully');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete budget');
+    } finally {
       setDeleteLoading(false);
     }
   };
@@ -148,7 +156,7 @@ export function BudgetTable() {
               <div className="px-4 py-2 bg-chart-2/5 text-xs font-semibold text-chart-2 uppercase tracking-wider">Income</div>
             )}
             {incomeBudgets.map((b) => {
-              const isOver = b.remaining < 0;
+              const isTargetMet = b.remaining >= 0;
               return (
                 <div key={b.id} className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -176,15 +184,15 @@ export function BudgetTable() {
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{formatCurrency(b.budgeted)}</span></span>
                     <span className="text-muted-foreground">Actual: <span className="text-chart-2 blur-number">{formatCurrency(b.actual)}</span></span>
-                    <span className={`blur-number ${isOver ? 'text-destructive' : 'text-chart-2'}`}>
+                    <span className={`blur-number ${isTargetMet ? 'text-chart-2' : 'text-chart-3'}`}>
                       {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 pt-0.5">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full ${isOver ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                      <div className={`h-full ${isTargetMet ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                     </div>
-                    <span className={`text-[10px] font-mono flex-shrink-0 ${isOver ? 'text-chart-2' : 'text-muted-foreground'}`}>
+                    <span className={`text-[10px] font-mono flex-shrink-0 ${isTargetMet ? 'text-chart-2' : 'text-muted-foreground'}`}>
                       {(b.percentUsed || 0).toFixed(0)}%
                     </span>
                     {b.fundingAccountId ? (() => {
@@ -301,7 +309,7 @@ export function BudgetTable() {
                   </tr>
                 )}
                 {incomeBudgets.map((b) => {
-                  const isOver = b.remaining < 0;
+                  const isTargetMet = b.remaining >= 0;
                   return (
                     <tr key={b.id} className="border-b border-border hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-3">
@@ -314,15 +322,15 @@ export function BudgetTable() {
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
                       <td className="px-4 py-3 text-right font-mono text-chart-2 blur-number">{formatCurrency(b.actual)}</td>
-                      <td className={`px-4 py-3 text-right font-mono blur-number ${isOver ? 'text-destructive' : 'text-chart-2'}`}>
+                      <td className={`px-4 py-3 text-right font-mono blur-number ${isTargetMet ? 'text-chart-2' : 'text-chart-3'}`}>
                         {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className={`h-full ${isOver ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                            <div className={`h-full ${isTargetMet ? 'bg-chart-2' : 'bg-chart-3'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                           </div>
-                          <span className={`text-[10px] font-mono ${isOver ? 'text-chart-2' : 'text-muted-foreground'}`}>
+                          <span className={`text-[10px] font-mono ${isTargetMet ? 'text-chart-2' : 'text-muted-foreground'}`}>
                             {(b.percentUsed || 0).toFixed(0)}%
                           </span>
                         </div>
@@ -473,6 +481,7 @@ export function BudgetTable() {
           id: editBudget.id,
           categoryId: editBudget.categoryId,
           periodType: editBudget.periodType,
+          periodKey: editBudget.periodKey || editBudget.yearMonth || null,
           amount: String(editBudget.budgeted),
           isRecurring: editBudget.isRecurring,
           fundingAccountId: editBudget.fundingAccountId,

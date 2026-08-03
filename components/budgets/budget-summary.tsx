@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -8,8 +8,6 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { apiFetch } from '@/lib/utils/api-client';
 
 interface BudgetData {
   id: string;
@@ -35,20 +33,19 @@ function MetricRow({ label, value, valueClass }: { label: string; value: string;
 
 export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
-  const [budgets, setBudgets] = useState<BudgetData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useCardCollapsed('budgetSummary');
 
-  useEffect(() => {
-    setLoading(true);
-    apiFetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' })
-      .then((data) => setBudgets(data.budgets ?? []))
-      .catch((err) => {
-        toast.error('Failed to load budgets');
-        console.error('Error fetching budgets:', err);
-      })
-      .finally(() => setLoading(false));
-  }, [periodType, periodKey]);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['budgets', periodType, periodKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load budgets');
+      const resData = await res.json();
+      return (resData.budgets ?? []) as BudgetData[];
+    },
+  });
+
+  const budgets = data ?? [];
 
   if (loading) {
     return (
