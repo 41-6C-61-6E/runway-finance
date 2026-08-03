@@ -38,14 +38,13 @@ export function BudgetSummary() {
   const { data, isLoading: loading } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
     queryFn: async () => {
-      const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}`, { credentials: 'include' });
+      const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load budgets');
-      const resData = await res.json();
-      return (resData.budgets ?? []) as BudgetData[];
+      return await res.json();
     },
   });
 
-  const budgets = data ?? [];
+  const budgets = (data?.budgets ?? []) as BudgetData[];
 
   if (loading) {
     return (
