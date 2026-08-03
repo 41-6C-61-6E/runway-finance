@@ -34,8 +34,7 @@ function getCurrentKey(type: PeriodType): string {
 function getNextKey(type: PeriodType, key: string): string {
   if (type === 'monthly') {
     const [y, m] = key.split('-').map(Number);
-    const d = new Date(y, m);
-    d.setMonth(d.getMonth() + 1);
+    const d = new Date(y, m - 1 + 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
   if (type === 'quarterly') {
@@ -49,7 +48,7 @@ function getNextKey(type: PeriodType, key: string): string {
 function getPrevKey(type: PeriodType, key: string): string {
   if (type === 'monthly') {
     const [y, m] = key.split('-').map(Number);
-    const d = new Date(y, m - 2);
+    const d = new Date(y, m - 1 - 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
   if (type === 'quarterly') {
