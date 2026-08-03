@@ -100,11 +100,16 @@ try {
   });
 
   const history = mergedHistory.slice(0, 200);
+  if (history.length > 0 && !history[0].buildNumber) {
+    history[0].buildNumber = buildNum;
+  }
   const commits = history.map((item) => item.message);
 
   const versionInfo = {
     buildNumber: buildNum,
     buildTime: now.toISOString(),
+    hash: history[0]?.hash || '',
+    fullHash: history[0]?.fullHash || '',
     commits,
     history,
   };

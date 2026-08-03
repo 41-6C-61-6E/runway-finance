@@ -37,24 +37,30 @@ export function PWARegister() {
                     const currentBuild = typeof window !== 'undefined'
                       ? localStorage.getItem('pf_installed_build') || process.env.NEXT_PUBLIC_BUILD_NUMBER
                       : null;
+                    const currentHash = typeof window !== 'undefined'
+                      ? localStorage.getItem('pf_installed_hash') || process.env.NEXT_PUBLIC_COMMIT_HASH
+                      : null;
 
                     let deltaCommits: string[] = [];
                     if (data.history && Array.isArray(data.history) && data.history.length > 0) {
-                      if (currentBuild) {
-                        const matchedIndex = data.history.findIndex(
-                          (item: any) =>
+                      const matchedIndex = data.history.findIndex(
+                        (item: any) =>
+                          (currentHash && (item.hash === currentHash || item.fullHash === currentHash)) ||
+                          (currentBuild && (
                             item.hash === currentBuild ||
                             item.fullHash === currentBuild ||
+                            item.buildNumber === currentBuild ||
                             item.message === currentBuild
-                        );
-                        if (matchedIndex > 0) {
-                          deltaCommits = data.history.slice(0, matchedIndex).map((item: any) => item.message);
-                        }
-                      }
-                    }
+                          ))
+                      );
 
-                    if (deltaCommits.length === 0 && Array.isArray(data.commits)) {
-                      deltaCommits = data.commits;
+                      if (matchedIndex !== -1) {
+                        deltaCommits = data.history.slice(0, matchedIndex).map((item: any) => item.message);
+                      } else if (Array.isArray(data.commits)) {
+                        deltaCommits = data.commits.slice(0, 1);
+                      }
+                    } else if (Array.isArray(data.commits)) {
+                      deltaCommits = data.commits.slice(0, 1);
                     }
 
                     toast.info("A new version of Personal Finance is available!", {
@@ -81,6 +87,10 @@ export function PWARegister() {
                         onClick: () => {
                           if (data.buildNumber) {
                             localStorage.setItem('pf_installed_build', data.buildNumber);
+                          }
+                          const newHash = data.hash || (data.history && data.history[0]?.hash);
+                          if (newHash) {
+                            localStorage.setItem('pf_installed_hash', newHash);
                           }
                           window.location.reload();
                         },

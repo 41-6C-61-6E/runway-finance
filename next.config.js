@@ -9,6 +9,28 @@ const getBuildNumber = () => {
   return `${yy}.${mm}.${isProd ? 'local' : 'dev'}`;
 };
 
+const getCommitHash = () => {
+  if (process.env.COMMIT_HASH) return process.env.COMMIT_HASH;
+  if (process.env.NEXT_PUBLIC_COMMIT_HASH) return process.env.NEXT_PUBLIC_COMMIT_HASH;
+  try {
+    const { execSync } = require('child_process');
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const infoPath = path.join(__dirname, 'public', 'version-info.json');
+      if (fs.existsSync(infoPath)) {
+        const info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
+        return info.hash || (info.history && info.history[0]?.hash) || '';
+      }
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -29,6 +51,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_NUMBER: getBuildNumber(),
     NEXT_PUBLIC_BUILD_TIME: process.env.BUILD_TIME || new Date().toISOString(),
+    NEXT_PUBLIC_COMMIT_HASH: getCommitHash(),
   },
   async headers() {
     return [
