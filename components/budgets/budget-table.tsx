@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useUserSettings } from '@/components/user-settings-provider';
 
 import { toast } from 'sonner';
+
+type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
+type SortDirection = 'asc' | 'desc';
 
 interface BudgetData {
   id: string;
@@ -88,6 +91,8 @@ export function BudgetTable() {
   const [editBudget, setEditBudget] = useState<BudgetData | null>(null);
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('category');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const fetchBudgets = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -109,7 +114,93 @@ export function BudgetTable() {
     }
   };
 
-  const getAccountName = (id: string | null) => accounts.find((a) => a.id === id)?.name;
+  const getAccountName = (id: string | null) => accounts.find((a: Account) => a.id === id)?.name;
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'category' || field === 'account' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortBudgets = useCallback(
+    (items: BudgetData[]) => {
+      return [...items].sort((a, b) => {
+        let valA: any;
+        let valB: any;
+
+        switch (sortField) {
+          case 'category':
+            valA = a.categoryName.toLowerCase();
+            valB = b.categoryName.toLowerCase();
+            return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+          case 'budgeted':
+            valA = a.budgeted;
+            valB = b.budgeted;
+            break;
+          case 'actual':
+            valA = a.actual;
+            valB = b.actual;
+            break;
+          case 'variance':
+            valA = a.remaining;
+            valB = b.remaining;
+            break;
+          case 'progress':
+            valA = a.percentUsed ?? 0;
+            valB = b.percentUsed ?? 0;
+            break;
+          case 'account': {
+            const accA = (a.fundingAccountId ? accounts.find((acc: Account) => acc.id === a.fundingAccountId)?.name || '' : '').toLowerCase();
+            const accB = (b.fundingAccountId ? accounts.find((acc: Account) => acc.id === b.fundingAccountId)?.name || '' : '').toLowerCase();
+            return sortDirection === 'asc' ? accA.localeCompare(accB) : accB.localeCompare(accA);
+          }
+          default:
+            return 0;
+        }
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    },
+    [sortField, sortDirection, accounts]
+  );
+
+  const incomeBudgets = useMemo(
+    () => sortBudgets((budgets as BudgetData[]).filter((b) => b.type === 'income')),
+    [budgets, sortBudgets]
+  );
+
+  const expenseBudgets = useMemo(
+    () => sortBudgets((budgets as BudgetData[]).filter((b) => b.type === 'expense')),
+    [budgets, sortBudgets]
+  );
+
+  const renderSortHeader = (field: SortField, label: string, align: 'left' | 'right' = 'left') => {
+    const isActive = sortField === field;
+    return (
+      <button
+        onClick={() => handleSort(field)}
+        className={`group flex items-center gap-1 font-medium hover:text-foreground transition-colors focus:outline-none py-1 select-none ${
+          align === 'right' ? 'ml-auto justify-end' : 'justify-start'
+        }`}
+      >
+        <span>{label}</span>
+        {isActive ? (
+          sortDirection === 'asc' ? (
+            <ChevronUp className="w-3.5 h-3.5 text-primary shrink-0" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 text-primary shrink-0" />
+          )
+        ) : (
+          <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground shrink-0" />
+        )}
+      </button>
+    );
+  };
 
   if (loading) {
     return (
@@ -131,21 +222,44 @@ export function BudgetTable() {
     );
   }
 
-  const incomeBudgets = budgets.filter((b) => b.type === 'income').sort((a, b) => a.categoryName.localeCompare(b.categoryName));
-  const expenseBudgets = budgets.filter((b) => b.type === 'expense').sort((a, b) => a.percentUsed - b.percentUsed);
-
   return (
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-3 sm:p-5 pb-3 flex items-center justify-between">
+        <div className="p-3 sm:p-5 pb-3 flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
-          <button
-            onClick={() => { setEditBudget(null); setShowForm(true); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Budget
-          </button>
+          <div className="flex items-center gap-2">
+            {isMobile && budgets.length > 0 && (
+              <select
+                value={`${sortField}-${sortDirection}`}
+                onChange={(e) => {
+                  const [field, dir] = e.target.value.split('-') as [SortField, SortDirection];
+                  setSortField(field);
+                  setSortDirection(dir);
+                }}
+                className="text-xs bg-muted/50 border border-border rounded-lg px-2 py-1 text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="category-asc">Category (A-Z)</option>
+                <option value="category-desc">Category (Z-A)</option>
+                <option value="budgeted-desc">Budgeted (High-Low)</option>
+                <option value="budgeted-asc">Budgeted (Low-High)</option>
+                <option value="actual-desc">Actual (High-Low)</option>
+                <option value="actual-asc">Actual (Low-High)</option>
+                <option value="variance-desc">Variance (High-Low)</option>
+                <option value="variance-asc">Variance (Low-High)</option>
+                <option value="progress-desc">Progress (High-Low)</option>
+                <option value="progress-asc">Progress (Low-High)</option>
+                <option value="account-asc">Account (A-Z)</option>
+                <option value="account-desc">Account (Z-A)</option>
+              </select>
+            )}
+            <button
+              onClick={() => { setEditBudget(null); setShowForm(true); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Budget
+            </button>
+          </div>
         </div>
 
         {budgets.length === 0 ? (
@@ -305,12 +419,12 @@ export function BudgetTable() {
             <table className="w-full text-sm min-w-[650px] md:min-w-full">
               <thead>
                 <tr className="border-t border-border">
-                  <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">Category</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Budgeted</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{'Actual'}</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Variance</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Progress</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Account</th>
+                  <th className="text-left px-5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('actual', 'Actual', 'right')}</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('variance', 'Variance', 'right')}</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('progress', 'Progress', 'left')}</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('account', 'Account', 'left')}</th>
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>

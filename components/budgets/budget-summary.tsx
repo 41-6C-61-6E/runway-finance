@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BudgetData {
@@ -18,17 +18,6 @@ interface BudgetData {
   remaining: number;
   percentUsed: number;
   type: 'income' | 'expense';
-}
-
-function MetricRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-xs sm:text-sm text-muted-foreground">{label}</span>
-      <span className={cn('text-sm sm:text-base font-semibold font-mono blur-number', valueClass || 'text-foreground')}>
-        {value}
-      </span>
-    </div>
-  );
 }
 
 export function BudgetSummary() {
@@ -49,24 +38,14 @@ export function BudgetSummary() {
   if (loading) {
     return (
       <Card className="animate-pulse">
-        <CardContent className="p-5">
-          <div className="h-4 bg-muted rounded w-36 mb-6" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((side) => (
-              <div key={side} className="space-y-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex justify-between">
-                    <div className="h-3 bg-muted rounded w-14" />
-                    <div className="h-3 bg-muted rounded w-20" />
-                  </div>
-                ))}
-              </div>
+        <CardContent className="p-6 space-y-4">
+          <div className="h-5 bg-muted rounded w-40 mb-4" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-28 bg-muted/60 rounded-xl" />
             ))}
           </div>
-          <div className="border-t border-border/50 mt-4 pt-4 flex justify-between">
-            <div className="h-3 bg-muted rounded w-24" />
-            <div className="h-3 bg-muted rounded w-28" />
-          </div>
+          <div className="h-48 bg-muted/40 rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -77,7 +56,6 @@ export function BudgetSummary() {
 
   const totalIncomeBudgeted = incomeBudgets.reduce((s, b) => s + b.budgeted, 0);
   const totalIncomeActual = incomeBudgets.reduce((s, b) => s + b.actual, 0);
-  const incomeRemaining = incomeBudgets.reduce((s, b) => s + b.remaining, 0);
   const incomePercent = totalIncomeBudgeted > 0 ? (totalIncomeActual / totalIncomeBudgeted) * 100 : 0;
 
   const totalExpenseBudgeted = expenseBudgets.reduce((s, b) => s + b.budgeted, 0);
@@ -103,7 +81,7 @@ export function BudgetSummary() {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="overflow-hidden border border-border/60 shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={collapsed}
           onToggle={setCollapsed}
@@ -115,68 +93,115 @@ export function BudgetSummary() {
           }
         />
         {!collapsed && (
-          <CardContent>
-            <div
-              className={cn(
-                'grid divide-y divide-border',
-                hasIncome && hasExpenses
-                  ? 'grid-cols-1 lg:grid-cols-2 lg:divide-y-0 lg:divide-x'
-                  : 'grid-cols-1'
-              )}
-            >
+          <CardContent className="p-4 sm:p-6 space-y-6">
+            {/* ── Summary Visual Cards Row ── */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Income Meter */}
               {hasIncome && (
-                <div className={cn('pb-4 lg:pb-0', hasExpenses && 'lg:pr-6')}>
-                  <p className="text-xs font-semibold text-chart-2 uppercase tracking-wider mb-3">Income</p>
-                  <div className="space-y-2">
-                    <MetricRow label="Budgeted" value={formatCurrency(totalIncomeBudgeted)} />
-                    <MetricRow label="Actual" value={formatCurrency(totalIncomeActual)} />
-                    <MetricRow
-                      label="Variance"
-                      value={`${incomeRemaining >= 0 ? '+' : ''}${formatCurrency(incomeRemaining)}`}
-                      valueClass={incomeRemaining >= 0 ? 'text-chart-2' : 'text-destructive'}
-                    />
-                    <MetricRow
-                      label="% Achieved"
-                      value={`${incomePercent.toFixed(1)}%`}
-                      valueClass={incomePercent >= 100 ? 'text-chart-2' : 'text-chart-3'}
+                <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                    <span className="flex items-center gap-1.5 text-chart-2 font-semibold uppercase tracking-wider text-[11px]">
+                      <TrendingUp className="w-3.5 h-3.5" /> Income Target
+                    </span>
+                    <span className="font-semibold text-foreground">{incomePercent.toFixed(1)}%</span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono blur-number text-foreground">
+                      {formatCurrency(totalIncomeActual)}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono blur-number">
+                      Target: {formatCurrency(totalIncomeBudgeted)}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-chart-2 transition-all duration-500 rounded-full"
+                      style={{ width: `${Math.min(incomePercent, 100)}%` }}
                     />
                   </div>
                 </div>
               )}
 
+              {/* Expense Meter */}
               {hasExpenses && (
-                <div className={cn('pt-4 lg:pt-0', hasIncome && 'lg:pl-6')}>
-                  <p className="text-xs font-semibold text-destructive uppercase tracking-wider mb-3">Expenses</p>
-                  <div className="space-y-2">
-                    <MetricRow label="Budgeted" value={formatCurrency(totalExpenseBudgeted)} />
-                    <MetricRow label="Actual" value={formatCurrency(totalExpenseActual)} />
-                    <MetricRow
-                      label="Remaining"
-                      value={formatCurrency(expenseRemaining)}
-                      valueClass={expenseRemaining >= 0 ? 'text-chart-2' : 'text-destructive'}
-                    />
-                    <MetricRow
-                      label="% Used"
-                      value={`${expensePercent.toFixed(1)}%`}
-                      valueClass={expensePercent > 100 ? 'text-destructive' : 'text-chart-1'}
+                <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                    <span className={cn(
+                      "flex items-center gap-1.5 font-semibold uppercase tracking-wider text-[11px]",
+                      expensePercent > 100 ? "text-chart-5" : expensePercent > 85 ? "text-chart-3" : "text-chart-1"
+                    )}>
+                      {expensePercent > 100 ? <AlertTriangle className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                      Expense Budget
+                    </span>
+                    <span className={cn(
+                      "font-semibold",
+                      expensePercent > 100 ? "text-chart-5" : expensePercent > 85 ? "text-chart-3" : "text-foreground"
+                    )}>
+                      {expensePercent.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono blur-number text-foreground">
+                      {formatCurrency(totalExpenseActual)}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono blur-number">
+                      Limit: {formatCurrency(totalExpenseBudgeted)}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all duration-500 rounded-full",
+                        expensePercent > 100 ? "bg-chart-5" : expensePercent > 85 ? "bg-chart-3" : "bg-chart-1"
+                      )}
+                      style={{ width: `${Math.min(expensePercent, 100)}%` }}
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground text-right font-mono blur-number pt-0.5">
+                    {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over budget`}
+                  </p>
                 </div>
               )}
+
+              {/* Net Surplus / Deficit Meter */}
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2 md:col-span-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                  <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-foreground font-semibold">
+                    <CheckCircle2 className={cn("w-3.5 h-3.5", isSurplus ? "text-chart-2" : "text-chart-5")} />
+                    Net Position
+                  </span>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                    isSurplus ? "bg-chart-2/15 text-chart-2" : "bg-chart-5/15 text-chart-5"
+                  )}>
+                    {isSurplus ? 'Surplus' : 'Deficit'}
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1">
+                  <span className={cn(
+                    "text-xl font-bold font-mono blur-number",
+                    isSurplus ? "text-chart-2" : "text-chart-5"
+                  )}>
+                    {isSurplus ? '+' : ''}{formatCurrency(netActual)}
+                  </span>
+                </div>
+
+                <p className="text-xs text-muted-foreground pt-2 border-t border-border/30">
+                  {isSurplus
+                    ? 'Income exceeds total actual spending for this period.'
+                    : 'Spending exceeds total actual income earned.'}
+                </p>
+              </div>
             </div>
 
-            {/* Net Position */}
-            <div className="border-t border-border mt-4 pt-4 flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-medium text-foreground">Net Position</span>
-              <span
-                className={cn(
-                  'text-sm sm:text-base font-bold blur-number',
-                  isSurplus ? 'text-chart-2' : 'text-destructive'
-                )}
-              >
-                {isSurplus ? '+' : ''}{formatCurrency(netActual)} {isSurplus ? 'surplus' : 'deficit'}
-              </span>
-            </div>
+
           </CardContent>
         )}
       </Card>
