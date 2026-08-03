@@ -154,4 +154,65 @@ describe('PWARegister Component', () => {
     expect(getByText('feat: v3 feature')).not.toBeNull();
     expect(queryByText('fix: v2 bug')).toBeNull();
   });
+
+  it('displays top commit message when matchedIndex is 0', async () => {
+    localStorage.setItem('pf_installed_hash', 'hash-v3');
+
+    const mockRegistration = {
+      addEventListener: vi.fn((event, callback) => {
+        if (event === 'updatefound') {
+          const installingWorker = {
+            state: 'installing',
+            addEventListener: vi.fn((stateEvent, stateCallback) => {
+              if (stateEvent === 'statechange') {
+                // @ts-ignore
+                installingWorker.state = 'installed';
+                stateCallback();
+              }
+            }),
+          };
+
+          // @ts-ignore
+          mockRegistration.installing = installingWorker;
+          callback();
+        }
+      }),
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // @ts-ignore
+    navigator.serviceWorker = {
+      register: vi.fn().mockResolvedValue(mockRegistration),
+      controller: {},
+    };
+
+    const versionData = {
+      buildNumber: '26.08.100',
+      hash: 'hash-v3',
+      commits: ['feat: v3 feature', 'fix: v2 bug'],
+      history: [
+        { hash: 'hash-v3', message: 'feat: v3 feature' },
+        { hash: 'hash-v2', message: 'fix: v2 bug' },
+      ],
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => versionData,
+    } as Response);
+
+    render(<PWARegister />);
+
+    await waitFor(() => {
+      expect(toast.info).toHaveBeenCalled();
+    });
+
+    const toastCall = (toast.info as any).mock.calls[0];
+    const descriptionElement = toastCall[1].description;
+    const { getByText, queryByText } = render(descriptionElement);
+
+    expect(getByText('New changes (1):')).not.toBeNull();
+    expect(getByText('feat: v3 feature')).not.toBeNull();
+    expect(queryByText('fix: v2 bug')).toBeNull();
+  });
 });
