@@ -54,13 +54,14 @@ export function PWARegister() {
                           ))
                       );
 
-                      if (matchedIndex !== -1) {
+                      if (matchedIndex > 0) {
                         deltaCommits = data.history.slice(0, matchedIndex).map((item: any) => item.message);
-                      } else if (Array.isArray(data.commits)) {
-                        deltaCommits = data.commits.slice(0, 1);
+                      } else {
+                        const topMsg = data.history[0]?.message || (Array.isArray(data.commits) ? data.commits[0] : null);
+                        if (topMsg) deltaCommits = [topMsg];
                       }
-                    } else if (Array.isArray(data.commits)) {
-                      deltaCommits = data.commits.slice(0, 1);
+                    } else if (Array.isArray(data.commits) && data.commits.length > 0) {
+                      deltaCommits = [data.commits[0]];
                     }
 
                     toast.info("A new version of Personal Finance is available!", {
