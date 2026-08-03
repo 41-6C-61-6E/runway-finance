@@ -1,9 +1,12 @@
 {
-  "buildNumber": "26.08.1785784231533",
-  "buildTime": "2026-08-03T19:10:31.533Z",
-  "hash": "62fae2a",
-  "fullHash": "62fae2a3421c476a23cd36ef9d73132fbb4cd937",
+  "buildNumber": "26.08.1785789397812",
+  "buildTime": "2026-08-03T20:36:37.812Z",
+  "hash": "5637db9",
+  "fullHash": "5637db91e19ae9d47f8189cc7f09f09cae9bb975",
   "commits": [
+    "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
+    "fix: correctly identify delta commits and display top message when no prior version history is matched",
+    "feat: enhance PWA update detection with commit hash tracking and delta commit filtering",
     "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
     "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
     "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
@@ -200,20 +203,41 @@
     "payroll crash fix",
     "drizzle name fix",
     "backup improvements",
-    "snapshot improvements",
-    "snapshot improvements",
-    "re-link sync fix",
-    "acct mappping"
+    "snapshot improvements"
   ],
   "history": [
+    {
+      "hash": "5637db9",
+      "fullHash": "5637db91e19ae9d47f8189cc7f09f09cae9bb975",
+      "author": "Alan Racek",
+      "date": "2026-08-03T13:29:30-07:00",
+      "message": "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
+      "type": "refactor",
+      "buildNumber": "26.08.1785789397812"
+    },
+    {
+      "hash": "fb3891d",
+      "fullHash": "fb3891d347d8c8a866e9651b086d27cd34dced2b",
+      "author": "Alan Racek",
+      "date": "2026-08-03T13:19:14-07:00",
+      "message": "fix: correctly identify delta commits and display top message when no prior version history is matched",
+      "type": "fix"
+    },
+    {
+      "hash": "414289e",
+      "fullHash": "414289e663d0eac9bf7ae2a799551d4c66ab787d",
+      "author": "Alan Racek",
+      "date": "2026-08-03T12:35:41-07:00",
+      "message": "feat: enhance PWA update detection with commit hash tracking and delta commit filtering",
+      "type": "feat"
+    },
     {
       "hash": "62fae2a",
       "fullHash": "62fae2a3421c476a23cd36ef9d73132fbb4cd937",
       "author": "Alan Racek",
       "date": "2026-08-03T11:53:41-07:00",
       "message": "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
-      "type": "chore",
-      "buildNumber": "26.08.1785784231533"
+      "type": "chore"
     },
     {
       "hash": "26d5660",
@@ -1781,30 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T18:54:34-07:00",
       "message": "snapshot improvements",
-      "type": "other"
-    },
-    {
-      "hash": "399ee2c",
-      "fullHash": "399ee2c2cd06d15127fbac827c90822a8c039ba1",
-      "author": "Alan Racek",
-      "date": "2026-06-12T18:02:51-07:00",
-      "message": "snapshot improvements",
-      "type": "other"
-    },
-    {
-      "hash": "655466d",
-      "fullHash": "655466d953891b08d673b6347e883c243a5831af",
-      "author": "Alan Racek",
-      "date": "2026-06-12T17:19:30-07:00",
-      "message": "re-link sync fix",
-      "type": "other"
-    },
-    {
-      "hash": "4c40952",
-      "fullHash": "4c40952ed8546758c2d6961d86636b81a52cfd67",
-      "author": "Alan Racek",
-      "date": "2026-06-12T15:29:24-07:00",
-      "message": "acct mappping",
       "type": "other"
     }
   ]

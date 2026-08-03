@@ -369,9 +369,7 @@ export default function TransactionTable({
     const containerWidth = clientWidth;
     setTableWidth(containerWidth);
 
-    // Calculate dynamic column sizes based on actual content
-    const hasPending = transactions.some((tx) => tx.pending);
-    const dateWidth = isMobileSize ? 75 : (hasPending ? 110 : 95);
+    const dateWidth = isMobileSize ? 75 : 95;
 
     let maxCategoryWidth = 90;
     for (const tx of transactions) {
@@ -934,27 +932,11 @@ export default function TransactionTable({
         accessorKey: "date",
         header: ({ column }) => <SortableHeader column={column} title="Date" />,
         cell: ({ row }) => {
-          const tx = row.original;
-          const isPending = tx.pending;
           return (
             <div className="whitespace-nowrap flex items-center">
               <span className="text-foreground text-sm">
                 {new Date(row.getValue("date")).toLocaleDateString()}
               </span>
-              {isPending && (
-                <span
-                  className="ml-1.5 inline-flex items-center text-primary shrink-0"
-                  title="Pending"
-                >
-                  <svg
-                    className="h-2 w-2"
-                    fill="currentColor"
-                    viewBox="0 0 8 8"
-                  >
-                    <circle cx="4" cy="4" r="3" />
-                  </svg>
-                </span>
-              )}
             </div>
           );
         },
@@ -1000,6 +982,20 @@ export default function TransactionTable({
                 >
                   {tx.payee || tx.description}
                 </span>
+                {isPending && (
+                  <span
+                    className="inline-flex items-center text-primary shrink-0"
+                    title="Pending"
+                  >
+                    <svg
+                      className="h-2 w-2"
+                      fill="currentColor"
+                      viewBox="0 0 8 8"
+                    >
+                      <circle cx="4" cy="4" r="3" />
+                    </svg>
+                  </span>
+                )}
                 {tx.splits && tx.splits.length > 0 && (
                   <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0">
                     Split
