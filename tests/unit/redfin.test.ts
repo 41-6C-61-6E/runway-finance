@@ -27,7 +27,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { fetchRedfinValue } from '@/lib/services/manual-accounts';
+import { fetchRedfinValue, normalizeRedfinApiUrl } from '@/lib/services/manual-accounts';
 
 describe('Redfin fetchRedfinValue', () => {
   const apiConfig = {
@@ -211,5 +211,36 @@ describe('Redfin fetchRedfinValue', () => {
     await expect(
       fetchRedfinValue({ address: 'Unknown St' }, apiConfig)
     ).rejects.toThrow('Redfin estimate unavailable for address "Unknown St". Please check the address, paste the Redfin property link (e.g. redfin.com/.../home/446533), or enter value manually.');
+  });
+
+  it('normalizes misconfigured redfinApiUrl to include /stingray', () => {
+    expect(normalizeRedfinApiUrl('https://www.redfin.com/what-is-my-home-worth')).toBe('https://www.redfin.com/stingray');
+    expect(normalizeRedfinApiUrl('https://www.redfin.com/what-is-my-home-worth/')).toBe('https://www.redfin.com/stingray');
+    expect(normalizeRedfinApiUrl('https://www.redfin.com')).toBe('https://www.redfin.com/stingray');
+    expect(normalizeRedfinApiUrl('https://www.redfin.com/stingray')).toBe('https://www.redfin.com/stingray');
+    expect(normalizeRedfinApiUrl(undefined)).toBe('https://www.redfin.com/stingray');
+  });
+
+  it('correctly uses normalized URL when fetching AVM with misconfigured redfinApiUrl', async () => {
+    const mockAvmText = '{}&&' + JSON.stringify({
+      payload: { predictedValue: 600000 },
+    });
+
+    let requestedUrl = '';
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      requestedUrl = url;
+      if (url.includes('api/home/details/avm')) {
+        return { ok: true, text: async () => mockAvmText } as Response;
+      }
+      return { ok: false, status: 404 } as Response;
+    });
+
+    const price = await fetchRedfinValue(
+      { address: '157939' },
+      { redfinApiUrl: 'https://www.redfin.com/what-is-my-home-worth' }
+    );
+
+    expect(price).toBe(600000);
+    expect(requestedUrl).toBe('https://www.redfin.com/stingray/api/home/details/avm?propertyId=157939&accessLevel=1');
   });
 });

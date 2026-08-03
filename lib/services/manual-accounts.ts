@@ -20,6 +20,19 @@ export type { ApiConfig };
 
 const DEFAULT_API_CONFIG: ApiConfig = { ...API_KEY_DEFAULTS };
 
+export function normalizeRedfinApiUrl(url?: string): string {
+  const fallback = DEFAULT_API_CONFIG.redfinApiUrl || 'https://www.redfin.com/stingray';
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return fallback;
+  }
+  let trimmed = url.trim().replace(/\/+$/, '');
+  trimmed = trimmed.replace(/\/what-is-my-home-worth\/?$/, '');
+  if (!trimmed.endsWith('/stingray')) {
+    trimmed = `${trimmed}/stingray`;
+  }
+  return trimmed;
+}
+
 export async function readApiConfig(userId: string): Promise<ApiConfig> {
   try {
     const db = getDb();
@@ -37,7 +50,7 @@ export async function readApiConfig(userId: string): Promise<ApiConfig> {
     return {
       metalsApiUrl: keys.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl,
       metalsApiKey: keys.metalsApiKey || '',
-      redfinApiUrl: keys.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl,
+      redfinApiUrl: normalizeRedfinApiUrl(keys.redfinApiUrl),
       fredApiUrl: keys.fredApiUrl || DEFAULT_API_CONFIG.fredApiUrl,
       fredApiKey: keys.fredApiKey || (typeof process !== 'undefined' ? (process.env.FRED_API_KEY ?? '') : ''),
       btcApiUrl: keys.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl,
@@ -124,7 +137,7 @@ export async function fetchRedfinValuationDetails(
   apiConfig?: ApiConfig
 ): Promise<RedfinEstimates> {
   const address = params.address.trim();
-  const baseUrl = apiConfig?.redfinApiUrl || DEFAULT_API_CONFIG.redfinApiUrl || 'https://www.redfin.com/stingray';
+  const baseUrl = normalizeRedfinApiUrl(apiConfig?.redfinApiUrl);
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   let propertyId: string | undefined;

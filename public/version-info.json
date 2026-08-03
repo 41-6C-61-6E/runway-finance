@@ -1,7 +1,8 @@
 {
-  "buildNumber": "26.08.1785773991546",
-  "buildTime": "2026-08-03T16:19:51.546Z",
+  "buildNumber": "26.08.1785783126035",
+  "buildTime": "2026-08-03T18:52:06.035Z",
   "commits": [
+    "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
     "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
     "refactor: modularize account transactions component and centralize API response/session utilities",
     "refactor: centralize real estate type logic and add real estate form component with ZIP extraction",
@@ -200,10 +201,17 @@
     "snapshot improvements",
     "re-link sync fix",
     "acct mappping",
-    "acct mgmt",
-    "db migration fix"
+    "acct mgmt"
   ],
   "history": [
+    {
+      "hash": "26d5660",
+      "fullHash": "26d56607a67c45bc1b651d1888c0d0bdda9a1308",
+      "author": "Alan Racek",
+      "date": "2026-08-03T09:20:47-07:00",
+      "message": "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
+      "type": "chore"
+    },
     {
       "hash": "c54bb15",
       "fullHash": "c54bb153cf9a19ada5fdae499d82e210a9ca725a",
@@ -1794,14 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T11:31:54-07:00",
       "message": "acct mgmt",
-      "type": "other"
-    },
-    {
-      "hash": "9d06031",
-      "fullHash": "9d06031605735e197427a220b9eaaedd72c7bfe5",
-      "author": "Alan Racek",
-      "date": "2026-06-12T11:15:54-07:00",
-      "message": "db migration fix",
       "type": "other"
     }
   ]
