@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1785789397812",
-  "buildTime": "2026-08-03T20:36:37.812Z",
-  "hash": "5637db9",
-  "fullHash": "5637db91e19ae9d47f8189cc7f09f09cae9bb975",
+  "buildNumber": "26.08.1785795522780",
+  "buildTime": "2026-08-03T22:18:42.780Z",
+  "hash": "6037421",
+  "fullHash": "6037421425264f66c1fad954f816794a1e8cea8f",
   "commits": [
+    "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
+    "refactor: update budget period logic, improve transaction table UI, and unify fetch implementation with TanStack Query",
     "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
     "fix: correctly identify delta commits and display top message when no prior version history is matched",
     "feat: enhance PWA update detection with commit hash tracking and delta commit filtering",
@@ -201,19 +203,33 @@
     "db fix",
     "imports fix",
     "payroll crash fix",
-    "drizzle name fix",
-    "backup improvements",
-    "snapshot improvements"
+    "drizzle name fix"
   ],
   "history": [
+    {
+      "hash": "6037421",
+      "fullHash": "6037421425264f66c1fad954f816794a1e8cea8f",
+      "author": "Alan Racek",
+      "date": "2026-08-03T14:52:07-07:00",
+      "message": "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
+      "type": "feat",
+      "buildNumber": "26.08.1785795522780"
+    },
+    {
+      "hash": "5b87dbd",
+      "fullHash": "5b87dbd48234a89a19ebab3898d93d84806935d3",
+      "author": "Alan Racek",
+      "date": "2026-08-03T14:28:22-07:00",
+      "message": "refactor: update budget period logic, improve transaction table UI, and unify fetch implementation with TanStack Query",
+      "type": "refactor"
+    },
     {
       "hash": "5637db9",
       "fullHash": "5637db91e19ae9d47f8189cc7f09f09cae9bb975",
       "author": "Alan Racek",
       "date": "2026-08-03T13:29:30-07:00",
       "message": "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
-      "type": "refactor",
-      "buildNumber": "26.08.1785789397812"
+      "type": "refactor"
     },
     {
       "hash": "fb3891d",
@@ -1789,22 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T19:25:47-07:00",
       "message": "drizzle name fix",
-      "type": "other"
-    },
-    {
-      "hash": "bd68923",
-      "fullHash": "bd689236242797632bcc5e3e9e0ed28f515d8741",
-      "author": "Alan Racek",
-      "date": "2026-06-12T19:25:03-07:00",
-      "message": "backup improvements",
-      "type": "other"
-    },
-    {
-      "hash": "d6dc901",
-      "fullHash": "d6dc901bbef4563f8124f371b1154ba7feeae6a3",
-      "author": "Alan Racek",
-      "date": "2026-06-12T18:54:34-07:00",
-      "message": "snapshot improvements",
       "type": "other"
     }
   ]

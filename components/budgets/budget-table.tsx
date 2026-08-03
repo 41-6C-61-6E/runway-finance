@@ -24,6 +24,7 @@ interface BudgetData {
   fundingAccountId: string | null;
   rollover: boolean;
   notes: string | null;
+  monthlyAmount?: number;
   budgeted: number;
   actual: number;
   remaining: number;
@@ -164,6 +165,11 @@ export function BudgetTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <span className="text-foreground font-medium text-sm truncate">{b.categoryName}</span>
+                      {b.periodType !== periodType && b.monthlyAmount !== undefined && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
+                          {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
+                        </span>
+                      )}
                       <ArrowUpCircle className="w-3 h-3 text-chart-2 flex-shrink-0" />
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -226,6 +232,11 @@ export function BudgetTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <span className="text-foreground font-medium text-sm truncate">{b.categoryName}</span>
+                      {b.periodType !== periodType && b.monthlyAmount !== undefined && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
+                          {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
+                        </span>
+                      )}
                       {b.rollover && <RotateCcw className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -278,7 +289,7 @@ export function BudgetTable() {
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Landmark className="w-3 h-3" />
                           {getAccountName(b.fundingAccountId)}
                         </div>
@@ -317,6 +328,11 @@ export function BudgetTable() {
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                           <span className="text-foreground font-medium">{b.categoryName}</span>
+                          {b.periodType !== periodType && b.monthlyAmount !== undefined && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
+                              {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
+                            </span>
+                          )}
                           <ArrowUpCircle className="w-3 h-3 text-chart-2" />
                         </div>
                         {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4">{b.notes}</div>}
@@ -399,7 +415,12 @@ export function BudgetTable() {
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                           <span className="text-foreground font-medium">{b.categoryName}</span>
-                          {b.rollover && <RotateCcw className="w-3 h-3 text-muted-foreground/50" />}
+                          {b.periodType !== periodType && b.monthlyAmount !== undefined && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
+                              {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
+                            </span>
+                          )}
+                          {b.rollover && <RotateCcw className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />}
                         </div>
                         {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4">{b.notes}</div>}
                       </td>
