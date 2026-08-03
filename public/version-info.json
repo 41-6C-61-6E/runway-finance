@@ -1,7 +1,10 @@
 {
-  "buildNumber": "26.08.1785783126035",
-  "buildTime": "2026-08-03T18:52:06.035Z",
+  "buildNumber": "26.08.1785784231533",
+  "buildTime": "2026-08-03T19:10:31.533Z",
+  "hash": "62fae2a",
+  "fullHash": "62fae2a3421c476a23cd36ef9d73132fbb4cd937",
   "commits": [
+    "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
     "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
     "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
     "refactor: modularize account transactions component and centralize API response/session utilities",
@@ -200,10 +203,18 @@
     "snapshot improvements",
     "snapshot improvements",
     "re-link sync fix",
-    "acct mappping",
-    "acct mgmt"
+    "acct mappping"
   ],
   "history": [
+    {
+      "hash": "62fae2a",
+      "fullHash": "62fae2a3421c476a23cd36ef9d73132fbb4cd937",
+      "author": "Alan Racek",
+      "date": "2026-08-03T11:53:41-07:00",
+      "message": "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
+      "type": "chore",
+      "buildNumber": "26.08.1785784231533"
+    },
     {
       "hash": "26d5660",
       "fullHash": "26d56607a67c45bc1b651d1888c0d0bdda9a1308",
@@ -1794,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T15:29:24-07:00",
       "message": "acct mappping",
-      "type": "other"
-    },
-    {
-      "hash": "81ef35f",
-      "fullHash": "81ef35f0ce479681c1711f33c4cb634dc5d325a9",
-      "author": "Alan Racek",
-      "date": "2026-06-12T11:31:54-07:00",
-      "message": "acct mgmt",
       "type": "other"
     }
   ]

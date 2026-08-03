@@ -108,6 +108,8 @@ export async function GET() {
     return NextResponse.json({
       buildNumber,
       buildTime,
+      hash: history[0]?.hash || '',
+      fullHash: history[0]?.fullHash || '',
       commits,
       history,
     });
