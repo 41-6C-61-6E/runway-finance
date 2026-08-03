@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
+import { Suspense, useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -273,7 +274,7 @@ const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] =>
 };
 
 // ── Main Accounts Dashboard Page ─────────────────────────────────────────────
-export default function AccountsPage() {
+function AccountsContent() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [mutingAccountId, setMutingAccountId] = useState<string | null>(null);
@@ -579,6 +580,36 @@ export default function AccountsPage() {
       return true;
     });
   }, [allAccounts, isNetWorthEnabled, isRealEstateEnabled]);
+
+  const searchParams = useSearchParams();
+  const targetAccountId = searchParams.get('accountId') || searchParams.get('account');
+
+  useEffect(() => {
+    if (!targetAccountId) return;
+    setExpandedAccounts({ [targetAccountId]: true });
+
+    if (filteredAllAccounts && filteredAllAccounts.length > 0) {
+      const acc = filteredAllAccounts.find((a) => a.id === targetAccountId);
+      if (acc) {
+        const { group, subGroup } = getHierarchy(acc.type);
+        setExpandedGroups((prev) => ({ ...prev, [group]: true }));
+        setExpandedSubgroups((prev) => ({ ...prev, [`${group}::${subGroup}`]: true }));
+      }
+    }
+
+    if (hierarchyCollapsed) {
+      setHierarchyCollapsed(false);
+    }
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`account-row-${targetAccountId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [targetAccountId, filteredAllAccounts, hierarchyCollapsed, setHierarchyCollapsed]);
 
   // Compute available Groups, Types, and Accounts for dropdowns
   const availableGroups = useMemo(() => {
@@ -2593,12 +2624,6 @@ export default function AccountsPage() {
                               <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
                                 {formatCurrency(groupStats.current)}
                               </p>
-                              <span className={`text-[11px] sm:text-xs font-semibold flex items-center gap-0.5 justify-end ${
-                                groupChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                              }`}>
-                                {groupChange.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                                {groupChange.text}
-                              </span>
                             </div>
                           </div>
 
@@ -2626,6 +2651,7 @@ export default function AccountsPage() {
                                     return (
                                       <Fragment key={acc.id}>
                                         <div 
+                                          id={`account-row-${acc.id}`}
                                           onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                           className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                             isAccExpanded 
@@ -2715,13 +2741,6 @@ export default function AccountsPage() {
                                             <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
                                               {formatCurrency(acc.balance)}
                                             </p>
-                                            {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                              <span className={`text-[9px] sm:text-[10px] ${
-                                                accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                              }`}>
-                                                {accChange.text}
-                                              </span>
-                                            )}
                                           </div>
                                         </div>
 
@@ -2778,11 +2797,6 @@ export default function AccountsPage() {
                                             <p className="font-mono text-xs sm:text-sm font-bold text-muted-foreground blur-number">
                                               {formatCurrency(subStats.current)}
                                             </p>
-                                            <span className={`text-[9px] sm:text-[10px] font-medium ${
-                                              subChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                            }`}>
-                                              {subChange.text}
-                                            </span>
                                           </div>
                                         </div>
 
@@ -2794,6 +2808,7 @@ export default function AccountsPage() {
                                           return (
                                             <Fragment key={acc.id}>
                                               <div 
+                                                id={`account-row-${acc.id}`}
                                                 onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                                 className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
                                                   isAccExpanded 
@@ -2881,13 +2896,6 @@ export default function AccountsPage() {
                                                   <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
                                                     {formatCurrency(acc.balance)}
                                                   </p>
-                                                  {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                                    <span className={`text-[9px] sm:text-[10px] ${
-                                                      accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                                    }`}>
-                                                      {accChange.text}
-                                                    </span>
-                                                  )}
                                                 </div>
                                               </div>
 
@@ -2914,6 +2922,7 @@ export default function AccountsPage() {
                                   return (
                                     <Fragment key={acc.id}>
                                       <div 
+                                        id={`account-row-${acc.id}`}
                                         onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
                                         className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                           isAccExpanded 
@@ -2975,13 +2984,6 @@ export default function AccountsPage() {
                                           <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
                                             {formatCurrency(acc.balance)}
                                           </p>
-                                          {!(acc.isHidden || acc.isExcludedFromNetWorth) && (
-                                            <span className={`text-[9px] sm:text-[10px] ${
-                                              accChange.isPositive ? 'text-chart-1' : 'text-chart-5'
-                                            }`}>
-                                              {accChange.text}
-                                            </span>
-                                          )}
                                         </div>
                                       </div>
 
@@ -3013,5 +3015,13 @@ export default function AccountsPage() {
       </PageContent>
 
     </div>
+  );
+}
+
+export default function AccountsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground"><LoadingSpinner /></div>}>
+      <AccountsContent />
+    </Suspense>
   );
 }
