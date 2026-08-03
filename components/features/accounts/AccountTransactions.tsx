@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Activity } from 'lucide-react';
+import { Receipt, ArrowRight } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -157,7 +158,7 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
         <div className="md:col-span-3 flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
-              <Activity className="w-3.5 h-3.5" /> Balance History
+              Balance History
             </span>
             {showWindowNav && (
               <DateWindowNav
@@ -221,8 +222,18 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
 
         {/* Right Side: Recent Transactions */}
         <div className="md:col-span-2 flex flex-col space-y-3">
-          <div className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
-            <Activity className="w-3.5 h-3.5" /> Recent Activity (Last 5)
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
+              Recent Activity
+            </div>
+            <Link
+              href={`/transactions?accountId=${accountId}`}
+              className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>See all</span>
+              <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
 
           <div className="flex-1 flex flex-col justify-center min-h-[140px]">
