@@ -55,7 +55,7 @@ describe('AccountRow Component', () => {
     expect(screen.getByText('$1,251')).toBeDefined();
   });
 
-  it('navigates to transaction page on click', () => {
+  it('navigates to accounts page on click', () => {
     render(<AccountRow account={mockAccount} onOpenDrawer={mockOnOpenDrawer} />);
 
     const rowElement = screen.getByText('Chase Checking').closest('div');
@@ -64,7 +64,7 @@ describe('AccountRow Component', () => {
       fireEvent.click(rowElement);
     }
 
-    expect(mockPush).toHaveBeenCalledWith('/transactions?accountId=acc_123');
+    expect(mockPush).toHaveBeenCalledWith('/accounts?accountId=acc_123');
   });
 
   it('calls onOpenDrawer when edit button is clicked', () => {

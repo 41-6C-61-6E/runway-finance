@@ -49,7 +49,7 @@ export default function AccountRow({
   return (
     <div
       className="flex items-center justify-between py-1 pl-6 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
-      onClick={() => router.push(`/transactions?accountId=${account.id}`)}
+      onClick={() => router.push(`/accounts?accountId=${account.id}`)}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
