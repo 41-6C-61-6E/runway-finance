@@ -1,6 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { AppTabs } from '@/components/ui/app-tabs';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type PeriodType = 'monthly' | 'quarterly' | 'yearly';
 
@@ -91,30 +93,38 @@ export function BudgetPeriodSelector() {
   const { periodType, periodKey, setPeriodType, goNext, goPrev } = useBudgetPeriod();
   const label = getKeyLabel(periodType, periodKey);
 
+  const tabs = [
+    { id: 'monthly', label: 'Monthly' },
+    { id: 'quarterly', label: 'Quarterly' },
+    { id: 'yearly', label: 'Yearly' },
+  ];
+
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex bg-muted rounded-lg p-0.5">
-        {(['monthly', 'quarterly', 'yearly'] as PeriodType[]).map((type) => (
-          <button
-            key={type}
-            onClick={() => setPeriodType(type)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all capitalize ${
-              periodType === type
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {type}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-1">
-        <button onClick={goPrev} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 mb-5 sm:mb-6 pb-2 sm:pb-0">
+      <AppTabs
+        tabs={tabs}
+        activeTab={periodType}
+        onChange={(tabId) => setPeriodType(tabId as PeriodType)}
+        variant="underline"
+        className="border-b-0"
+      />
+      <div className="flex items-center gap-1 self-start sm:self-center pb-2 sm:pb-2.5">
+        <button
+          onClick={goPrev}
+          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Previous period"
+        >
+          <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-medium text-foreground min-w-[140px] text-center">{label}</span>
-        <button onClick={goNext} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        <span className="text-sm font-medium text-foreground min-w-[130px] text-center select-none">
+          {label}
+        </span>
+        <button
+          onClick={goNext}
+          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Next period"
+        >
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>

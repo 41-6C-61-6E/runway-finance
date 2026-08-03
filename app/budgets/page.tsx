@@ -16,10 +16,9 @@ function BudgetsContent() {
   return (
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
-      <PageHeader title="Budgets" icon={Wallet}>
-        <BudgetPeriodSelector />
-      </PageHeader>
+      <PageHeader title="Budgets" icon={Wallet} />
       <PageContent>
+        <BudgetPeriodSelector />
         {isVisible('budgetSummary') && (
           <Suspense fallback={<LoadingSpinner category="summary" />}>
             <div>
