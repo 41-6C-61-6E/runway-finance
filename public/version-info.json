@@ -1,7 +1,10 @@
 {
-  "buildNumber": "26.08.1785692977217",
-  "buildTime": "2026-08-02T17:49:37.217Z",
+  "buildNumber": "26.08.1785773991546",
+  "buildTime": "2026-08-03T16:19:51.546Z",
   "commits": [
+    "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
+    "refactor: modularize account transactions component and centralize API response/session utilities",
+    "refactor: centralize real estate type logic and add real estate form component with ZIP extraction",
     "refactor: implement history merging in changelog API and build script to preserve commit logs in shallow clones",
     "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
     "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
@@ -198,12 +201,33 @@
     "re-link sync fix",
     "acct mappping",
     "acct mgmt",
-    "db migration fix",
-    "sync improvements",
-    "sync improvements",
-    "backup fix"
+    "db migration fix"
   ],
   "history": [
+    {
+      "hash": "c54bb15",
+      "fullHash": "c54bb153cf9a19ada5fdae499d82e210a9ca725a",
+      "author": "Alan Racek",
+      "date": "2026-08-02T20:07:49-07:00",
+      "message": "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
+      "type": "feat"
+    },
+    {
+      "hash": "6401436",
+      "fullHash": "6401436d0a69cce2e036a6fcbc46390fed4e4bc6",
+      "author": "Alan Racek",
+      "date": "2026-08-02T11:00:08-07:00",
+      "message": "refactor: modularize account transactions component and centralize API response/session utilities",
+      "type": "refactor"
+    },
+    {
+      "hash": "5c23bb2",
+      "fullHash": "5c23bb2ffc22c8e8babc3fb34bd5ed0a0a2a2056",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:50:38-07:00",
+      "message": "refactor: centralize real estate type logic and add real estate form component with ZIP extraction",
+      "type": "refactor"
+    },
     {
       "hash": "ecf12aa",
       "fullHash": "ecf12aa25bef6823bb06c3a69ff43b20481a4c08",
@@ -1778,30 +1802,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T11:15:54-07:00",
       "message": "db migration fix",
-      "type": "other"
-    },
-    {
-      "hash": "5fb1639",
-      "fullHash": "5fb16396c35c81c693b172016d58b836bde2d100",
-      "author": "Alan Racek",
-      "date": "2026-06-12T11:02:47-07:00",
-      "message": "sync improvements",
-      "type": "other"
-    },
-    {
-      "hash": "738af5c",
-      "fullHash": "738af5c78f39b22b75f76614a70f919ffe2d63d5",
-      "author": "Alan Racek",
-      "date": "2026-06-12T11:02:29-07:00",
-      "message": "sync improvements",
-      "type": "other"
-    },
-    {
-      "hash": "3eda96e",
-      "fullHash": "3eda96e336f5216dbf0b6665a602fe9103f5a16f",
-      "author": "Alan Racek",
-      "date": "2026-06-12T09:56:14-07:00",
-      "message": "backup fix",
       "type": "other"
     }
   ]

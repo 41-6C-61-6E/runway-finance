@@ -29,7 +29,6 @@ function getStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = await auth();
