@@ -86,6 +86,27 @@ function cleanRedfinJson(text: string): any {
   return JSON.parse(cleanText);
 }
 
+function extractPropertyIdFromHtml(html: string): string | undefined {
+  // Check 1: Decoded Yahoo RU= redirect parameters
+  const ruMatches = html.match(/RU=([^&"'>]+)/gi) || [];
+  for (const m of ruMatches) {
+    const decoded = decodeURIComponent(m.replace(/^RU=/i, ''));
+    if (decoded.includes('redfin.com') && decoded.includes('/home/')) {
+      const propIdMatch = decoded.match(/\/home\/(\d+)/);
+      if (propIdMatch) return propIdMatch[1];
+    }
+  }
+
+  // Check 2: Direct Redfin property URLs anywhere in HTML
+  const directMatches = html.match(/redfin\.com\/[^\s"'>]*\/home\/(\d+)/gi) || [];
+  for (const m of directMatches) {
+    const propIdMatch = m.match(/\/home\/(\d+)/);
+    if (propIdMatch) return propIdMatch[1];
+  }
+
+  return undefined;
+}
+
 export interface RedfinEstimates {
   normal: number;
   conservative: number;
@@ -130,21 +151,37 @@ export async function fetchRedfinValuationDetails(
 
       if (res.ok) {
         const html = await res.text();
-        const matches = html.match(/RU=([^&"'>]+)/gi) || [];
-        for (const m of matches) {
-          const decoded = decodeURIComponent(m.replace(/^RU=/i, ''));
-          if (decoded.includes('redfin.com') && decoded.includes('/home/')) {
-            const propIdMatch = decoded.match(/\/home\/(\d+)/);
-            if (propIdMatch) {
-              propertyId = propIdMatch[1];
-              logger.info(`${LOG_TAG} Resolved Redfin property ID via web search`, { propertyId, address, url: decoded });
-              break;
-            }
-          }
+        propertyId = extractPropertyIdFromHtml(html);
+        if (propertyId) {
+          logger.info(`${LOG_TAG} Resolved Redfin property ID via web search`, { propertyId, address });
         }
       }
     } catch (err) {
       logger.warn(`${LOG_TAG} Web search lookup error`, { address, error: String(err) });
+    }
+
+    // Secondary fallback: DuckDuckGo HTML search if Yahoo search returned no matches
+    if (!propertyId) {
+      try {
+        const ddgUrl = `https://html.duckduckgo.com/html/?q=site:redfin.com+${encodeURIComponent(address)}`;
+        logger.info(`${LOG_TAG} DuckDuckGo fallback for Redfin property URL`, { address, url: ddgUrl });
+        const ddgRes = await fetch(ddgUrl, {
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        });
+
+        if (ddgRes.ok) {
+          const html = await ddgRes.text();
+          propertyId = extractPropertyIdFromHtml(html);
+          if (propertyId) {
+            logger.info(`${LOG_TAG} Resolved Redfin property ID via DuckDuckGo search`, { propertyId, address });
+          }
+        }
+      } catch (err) {
+        logger.warn(`${LOG_TAG} DuckDuckGo search lookup error`, { address, error: String(err) });
+      }
     }
   }
 
@@ -229,16 +266,27 @@ export async function fetchRedfinValuationDetails(
           'Referer': 'https://www.redfin.com/',
         },
       });
-      if (avmRes.status === 403 || avmRes.status === 429) {
+      if (avmRes.status === 403 || avmRes.status === 429 || avmRes.status === 503) {
         isRateLimited = true;
         logger.warn(`${LOG_TAG} Redfin AVM rate limited (HTTP ${avmRes.status})`, { propertyId: targetPropId });
       } else if (avmRes.ok) {
         const text = await avmRes.text();
-        const json = cleanRedfinJson(text);
-        const p = json.payload || {};
-        normalPrice = p.predictedValue ?? p.value ?? p.price;
-        lowPrice = p.priceRangeLow ?? p.predictedValueMin ?? p.priceRangeMin;
-        highPrice = p.priceRangeHigh ?? p.predictedValueMax ?? p.priceRangeMax;
+        const trimmed = text.trim().toLowerCase();
+        if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || trimmed.includes('challenge') || trimmed.includes('captcha')) {
+          isRateLimited = true;
+          logger.warn(`${LOG_TAG} Redfin AVM returned WAF challenge/captcha page`, { propertyId: targetPropId });
+        } else {
+          try {
+            const json = cleanRedfinJson(text);
+            const p = json.payload || {};
+            normalPrice = p.predictedValue ?? p.value ?? p.price;
+            lowPrice = p.priceRangeLow ?? p.predictedValueMin ?? p.priceRangeMin;
+            highPrice = p.priceRangeHigh ?? p.predictedValueMax ?? p.priceRangeMax;
+          } catch (jsonErr) {
+            isRateLimited = true;
+            logger.warn(`${LOG_TAG} Redfin AVM JSON parse error (likely WAF challenge)`, { propertyId: targetPropId, error: String(jsonErr) });
+          }
+        }
       }
     } catch (err) {
       logger.warn(`${LOG_TAG} AVM query error`, { propertyId: targetPropId, error: String(err) });
