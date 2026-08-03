@@ -228,7 +228,8 @@ export async function GET(request: Request) {
     ]);
 
     const data = decryptedBudgetRows.map((row) => {
-      let budgeted = parseFloat(row.amount);
+      const nativeAmount = parseFloat(row.amount);
+      let budgeted = nativeAmount;
       if (row.isRecurring && row.periodType === 'monthly') {
         if (periodType === 'quarterly') budgeted *= 3;
         else if (periodType === 'yearly') budgeted *= 12;
@@ -254,6 +255,7 @@ export async function GET(request: Request) {
         fundingAccountId: row.fundingAccountId,
         rollover: row.rollover,
         notes: row.notes,
+        monthlyAmount: nativeAmount,
         budgeted,
         actual,
         remaining,

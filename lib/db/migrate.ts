@@ -342,8 +342,10 @@ async function runSelfHealingChecks(client: any): Promise<void> {
         { tag: '0069_kind_sabretooth', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_accounts'` },
         { tag: '0070_regular_aqueduct', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'spouse_name'` },
         { tag: '0071_famous_runaways', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_flows' AND column_name = 'salary_source'` },
+        { tag: '0072_account_contributions', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary'` },
         { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
         { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
+        { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
       ];
       for (const { tag, check } of migrationArtifacts) {
         if (appliedTagsMap.has(tag)) continue;
