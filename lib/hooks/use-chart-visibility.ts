@@ -9,27 +9,23 @@ export const CHARTS = {
       netWorthSummary: 'Summary Cards',
       netWorthChart: 'Net Worth Line Chart',
       debtToAssetRatio: 'Debt-to-Asset Ratio',
-      accountValuesChart: 'Account Values Chart',
+      assetAllocation: 'Asset Allocation',
+      debtBreakdown: 'Debt Breakdown',
     },
   },
   flows: {
     label: 'Flows',
     charts: {
-      cashFlowSummary: 'Summary Cards',
-      budgetVsActual: 'Budget vs Actual',
-      cashFlowSankey: 'Sankey Diagram',
-      cashFlowForecast: 'Cash Flow Forecast',
+      wealthFlowSankey: 'Wealth Flow Sankey',
+      cashFlowSankey: 'Cash Flow Sankey',
     },
   },
   spending: {
     label: 'Spending',
     charts: {
-      cashVsCredit: 'Cash vs Credit',
       incomeExpenseChart: 'Income vs Expense Chart',
       spendingBreakdown: 'Spending Breakdown',
-      categorySummaries: 'Category Breakdown',
-      categoryIncome: 'Income Section',
-      categoryExpenses: 'Expenses Section',
+      cashVsCredit: 'Cash vs Credit',
     },
   },
 

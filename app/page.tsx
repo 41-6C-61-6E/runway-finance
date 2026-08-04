@@ -18,6 +18,10 @@ function NetWorthContent() {
   const showSummary = isVisible('netWorthSummary');
   const showRatio = isVisible('debtToAssetRatio');
   const showChart = isVisible('netWorthChart');
+  const showAssetAllocation = isVisible('assetAllocation');
+  const showDebtBreakdown = isVisible('debtBreakdown');
+
+  const showGridSection = showRatio || showAssetAllocation;
 
   return (
     <div className="min-h-screen w-full">
@@ -42,16 +46,23 @@ function NetWorthContent() {
           </Suspense>
         )}
 
-        {!showSummary && showRatio && (
-          <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
-            <div className="space-y-5 sm:space-y-6">
-              <DebtToAssetRatio />
-            </div>
-          </Suspense>
+        {!showSummary && showGridSection && (
+          <div className="space-y-5 sm:space-y-6">
+            {showRatio && (
+              <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
+                <DebtToAssetRatio />
+              </Suspense>
+            )}
+            {showAssetAllocation && (
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <AssetAllocation />
+              </Suspense>
+            )}
+          </div>
         )}
 
-        {showSummary && (
-          <div className="mt-5 sm:mt-6 grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
+        {showSummary && showGridSection && (
+          <div className={`mt-5 sm:mt-6 grid grid-cols-1 ${showRatio && showAssetAllocation ? 'lg:grid-cols-2' : ''} gap-5 sm:gap-6 items-stretch`}>
             {showRatio && (
               <Suspense fallback={<LoadingSpinner category="chart" />}>
                 <div className="h-full space-y-5">
@@ -59,13 +70,15 @@ function NetWorthContent() {
                 </div>
               </Suspense>
             )}
-            <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <AssetAllocation />
-            </Suspense>
+            {showAssetAllocation && (
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <AssetAllocation />
+              </Suspense>
+            )}
           </div>
         )}
 
-        {showRatio && (
+        {showDebtBreakdown && (
           <div className="mt-5 sm:mt-6">
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <DebtBreakdown />
