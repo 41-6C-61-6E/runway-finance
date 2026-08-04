@@ -455,6 +455,9 @@ const SankeyCustomNode = ({
   nodeHeight,
   ...restProps
 }: any) => {
+  if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) {
+    return null;
+  }
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
@@ -653,6 +656,14 @@ const SankeyCustomLink = ({
   depth,
   ...restProps
 }: any) => {
+  if (
+    typeof sourceX !== 'number' || Number.isNaN(sourceX) ||
+    typeof sourceY !== 'number' || Number.isNaN(sourceY) ||
+    typeof targetX !== 'number' || Number.isNaN(targetX) ||
+    typeof targetY !== 'number' || Number.isNaN(targetY)
+  ) {
+    return null;
+  }
   const gradId = `link-grad-${index}`;
 
   // Get column indices for source and target
