@@ -59,7 +59,7 @@ function WhatIsSharedPanel() {
           <ul className="space-y-1 text-muted-foreground pl-5 list-disc">
             <li>All accounts and balances</li>
             <li>All transactions and categories</li>
-            <li>Budgets and financial goals</li>
+            <li>Budgets and goals</li>
             <li>FIRE scenarios and retirement projections</li>
             <li>Category rules, tags</li>
             <li>SimpleFIN connections (visible to all)</li>

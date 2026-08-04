@@ -159,7 +159,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
   },
   financial_goals: {
     table: schema.financialGoals,
-    label: 'Financial Goals',
+    label: 'Goals',
     group: 'Budgets',
     defaultSort: 'priority',
     defaultSortOrder: 'desc',

@@ -42,7 +42,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'budgets', href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets', category: 'finances' },
   { id: 'real-estate', href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate', category: 'finances' },
   { id: 'investments', href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments', category: 'finances' },
-  { id: 'goals', href: '/goals', label: 'Financial Goals', icon: Target, pageKey: 'goals', category: 'finances' },
+  { id: 'goals', href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals', category: 'finances' },
   { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic Explorer', icon: Calculator, pageKey: 'financialLogic', category: 'finances' },
   { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'finances' },
   { id: 'plans', href: '/plans', label: 'FIRE', icon: Flame, pageKey: 'plans', category: 'planning' },

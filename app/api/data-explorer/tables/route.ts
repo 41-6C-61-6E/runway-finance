@@ -12,7 +12,7 @@ const TABLE_METADATA = [
   { key: 'category_spending_summary', label: 'Category Spending', group: 'Cash Flow' },
   { key: 'category_income_summary', label: 'Category Income', group: 'Cash Flow' },
   { key: 'budgets', label: 'Budgets', group: 'Budgets' },
-  { key: 'financial_goals', label: 'Financial Goals', group: 'Budgets' },
+  { key: 'financial_goals', label: 'Goals', group: 'Budgets' },
 
   { key: 'sync_logs', label: 'Sync Logs', group: 'System' },
   { key: 'simplefin_connections', label: 'SimpleFIN Connections', group: 'System' },
