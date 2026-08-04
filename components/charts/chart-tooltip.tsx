@@ -19,7 +19,7 @@ export function ChartTooltip({ children, x, y, containerRef }: ChartTooltipProps
     const el = ref.current;
     if (!el) return;
 
-    if (containerRef && containerRef.current && typeof x === 'number' && typeof y === 'number') {
+    if (containerRef && containerRef.current && typeof x === 'number' && typeof y === 'number' && !Number.isNaN(x) && !Number.isNaN(y)) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const initialLeft = containerRect.left + x;
       const initialTop = containerRect.top + y;
