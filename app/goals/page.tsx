@@ -17,7 +17,7 @@ function GoalsContent() {
   return (
     <GoalInflowProvider>
       <div className="min-h-screen w-full">
-        <PageHeader title="Financial Goals" icon={Target} />
+        <PageHeader title="Goals" icon={Target} />
         <PageContent>
           {isVisible('goalsSummary') && (
             <Suspense fallback={<LoadingSpinner category="summary" />}>

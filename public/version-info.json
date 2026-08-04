@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1785795522780",
-  "buildTime": "2026-08-03T22:18:42.780Z",
-  "hash": "6037421",
-  "fullHash": "6037421425264f66c1fad954f816794a1e8cea8f",
+  "buildNumber": "26.08.1785854240673",
+  "buildTime": "2026-08-04T14:37:20.673Z",
+  "hash": "1e07d0c",
+  "fullHash": "1e07d0c3c9bb7ea49ebdba0819f102de1038faed",
   "commits": [
+    "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
+    "feat: update budget table UI to display monthly amounts and add migration definitions for plan and user settings",
     "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
     "refactor: update budget period logic, improve transaction table UI, and unify fetch implementation with TanStack Query",
     "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
@@ -201,19 +203,33 @@
     "real estate backend",
     "restore fix",
     "db fix",
-    "imports fix",
-    "payroll crash fix",
-    "drizzle name fix"
+    "imports fix"
   ],
   "history": [
+    {
+      "hash": "1e07d0c",
+      "fullHash": "1e07d0c3c9bb7ea49ebdba0819f102de1038faed",
+      "author": "Alan Racek",
+      "date": "2026-08-03T15:52:08-07:00",
+      "message": "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
+      "type": "refactor",
+      "buildNumber": "26.08.1785854240673"
+    },
+    {
+      "hash": "7660f8d",
+      "fullHash": "7660f8d3525ff116bb179ddc71af821480ecc408",
+      "author": "Alan Racek",
+      "date": "2026-08-03T15:19:36-07:00",
+      "message": "feat: update budget table UI to display monthly amounts and add migration definitions for plan and user settings",
+      "type": "feat"
+    },
     {
       "hash": "6037421",
       "fullHash": "6037421425264f66c1fad954f816794a1e8cea8f",
       "author": "Alan Racek",
       "date": "2026-08-03T14:52:07-07:00",
       "message": "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
-      "type": "feat",
-      "buildNumber": "26.08.1785795522780"
+      "type": "feat"
     },
     {
       "hash": "5b87dbd",
@@ -1789,22 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T19:58:51-07:00",
       "message": "imports fix",
-      "type": "other"
-    },
-    {
-      "hash": "7b6db56",
-      "fullHash": "7b6db565b909f94a94148fc12e31cef09ea8f641",
-      "author": "Alan Racek",
-      "date": "2026-06-12T19:49:04-07:00",
-      "message": "payroll crash fix",
-      "type": "other"
-    },
-    {
-      "hash": "16228bd",
-      "fullHash": "16228bda5d2858bb14473d08b416e31698fa9668",
-      "author": "Alan Racek",
-      "date": "2026-06-12T19:25:47-07:00",
-      "message": "drizzle name fix",
       "type": "other"
     }
   ]
