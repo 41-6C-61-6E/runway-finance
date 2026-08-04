@@ -63,6 +63,9 @@ const SankeyCustomNode = ({
   onClick, hoveredNode, setHoveredNode,
   showPercentages, isMobile, ...restProps
 }: any) => {
+  if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) {
+    return null;
+  }
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
@@ -198,6 +201,14 @@ const SankeyCustomLink = ({
   sourceX, sourceY, targetX, targetY, linkWidth, index,
   payload, onClick, hoveredNode, ...restProps
 }: any) => {
+  if (
+    typeof sourceX !== 'number' || Number.isNaN(sourceX) ||
+    typeof sourceY !== 'number' || Number.isNaN(sourceY) ||
+    typeof targetX !== 'number' || Number.isNaN(targetX) ||
+    typeof targetY !== 'number' || Number.isNaN(targetY)
+  ) {
+    return null;
+  }
   const gradId = `wealth-link-grad-${index}`;
   const midX = (sourceX + targetX) / 2;
   const halfW = linkWidth / 2;
@@ -1026,7 +1037,7 @@ export function WealthFlowSankey() {
                 <div className="h-[400px] flex items-center justify-center">
                   <ChartEmptyState variant="empty" description="All accounts are excluded. Adjust your filters." />
                 </div>
-              ) : processedData.nodes.length === 0 ? (
+              ) : processedData.nodes.length === 0 || processedData.links.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">
                   <ChartEmptyState variant="nodata" description="No data available for the selected range." />
                 </div>

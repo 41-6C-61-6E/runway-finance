@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1785854240673",
-  "buildTime": "2026-08-04T14:37:20.673Z",
-  "hash": "1e07d0c",
-  "fullHash": "1e07d0c3c9bb7ea49ebdba0819f102de1038faed",
+  "buildNumber": "26.08.1785857670916",
+  "buildTime": "2026-08-04T15:34:30.916Z",
+  "hash": "028f6ff",
+  "fullHash": "028f6ff20c4f7bb837d49c3366dd565ce2f37f15",
   "commits": [
+    "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
+    "refactor: rename Financial Goals to Goals throughout the UI and remove redundant account indicators",
     "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
     "feat: update budget table UI to display monthly amounts and add migration definitions for plan and user settings",
     "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
@@ -201,19 +203,33 @@
     "settings improvements",
     "better investment snapshots",
     "real estate backend",
-    "restore fix",
-    "db fix",
-    "imports fix"
+    "restore fix"
   ],
   "history": [
+    {
+      "hash": "028f6ff",
+      "fullHash": "028f6ff20c4f7bb837d49c3366dd565ce2f37f15",
+      "author": "Alan Racek",
+      "date": "2026-08-04T08:01:07-07:00",
+      "message": "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
+      "type": "feat",
+      "buildNumber": "26.08.1785857670916"
+    },
+    {
+      "hash": "ca04962",
+      "fullHash": "ca0496270aa47d5ff1aa3246a5dd537796587790",
+      "author": "Alan Racek",
+      "date": "2026-08-04T07:50:30-07:00",
+      "message": "refactor: rename Financial Goals to Goals throughout the UI and remove redundant account indicators",
+      "type": "refactor"
+    },
     {
       "hash": "1e07d0c",
       "fullHash": "1e07d0c3c9bb7ea49ebdba0819f102de1038faed",
       "author": "Alan Racek",
       "date": "2026-08-03T15:52:08-07:00",
       "message": "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
-      "type": "refactor",
-      "buildNumber": "26.08.1785854240673"
+      "type": "refactor"
     },
     {
       "hash": "7660f8d",
@@ -1789,22 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-12T21:49:04-07:00",
       "message": "restore fix",
-      "type": "other"
-    },
-    {
-      "hash": "04639ce",
-      "fullHash": "04639ce80164f892455bdf589a60526d9fe4c937",
-      "author": "Alan Racek",
-      "date": "2026-06-12T20:12:06-07:00",
-      "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "2031efb",
-      "fullHash": "2031efb334708f1c2a1970f47024d5389805c7d4",
-      "author": "Alan Racek",
-      "date": "2026-06-12T19:58:51-07:00",
-      "message": "imports fix",
       "type": "other"
     }
   ]
