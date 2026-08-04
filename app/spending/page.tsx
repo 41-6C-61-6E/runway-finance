@@ -17,26 +17,26 @@ function SpendingContent() {
   return (
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
-      <PageHeader title="Spend / Save" icon={DollarSign} />
+      <PageHeader title="Spending" icon={DollarSign} />
       <PageContent className="space-y-5 sm:space-y-6">
-        {isVisible('incomeExpenseChart') && (
-          <div>
-            <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <ChartErrorBoundary name="Income vs Expenses">
-                <div>
-                  <IncomeExpenseChart />
-                </div>
-              </ChartErrorBoundary>
-            </Suspense>
-          </div>
-        )}
-
         {isVisible('spendingBreakdown') && (
           <div>
             <Suspense fallback={<LoadingSpinner category="chart" />}>
               <div>
                 <SpendingBreakdown />
               </div>
+            </Suspense>
+          </div>
+        )}
+
+        {isVisible('incomeExpenseChart') && (
+          <div>
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <ChartErrorBoundary name="Net Income">
+                <div>
+                  <IncomeExpenseChart />
+                </div>
+              </ChartErrorBoundary>
             </Suspense>
           </div>
         )}
