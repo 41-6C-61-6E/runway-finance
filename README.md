@@ -139,7 +139,7 @@ Manage your personal finance on the go with a fully optimized mobile responsive 
 - **Accounts** — Connect bank/brokerage accounts via Plaid or SimpleFIN, or manage them manually; track balances and values over time.
 - **Transactions** — Full ledger with filtering, searching, bulk editing, detail drawers, tags, and auto-categorization rules.
 - **Net Worth** — Real-time net worth dashboard with debt-to-asset ratio, asset allocation charts, and goal progress tracking.
-- **Spend / Save** — Detailed cash flow analysis, income vs. expenses, category spending breakdown, cash vs. credit card usage, and category summaries.
+- **Spending** — Detailed cash flow analysis, income vs. expenses, category spending breakdown, cash vs. credit card usage, and category summaries.
 - **Flows** — Wealth Flow and Cash Flow visualization via interactive Sankey diagrams.
 
 ### 📊 Budgeting & Planning
