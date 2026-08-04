@@ -50,7 +50,7 @@ export const CHARTS = {
     },
   },
   goals: {
-    label: 'Financial Goals',
+    label: 'Goals',
     charts: {
       goalsSummary: 'Summary Cards',
       goalsList: 'Goals List',

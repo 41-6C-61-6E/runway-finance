@@ -2662,9 +2662,6 @@ function AccountsContent() {
                                           }`}
                                         >
                                           <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                            <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                              <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                            </div>
                                             <div className="min-w-0 flex-1">
                                               <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
@@ -2819,9 +2816,6 @@ function AccountsContent() {
                                                 }`}
                                               >
                                                 <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-12">
-                                                  <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                                  </div>
                                                   <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                       <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
@@ -2933,9 +2927,6 @@ function AccountsContent() {
                                         }`}
                                       >
                                         <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                          <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                          </div>
                                           <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                               <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
