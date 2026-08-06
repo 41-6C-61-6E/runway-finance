@@ -33,7 +33,7 @@ export function AppTabs({
     return (
       <div
         className={cn(
-          'inline-flex items-center gap-1 p-1 rounded-xl bg-muted/60 border border-border/40',
+          'inline-flex items-center gap-1 p-1 rounded-xl bg-muted/60 border border-border/40 max-w-full overflow-x-auto no-scrollbar',
           className
         )}
         role="tablist"
@@ -49,7 +49,7 @@ export function AppTabs({
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onChange(tab.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none min-h-[36px]',
+                'inline-flex items-center gap-1.5 rounded-lg font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none min-h-[36px] whitespace-nowrap shrink-0',
                 size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm',
                 isActive
                   ? 'bg-background text-foreground shadow-xs border border-border/50 font-semibold'

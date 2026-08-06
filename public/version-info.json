@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1785857670916",
-  "buildTime": "2026-08-04T15:34:30.916Z",
-  "hash": "028f6ff",
-  "fullHash": "028f6ff20c4f7bb837d49c3366dd565ce2f37f15",
+  "buildNumber": "26.08.1786037372860",
+  "buildTime": "2026-08-06T17:29:32.860Z",
+  "hash": "22d1a2d",
+  "fullHash": "22d1a2d759f2e14a38842fe6cddfb76cee50f7e6",
   "commits": [
+    "feat: refine dashboard layouts and add NaN safety checks for sankey charts and tooltips",
     "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
     "refactor: rename Financial Goals to Goals throughout the UI and remove redundant account indicators",
     "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
@@ -202,18 +203,25 @@
     "categorization fixes",
     "settings improvements",
     "better investment snapshots",
-    "real estate backend",
-    "restore fix"
+    "real estate backend"
   ],
   "history": [
+    {
+      "hash": "22d1a2d",
+      "fullHash": "22d1a2d759f2e14a38842fe6cddfb76cee50f7e6",
+      "author": "Alan Racek",
+      "date": "2026-08-04T08:35:40-07:00",
+      "message": "feat: refine dashboard layouts and add NaN safety checks for sankey charts and tooltips",
+      "type": "feat",
+      "buildNumber": "26.08.1786037372860"
+    },
     {
       "hash": "028f6ff",
       "fullHash": "028f6ff20c4f7bb837d49c3366dd565ce2f37f15",
       "author": "Alan Racek",
       "date": "2026-08-04T08:01:07-07:00",
       "message": "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
-      "type": "feat",
-      "buildNumber": "26.08.1785857670916"
+      "type": "feat"
     },
     {
       "hash": "ca04962",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-16T09:42:07-07:00",
       "message": "real estate backend",
-      "type": "other"
-    },
-    {
-      "hash": "ac880bc",
-      "fullHash": "ac880bc4b338fc5eae5c6e9fb167fa45b27de4db",
-      "author": "Alan Racek",
-      "date": "2026-06-12T21:49:04-07:00",
-      "message": "restore fix",
       "type": "other"
     }
   ]

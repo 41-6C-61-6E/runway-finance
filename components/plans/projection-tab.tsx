@@ -628,7 +628,7 @@ export function ProjectionTab({
   const diagnosticWarnings = useMemo(() => {
     const warnings: string[] = [];
     if (totalAnnualExpensesFromPlan <= 0) {
-      warnings.push('No living expenses configured for this plan. Add expense events under Plan Details to see realistic portfolio drawdowns.');
+      warnings.push('No living expenses configured for this plan. Add expense events under Settings -> Plan Details to see realistic portfolio drawdowns.');
     }
     if (plan?.hasSpouse && !plan?.spouseBirthYear) {
       warnings.push('Spouse option is enabled, but spouse birth year is missing. Defaulting to 1987.');
