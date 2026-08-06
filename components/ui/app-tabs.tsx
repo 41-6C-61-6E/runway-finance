@@ -35,7 +35,7 @@ export function AppTabs({
     return (
       <div
         className={cn(
-          'items-center gap-1 p-1 rounded-xl bg-muted/60 border border-border/40 max-w-full overflow-x-auto no-scrollbar',
+          'items-center gap-0.5 p-0.5 rounded-lg bg-muted/60 border border-border/40 max-w-full overflow-x-auto no-scrollbar',
           fullWidth ? 'flex w-full' : 'inline-flex',
           className
         )}
@@ -52,15 +52,15 @@ export function AppTabs({
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onChange(tab.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none min-h-[36px] whitespace-nowrap shrink-0',
+                'inline-flex items-center gap-1.5 rounded-md font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0',
                 fullWidth && 'flex-1 justify-center text-center',
-                size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm',
+                size === 'sm' ? 'px-2.5 py-0.5 text-xs min-h-[28px]' : 'px-3 py-1 text-xs sm:text-sm min-h-[32px]',
                 isActive
                   ? 'bg-primary/10 text-primary border border-primary/30 font-semibold shadow-xs'
                   : 'text-muted-foreground hover:text-foreground hover:bg-background/40 border border-transparent'
               )}
             >
-              {Icon && <Icon className={cn('shrink-0', size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4')} />}
+              {Icon && <Icon className={cn('shrink-0', size === 'sm' ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5 sm:w-4 sm:h-4')} />}
               <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span
@@ -110,7 +110,7 @@ export function AppTabs({
             disabled={tab.disabled}
             onClick={() => !tab.disabled && onChange(tab.id)}
             className={cn(
-              'inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-px pb-2.5 pt-1 min-h-[40px]',
+              'inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-px pb-1.5 pt-0.5 min-h-[34px]',
               fullWidth && 'flex-1 justify-center text-center',
               size === 'sm' ? 'text-xs' : 'text-sm',
               isActive
