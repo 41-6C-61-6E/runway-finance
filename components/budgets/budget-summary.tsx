@@ -1,13 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 interface BudgetData {
   id: string;
@@ -38,14 +40,10 @@ export function BudgetSummary() {
   if (loading) {
     return (
       <Card className="animate-pulse">
-        <CardContent className="p-6 space-y-4">
-          <div className="h-5 bg-muted rounded w-40 mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 bg-muted/60 rounded-xl" />
-            ))}
-          </div>
-          <div className="h-48 bg-muted/40 rounded-xl" />
+        <CardContent className="p-5 space-y-4">
+          <div className="h-5 bg-muted rounded w-36 mb-2" />
+          <div className="h-32 bg-muted/60 rounded-xl" />
+          <div className="h-20 bg-muted/40 rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -79,132 +77,215 @@ export function BudgetSummary() {
   const netActual = totalIncomeActual - totalExpenseActual;
   const isSurplus = netActual >= 0;
 
+  const overBudgetBudgets = expenseBudgets.filter((b) => b.remaining < 0);
+  const nearLimitBudgets = expenseBudgets.filter((b) => b.percentUsed > 85 && b.remaining >= 0);
+  const topExpense = expenseBudgets.slice().sort((a, b) => b.actual - a.actual)[0];
+
+  let healthStatus = {
+    label: 'On Track',
+    badgeClass: 'bg-constructive/10 text-constructive border-constructive/20',
+    icon: ShieldCheck,
+  };
+  if (expensePercent > 100 || overBudgetBudgets.length > 0) {
+    healthStatus = {
+      label: 'Attention Needed',
+      badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
+      icon: AlertTriangle,
+    };
+  } else if (expensePercent > 85 || nearLimitBudgets.length > 0) {
+    healthStatus = {
+      label: 'Near Limit',
+      badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+      icon: AlertTriangle,
+    };
+  }
+
+  let alertHref: string | null = null;
+  let alertText: string | null = null;
+  let alertClass = '';
+
+  if (overBudgetBudgets.length === 1) {
+    alertText = `1 category over budget (${overBudgetBudgets[0].categoryName})`;
+    alertHref = `/transactions?categoryId=${overBudgetBudgets[0].categoryId}`;
+    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
+  } else if (overBudgetBudgets.length > 1) {
+    alertText = `${overBudgetBudgets.length} categories over budget`;
+    alertHref = `/transactions?categoryIds=${overBudgetBudgets.map((b) => b.categoryId).join(',')}`;
+    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
+  } else if (nearLimitBudgets.length > 0) {
+    alertText = `${nearLimitBudgets.length} ${nearLimitBudgets.length === 1 ? 'category' : 'categories'} near budget limit`;
+    alertHref = `/transactions?categoryIds=${nearLimitBudgets.map((b) => b.categoryId).join(',')}`;
+    alertClass = 'text-amber-500 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15';
+  }
+
+  const spentAmount = Math.max(0, totalExpenseActual);
+  const remainingAmount = Math.max(0, totalExpenseBudgeted - totalExpenseActual);
+  const chartData = (spentAmount === 0 && remainingAmount === 0)
+    ? [{ name: 'Empty', value: 1, color: 'var(--muted)' }]
+    : [
+        { name: 'Spent', value: spentAmount, color: expensePercent > 100 ? 'var(--destructive)' : 'var(--primary)' },
+        { name: 'Remaining', value: remainingAmount, color: 'var(--muted)' },
+      ];
+
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden border border-border/60 shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={collapsed}
-          onToggle={setCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-primary shrink-0" />
-              <span>Budget Overview</span>
-            </div>
-          }
-        />
-        {!collapsed && (
-          <CardContent className="p-4 sm:p-6 space-y-6">
-            {/* ── Summary Visual Cards Row ── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Income Meter */}
-              {hasIncome && (
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-                    <span className="flex items-center gap-1.5 text-chart-2 font-semibold uppercase tracking-wider text-[11px]">
-                      <TrendingUp className="w-3.5 h-3.5" /> Income Target
-                    </span>
-                    <span className="font-semibold text-foreground">{incomePercent.toFixed(1)}%</span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono blur-number text-foreground">
-                      {formatCurrency(totalIncomeActual)}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-mono blur-number">
-                      Target: {formatCurrency(totalIncomeBudgeted)}
-                    </span>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-chart-2 transition-all duration-500 rounded-full"
-                      style={{ width: `${Math.min(incomePercent, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Expense Meter */}
-              {hasExpenses && (
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-                    <span className={cn(
-                      "flex items-center gap-1.5 font-semibold uppercase tracking-wider text-[11px]",
-                      expensePercent > 100 ? "text-chart-5" : expensePercent > 85 ? "text-chart-3" : "text-chart-1"
-                    )}>
-                      {expensePercent > 100 ? <AlertTriangle className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                      Expense Budget
-                    </span>
-                    <span className={cn(
-                      "font-semibold",
-                      expensePercent > 100 ? "text-chart-5" : expensePercent > 85 ? "text-chart-3" : "text-foreground"
-                    )}>
-                      {expensePercent.toFixed(1)}%
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono blur-number text-foreground">
-                      {formatCurrency(totalExpenseActual)}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-mono blur-number">
-                      Limit: {formatCurrency(totalExpenseBudgeted)}
-                    </span>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn(
-                        "h-full transition-all duration-500 rounded-full",
-                        expensePercent > 100 ? "bg-chart-5" : expensePercent > 85 ? "bg-chart-3" : "bg-chart-1"
-                      )}
-                      style={{ width: `${Math.min(expensePercent, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground text-right font-mono blur-number pt-0.5">
-                    {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over budget`}
-                  </p>
-                </div>
-              )}
-
-              {/* Net Surplus / Deficit Meter */}
-              <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-2 md:col-span-1">
-                <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-                  <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-foreground font-semibold">
-                    <CheckCircle2 className={cn("w-3.5 h-3.5", isSurplus ? "text-chart-2" : "text-chart-5")} />
-                    Net Position
-                  </span>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                    isSurplus ? "bg-chart-2/15 text-chart-2" : "bg-chart-5/15 text-chart-5"
-                  )}>
-                    {isSurplus ? 'Surplus' : 'Deficit'}
-                  </span>
-                </div>
-
-                <div className="flex items-baseline justify-between pt-1">
-                  <span className={cn(
-                    "text-xl font-bold font-mono blur-number",
-                    isSurplus ? "text-chart-2" : "text-chart-5"
-                  )}>
-                    {isSurplus ? '+' : ''}{formatCurrency(netActual)}
-                  </span>
-                </div>
-
-                <p className="text-xs text-muted-foreground pt-2 border-t border-border/30">
-                  {isSurplus
-                    ? 'Income exceeds total actual spending for this period.'
-                    : 'Spending exceeds total actual income earned.'}
-                </p>
+    <Card className="overflow-hidden border border-border/70 shadow-sm bg-card">
+      <CollapsibleCardHeader
+        isCollapsed={collapsed}
+        onToggle={setCollapsed}
+        title={
+          <div className="flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-semibold text-sm">Budget Overview</span>
+          </div>
+        }
+      />
+      {!collapsed && (
+        <CardContent className="p-4 sm:p-5 space-y-4">
+          {/* Header Status & Net Position Row */}
+          <div className="flex items-center justify-between pb-3 border-b border-border/40">
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold border flex items-center gap-1', healthStatus.badgeClass)}>
+                  <healthStatus.icon className="w-3 h-3" />
+                  {healthStatus.label}
+                </span>
               </div>
             </div>
+            <div className="text-right">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Net Position</span>
+              <p className={cn('text-base font-bold font-mono blur-number', isSurplus ? 'text-constructive' : 'text-destructive')}>
+                {isSurplus ? '+' : ''}{formatCurrency(netActual)}
+              </p>
+            </div>
+          </div>
 
+          {/* Donut Chart & Percent Ring Section */}
+          {hasExpenses && (
+            <div className="flex items-center justify-center relative py-1">
+              <div className="w-36 h-36 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={44}
+                      outerRadius={58}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-xl font-bold font-mono text-foreground leading-none">
+                    {expensePercent.toFixed(0)}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium mt-0.5">used</span>
+                </div>
+              </div>
+            </div>
+          )}
 
-          </CardContent>
-        )}
-      </Card>
-    </div>
+          {/* Expense & Income Progress Bars */}
+          <div className="space-y-3 pt-1">
+            {hasExpenses && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="flex items-center gap-1 text-foreground/90 font-semibold text-[11px]">
+                    <TrendingDown className="w-3.5 h-3.5 text-primary" />
+                    Expenses
+                  </span>
+                  <span className="font-mono text-xs text-foreground">
+                    <span className="blur-number">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full transition-all duration-500 rounded-full',
+                      expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'bg-primary'
+                    )}
+                    style={{ width: `${Math.min(expensePercent, 100)}%` }}
+                  />
+                </div>
+                <p className={cn('text-[11px] text-right font-mono blur-number', expenseRemaining < 0 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                  {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
+                </p>
+              </div>
+            )}
+
+            {hasIncome && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="flex items-center gap-1 text-primary font-semibold text-[11px]">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    Income Target
+                  </span>
+                  <span className="font-mono text-xs text-foreground">
+                    <span className="blur-number">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 rounded-full"
+                    style={{ width: `${Math.min(incomePercent, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Smart Insights Footer */}
+          <div className="pt-3 border-t border-border/40 space-y-2">
+            {topExpense && (
+              <Link
+                href={`/transactions?categoryId=${topExpense.categoryId}`}
+                className="flex items-center justify-between text-xs bg-accent/30 p-2.5 rounded-lg border border-border/40 hover:bg-accent/60 transition-colors group"
+              >
+                <span className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                  Top Expense
+                </span>
+                <span
+                  className="font-medium text-foreground text-xs truncate max-w-[140px] group-hover:text-primary transition-colors flex items-center gap-1"
+                  title={`${topExpense.categoryName} (${formatCurrency(topExpense.actual)})`}
+                >
+                  {topExpense.categoryName} ({formatCurrency(topExpense.actual)})
+                  <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary shrink-0" />
+                </span>
+              </Link>
+            )}
+
+            {alertText && alertHref ? (
+              <Link
+                href={alertHref}
+                className={cn('flex items-center justify-between text-xs p-2.5 rounded-lg border font-medium transition-colors group', alertClass)}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{alertText}</span>
+                </div>
+                <div className="flex items-center gap-0.5 text-[11px] font-semibold shrink-0 pl-1">
+                  <span>View</span>
+                  <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </Link>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground text-[11px] px-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-constructive shrink-0" />
+                <span>All categories within budgeted limits</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 }
