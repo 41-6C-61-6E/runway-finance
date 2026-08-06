@@ -111,17 +111,17 @@ export function BudgetPeriodSelector() {
       <div className="flex items-center gap-1 self-start sm:self-center pb-2 sm:pb-2.5">
         <button
           onClick={goPrev}
-          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
           aria-label="Previous period"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-medium text-foreground min-w-[130px] text-center select-none">
+        <span className="text-sm font-semibold text-foreground min-w-[130px] text-center select-none">
           {label}
         </span>
         <button
           onClick={goNext}
-          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
           aria-label="Next period"
         >
           <ChevronRight className="w-4 h-4" />
