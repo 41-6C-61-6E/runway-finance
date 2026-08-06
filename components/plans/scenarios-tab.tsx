@@ -381,6 +381,7 @@ export function ScenariosTab({
         onChange={(tabId) => setActiveSubTab(tabId as any)}
         variant="pills"
         size="sm"
+        fullWidth
       />
 
       {/* SUB-TAB 1: WITHDRAW STRATEGY */}

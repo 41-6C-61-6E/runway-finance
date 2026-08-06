@@ -1407,7 +1407,7 @@ function SettingsPageBody() {
       {activeTab === 'accounts' && (
         <>
           {/* Sub-tab toggle */}
-          <div className="flex border-b border-border/60 w-full gap-6 mb-5 sm:mb-6">
+          <div className="flex border-b border-border/60 w-full gap-2 sm:gap-6 mb-5 sm:mb-6">
             <button
               onClick={() => {
                 setAccountSubTab('connections');
@@ -1415,7 +1415,7 @@ function SettingsPageBody() {
                 params.set('sub', 'connections');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
+              className={`flex-1 text-center justify-center pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'connections'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -1430,7 +1430,7 @@ function SettingsPageBody() {
                 params.set('sub', 'automatic');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
+              className={`flex-1 text-center justify-center pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'automatic'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -1445,7 +1445,7 @@ function SettingsPageBody() {
                 params.set('sub', 'manual');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
+              className={`flex-1 text-center justify-center pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
                 accountSubTab === 'manual'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
