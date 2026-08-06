@@ -26,7 +26,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { username, password, email, pin, sharingEmail, sharingPin, timezone } = body;
+    let { username, password, email, pin, sharingEmail, sharingPin, timezone } = body;
+
+    if (email && typeof email === 'string') {
+      email = email.trim().normalize('NFKC');
+    }
+    if (sharingEmail && typeof sharingEmail === 'string') {
+      sharingEmail = sharingEmail.trim().normalize('NFKC');
+    }
 
     logger.debug('Register API: request received', { username, email, isSharedJoin: !!(sharingEmail && sharingPin) });
 
