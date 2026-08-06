@@ -19,23 +19,23 @@ function BudgetsContent() {
       <PageHeader title="Budgets" icon={Wallet} />
       <PageContent>
         <BudgetPeriodSelector />
-        {isVisible('budgetSummary') && (
-          <Suspense fallback={<LoadingSpinner category="summary" />}>
-            <div>
-              <BudgetSummary />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {isVisible('budgetSummary') && (
+            <div className="lg:col-span-1 order-first lg:order-last">
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
+                <BudgetSummary />
+              </Suspense>
             </div>
-          </Suspense>
-        )}
+          )}
 
-        {isVisible('budgetTable') && (
-          <div className="mt-5 sm:mt-6">
-            <Suspense fallback={<LoadingSpinner category="summary" />}>
-              <div>
+          {isVisible('budgetTable') && (
+            <div className={isVisible('budgetSummary') ? 'lg:col-span-2' : 'lg:col-span-3'}>
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
                 <BudgetTable />
-              </div>
-            </Suspense>
-          </div>
-        )}
+              </Suspense>
+            </div>
+          )}
+        </div>
       </PageContent>
     </div>
   );
