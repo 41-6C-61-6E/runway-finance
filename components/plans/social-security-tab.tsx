@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { formatCurrency } from '@/lib/utils/format';
@@ -51,14 +51,28 @@ export function SocialSecurityTab({
   const [spouseAge, setSpouseAge] = useState<number>(Number(plan?.spouseSsStartAge) || 67);
   const [enableSpousal, setEnableSpousal] = useState<boolean>(plan?.enableSpousalSsBenefit !== false);
 
+  // Editable Base Monthly Benefit (PIA at FRA) State
+  const [primaryMonthlyPIAInput, setPrimaryMonthlyPIAInput] = useState<string>(plan?.primarySsMonthlyAmount || '2500');
+  const [spouseMonthlyPIAInput, setSpouseMonthlyPIAInput] = useState<string>(plan?.spouseSsMonthlyAmount || '2000');
+
+  useEffect(() => {
+    if (plan) {
+      setPrimaryAge(Number(plan.primarySsStartAge) || 67);
+      setSpouseAge(Number(plan.spouseSsStartAge) || 67);
+      setEnableSpousal(plan.enableSpousalSsBenefit !== false);
+      setPrimaryMonthlyPIAInput(plan.primarySsMonthlyAmount || '2500');
+      setSpouseMonthlyPIAInput(plan.spouseSsMonthlyAmount || '2000');
+    }
+  }, [plan]);
+
   const [isOverviewCollapsed, setIsOverviewCollapsed] = useCardCollapsed('ss_overview');
   const [isTrajectoryCollapsed, setIsTrajectoryCollapsed] = useCardCollapsed('ss_trajectory');
   const [isTaxabilityCollapsed, setIsTaxabilityCollapsed] = useCardCollapsed('ss_taxability');
 
   const [appliedMsg, setAppliedMsg] = useState<string>('');
 
-  const primaryMonthlyPIA = parseFloat(plan?.primarySsMonthlyAmount) || 2500;
-  const spouseMonthlyPIA = parseFloat(plan?.spouseSsMonthlyAmount) || 2000;
+  const primaryMonthlyPIA = parseFloat(primaryMonthlyPIAInput) || 0;
+  const spouseMonthlyPIA = parseFloat(spouseMonthlyPIAInput) || 0;
   const isMfj = plan?.filingStatus === 'married_joint' || Boolean(plan?.hasSpouse);
 
   // Helper to convert DB plan to EnginePlan object
@@ -175,29 +189,25 @@ export function SocialSecurityTab({
     });
   }, [sim62, sim67, sim70, simSelected]);
 
-  const handleSaveToPlan = () => {
+  const updatePlanParameters = (overrides?: Partial<{
+    primarySsMonthlyAmount: string;
+    spouseSsMonthlyAmount: string;
+    primarySsStartAge: number;
+    spouseSsStartAge: number;
+    enableSpousalSsBenefit: boolean;
+  }>) => {
     if (!onUpdatePlan) return;
     onUpdatePlan({
-      primarySsStartAge: primaryAge,
-      spouseSsStartAge: spouseAge,
-      enableSpousalSsBenefit: enableSpousal,
+      primarySsMonthlyAmount: overrides?.primarySsMonthlyAmount ?? primaryMonthlyPIAInput,
+      spouseSsMonthlyAmount: overrides?.spouseSsMonthlyAmount ?? spouseMonthlyPIAInput,
+      primarySsStartAge: overrides?.primarySsStartAge ?? primaryAge,
+      spouseSsStartAge: overrides?.spouseSsStartAge ?? spouseAge,
+      enableSpousalSsBenefit: overrides?.enableSpousalSsBenefit ?? enableSpousal,
     });
-    setAppliedMsg(`Successfully saved Social Security claiming ages (Primary: Age ${primaryAge}${isMfj ? `, Spouse: Age ${spouseAge}` : ''}) to active plan!`);
-    setTimeout(() => setAppliedMsg(''), 4000);
   };
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
-      {appliedMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>{appliedMsg}</span>
-          </div>
-        </div>
-      )}
-
       {/* Header KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
@@ -205,7 +215,9 @@ export function SocialSecurityTab({
             <span className="text-[11px] font-semibold text-muted-foreground">Primary Claiming Age</span>
             <Calendar className="w-4 h-4 text-primary" />
           </div>
-          <div className="text-xl font-bold font-mono text-primary">Age {primaryAge}</div>
+          <div className="text-xl font-bold font-mono text-foreground flex items-baseline gap-2">
+            Age {primaryAge}
+          </div>
           <span className="text-[10px] text-muted-foreground block">
             {(getSsMult(primaryAge) * 100).toFixed(0)}% of Full Benefit (PIA)
           </span>
@@ -253,11 +265,11 @@ export function SocialSecurityTab({
         </div>
       </div>
 
-      {/* SECTION 1: INTERACTIVE CLAIMING AGE CONTROLS */}
+      {/* SECTION 1: INTERACTIVE CLAIMING AGE & BASE BENEFIT CONTROLS */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Social Security Claiming Age & Spousal Strategy"
-          description="Adjust claiming ages from 62 (early penalty) to 70 (delayed credits +24%) to optimize portfolio longevity"
+          title="Social Security Monthly Base & Claiming Strategy"
+          description="Configure base monthly PIA benefit estimates at Full Retirement Age (67) and optimize claiming ages (62 to 70)"
           icon={HeartHandshake}
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
@@ -265,6 +277,62 @@ export function SocialSecurityTab({
 
         {!isOverviewCollapsed && (
           <div className="p-5 space-y-6">
+            {/* Base PIA Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-card border border-border p-4 rounded-xl shadow-xs">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                  Primary Estimated Monthly Benefit at FRA (Age 67)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">$</span>
+                  <input
+                    type="number"
+                    value={primaryMonthlyPIAInput}
+                    onChange={(e) => {
+                      setPrimaryMonthlyPIAInput(e.target.value);
+                      updatePlanParameters({ primarySsMonthlyAmount: e.target.value });
+                    }}
+                    className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-primary"
+                    placeholder="2500"
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground block">
+                  Check ssa.gov statement for estimated Primary Insurance Amount (PIA)
+                </span>
+              </div>
+
+              {isMfj ? (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <HeartHandshake className="w-3.5 h-3.5 text-purple-500" />
+                    Spouse Estimated Monthly Benefit at FRA (Age 67)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">$</span>
+                    <input
+                      type="number"
+                      value={spouseMonthlyPIAInput}
+                      onChange={(e) => {
+                        setSpouseMonthlyPIAInput(e.target.value);
+                        updatePlanParameters({ spouseSsMonthlyAmount: e.target.value });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-purple-500"
+                      placeholder="2000"
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground block">
+                    Spouse's own earned PIA at Full Retirement Age (Age 67)
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center p-3 bg-muted/20 border border-border rounded-lg text-xs text-muted-foreground">
+                  Filing status is Single. Change status under Settings -&gt; Profile to enable spouse benefit inputs.
+                </div>
+              )}
+            </div>
+
+            {/* Claiming Age Sliders */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-4 rounded-xl border border-border">
               {/* Primary Claiming Age Slider */}
               <div className="space-y-3">
@@ -286,7 +354,11 @@ export function SocialSecurityTab({
                     { value: 67, label: '67 (FRA)' },
                     { value: 70, label: '70 (124%)' },
                   ]}
-                  onChange={(val) => setPrimaryAge(Math.round(val))}
+                  onChange={(val) => {
+                    const newAge = Math.round(val);
+                    setPrimaryAge(newAge);
+                    updatePlanParameters({ primarySsStartAge: newAge });
+                  }}
                   ariaLabel="Primary Claiming Age"
                 />
               </div>
@@ -312,29 +384,27 @@ export function SocialSecurityTab({
                       { value: 67, label: '67 (FRA)' },
                       { value: 70, label: '70 (124%)' },
                     ]}
-                    onChange={(val) => setSpouseAge(Math.round(val))}
+                    onChange={(val) => {
+                      const newAge = Math.round(val);
+                      setSpouseAge(newAge);
+                      updatePlanParameters({ spouseSsStartAge: newAge });
+                    }}
                     accentClass="accent-purple-500"
                     ariaLabel="Spouse Claiming Age"
                   />
                 </div>
               ) : (
                 <div className="flex items-center justify-center p-4 bg-card rounded-lg border border-border text-xs text-muted-foreground">
-                  Filing status is Single. Enable spouse in Plan Details for spousal benefits.
+                  Filing status is Single. Enable spouse under Settings -&gt; Profile for spousal benefits.
                 </div>
               )}
             </div>
 
-            {/* Action Bar */}
+            {/* Action & Active Status Bar */}
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-muted-foreground">
-                Plan Ending Net Worth with selected SS ages: <strong className="text-foreground font-mono">{formatCurrency(simSelected.endingNetWorth)}</strong>
+                Plan Ending Net Worth: <strong className="text-foreground font-mono">{formatCurrency(simSelected.endingNetWorth)}</strong>
               </div>
-              <button
-                onClick={handleSaveToPlan}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Apply Claiming Ages to Active Plan
-              </button>
             </div>
           </div>
         )}

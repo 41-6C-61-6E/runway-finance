@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import {
+  ListChecks,
   Flag,
   TrendingUp,
   ShieldCheck,
@@ -35,7 +36,9 @@ import { getYearSalary } from '@/lib/services/retirement-engine';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { EngineRulesView } from './engine-rules-view';
+import { PlanDetailsTab } from './plan-details-tab';
 
 interface SettingsTabProps {
   plan: any;
@@ -44,7 +47,7 @@ interface SettingsTabProps {
 
 export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [subTab, setSubTab] = useState<
-    'milestones' | 'social_security' | 'rates_estate' | 'engine_rules'
+    'milestones' | 'details' | 'rates_estate' | 'engine_rules'
   >('milestones');
 
   // Collapsible card states
@@ -237,30 +240,23 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Sub-Tab Bar */}
-      <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {[
-          { id: 'milestones' as const, label: 'Milestones & Profile', icon: Flag },
-          { id: 'social_security' as const, label: 'Social Security Planning', icon: HeartHandshake },
-          { id: 'rates_estate' as const, label: 'Strategy and Rates', icon: TrendingUp },
-          { id: 'engine_rules' as const, label: 'Engine Data & Tax Rules', icon: Database },
-        ].map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setSubTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                subTab === t.id
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <AppTabs
+        tabs={[
+          { id: 'milestones', label: 'Profile', icon: Flag },
+          { id: 'details', label: 'Plan Details', icon: ListChecks },
+          { id: 'rates_estate', label: 'Inflation & Rates', icon: TrendingUp },
+          { id: 'engine_rules', label: 'Engine Rules', icon: Database },
+        ]}
+        activeTab={subTab}
+        onChange={(tabId) => setSubTab(tabId as any)}
+        variant="pills"
+        size="sm"
+      />
+
+      {/* Sub-Tab: Plan Details */}
+      {subTab === 'details' && (
+        <PlanDetailsTab plan={plan} onUpdatePlan={onUpdatePlan} />
+      )}
 
       {/* Sub-Tab: Milestones & Profile */}
       {subTab === 'milestones' && (
@@ -521,39 +517,34 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                 <div className="p-5 space-y-4">
                   <div className="space-y-3 text-xs">
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Tax Filing Status</label>
-                      <select
-                        value={filingStatus}
+                      <label className="font-semibold text-muted-foreground">Partner / Spouse Name</label>
+                      <input
+                        type="text"
+                        value={spouseName}
                         onChange={(e) => {
-                          const status = e.target.value;
-                          setFilingStatus(status);
-                          const hasSpouseUpdate = status === 'married_joint';
-                          onUpdatePlan({ filingStatus: status, hasSpouse: hasSpouseUpdate });
+                          setSpouseName(e.target.value);
+                          onUpdatePlan({ spouseName: e.target.value });
                         }}
+                        placeholder="e.g. Spouse / Partner"
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
-                      >
-                        <option value="single">Single</option>
-                        <option value="married_joint">Married Filing Jointly (MFJ)</option>
-                        <option value="married_separate">Married Filing Separately</option>
-                        <option value="head_of_household">Head of Household</option>
-                      </select>
+                      />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-semibold text-muted-foreground">Primary Birth Year</label>
+                      <label className="font-semibold text-muted-foreground">Partner Birth Year</label>
                       <input
                         type="number"
-                        value={birthYear || ''}
-                        onChange={(e) => setBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        value={spouseBirthYear || ''}
+                        onChange={(e) => setSpouseBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                         onBlur={() => {
-                          const val = parseInt(String(birthYear), 10) || 1985;
-                          setBirthYear(val);
-                          onUpdatePlan({ primaryBirthYear: val });
+                          const val = parseInt(String(spouseBirthYear), 10) || 1987;
+                          setSpouseBirthYear(val);
+                          onUpdatePlan({ spouseBirthYear: val });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            const val = parseInt(String(birthYear), 10) || 1985;
-                            onUpdatePlan({ primaryBirthYear: val });
+                            const val = parseInt(String(spouseBirthYear), 10) || 1987;
+                            onUpdatePlan({ spouseBirthYear: val });
                           }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
@@ -564,17 +555,17 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                       <label className="font-semibold text-muted-foreground font-mono font-normal">Retirement Age Target</label>
                       <input
                         type="number"
-                        value={retirementAge || ''}
-                        onChange={(e) => setRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        value={spouseRetirementAge || ''}
+                        onChange={(e) => setSpouseRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                         onBlur={() => {
-                          const val = parseInt(String(retirementAge), 10) || 60;
-                          setRetirementAge(val);
-                          onUpdatePlan({ retirementAge: val });
+                          const val = parseInt(String(spouseRetirementAge), 10) || 60;
+                          setSpouseRetirementAge(val);
+                          onUpdatePlan({ spouseRetirementAge: val });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            const val = parseInt(String(retirementAge), 10) || 60;
-                            onUpdatePlan({ retirementAge: val });
+                            const val = parseInt(String(spouseRetirementAge), 10) || 60;
+                            onUpdatePlan({ spouseRetirementAge: val });
                           }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
@@ -585,17 +576,17 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                       <label className="font-semibold text-muted-foreground font-mono font-normal">Life Expectancy Target</label>
                       <input
                         type="number"
-                        value={lifeExpectancy || ''}
-                        onChange={(e) => setLifeExpectancy(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                        value={spouseLifeExpectancy || ''}
+                        onChange={(e) => setSpouseLifeExpectancy(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                         onBlur={() => {
-                          const val = parseInt(String(lifeExpectancy), 10) || 100;
-                          setLifeExpectancy(val);
-                          onUpdatePlan({ lifeExpectancyAge: val });
+                          const val = parseInt(String(spouseLifeExpectancy), 10) || 100;
+                          setSpouseLifeExpectancy(val);
+                          onUpdatePlan({ spouseLifeExpectancyAge: val });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            const val = parseInt(String(lifeExpectancy), 10) || 100;
-                            onUpdatePlan({ lifeExpectancyAge: val });
+                            const val = parseInt(String(spouseLifeExpectancy), 10) || 100;
+                            onUpdatePlan({ spouseLifeExpectancyAge: val });
                           }
                         }}
                         className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
@@ -609,13 +600,13 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">$</span>
                         <input
                           type="text"
-                          value={primarySalary}
-                          onChange={(e) => setPrimarySalary(e.target.value)}
-                          onBlur={() => onUpdatePlan({ primarySalary: primarySalary })}
+                          value={spouseSalary}
+                          onChange={(e) => setSpouseSalary(e.target.value)}
+                          onBlur={() => onUpdatePlan({ spouseSalary: spouseSalary })}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') onUpdatePlan({ primarySalary: primarySalary });
+                            if (e.key === 'Enter') onUpdatePlan({ spouseSalary: spouseSalary });
                           }}
-                          placeholder="e.g. 120000"
+                          placeholder="e.g. 85000"
                           className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary"
                         />
                       </div>
@@ -624,12 +615,12 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           <label className="text-[10px] font-semibold text-muted-foreground">Base Year</label>
                           <input
                             type="number"
-                            value={primarySalaryYear || ''}
-                            onChange={(e) => setPrimarySalaryYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                            value={spouseSalaryYear || ''}
+                            onChange={(e) => setSpouseSalaryYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                             onBlur={() => {
-                              const val = parseInt(String(primarySalaryYear), 10) || new Date().getFullYear();
-                              setPrimarySalaryYear(val);
-                              onUpdatePlan({ primarySalaryYear: val });
+                              const val = parseInt(String(spouseSalaryYear), 10) || new Date().getFullYear();
+                              setSpouseSalaryYear(val);
+                              onUpdatePlan({ spouseSalaryYear: val });
                             }}
                             className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
                           />
@@ -639,11 +630,11 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           <div className="relative">
                             <input
                               type="text"
-                              value={primarySalaryRaisePct}
-                              onChange={(e) => setPrimarySalaryRaisePct(e.target.value)}
-                              onBlur={() => onUpdatePlan({ primarySalaryRaisePct: primarySalaryRaisePct })}
+                              value={spouseSalaryRaisePct}
+                              onChange={(e) => setSpouseSalaryRaisePct(e.target.value)}
+                              onBlur={() => onUpdatePlan({ spouseSalaryRaisePct: spouseSalaryRaisePct })}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') onUpdatePlan({ primarySalaryRaisePct: primarySalaryRaisePct });
+                                if (e.key === 'Enter') onUpdatePlan({ spouseSalaryRaisePct: spouseSalaryRaisePct });
                               }}
                               placeholder="e.g. 3.0"
                               className="w-full bg-background border border-border rounded-lg px-2 py-1 font-mono text-foreground text-xs focus:ring-1 focus:ring-primary"
@@ -652,10 +643,10 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                           </div>
                         </div>
                       </div>
-                      {(parseFloat(primarySalaryRaisePct) > 0 || Object.keys(primarySalaryOverrides).length > 0) && (
+                      {(parseFloat(spouseSalaryRaisePct) > 0 || Object.keys(spouseSalaryOverrides).length > 0) && (
                         <div className="mt-2 border border-border rounded-lg overflow-hidden">
                           <button
-                            onClick={() => setShowPrimarySchedule(!showPrimarySchedule)}
+                            onClick={() => setShowSpouseSchedule(!showSpouseSchedule)}
                             className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted/50 transition-colors"
                           >
                             <span>Salary Schedule Preview</span>
@@ -770,166 +761,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
         </div>
       )}
 
-      {/* Sub-Tab: Social Security Planning */}
-      {subTab === 'social_security' && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-emerald-500/10 via-primary/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <HeartHandshake className="w-4 h-4 text-emerald-500" />
-                Projected Social Security Income
-              </h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Estimated combined annual SS benefits at claiming ages (indexed for inflation).
-              </p>
-            </div>
-            <div className="text-right flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-2xl font-extrabold text-emerald-500 font-mono">
-                  {formatCurrency(totalCombinedSsEst)}/yr
-                </p>
-                <p className="text-[11px] text-muted-foreground font-medium">
-                  {isMfj ? `Primary (${primarySsStartAge}) + Partner (${spouseSsStartAge})` : `Primary claiming at age ${primarySsStartAge}`}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Primary Social Security */}
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Primary Person Social Security</h3>
-                  <p className="text-[11px] text-muted-foreground">Auto-calculated from gross income ({formatCurrency(parseFloat(primarySalary))}/yr)</p>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono text-xs font-bold text-foreground block">
-                    {formatCurrency(calculateSocialSecurityPIA(parseFloat(primarySalary)) || parseFloat(primarySsMonthly))}/mo
-                  </span>
-                  <span className="text-[9px] uppercase font-semibold text-muted-foreground block">at FRA (Age 67)</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="space-y-2">
-                  <label className="font-semibold text-muted-foreground">Claiming Strategy</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
-                      { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
-                      { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.age}
-                        type="button"
-                        onClick={() => {
-                          setPrimarySsStartAge(opt.age);
-                          onUpdatePlan({ primarySsStartAge: opt.age });
-                        }}
-                        className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
-                          primarySsStartAge === opt.age
-                            ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
-                            : 'bg-muted/30 border-border text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        <span className="text-xs block font-semibold">{opt.label}</span>
-                        <span className="text-[10px] opacity-80 block">{opt.sub}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 flex items-center justify-between">
-                  <span className="text-muted-foreground">Adjusted Claiming Benefit:</span>
-                  <span className="font-mono font-bold text-emerald-500">
-                    {formatCurrency(calculateAdjustedSsBenefit(parseFloat(primarySsMonthly) || 0, primarySsStartAge))}/mo ({formatCurrency(primaryAnnualSsEst)}/yr)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Partner Social Security (Visible if MFJ) */}
-            {isMfj ? (
-              <div className="bg-card border border-primary/30 rounded-xl p-5 shadow-sm space-y-4 bg-primary/[0.02]">
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Partner Social Security ({spouseName})</h3>
-                    <p className="text-[11px] text-muted-foreground">Auto-calculated from partner income ({formatCurrency(parseFloat(spouseSalary))}/yr)</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono text-xs font-bold text-primary block">
-                      {formatCurrency(calculateSocialSecurityPIA(parseFloat(spouseSalary)) || parseFloat(spouseSsMonthly))}/mo
-                    </span>
-                    <span className="text-[9px] uppercase font-semibold text-muted-foreground block">at FRA (Age 67)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div className="space-y-2">
-                    <label className="font-semibold text-muted-foreground">Partner Claiming Strategy</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
-                        { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
-                        { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.age}
-                          type="button"
-                          onClick={() => {
-                            setSpouseSsStartAge(opt.age);
-                            onUpdatePlan({ spouseSsStartAge: opt.age });
-                          }}
-                          className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
-                            spouseSsStartAge === opt.age
-                              ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
-                              : 'bg-muted/30 border-border text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <span className="text-xs block font-semibold">{opt.label}</span>
-                          <span className="text-[10px] opacity-80 block">{opt.sub}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-2.5 flex items-center justify-between">
-                    <span className="text-muted-foreground">Partner Adjusted Benefit:</span>
-                    <span className="font-mono font-bold text-primary">
-                      {formatCurrency(calculateAdjustedSsBenefit(parseFloat(spouseSsMonthly) || 0, spouseSsStartAge))}/mo ({formatCurrency(spouseAnnualSsEst)}/yr)
-                    </span>
-                  </div>
-
-                  <div className="pt-2 border-t border-border flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">Spousal Benefit Optimization (50% Rule)</p>
-                      <p className="text-[11px] text-muted-foreground">Ensure partner receives at least 50% of primary PIA if higher.</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={enableSpousalSsBenefit}
-                      onChange={(e) => {
-                        setEnableSpousalSsBenefit(e.target.checked);
-                        onUpdatePlan({ enableSpousalSsBenefit: e.target.checked });
-                      }}
-                      className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-card border border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-2 text-muted-foreground">
-                <HeartHandshake className="w-8 h-8 opacity-40" />
-                <p className="text-xs font-semibold">Single Tax Status Active</p>
-                <p className="text-[11px] text-muted-foreground/80 max-w-xs">
-                  Switch to Married Filing Jointly in Milestones to configure partner Social Security, spousal benefits, and survivor protections.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Sub-Tab: Strategy and Rates */}
       {subTab === 'rates_estate' && (() => {
@@ -1109,111 +941,16 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
 
         return (
           <div className="space-y-6">
-            {/* Primary Strategy Card at TOP of Tab */}
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5 text-xs">
-              <div className="border-b border-border pb-3">
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-500" />
-                  Retirement Withdrawal Sequencing & Strategy
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Configure how the engine draws down accounts during retirement deficit years and executes Roth conversion ladders.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Withdrawal Strategy Selector */}
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="font-bold text-foreground">Withdrawal Sequencing Strategy</label>
-                    <select
-                      value={withdrawalMethod}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setWithdrawalMethod(val);
-                        onUpdatePlan({ withdrawalMethod: val, settings: { withdrawalMethod: val } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-medium text-foreground focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="textbook">Textbook Waterfall (Cash → Taxable → Traditional → Roth → HSA)</option>
-                      <option value="tax_optimized">Tax-Bracket Shielding (Fill 12% Bracket with Traditional, remainder from Taxable/Roth)</option>
-                      <option value="proportional">Proportional Drawdown (Spread across accounts proportional to balance)</option>
-                      <option value="custom_order">Custom Priority Order</option>
-                    </select>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    <strong>Tax-Bracket Shielding</strong> utilizes lower 10%/12% ordinary tax brackets with Pre-Tax Traditional IRA/401(k) withdrawals up to the bracket ceiling, drawing any remaining deficit from Taxable Brokerage or Roth accounts so you avoid jumping into higher tax brackets.
-                  </p>
-                </div>
-
-                {/* Roth Conversion Controls */}
-                <div className="space-y-3 bg-muted/30 border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-foreground block">Roth Conversion Ladder Simulation</span>
-                      <span className="text-[11px] text-muted-foreground">Convert Pre-Tax Traditional → Roth during early retirement</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={enableRothConversions}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setEnableRothConversions(checked);
-                        onUpdatePlan({ settings: { enableRothConversions: checked } });
-                      }}
-                      className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary cursor-pointer"
-                    />
-                  </div>
-
-                  {enableRothConversions && (
-                    <div className="space-y-3 pt-2 border-t border-border animate-in fade-in">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-muted-foreground">Target Conversion Bracket Ceiling</label>
-                        <select
-                          value={rothConversionTargetCeiling}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setRothConversionTargetCeiling(val);
-                            onUpdatePlan({ settings: { rothConversionTargetCeiling: val } });
-                          }}
-                          className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 font-medium text-foreground focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="top_of_10">Top of 10% Ordinary Bracket</option>
-                          <option value="top_of_12">Top of 12% Ordinary Bracket (Recommended)</option>
-                          <option value="top_of_22">Top of 22% Ordinary Bracket</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1">
-                        <div>
-                          <span className="font-semibold text-foreground block">IRMAA Cliff Guard</span>
-                          <span className="text-[11px] text-muted-foreground">Prevent conversions from triggering Medicare Part B/D surcharges</span>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={avoidIrmaaCliffs}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setAvoidIrmaaCliffs(checked);
-                            onUpdatePlan({ settings: { avoidIrmaaCliffs: checked } });
-                          }}
-                          className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Allow Penalty Withdrawals Toggle */}
-              <div className="flex items-center justify-between pt-3 border-t border-border">
+            {/* Allow Penalty Withdrawals Card */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3 text-xs">
+              <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-foreground flex items-center gap-2">
+                  <span className="font-bold text-foreground text-sm flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-amber-500" />
                     Allow Early Withdrawals at a Penalty
                   </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    When enabled, the engine may draw from penalized accounts (10%/20% penalty) if non-penalized funds run out.
+                  <span className="text-xs text-muted-foreground block mt-0.5">
+                    When enabled, the engine may draw from penalized tax-deferred accounts (with 10%/20% early withdrawal penalty) if liquid non-penalized funds are fully exhausted.
                   </span>
                 </div>
                 <input
@@ -1227,104 +964,104 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                   className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary cursor-pointer"
                 />
               </div>
+            </div>
 
-              {/* LIVE WATERFALL & ACCOUNT DRAWDOWN SEQUENCE */}
-              <div className="pt-4 border-t border-border space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <Layers className="w-4 h-4 text-primary" />
-                      Active Account Drawdown Waterfall & Sequence
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Based on strategy <span className="font-semibold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>, active plan accounts will be drawn in the sequence below:
-                    </p>
-                  </div>
-                  {totalPortfolioBal > 0 && (
-                    <div className="text-right">
-                      <span className="text-[10px] text-muted-foreground block font-medium">Included Assets</span>
-                      <span className="font-mono text-xs font-bold text-foreground">{formatCurrency(totalPortfolioBal)}</span>
-                    </div>
-                  )}
+            {/* LIVE WATERFALL & ACCOUNT DRAWDOWN SEQUENCE */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-primary" />
+                    Active Account Drawdown Waterfall & Sequence
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Based on strategy <span className="font-semibold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>, active plan accounts will be drawn in the sequence below:
+                  </p>
                 </div>
-
-                {expandedPortions.length === 0 ? (
-                  <div className="p-4 border border-dashed border-border rounded-xl text-center text-xs text-muted-foreground">
-                    No active FIRE eligible accounts found for this plan. Accounts added to your plan portfolio will automatically map to this drawdown sequence.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {waterfallTiers.map((tier) => {
-                      if (tier.items.length === 0) return null;
-                      return (
-                        <div key={tier.stepNumber} className="bg-muted/20 border border-border rounded-xl p-3.5 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${tier.badgeStyle}`}>
-                                Step {tier.stepNumber}
-                              </span>
-                              <span className="text-xs font-bold text-foreground">{tier.title}</span>
-                            </div>
-                            <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                              {tier.items.length} {tier.items.length === 1 ? 'holding' : 'holdings'} ({formatCurrency(tier.items.reduce((s, i) => s + i.balance, 0))})
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">{tier.subtitle}</p>
-
-                          <div className="space-y-1.5 pt-1">
-                            {tier.items.map((item) => {
-                              const sharePct = totalPortfolioBal > 0 ? (item.balance / totalPortfolioBal) * 100 : 0;
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center justify-between bg-card border border-border/80 rounded-lg p-2.5 text-xs transition-all hover:border-primary/30"
-                                >
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-bold text-foreground">{item.accountName}</span>
-                                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                                          item.portionType === 'roth'
-                                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                            : item.portionType === 'traditional'
-                                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                            : item.portionType === 'taxable'
-                                            ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                                            : item.portionType === 'cash'
-                                            ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400'
-                                            : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
-                                        }`}>
-                                          {item.portionLabel}
-                                        </span>
-                                        {item.isSplit && (
-                                          <span className="text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                            Split: {100 - item.rothPercentage}% Pre-Tax / {item.rothPercentage}% Roth
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[10px] text-muted-foreground capitalize">
-                                        Owner: {item.owner}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right font-mono">
-                                    <span className="font-bold text-foreground block">{formatCurrency(item.balance)}</span>
-                                    {withdrawalMethod === 'proportional' && (
-                                      <span className="text-[10px] text-muted-foreground block">{sharePct.toFixed(1)}% of drawdown</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                {totalPortfolioBal > 0 && (
+                  <div className="text-right">
+                    <span className="text-[10px] text-muted-foreground block font-medium">Included Assets</span>
+                    <span className="font-mono text-xs font-bold text-foreground">{formatCurrency(totalPortfolioBal)}</span>
                   </div>
                 )}
               </div>
+
+              {expandedPortions.length === 0 ? (
+                <div className="p-4 border border-dashed border-border rounded-xl text-center text-xs text-muted-foreground">
+                  No active FIRE eligible accounts found for this plan. Accounts added to your plan portfolio will automatically map to this drawdown sequence.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {waterfallTiers.map((tier) => {
+                    if (tier.items.length === 0) return null;
+                    return (
+                      <div key={tier.stepNumber} className="bg-muted/20 border border-border rounded-xl p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${tier.badgeStyle}`}>
+                              Step {tier.stepNumber}
+                            </span>
+                            <span className="text-xs font-bold text-foreground">{tier.title}</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-semibold text-muted-foreground">
+                            {tier.items.length} {tier.items.length === 1 ? 'holding' : 'holdings'} ({formatCurrency(tier.items.reduce((s, i) => s + i.balance, 0))})
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{tier.subtitle}</p>
+
+                        <div className="space-y-1.5 pt-1">
+                          {tier.items.map((item) => {
+                            const sharePct = totalPortfolioBal > 0 ? (item.balance / totalPortfolioBal) * 100 : 0;
+                            return (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between bg-card border border-border/80 rounded-lg p-2.5 text-xs transition-all hover:border-primary/30"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-foreground">{item.accountName}</span>
+                                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                        item.portionType === 'roth'
+                                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                          : item.portionType === 'traditional'
+                                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                          : item.portionType === 'taxable'
+                                          ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                          : item.portionType === 'cash'
+                                          ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400'
+                                          : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                                      }`}>
+                                        {item.portionLabel}
+                                      </span>
+                                      {item.isSplit && (
+                                        <span className="text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                          Split: {100 - item.rothPercentage}% Pre-Tax / {item.rothPercentage}% Roth
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-muted-foreground capitalize">
+                                      Owner: {item.owner}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="text-right font-mono">
+                                  <span className="font-bold text-foreground block">{formatCurrency(item.balance)}</span>
+                                  {withdrawalMethod === 'proportional' && (
+                                    <span className="text-[10px] text-muted-foreground block">{sharePct.toFixed(1)}% of drawdown</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Rates & Estate Assumptions Cards BELOW Strategy */}

@@ -202,28 +202,31 @@ export function RothConversionTab({
     return { preTax, roth };
   }, [plan]);
 
-  const handleSaveToPlan = () => {
+  const updatePlanSettings = (overrides?: Partial<{
+    enableRothConversions: boolean;
+    rothConversionTargetCeiling: string;
+    avoidIrmaaCliffs: boolean;
+  }>) => {
     if (!onUpdatePlan) return;
     onUpdatePlan({
       settings: {
-        enableRothConversions: enableRoth,
-        rothConversionTargetCeiling: targetCeiling,
-        avoidIrmaaCliffs: avoidIrmaa,
+        ...plan?.settings,
+        enableRothConversions: overrides?.enableRothConversions ?? enableRoth,
+        rothConversionTargetCeiling: overrides?.rothConversionTargetCeiling ?? targetCeiling,
+        avoidIrmaaCliffs: overrides?.avoidIrmaaCliffs ?? avoidIrmaa,
       },
     });
-    setAppliedMsg(`Successfully saved Roth Conversion settings (Active: ${enableRoth ? 'Yes' : 'No'}, Ceiling: ${targetCeiling}) to plan!`);
-    setTimeout(() => setAppliedMsg(''), 4000);
   };
 
   const getPhaseForAge = (age: number) => {
     if (age < retirementAge) return { name: 'Accumulation', color: 'bg-muted text-muted-foreground border-border' };
     if (age >= retirementAge && age < rmdStartAge) return { name: 'Conversion Window', color: 'bg-pink-500/10 text-pink-500 border-pink-500/30 font-bold' };
-    return { name: 'RMD Phase', color: 'bg-amber-500/10 text-amber-500 border-amber-500/30 font-bold' };
+    return { name: 'RMD & Legacy', color: 'bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold' };
   };
 
   return (
     <div className="space-y-6">
-      {/* Toast Banner */}
+      {/* Toast Notification */}
       {appliedMsg && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
@@ -233,15 +236,15 @@ export function RothConversionTab({
         </div>
       )}
 
-      {/* Header Summary KPI Cards */}
+      {/* Header KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Traditional Pre-Tax Balance</span>
-            <DollarSign className="w-4 h-4 text-amber-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground">Pre-Tax Traditional Balance</span>
+            <Layers className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-amber-500">{formatCurrency(accountTotals.preTax)}</div>
-          <span className="text-[10px] text-muted-foreground block">Subject to mandatory RMD tax drag at age {rmdStartAge}</span>
+          <div className="text-xl font-bold font-mono text-foreground">{formatCurrency(accountTotals.preTax)}</div>
+          <span className="text-[10px] text-muted-foreground block">Subject to ordinary tax & mandatory RMDs</span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
@@ -301,7 +304,11 @@ export function RothConversionTab({
                     type="checkbox"
                     id="enableRothCheck"
                     checked={enableRoth}
-                    onChange={(e) => setEnableRoth(e.target.checked)}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setEnableRoth(val);
+                      updatePlanSettings({ enableRothConversions: val });
+                    }}
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
                   <label htmlFor="enableRothCheck" className="text-xs font-semibold text-muted-foreground cursor-pointer">
@@ -318,7 +325,11 @@ export function RothConversionTab({
                 <label className="font-bold text-foreground block">Target Bracket Ceiling</label>
                 <select
                   value={targetCeiling}
-                  onChange={(e: any) => setTargetCeiling(e.target.value)}
+                  onChange={(e: any) => {
+                    const val = e.target.value;
+                    setTargetCeiling(val);
+                    updatePlanSettings({ rothConversionTargetCeiling: val });
+                  }}
                   disabled={!enableRoth}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary disabled:opacity-50"
                 >
@@ -341,7 +352,11 @@ export function RothConversionTab({
                     type="checkbox"
                     id="avoidIrmaaCheck"
                     checked={avoidIrmaa}
-                    onChange={(e) => setAvoidIrmaa(e.target.checked)}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setAvoidIrmaa(val);
+                      updatePlanSettings({ avoidIrmaaCliffs: val });
+                    }}
                     disabled={!enableRoth}
                     className="w-4 h-4 accent-primary rounded cursor-pointer disabled:opacity-50"
                   />
@@ -355,17 +370,11 @@ export function RothConversionTab({
               </div>
             </div>
 
-            {/* Save Action Bar */}
+            {/* Active Status Bar */}
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-muted-foreground">
                 Lifetime Taxes Paid with selected strategy: <strong className="text-foreground font-mono">{formatCurrency(summaryActive.totalTaxes)}</strong>
               </div>
-              <button
-                onClick={handleSaveToPlan}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Apply Roth Conversion Settings to Active Plan
-              </button>
             </div>
           </div>
         )}
