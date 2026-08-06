@@ -384,29 +384,29 @@ export default function ImportExportTab() {
         </div>
 
         {/* Sub-tab segmented pill selector */}
-        <div className="flex w-full items-center rounded-xl bg-muted/60 p-1 border border-border/40 text-muted-foreground">
+        <div className="flex w-full items-center rounded-lg bg-muted/60 p-0.5 border border-border/40 text-muted-foreground">
           <button
             type="button"
             onClick={() => setSubTab('import')}
-            className={`flex-1 justify-center inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex-1 justify-center inline-flex items-center gap-2 rounded-md px-3 py-1 min-h-[30px] text-xs font-medium transition-all ${
               subTab === 'import'
                 ? 'bg-primary/10 text-primary border border-primary/30 font-semibold shadow-xs'
                 : 'hover:text-foreground border border-transparent'
             }`}
           >
-            <UploadCloud className="h-4 w-4" />
+            <UploadCloud className="h-3.5 w-3.5" />
             Import Data
           </button>
           <button
             type="button"
             onClick={() => setSubTab('export')}
-            className={`flex-1 justify-center inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex-1 justify-center inline-flex items-center gap-2 rounded-md px-3 py-1 min-h-[30px] text-xs font-medium transition-all ${
               subTab === 'export'
                 ? 'bg-primary/10 text-primary border border-primary/30 font-semibold shadow-xs'
                 : 'hover:text-foreground border border-transparent'
             }`}
           >
-            <DownloadCloud className="h-4 w-4" />
+            <DownloadCloud className="h-3.5 w-3.5" />
             Export Data
           </button>
         </div>
