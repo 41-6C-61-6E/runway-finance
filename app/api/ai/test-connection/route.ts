@@ -32,12 +32,10 @@ export async function POST(request: Request) {
   }
 
   const endpoint = validated.url.toString();
-  const targetUrl = new URL(endpoint);
-  if (!targetUrl.pathname.endsWith('/')) {
-    targetUrl.pathname += '/chat/completions';
-  } else {
-    targetUrl.pathname += 'chat/completions';
-  }
+  const basePath = validated.url.pathname.endsWith('/')
+    ? validated.url.pathname.slice(0, -1)
+    : validated.url.pathname;
+  const targetUrl = new URL(`${basePath}/chat/completions`, validated.url.origin);
 
   logger.info('Testing AI connection', { endpoint, model, hasKey: !!apiKey });
 
