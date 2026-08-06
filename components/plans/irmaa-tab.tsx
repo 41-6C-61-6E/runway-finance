@@ -59,6 +59,7 @@ export function IrmaaTab({
   const isMfj = plan?.filingStatus === 'married_joint' || Boolean(plan?.hasSpouse);
   const rules = plan?.rules || DEFAULT_2026_RULES;
   const irmaaList = rules?.irmaaThresholds || [];
+  const tier1Limit = irmaaList[0] ? (isMfj ? irmaaList[0].magiJoint : irmaaList[0].magiSingle) : 103000;
 
   // Helper to convert DB plan to EnginePlan object
   const buildEnginePlan = (irmaaGuard: boolean): EnginePlan => {
@@ -169,29 +170,18 @@ export function IrmaaTab({
     return { tier: 0, monthlySurchargePerPerson: 0, annualHouseholdSurcharge: 0, limit: irmaaList[0] ? (isMfj ? irmaaList[0].magiJoint : irmaaList[0].magiSingle) : 103000 };
   }, [customTestMagi, irmaaList, isMfj]);
 
-  const handleSaveToPlan = () => {
+  const updatePlanSettings = (avoidVal: boolean) => {
     if (!onUpdatePlan) return;
     onUpdatePlan({
       settings: {
-        avoidIrmaaCliffs: avoidIrmaa,
+        ...plan?.settings,
+        avoidIrmaaCliffs: avoidVal,
       },
     });
-    setAppliedMsg(`Successfully saved Medicare IRMAA Cliff Guard setting (${avoidIrmaa ? 'Active' : 'Disabled'}) to plan!`);
-    setTimeout(() => setAppliedMsg(''), 4000);
   };
 
   return (
     <div className="space-y-6">
-      {/* Toast Banner */}
-      {appliedMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>{appliedMsg}</span>
-          </div>
-        </div>
-      )}
-
       {/* Header KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
@@ -199,55 +189,59 @@ export function IrmaaTab({
             <span className="text-[11px] font-semibold text-muted-foreground">Medicare Age Status</span>
             <Calendar className="w-4 h-4 text-primary" />
           </div>
-          <div className="text-xl font-bold font-mono text-primary">Medicare Age 65</div>
+          <div className="text-xl font-bold font-mono text-foreground">
+            Age {rules.medicareAge || 65}
+          </div>
           <span className="text-[10px] text-muted-foreground block">
-            MAGI lookback begins 2 years prior at Age 63
+            Medicare Part B & D eligibility start
           </span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">IRMAA Cliff Guard</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground">Lookback MAGI Start</span>
+            <ShieldCheck className="w-4 h-4 text-indigo-500" />
           </div>
-          <div className={`text-xl font-bold font-mono ${avoidIrmaa ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {avoidIrmaa ? 'Active (Capped - $1k)' : 'Disabled'}
+          <div className="text-xl font-bold font-mono text-indigo-500">
+            Age {(rules.medicareAge || 65) - (rules.irmaaLookbackYears || 2)}
           </div>
           <span className="text-[10px] text-muted-foreground block">
-            Caps conversions below Tier 1 cliff
+            2-year tax return lookback rule applies
           </span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Highest Projected IRMAA Tier</span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground">Tier 1 MAGI Threshold</span>
+            <DollarSign className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-amber-500">Tier {irmaaStats.maxTierGuard}</div>
+          <div className="text-xl font-bold font-mono text-foreground">
+            {formatCurrency(tier1Limit)}
+          </div>
           <span className="text-[10px] text-muted-foreground block">
-            Without guardrail: Tier {irmaaStats.maxTierNoGuard}
+            {isMfj ? 'Married Filing Jointly limit' : 'Single Filer limit'}
           </span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Lifetime IRMAA Savings</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Guardrail Savings</span>
             <Sparkles className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-xl font-bold font-mono text-emerald-500">
             {formatCurrency(irmaaStats.totalSaved)}
           </div>
           <span className="text-[10px] text-muted-foreground block">
-            Total Medicare surcharges avoided
+            Surcharges avoided via cliff guard
           </span>
         </div>
       </div>
 
-      {/* SECTION 1: IRMAA GUARDRAIL & MAGI TEST CALCULATOR */}
+      {/* SECTION 1: Medicare IRMAA GUARDRAIL CONTROLS */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Medicare IRMAA Guardrail Controls & MAGI Calculator"
-          description="Medicare Part B and Part D premiums incur steep monthly surcharges if Modified AGI (MAGI) breaches tier thresholds by even $1"
+          title="Medicare IRMAA Cliff Guardrail Controls"
+          description="Protect your retirement income from triggering costly Medicare Part B & D surcharge cliffs"
           icon={ShieldCheck}
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
@@ -256,24 +250,25 @@ export function IrmaaTab({
         {!isOverviewCollapsed && (
           <div className="p-5 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-4 rounded-xl border border-border text-xs">
-              {/* Toggle Avoid IRMAA Cliffs */}
-              <div className="space-y-3">
-                <label className="font-bold text-foreground block">Automatic IRMAA Cliff Avoidance</label>
+              {/* Avoid IRMAA Cliffs Toggle */}
+              <div className="space-y-2">
+                <label className="font-bold text-foreground block">Enable Medicare IRMAA Cliff Guardrail</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     id="avoidIrmaaToggle"
                     checked={avoidIrmaa}
-                    onChange={(e) => setAvoidIrmaa(e.target.checked)}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setAvoidIrmaa(val);
+                      updatePlanSettings(val);
+                    }}
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
                   <label htmlFor="avoidIrmaaToggle" className="text-xs font-semibold text-muted-foreground cursor-pointer">
                     {avoidIrmaa ? 'Guardrail Active (Cap conversions $1,000 below Tier 1 cliff)' : 'No Guardrail (Risk cliff surcharges)'}
                   </label>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  When active, pre-tax Roth conversions and capital gains harvesting are automatically capped $1,000 below the first IRMAA threshold starting at age 63.
-                </p>
               </div>
 
               {/* MAGI Surcharge Estimator Tool */}
@@ -304,17 +299,11 @@ export function IrmaaTab({
               </div>
             </div>
 
-            {/* Save Action Bar */}
+            {/* Active Status Bar */}
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-muted-foreground">
                 Lifetime Medicare Surcharges with active guardrail: <strong className="text-foreground font-mono">{formatCurrency(irmaaStats.totalCostGuard)}</strong>
               </div>
-              <button
-                onClick={handleSaveToPlan}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Apply IRMAA Settings to Active Plan
-              </button>
             </div>
           </div>
         )}

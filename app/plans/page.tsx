@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Flame, TrendingUp, ListChecks, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
+import { Flame, TrendingUp, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { ProjectionTab } from '@/components/plans/projection-tab';
-import { PlanDetailsTab } from '@/components/plans/plan-details-tab';
 import { ScenariosTab } from '@/components/plans/scenarios-tab';
 import { SettingsTab } from '@/components/plans/settings-tab';
 import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
@@ -16,7 +15,7 @@ import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
 export default function PlansPage() {
-  const [activeTab, setActiveTab] = useState<'projection' | 'details' | 'scenarios' | 'settings'>('projection');
+  const [activeTab, setActiveTab] = useState<'projection' | 'scenarios' | 'settings'>('projection');
   const [plansList, setPlansList] = useState<any[]>([]);
   const [accountsList, setAccountsList] = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -244,7 +243,6 @@ export default function PlansPage() {
 
   const tabs = [
     { id: 'projection' as const, label: 'Projection', icon: TrendingUp },
-    { id: 'details' as const, label: 'Plan Details', icon: ListChecks },
     { id: 'scenarios' as const, label: 'Scenarios', icon: BarChart3 },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
   ];
@@ -345,13 +343,6 @@ export default function PlansPage() {
               onToggleDollarMode={setDollarMode}
               viewMode={viewMode}
               onToggleViewMode={setViewMode}
-            />
-          )}
-
-          {activeTab === 'details' && selectedPlan && (
-            <PlanDetailsTab
-              plan={selectedPlan}
-              onUpdatePlan={handleUpdatePlan}
             />
           )}
 
