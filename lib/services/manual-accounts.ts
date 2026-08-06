@@ -104,17 +104,28 @@ function extractPropertyIdFromHtml(html: string): string | undefined {
   const ruMatches = html.match(/RU=([^&"'>]+)/gi) || [];
   for (const m of ruMatches) {
     const decoded = decodeURIComponent(m.replace(/^RU=/i, ''));
-    if (decoded.includes('redfin.com') && decoded.includes('/home/')) {
-      const propIdMatch = decoded.match(/\/home\/(\d+)/);
-      if (propIdMatch) return propIdMatch[1];
-    }
+    try {
+      const parsedUrl = new URL(decoded);
+      if (
+        (parsedUrl.hostname === 'redfin.com' || parsedUrl.hostname.endsWith('.redfin.com')) &&
+        parsedUrl.pathname.includes('/home/')
+      ) {
+        const propIdMatch = parsedUrl.pathname.match(/\/home\/(\d+)/);
+        if (propIdMatch) return propIdMatch[1];
+      }
+    } catch {}
   }
 
   // Check 2: Direct Redfin property URLs anywhere in HTML
-  const directMatches = html.match(/redfin\.com\/[^\s"'>]*\/home\/(\d+)/gi) || [];
+  const directMatches = html.match(/https?:\/\/(?:www\.)?redfin\.com\/[^\s"'>]*\/home\/(\d+)/gi) || [];
   for (const m of directMatches) {
-    const propIdMatch = m.match(/\/home\/(\d+)/);
-    if (propIdMatch) return propIdMatch[1];
+    try {
+      const parsedUrl = new URL(m);
+      if (parsedUrl.hostname === 'redfin.com' || parsedUrl.hostname.endsWith('.redfin.com')) {
+        const propIdMatch = parsedUrl.pathname.match(/\/home\/(\d+)/);
+        if (propIdMatch) return propIdMatch[1];
+      }
+    } catch {}
   }
 
   return undefined;

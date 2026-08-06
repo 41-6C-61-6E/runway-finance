@@ -49,13 +49,14 @@ describe('Redfin fetchRedfinValue', () => {
     });
 
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('search.yahoo.com')) {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith('search.yahoo.com')) {
         return {
           ok: true,
           text: async () => mockYahooHtml,
         } as Response;
       }
-      if (url.includes('api/home/details/avm')) {
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return {
           ok: true,
           text: async () => mockAvmText,
@@ -83,13 +84,14 @@ describe('Redfin fetchRedfinValue', () => {
     });
 
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('search.yahoo.com')) {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith('search.yahoo.com')) {
         return {
           ok: true,
           text: async () => mockYahooHtml,
         } as Response;
       }
-      if (url.includes('api/home/details/avm')) {
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return {
           ok: true,
           text: async () => mockAvmText,
@@ -118,13 +120,14 @@ describe('Redfin fetchRedfinValue', () => {
     });
 
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('search.yahoo.com')) {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith('search.yahoo.com')) {
         return {
           ok: true,
           text: async () => mockYahooHtml,
         } as Response;
       }
-      if (url.includes('api/home/details/avm')) {
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return {
           ok: true,
           text: async () => mockAvmText,
@@ -160,16 +163,17 @@ describe('Redfin fetchRedfinValue', () => {
     });
 
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('search.yahoo.com')) {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith('search.yahoo.com')) {
         return { ok: false, status: 404 } as Response;
       }
-      if (url.includes('geocoding.geo.census.gov')) {
+      if (parsed.hostname.endsWith('geocoding.geo.census.gov')) {
         return { ok: true, json: async () => mockCensusRes } as Response;
       }
-      if (url.includes('api/gis')) {
+      if (parsed.pathname.includes('/api/gis')) {
         return { ok: true, text: async () => mockGisText } as Response;
       }
-      if (url.includes('api/home/details/avm')) {
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return { ok: false, status: 403 } as Response;
       }
       return { ok: false, status: 404 } as Response;
@@ -185,13 +189,14 @@ describe('Redfin fetchRedfinValue', () => {
 
   it('throws a rate limit error if AVM returns 403', async () => {
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('search.yahoo.com')) {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith('search.yahoo.com')) {
         return {
           ok: true,
           text: async () => '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2Fhome%2F446533">Link</a>',
         } as Response;
       }
-      if (url.includes('api/home/details/avm')) {
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return { ok: false, status: 403 } as Response;
       }
       return { ok: false, status: 404 } as Response;
@@ -229,7 +234,8 @@ describe('Redfin fetchRedfinValue', () => {
     let requestedUrl = '';
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
       requestedUrl = url;
-      if (url.includes('api/home/details/avm')) {
+      const parsed = new URL(url);
+      if (parsed.pathname.includes('/api/home/details/avm')) {
         return { ok: true, text: async () => mockAvmText } as Response;
       }
       return { ok: false, status: 404 } as Response;

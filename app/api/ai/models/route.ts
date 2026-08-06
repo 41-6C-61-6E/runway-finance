@@ -29,12 +29,10 @@ export async function POST(request: Request) {
   }
 
   const endpoint = validated.url.toString();
-  const targetUrl = new URL(endpoint);
-  if (!targetUrl.pathname.endsWith('/')) {
-    targetUrl.pathname += '/models';
-  } else {
-    targetUrl.pathname += 'models';
-  }
+  const basePath = validated.url.pathname.endsWith('/')
+    ? validated.url.pathname.slice(0, -1)
+    : validated.url.pathname;
+  const targetUrl = new URL(`${basePath}/models`, validated.url.origin);
 
   try {
     const headers: Record<string, string> = {
