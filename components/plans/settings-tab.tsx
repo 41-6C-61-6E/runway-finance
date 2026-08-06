@@ -238,7 +238,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const totalCombinedSsEst = isMfj ? primaryAnnualSsEst + spouseAnnualSsEst : primaryAnnualSsEst;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 w-full">
       {/* Sub-Tab Bar */}
       <AppTabs
         tabs={[
@@ -251,6 +251,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
         onChange={(tabId) => setSubTab(tabId as any)}
         variant="pills"
         size="sm"
+        fullWidth
       />
 
       {/* Sub-Tab: Plan Details */}
