@@ -1,90 +1,52 @@
 'use client';
 
 import { Suspense } from 'react';
-import { NetWorthSummary } from '@/components/net-worth/net-worth-summary';
-import { AssetAllocation } from '@/components/net-worth/asset-allocation';
-import { DebtToAssetRatio } from '@/components/debt-to-asset-ratio';
+import { NetWorthChart } from '@/components/net-worth/net-worth-chart';
 import { DebtBreakdown } from '@/components/debt-breakdown';
+import { NetWorthSidePanel } from '@/components/net-worth/net-worth-side-panel';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
-import { NetWorthChart } from '@/components/net-worth/net-worth-chart';
 
 function NetWorthContent() {
   const { isVisible } = useChartVisibility();
 
   const showSummary = isVisible('netWorthSummary');
-  const showRatio = isVisible('debtToAssetRatio');
   const showChart = isVisible('netWorthChart');
-  const showAssetAllocation = isVisible('assetAllocation');
   const showDebtBreakdown = isVisible('debtBreakdown');
-
-  const showGridSection = showRatio || showAssetAllocation;
 
   return (
     <div className="min-h-screen w-full">
       {/* ── Page Header ── */}
       <PageHeader title="Net Worth" icon={ChartSpline} />
       <PageContent>
-        {showChart && (
-          <div className="mb-5 sm:mb-6">
-            <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <div className="space-y-5 sm:space-y-6">
-                <NetWorthChart />
-              </div>
-            </Suspense>
-          </div>
-        )}
-
-        {showSummary && (
-          <Suspense fallback={<LoadingSpinner category="summary" />}>
-            <div className="space-y-5 sm:space-y-6">
-              <NetWorthSummary />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Right 1/3 Overview & Summary Panel */}
+          {showSummary && (
+            <div className="lg:col-span-1 order-first lg:order-last">
+              <Suspense fallback={<LoadingSpinner category="summary" />}>
+                <NetWorthSidePanel />
+              </Suspense>
             </div>
-          </Suspense>
-        )}
+          )}
 
-        {!showSummary && showGridSection && (
-          <div className="space-y-5 sm:space-y-6">
-            {showRatio && (
-              <Suspense fallback={<div className="text-muted-foreground">Loading ratio...</div>}>
-                <DebtToAssetRatio />
+          {/* Left 2/3 Main Charts & Detailed Breakdown */}
+          <div className={showSummary ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
+            {showChart && (
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <NetWorthChart />
               </Suspense>
             )}
-            {showAssetAllocation && (
+
+            {showDebtBreakdown && (
               <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <AssetAllocation />
+                <DebtBreakdown />
               </Suspense>
             )}
           </div>
-        )}
-
-        {showSummary && showGridSection && (
-          <div className={`mt-5 sm:mt-6 grid grid-cols-1 ${showRatio && showAssetAllocation ? 'lg:grid-cols-2' : ''} gap-5 sm:gap-6 items-stretch`}>
-            {showRatio && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <div className="h-full space-y-5">
-                  <DebtToAssetRatio />
-                </div>
-              </Suspense>
-            )}
-            {showAssetAllocation && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <AssetAllocation />
-              </Suspense>
-            )}
-          </div>
-        )}
-
-        {showDebtBreakdown && (
-          <div className="mt-5 sm:mt-6">
-            <Suspense fallback={<LoadingSpinner category="chart" />}>
-              <DebtBreakdown />
-            </Suspense>
-          </div>
-        )}
+        </div>
       </PageContent>
     </div>
   );
