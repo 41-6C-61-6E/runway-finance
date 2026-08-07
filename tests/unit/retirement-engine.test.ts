@@ -454,11 +454,11 @@ describe('Retirement Projection Engine', () => {
 
     const output = runRetirementSimulation(highEarnerPlan);
     const yr1 = output.yearlyResults[0];
-    // SS tax = $168,600 * 6.2% = $10,453.20
+    // SS tax = $176,100 * 6.2% = $10,918.20 (using official 2026 wage base cap)
     // Medicare tax = $300,000 * 1.45% = $4,350.00
     // Addl Medicare tax = ($300,000 - $200,000) * 0.9% = $900.00
-    // Total FICA = $15,703.20 (without cap, flat 7.65% would be $22,950)
-    expect(yr1.ficaTax).toBeCloseTo(15703.20, 0);
+    // Total FICA = $16,168.20 (without cap, flat 7.65% would be $22,950)
+    expect(yr1.ficaTax).toBeCloseTo(16168.20, 0);
     expect(yr1.ficaTax).toBeLessThan(22000);
   });
 

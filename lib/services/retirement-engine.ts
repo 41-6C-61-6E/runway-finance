@@ -7,11 +7,11 @@ export interface EngineAccount {
   type: string; // 'cash' | 'taxable' | 'traditional_ira' | 'roth_ira' | 'traditional_401k' | 'roth_401k' | 'hsa' | 'crypto'
   owner: string;
   balance: number;
-  costBasis: number;
+  costBasis?: number;
   expectedGrowthRate: number;
   dividendYield: number;
   reinvestDividends: boolean;
-  qualifiedDividendRatio: number;
+  qualifiedDividendRatio?: number;
   rothPercentage?: number;
   // Per-account contribution fields
   contributionMode?: 'none' | 'percentage' | 'fixed_amount' | 'maximize';
@@ -69,8 +69,9 @@ export interface EnginePlan {
   id: string;
   name: string;
   hasSpouse: boolean;
+  householdSize?: number;
   primaryBirthYear: number;
-  primaryBirthMonth: number;
+  primaryBirthMonth?: number;
   spouseBirthYear?: number;
   spouseBirthMonth?: number;
   spouseName?: string;
@@ -84,7 +85,7 @@ export interface EnginePlan {
   filingStatus: string;
   retirementAge: number;
   lifeExpectancyAge: number;
-  withdrawalMethod: string; // 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order'
+  withdrawalMethod?: string; // 'textbook' | 'proportional' | 'tax_optimized' | 'custom_order'
   fiTargetMultiplier?: number;
   customWithdrawalOrder?: string[];
   primarySalary?: number;
@@ -559,11 +560,12 @@ export function runRetirementSimulation(
           } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
             requestedAlloc = contribVal * compoundInflation;
           } else if (origAcc.contributionMode === 'maximize') {
-            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+            let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
             if (targetAcc.type.includes('401k')) {
-              maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
             } else if (targetAcc.type === 'hsa') {
-              maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+              const hsaBase = (isMfj || targetAcc.owner === 'joint') ? (rules.contributionLimits?.hsaFamily ?? 8300) : (rules.contributionLimits?.hsaSingle ?? 4150);
+              maxLimit = hsaBase + (ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0);
             }
             if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
               maxLimit *= 2;
@@ -622,11 +624,12 @@ export function runRetirementSimulation(
             const targetBal = (flow.ruleValue || 0) * compoundInflation;
             requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
           } else if (flow.ruleType === 'maximize') {
-            let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
+            let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
             if (targetAcc.type.includes('401k')) {
-              maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
             } else if (targetAcc.type === 'hsa') {
-              maxLimit = (isMfj || targetAcc.owner === 'joint' ? 8300 : 4150) + (ownerCatchUp55 ? 1000 : 0);
+              const hsaBase = (isMfj || targetAcc.owner === 'joint') ? (rules.contributionLimits?.hsaFamily ?? 8300) : (rules.contributionLimits?.hsaSingle ?? 4150);
+              maxLimit = hsaBase + (ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0);
             }
             if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
               maxLimit *= 2;
@@ -664,8 +667,12 @@ export function runRetirementSimulation(
 
     const stdDeductionBase = isHoH
       ? parseFloat(rules.standardDeductionHoH || '22500')
-      : parseFloat(rules.standardDeduction || '15000');
-    let stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
+      : (isMfj
+          ? parseFloat(rules.standardDeductionMfj || '30000')
+          : (isMfs
+              ? parseFloat(rules.standardDeductionMfs || '15000')
+              : parseFloat(rules.standardDeductionSingle || rules.standardDeduction || '15000')));
+    let stdDeduction = stdDeductionBase * compoundInflation;
     const age65Boost = rules.additionalStdDeduction65Plus;
     if (age65Boost) {
       if (primaryAge >= 65) {
@@ -676,17 +683,23 @@ export function runRetirementSimulation(
       }
     }
 
-    const ssWageBase = 168600 * compoundInflation;
+    const ficaRules = rules.ficaRules || DEFAULT_2026_RULES.ficaRules;
+    const ssWageBase = (ficaRules.ssWageBaseCap ?? 176100) * compoundInflation;
     const ssTaxableSalary = Math.min(ficaTaxableSalary, ssWageBase);
-    const ssFica = ssTaxableSalary * 0.062;
-    const medicareFica = ficaTaxableSalary * 0.0145;
-    const addMedicareThresh = isMfj ? 250000 : (isMfs ? 125000 : 200000);
-    const addMedicareFica = Math.max(0, ficaTaxableSalary - addMedicareThresh) * 0.009;
+    const ssFica = ssTaxableSalary * (ficaRules.ssTaxRate ?? 0.062);
+    const medicareFica = ficaTaxableSalary * (ficaRules.medicareTaxRate ?? 0.0145);
+    const addMedicareThresh = isMfj
+      ? (ficaRules.addMedicareThresholdMfj ?? 250000)
+      : (isMfs ? (ficaRules.addMedicareThresholdMfs ?? 125000) : (ficaRules.addMedicareThresholdSingle ?? 200000));
+    const addMedicareFica = Math.max(0, ficaTaxableSalary - addMedicareThresh) * (ficaRules.addMedicareTaxRate ?? 0.009);
     const ficaTax = ssFica + medicareFica + addMedicareFica;
 
     const provisionalIncome = taxableSalary + pensionIncome + otherIncome + totalSsIncome * 0.5;
-    const ssTier1 = isMfs ? 0 : (isMfj ? 32000 : 25000);
-    const ssTier2 = isMfs ? 0 : (isMfj ? 44000 : 34000);
+    const ssThresholds = rules.ssTaxationThresholds || DEFAULT_2026_RULES.ssTaxationThresholds;
+    const ssSingleTiers = ssThresholds.single || { tier1: 25000, tier2: 34000 };
+    const ssJointTiers = ssThresholds.married_joint || { tier1: 32000, tier2: 44000 };
+    const ssTier1 = isMfs ? 0 : (isMfj ? ssJointTiers.tier1 : ssSingleTiers.tier1);
+    const ssTier2 = isMfs ? 0 : (isMfj ? ssJointTiers.tier2 : ssSingleTiers.tier2);
 
     let taxableSs = 0;
     if (isMfs) {
@@ -737,19 +750,26 @@ export function runRetirementSimulation(
     let totalTaxableGains = 0;
     let totalNonQualifiedRothEarnings = 0;
 
+    // Dynamic Penalty Rules from DB
+    const penaltyRules = rules.earlyPenaltyRules || DEFAULT_2026_RULES.earlyPenaltyRules;
+    const ira401kPenAge = penaltyRules.ira401kPenaltyAge ?? 59.5;
+    const ruleOf55PenAge = penaltyRules.ruleOf55Age ?? 55;
+    const hsaPenAge = penaltyRules.hsaPenaltyAge ?? 65;
+    const ira401kPenRate = penaltyRules.ira401kPenaltyRate ?? 0.10;
+    const hsaPenRate = penaltyRules.hsaPenaltyRate ?? 0.20;
+
     // Helper: check if an account would incur an early withdrawal penalty
     const wouldIncurPenalty = (acc: EngineAccount): boolean => {
       const accOwnerAge = acc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
       const accOwnerRetirementAge = acc.owner === 'spouse' && plan.spouseRetirementAge ? plan.spouseRetirementAge : plan.retirementAge;
       if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
-        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
-        return accOwnerAge < 59.5 && !isRuleOf55;
+        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+        return accOwnerAge < ira401kPenAge && !isRuleOf55;
       }
       if (acc.type === 'roth_ira' || acc.type === 'roth_401k') {
-        // Direct contributions can be withdrawn penalty-free at any age, but earnings withdrawn before 59.5 incur a 10% penalty
-        return accOwnerAge < 59.5 && acc.balance > (acc.costBasis || 0);
+        return accOwnerAge < ira401kPenAge && acc.balance > (acc.costBasis || 0);
       }
-      if (acc.type === 'hsa') return accOwnerAge < 65;
+      if (acc.type === 'hsa') return accOwnerAge < hsaPenAge;
       return false;
     };
 
@@ -761,13 +781,13 @@ export function runRetirementSimulation(
 
       if (!allowPenalty) {
         if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k' || acc.type.includes('403b')) {
-          const isRuleOf55 = (acc.type.includes('401k') || acc.type.includes('403b')) && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
-          if (accOwnerAge < 59.5 && !isRuleOf55) {
+          const isRuleOf55 = (acc.type.includes('401k') || acc.type.includes('403b')) && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+          if (accOwnerAge < ira401kPenAge && !isRuleOf55) {
             maxAvail = 0;
           }
-        } else if ((acc.type === 'roth_ira' || acc.type === 'roth_401k' || acc.type.includes('roth')) && accOwnerAge < 59.5) {
+        } else if ((acc.type === 'roth_ira' || acc.type === 'roth_401k' || acc.type.includes('roth')) && accOwnerAge < ira401kPenAge) {
           maxAvail = Math.min(acc.balance, Math.max(0, acc.costBasis || 0));
-        } else if (acc.type === 'hsa' && accOwnerAge < 65) {
+        } else if (acc.type === 'hsa' && accOwnerAge < hsaPenAge) {
           maxAvail = 0;
         }
       }
@@ -775,30 +795,29 @@ export function runRetirementSimulation(
       const actual = Math.min(maxAvail, amt);
       if (actual <= 0) return 0;
 
-      // 10% IRS Early Withdrawal Penalty check for Traditional accounts before 59.5 (Rule of 55 exception check for 401k)
+      // Early Withdrawal Penalty check for Traditional accounts before ira401kPenAge
       if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
-        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= 55 && accOwnerRetirementAge >= 55;
-        if (accOwnerAge < 59.5 && !isRuleOf55) {
-          const penalty = actual * 0.10;
+        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+        if (accOwnerAge < ira401kPenAge && !isRuleOf55) {
+          const penalty = actual * ira401kPenRate;
           earlyPenaltyTax += penalty;
           earlyWithdrawalWarnings.push(
-            `Age ${accOwnerAge}: Withdrawal of $${Math.round(actual).toLocaleString()} from ${acc.name} incurred a 10% early withdrawal penalty ($${Math.round(penalty).toLocaleString()}).`
+            `Age ${accOwnerAge}: Withdrawal of $${Math.round(actual).toLocaleString()} from ${acc.name} incurred a ${(ira401kPenRate * 100).toFixed(0)}% early withdrawal penalty ($${Math.round(penalty).toLocaleString()}).`
           );
           earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: actual, penalty });
         }
       }
 
-      // Roth IRA / Roth 401(k) Ordering Rules: Contributions (cost basis) come out tax & penalty free at any age.
-      // Non-qualified earnings withdrawn before age 59.5 incur a 10% IRS penalty AND ordinary income tax.
-      if ((acc.type === 'roth_ira' || acc.type === 'roth_401k') && accOwnerAge < 59.5) {
+      // Roth IRA / Roth 401(k) Ordering Rules
+      if ((acc.type === 'roth_ira' || acc.type === 'roth_401k') && accOwnerAge < ira401kPenAge) {
         const availableBasis = Math.max(0, acc.costBasis || 0);
         if (actual > availableBasis) {
           const earningsWithdrawn = actual - availableBasis;
-          const penalty = earningsWithdrawn * 0.10;
+          const penalty = earningsWithdrawn * ira401kPenRate;
           earlyPenaltyTax += penalty;
           totalNonQualifiedRothEarnings += earningsWithdrawn;
           earlyWithdrawalWarnings.push(
-            `Age ${accOwnerAge}: Non-qualified Roth earnings withdrawal of $${Math.round(earningsWithdrawn).toLocaleString()} from ${acc.name} incurred a 10% early penalty ($${Math.round(penalty).toLocaleString()}).`
+            `Age ${accOwnerAge}: Non-qualified Roth earnings withdrawal of $${Math.round(earningsWithdrawn).toLocaleString()} from ${acc.name} incurred a ${(ira401kPenRate * 100).toFixed(0)}% early penalty ($${Math.round(penalty).toLocaleString()}).`
           );
           earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: earningsWithdrawn, penalty });
         }
@@ -807,12 +826,12 @@ export function runRetirementSimulation(
         acc.costBasis = Math.max(0, acc.costBasis - actual);
       }
 
-      // 20% Penalty for non-medical HSA withdrawals before age 65
-      if (acc.type === 'hsa' && accOwnerAge < 65) {
-        const penalty = actual * 0.20;
+      // Penalty for non-medical HSA withdrawals before hsaPenAge
+      if (acc.type === 'hsa' && accOwnerAge < hsaPenAge) {
+        const penalty = actual * hsaPenRate;
         earlyPenaltyTax += penalty;
         earlyWithdrawalWarnings.push(
-          `Age ${accOwnerAge}: Non-qualified withdrawal of $${Math.round(actual).toLocaleString()} from HSA incurred a 20% early penalty ($${Math.round(penalty).toLocaleString()}).`
+          `Age ${accOwnerAge}: Non-qualified withdrawal of $${Math.round(actual).toLocaleString()} from HSA incurred a ${(hsaPenRate * 100).toFixed(0)}% early penalty ($${Math.round(penalty).toLocaleString()}).`
         );
         earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: actual, penalty });
       }
@@ -876,8 +895,8 @@ export function runRetirementSimulation(
             } else if (origAcc.contributionMode === 'maximize') {
               const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
               const ownerCatchUp50 = ownerAge >= 50;
-              let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
-              if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
+              if (targetAcc.type.includes('401k')) maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
               if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
               limit = Math.min(surplus, maxLimit);
             } else {
@@ -957,8 +976,8 @@ export function runRetirementSimulation(
             } else if (flow.ruleType === 'maximize') {
               const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
               const ownerCatchUp50 = ownerAge >= 50;
-              let maxLimit = 7000 + (ownerCatchUp50 ? 1000 : 0);
-              if (targetAcc.type.includes('401k')) maxLimit = 23000 + (ownerCatchUp50 ? 7500 : 0);
+              let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
+              if (targetAcc.type.includes('401k')) maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
               if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
               limit = Math.min(surplus, maxLimit);
             } else if (flow.ruleType === 'save_leftover') {
@@ -1321,12 +1340,15 @@ export function runRetirementSimulation(
       stateTax = (fullTaxableOrdinary + totalTaxableGains) * stateTaxRate;
     }
 
-    // Compute Net Investment Income Tax (NIIT 3.8%)
+    // Compute Net Investment Income Tax (NIIT)
     const magi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + rothConversionAmount + totalTaxableGains;
-    const niitThresh = (isMfj ? 250000 : (isMfs ? 125000 : 200000)) * compoundInflation;
+    const niitRules = rules.niitRules || DEFAULT_2026_RULES.niitRules;
+    const niitRate = niitRules.rate ?? 0.038;
+    const niitThreshBase = isMfj ? (niitRules.thresholdMfj ?? 250000) : (isMfs ? (niitRules.thresholdMfs ?? 125000) : (niitRules.thresholdSingle ?? 200000));
+    const niitThresh = niitThreshBase * compoundInflation;
     if (magi > niitThresh && totalTaxableGains > 0) {
       const excessMagi = magi - niitThresh;
-      niitTax = 0.038 * Math.min(totalTaxableGains, excessMagi);
+      niitTax = niitRate * Math.min(totalTaxableGains, excessMagi);
     }
 
     taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax;
@@ -1370,11 +1392,13 @@ export function runRetirementSimulation(
       }
     }
 
-    // 5e. Compute ACA Healthcare Subsidy for Early Retirement (Age < 65)
+    // 5e. Compute ACA Healthcare Subsidy for Early Retirement (Age < HSA Penalty Age / 65)
     let acaSubsidy = 0;
-    if (isRetired && primaryAge < 65) {
-      const fplBase = parseFloat(rules.fplAmount || '15060');
-      const fplHousehold = fplBase * (isMfj ? 1.35 : 1.0) * compoundInflation;
+    const hsaExemptAge = rules.earlyPenaltyRules?.hsaPenaltyAge ?? 65;
+    if (isRetired && primaryAge < hsaExemptAge) {
+      const acaRules = rules.acaRules || DEFAULT_2026_RULES.acaRules;
+      const fplBase = parseFloat(rules.fplAmount || String(acaRules.fplBaseSingle ?? 15060));
+      const fplHousehold = fplBase * (isMfj ? (acaRules.fplMfjMultiplier ?? 1.35) : 1.0) * compoundInflation;
       const fplPercent = (magi / fplHousehold) * 100;
 
       let premiumCapPct = 0.085;
@@ -1385,7 +1409,7 @@ export function runRetirementSimulation(
         }
       }
 
-      const benchmarkCost = (isMfj ? 16800 : 8400) * compoundInflation;
+      const benchmarkCost = (isMfj ? (acaRules.benchmarkCostMfj ?? 16800) : (acaRules.benchmarkCostSingle ?? 8400)) * compoundInflation;
       const maxContrib = magi * premiumCapPct;
       acaSubsidy = Math.max(0, benchmarkCost - maxContrib);
     }
@@ -1633,7 +1657,11 @@ function isEventActive(
   return true;
 }
 
-function getSsClaimingMultiplier(age: number): number {
+function getSsClaimingMultiplier(age: number, rules?: any): number {
+  const customTable = rules?.socialSecurityRules?.claimingMultipliers;
+  if (customTable && customTable[age] !== undefined) {
+    return customTable[age];
+  }
   if (age <= 62) return 0.70;
   if (age === 63) return 0.75;
   if (age === 64) return 0.80;
