@@ -25,6 +25,10 @@ export const DEFAULT_2026_RULES = {
   taxYear: 2026,
   filingStatus: 'single',
   standardDeduction: '15000',
+  additionalStdDeduction65Plus: {
+    singleOrHoH: 1950,
+    marriedPerPerson: 1550,
+  },
   ordinaryTaxBrackets: [
     { rate: 0.10, threshold: 0 },
     { rate: 0.12, threshold: 11925 },
@@ -32,6 +36,15 @@ export const DEFAULT_2026_RULES = {
     { rate: 0.24, threshold: 103350 },
     { rate: 0.32, threshold: 197300 },
     { rate: 0.35, threshold: 250525 },
+    { rate: 0.37, threshold: 626350 },
+  ],
+  headOfHouseholdBrackets: [
+    { rate: 0.10, threshold: 0 },
+    { rate: 0.12, threshold: 17000 },
+    { rate: 0.22, threshold: 64850 },
+    { rate: 0.24, threshold: 103350 },
+    { rate: 0.32, threshold: 197300 },
+    { rate: 0.35, threshold: 250500 },
     { rate: 0.37, threshold: 626350 },
   ],
   capitalGainsBrackets: [

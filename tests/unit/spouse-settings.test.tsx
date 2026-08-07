@@ -50,8 +50,8 @@ describe('SettingsTab - Spouse Profile Isolation', () => {
     const onUpdatePlan = vi.fn();
     render(<SettingsTab plan={mockPlan} onUpdatePlan={onUpdatePlan} />);
 
-    // Click 'Milestones & Profile' sub-tab to navigate to profile fields
-    const milestonesTab = screen.getByText('Milestones & Profile');
+    // Click 'Profile' sub-tab to navigate to profile fields
+    const milestonesTab = screen.getByText('Profile');
     fireEvent.click(milestonesTab);
 
     // Partner profile fields should display initial values from spouse properties
@@ -75,8 +75,8 @@ describe('SettingsTab - Spouse Profile Isolation', () => {
     const onUpdatePlan = vi.fn();
     render(<SettingsTab plan={mockPlan} onUpdatePlan={onUpdatePlan} />);
 
-    // Click 'Milestones & Profile' sub-tab to navigate to profile fields
-    const milestonesTab = screen.getByText('Milestones & Profile');
+    // Click 'Profile' sub-tab to navigate to profile fields
+    const milestonesTab = screen.getByText('Profile');
     fireEvent.click(milestonesTab);
 
     const spouseNameInput = screen.getByDisplayValue('Jane Doe');

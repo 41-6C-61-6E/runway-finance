@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { plans, planAccounts, planEvents, planFlows, planSettings, retirementRules } from '@/lib/db/schema';
+import { plans, planAccounts, planEvents, planFlows, planSettings, retirementRules, planLiabilities } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
@@ -15,18 +15,20 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decPlan = await decryptRow('plans', planRow, dek);
   const currentYear = new Date().getFullYear();
 
-  // Fetch accounts, events, flows, settings, and user rules for this plan
-  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawRules] = await Promise.all([
+  // Fetch accounts, events, flows, settings, user rules, and liabilities for this plan
+  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawRules, rawLiabilities] = await Promise.all([
     getDb().select().from(planAccounts).where(eq(planAccounts.planId, planRow.id)),
     getDb().select().from(planEvents).where(eq(planEvents.planId, planRow.id)),
     getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
     getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
     getDb().select().from(retirementRules).where(eq(retirementRules.userId, planRow.userId)).limit(1),
+    getDb().select().from(planLiabilities).where(eq(planLiabilities.planId, planRow.id)),
   ]);
 
   const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
   const decEvents = await Promise.all(rawEvents.map((e) => decryptRow('plan_events', e, dek)));
   const decFlows = await Promise.all(rawFlows.map((f) => decryptRow('plan_flows', f, dek)));
+  const decLiabilities = await Promise.all(rawLiabilities.map((l) => decryptRow('plan_liabilities', l, dek)));
   const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
   const decRules = rawRules[0] ? await decryptRow('retirement_rules', rawRules[0], dek) : null;
 
@@ -141,7 +143,15 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
       isSurplusDestination: Boolean(a.isSurplusDestination),
     })),
-    liabilities: [],
+    liabilities: decLiabilities.map((l) => ({
+      id: l.id,
+      name: l.name,
+      owner: l.owner || 'primary',
+      balance: parseFloat(l.balance) || 0,
+      interestRate: parseFloat(l.interestRate) || 0,
+      monthlyPayment: parseFloat(l.monthlyPayment) || 0,
+      yearsRemaining: parseFloat(l.yearsRemaining) || 30,
+    })),
     events: decEvents.map((e) => ({
       id: e.id,
       name: e.name,
@@ -198,6 +208,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       ...a,
       isIncluded: a.isIncluded !== false,
     })),
+    liabilities: decLiabilities,
     events: decEvents,
     flows: decFlows,
     settings: {
@@ -846,6 +857,56 @@ export async function PUT(req: NextRequest) {
         endTriggerType: 'end_of_plan',
       }, dek);
       await getDb().insert(planFlows).values(encFlow);
+    }
+
+    // Handle adding new liabilities
+    if (updates.newLiability) {
+      const liab = updates.newLiability;
+      const encLiab = await encryptRow('plan_liabilities', {
+        planId,
+        userId: dataUserId,
+        name: liab.name || 'Debt / Mortgage',
+        owner: liab.owner || 'primary',
+        balance: String(liab.balance || 0),
+        interestRate: String(liab.interestRate || 4.5),
+        monthlyPayment: String(liab.monthlyPayment || 0),
+        yearsRemaining: String(liab.yearsRemaining || 30),
+      }, dek);
+      await getDb().insert(planLiabilities).values(encLiab);
+    }
+
+    // Handle updating an existing liability
+    if (updates.updateLiability) {
+      const liab = updates.updateLiability;
+      const existingLiab = await getDb().select().from(planLiabilities)
+        .where(and(eq(planLiabilities.id, liab.id), eq(planLiabilities.planId, planId)))
+        .limit(1);
+
+      if (existingLiab[0]) {
+        const decLiab = await decryptRow('plan_liabilities', existingLiab[0], dek);
+        const updatedValues = {
+          ...decLiab,
+          name: liab.name !== undefined ? liab.name : decLiab.name,
+          owner: liab.owner !== undefined ? liab.owner : decLiab.owner,
+          balance: liab.balance !== undefined ? String(liab.balance) : decLiab.balance,
+          interestRate: liab.interestRate !== undefined ? String(liab.interestRate) : decLiab.interestRate,
+          monthlyPayment: liab.monthlyPayment !== undefined ? String(liab.monthlyPayment) : decLiab.monthlyPayment,
+          yearsRemaining: liab.yearsRemaining !== undefined ? String(liab.yearsRemaining) : decLiab.yearsRemaining,
+          updatedAt: new Date(),
+          userId: dataUserId,
+          planId,
+        };
+        const encLiab = await encryptRow('plan_liabilities', updatedValues, dek);
+        delete encLiab.userId;
+        delete encLiab.planId;
+        await getDb().update(planLiabilities).set(encLiab).where(eq(planLiabilities.id, liab.id));
+      }
+    }
+
+    // Handle deleting liabilities
+    if (updates.deleteLiabilityId) {
+      await getDb().delete(planLiabilities)
+        .where(and(eq(planLiabilities.id, updates.deleteLiabilityId), eq(planLiabilities.planId, planId)));
     }
 
     // Handle deleting events

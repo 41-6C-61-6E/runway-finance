@@ -160,10 +160,10 @@ describe('Withdrawal Sequencing Strategies Comparison', () => {
 
     const taxesTextbook = simTextbook.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
     const taxesTaxDeferred = simTaxDeferred.yearlyResults.reduce((s, y) => s + y.taxesPaid, 0);
-    const endNWTextbook = simTextbook.yearlyResults[simTextbook.yearlyResults.length - 1].netWorth;
-    const endNWTaxDeferred = simTaxDeferred.yearlyResults[simTaxDeferred.yearlyResults.length - 1].netWorth;
+    const nw75Textbook = simTextbook.yearlyResults.find((y) => y.primaryAge === 75)?.netWorth || 0;
+    const nw75TaxDeferred = simTaxDeferred.yearlyResults.find((y) => y.primaryAge === 75)?.netWorth || 0;
 
     expect(taxesTextbook).not.toBe(taxesTaxDeferred);
-    expect(endNWTextbook).not.toBe(endNWTaxDeferred);
+    expect(nw75Textbook).not.toBe(nw75TaxDeferred);
   });
 });

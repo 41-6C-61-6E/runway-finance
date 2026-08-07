@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   LineChart,
@@ -73,73 +74,16 @@ export function RothConversionTab({
   const rmdStartAge = primaryBirthYear >= 1960 ? 75 : 73;
 
   // Helper to convert DB plan to EnginePlan object
-  const buildEnginePlan = (enable: boolean, ceiling: string, irmaaGuard: boolean): EnginePlan => {
-    const planAccountsList = Array.isArray(plan?.accounts) ? plan.accounts : [];
-    const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
-
-    return {
-      id: plan?.id || 'plan_1',
-      name: plan?.name || 'Primary Plan',
-      hasSpouse: Boolean(plan?.hasSpouse),
-      primaryBirthYear,
-      primaryBirthMonth: Number(plan?.primaryBirthMonth) || 1,
-      spouseBirthYear: plan?.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
-      spouseBirthMonth: plan?.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
-      spouseName: plan?.spouseName || 'Spouse / Partner',
-      spouseRetirementAge: plan?.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
-      spouseLifeExpectancyAge: plan?.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
-      primarySsMonthlyAmount: plan?.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500,
-      primarySsStartAge: plan?.primarySsStartAge ? Number(plan.primarySsStartAge) : 67,
-      spouseSsMonthlyAmount: plan?.spouseSsMonthlyAmount ? parseFloat(plan.spouseSsMonthlyAmount) : 2000,
-      spouseSsStartAge: plan?.spouseSsStartAge ? Number(plan.spouseSsStartAge) : 67,
-      enableSpousalSsBenefit: plan?.enableSpousalSsBenefit !== false,
-      filingStatus: plan?.filingStatus || 'single',
-      retirementAge,
-      lifeExpectancyAge: Number(plan?.lifeExpectancyAge) || 100,
-      withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-      primarySalary: parseFloat(plan?.primarySalary) || 0,
-      spouseSalary: parseFloat(plan?.spouseSalary) || 0,
-      accounts: activeAccounts.map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        owner: a.owner || 'primary',
-        balance: parseFloat(a.balance) || 0,
-        costBasis: parseFloat(a.costBasis) || 0,
-        expectedGrowthRate: parseFloat(a.expectedGrowthRate) || 6.0,
-        dividendYield: parseFloat(a.dividendYield) || 2.5,
-        reinvestDividends: a.reinvestDividends ?? true,
-        qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
-        rothPercentage: a.rothPercentage,
-      })),
-      liabilities: [],
-      events: (plan?.events || []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        category: e.category,
-        type: e.type,
-        owner: e.owner || 'primary',
-        amount: parseFloat(e.amount) || 0,
-        frequency: e.frequency || 'yearly',
-        growthRate: parseFloat(e.growthRate) || 0,
-        adjustForInflation: e.adjustForInflation ?? true,
-        startTriggerType: e.startTriggerType || 'now',
-        endTriggerType: e.endTriggerType || 'end_of_plan',
-      })),
-      flows: [],
-      settings: {
-        fixedInflationRate: parseFloat(plan?.settings?.fixedInflationRate || '3.0'),
-        enableRothConversions: enable,
-        rothConversionTargetCeiling: ceiling as any,
-        avoidIrmaaCliffs: irmaaGuard,
-        withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-      },
-      rules: plan?.rules || DEFAULT_2026_RULES,
-    };
+  const buildEnginePlanHelper = (enable: boolean, ceiling: string, irmaaGuard: boolean) => {
+    return buildEnginePlan(plan, {
+      enableRothConversions: enable,
+      rothConversionTargetCeiling: ceiling,
+      avoidIrmaaCliffs: irmaaGuard,
+    });
   };
 
-  const simNoRoth = useMemo(() => runRetirementSimulation(buildEnginePlan(false, 'top_of_12', false)), [plan]);
-  const simActive = useMemo(() => runRetirementSimulation(buildEnginePlan(enableRoth, targetCeiling, avoidIrmaa)), [plan, enableRoth, targetCeiling, avoidIrmaa]);
+  const simNoRoth = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(false, 'top_of_12', false)), [plan]);
+  const simActive = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(enableRoth, targetCeiling, avoidIrmaa)), [plan, enableRoth, targetCeiling, avoidIrmaa]);
 
   const summaryNoRoth = useMemo(() => {
     const lastYr = simNoRoth.yearlyResults[simNoRoth.yearlyResults.length - 1];

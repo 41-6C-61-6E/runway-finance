@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import {
   Plus, ArrowUpCircle, ArrowDownCircle, Landmark,
   Trash2, X, CheckSquare, Square, Eye, EyeOff,
-  Pencil, Save, ChevronDown, ChevronRight, Building2, Zap, HelpCircle,
+  Pencil, Save, ChevronDown, ChevronRight, Building2, Zap, HelpCircle, Receipt,
 } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
@@ -30,8 +30,9 @@ function safeString(val: any, fallback = ''): string {
 }
 
 export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
-  const [modalType, setModalType] = useState<'income' | 'expense' | null>(null);
-  const [editingItem, setEditingItem] = useState<{ type: 'income' | 'expense'; data: any } | null>(null);
+  const [modalType, setModalType] = useState<'income' | 'expense' | 'liability' | null>(null);
+  const [editingItem, setEditingItem] = useState<{ type: 'income' | 'expense' | 'liability'; data: any } | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'accounts' | 'liabilities' | 'incomes' | 'expenses'>('all');
   const [showExcludedAccounts, setShowExcludedAccounts] = useState(false);
   const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
   const [showTaxNotice, setShowTaxNotice] = useState(false);
@@ -42,6 +43,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   const [incType, setIncType] = useState('salary');
   const [incOwner, setIncOwner] = useState('primary');
   const [incAmount, setIncAmount] = useState('50000');
+  const [incFrequency, setIncFrequency] = useState<'yearly' | 'monthly'>('yearly');
   const [incGrowth, setIncGrowth] = useState('3.0');
   const [incStart, setIncStart] = useState('now');
   const [incStartVal, setIncStartVal] = useState('');
@@ -53,14 +55,24 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
   const [expType, setExpType] = useState('living_expense');
   const [expOwner, setExpOwner] = useState('primary');
   const [expAmount, setExpAmount] = useState('30000');
+  const [expFrequency, setExpFrequency] = useState<'yearly' | 'monthly'>('yearly');
   const [expGrowth, setExpGrowth] = useState('2.5');
   const [expStart, setExpStart] = useState('now');
   const [expStartVal, setExpStartVal] = useState('');
   const [expEnd, setExpEnd] = useState('end_of_plan');
   const [expEndVal, setExpEndVal] = useState('');
 
+  // Liability Form State
+  const [liabName, setLiabName] = useState('');
+  const [liabOwner, setLiabOwner] = useState('primary');
+  const [liabBalance, setLiabBalance] = useState('250000');
+  const [liabInterestRate, setLiabInterestRate] = useState('4.5');
+  const [liabMonthlyPayment, setLiabMonthlyPayment] = useState('1500');
+  const [liabYearsRemaining, setLiabYearsRemaining] = useState('25');
+
   // Section collapsed states
   const [isAccountsCollapsed, setIsAccountsCollapsed] = useCardCollapsed('plan_details_accounts');
+  const [isLiabilitiesCollapsed, setIsLiabilitiesCollapsed] = useCardCollapsed('plan_details_liabilities');
   const [isIncomesCollapsed, setIsIncomesCollapsed] = useCardCollapsed('plan_details_incomes');
   const [isExpensesCollapsed, setIsExpensesCollapsed] = useCardCollapsed('plan_details_expenses');
 
@@ -74,6 +86,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
   const planAccounts = (Array.isArray(plan.accounts) ? plan.accounts : []).filter(isFireEligibleAccount);
   const events = Array.isArray(plan.events) ? plan.events : [];
+  const liabilities = Array.isArray(plan.liabilities) ? plan.liabilities : [];
   const incomes = events.filter((e: any) => safeString(e.category) === 'income');
   const expenses = events.filter((e: any) => safeString(e.category) === 'expense');
 
@@ -146,6 +159,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setIncType('salary');
     setIncOwner('primary');
     setIncAmount('50000');
+    setIncFrequency('yearly');
     setIncGrowth('3.0');
     setIncStart('now');
     setIncStartVal('');
@@ -160,6 +174,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setIncType(safeString(inc.type, 'salary'));
     setIncOwner(safeString(inc.owner, 'primary'));
     setIncAmount(String(inc.amount || '50000'));
+    setIncFrequency((inc.frequency as any) || 'yearly');
     setIncGrowth(String(inc.growthRate || '3.0'));
     setIncStart(safeString(inc.startTriggerType, 'now'));
     setIncStartVal(String(inc.startTriggerValue || ''));
@@ -174,6 +189,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setExpType('living_expense');
     setExpOwner('primary');
     setExpAmount('30000');
+    setExpFrequency('yearly');
     setExpGrowth('2.5');
     setExpStart('now');
     setExpStartVal('');
@@ -188,12 +204,35 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setExpType(safeString(exp.type, 'living_expense'));
     setExpOwner(safeString(exp.owner, 'primary'));
     setExpAmount(String(exp.amount || '30000'));
+    setExpFrequency((exp.frequency as any) || 'yearly');
     setExpGrowth(String(exp.growthRate || '2.5'));
     setExpStart(safeString(exp.startTriggerType, 'now'));
     setExpStartVal(String(exp.startTriggerValue || ''));
     setExpEnd(safeString(exp.endTriggerType, 'end_of_plan'));
     setExpEndVal(String(exp.endTriggerValue || ''));
     setModalType('expense');
+  };
+
+  const openAddLiabilityModal = () => {
+    setEditingItem(null);
+    setLiabName('');
+    setLiabOwner('primary');
+    setLiabBalance('250000');
+    setLiabInterestRate('4.5');
+    setLiabMonthlyPayment('1500');
+    setLiabYearsRemaining('25');
+    setModalType('liability');
+  };
+
+  const openEditLiabilityModal = (liab: any) => {
+    setEditingItem({ type: 'liability', data: liab });
+    setLiabName(safeString(liab.name));
+    setLiabOwner(safeString(liab.owner, 'primary'));
+    setLiabBalance(String(liab.balance || '0'));
+    setLiabInterestRate(String(liab.interestRate || '4.5'));
+    setLiabMonthlyPayment(String(liab.monthlyPayment || '0'));
+    setLiabYearsRemaining(String(liab.yearsRemaining || '30'));
+    setModalType('liability');
   };
 
   const handleSaveIncome = async (e?: React.FormEvent) => {
@@ -209,6 +248,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           type: incType,
           owner: incOwner,
           amount: parseFloat(incAmount) || 0,
+          frequency: incFrequency,
           growthRate: parseFloat(incGrowth) || 0,
           startTriggerType: incStart,
           startTriggerValue: incStartVal,
@@ -224,7 +264,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           type: incType,
           owner: incOwner,
           amount: parseFloat(incAmount) || 0,
-          frequency: 'yearly',
+          frequency: incFrequency,
           growthRate: parseFloat(incGrowth) || 0,
           adjustForInflation: true,
           startTriggerType: incStart,
@@ -251,6 +291,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           type: expType,
           owner: expOwner,
           amount: parseFloat(expAmount) || 0,
+          frequency: expFrequency,
           growthRate: parseFloat(expGrowth) || 0,
           startTriggerType: expStart,
           startTriggerValue: expStartVal,
@@ -266,7 +307,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           type: expType,
           owner: expOwner,
           amount: parseFloat(expAmount) || 0,
-          frequency: 'yearly',
+          frequency: expFrequency,
           growthRate: parseFloat(expGrowth) || 0,
           adjustForInflation: true,
           startTriggerType: expStart,
@@ -280,8 +321,44 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     setEditingItem(null);
   };
 
+  const handleSaveLiability = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const finalName = liabName.trim() || 'Loan / Mortgage';
+
+    if (editingItem) {
+      await onUpdatePlan({
+        updateLiability: {
+          id: editingItem.data.id,
+          name: finalName,
+          owner: liabOwner,
+          balance: parseFloat(liabBalance) || 0,
+          interestRate: parseFloat(liabInterestRate) || 0,
+          monthlyPayment: parseFloat(liabMonthlyPayment) || 0,
+          yearsRemaining: parseFloat(liabYearsRemaining) || 30,
+        },
+      });
+    } else {
+      await onUpdatePlan({
+        newLiability: {
+          name: finalName,
+          owner: liabOwner,
+          balance: parseFloat(liabBalance) || 0,
+          interestRate: parseFloat(liabInterestRate) || 0,
+          monthlyPayment: parseFloat(liabMonthlyPayment) || 0,
+          yearsRemaining: parseFloat(liabYearsRemaining) || 30,
+        },
+      });
+    }
+    setModalType(null);
+    setEditingItem(null);
+  };
+
   const handleDeleteEvent = async (id: string) => {
     await onUpdatePlan({ deleteEventId: id });
+  };
+
+  const handleDeleteLiability = async (id: string) => {
+    await onUpdatePlan({ deleteLiabilityId: id });
   };
 
   const getAccountTypeLabel = (typeVal: any) => {
@@ -352,13 +429,81 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         </div>
       </div>
 
-      {/* Accounts Section with Contribution Configuration */}
-      {(() => {
-        const excludedAccountsCount = planAccounts.length - includedAccounts.length;
-        const visibleAccounts = showExcludedAccounts ? planAccounts : includedAccounts;
+      {/* Quick Section Filter Anchor Bar */}
+      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-card border border-border/80 shadow-xs overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'all'
+                ? 'bg-primary text-primary-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            All Sections
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilter('accounts')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'accounts'
+                ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Landmark className="w-3.5 h-3.5 text-violet-500" />
+            <span>Accounts ({includedAccounts.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilter('liabilities')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'liabilities'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5 text-amber-500" />
+            <span>Liabilities ({liabilities.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilter('incomes')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'incomes'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Incomes ({incomes.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilter('expenses')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'expenses'
+                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <ArrowDownCircle className="w-3.5 h-3.5 text-rose-500" />
+            <span>Expenses ({expenses.length})</span>
+          </button>
+        </div>
+      </div>
 
-        return (
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+      {/* 2-Column Dashboard Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left Column: Accounts & Liabilities */}
+        <div className="space-y-6">
+          {(activeFilter === 'all' || activeFilter === 'accounts') && (() => {
+            const excludedAccountsCount = planAccounts.length - includedAccounts.length;
+            const visibleAccounts = showExcludedAccounts ? planAccounts : includedAccounts;
+
+            return (
+              <div className="bg-card border-l-4 border-l-violet-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
             <CollapsibleCardHeader
               isCollapsed={isAccountsCollapsed}
               onToggle={setIsAccountsCollapsed}
@@ -805,8 +950,96 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         );
       })()}
 
-      {/* Income Streams Section */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+      {/* Debts & Liabilities Section */}
+      {(activeFilter === 'all' || activeFilter === 'liabilities') && (
+        <div className="bg-card border-l-4 border-l-amber-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+          <CollapsibleCardHeader
+            isCollapsed={isLiabilitiesCollapsed}
+            onToggle={setIsLiabilitiesCollapsed}
+            title={
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Debts & Liabilities</h3>
+                  <p className="text-[11px] text-muted-foreground">Mortgages, student loans, car loans, and credit card balances.</p>
+                </div>
+              </div>
+            }
+            actions={
+              <button
+                onClick={openAddLiabilityModal}
+                className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Liability
+              </button>
+            }
+          />
+
+          {!isLiabilitiesCollapsed && (
+            <div className="p-5 space-y-3">
+              <div className="space-y-2">
+                {liabilities.length === 0 ? (
+                  <div className="py-4 text-center border border-dashed border-border rounded-lg space-y-1">
+                    <p className="text-xs text-muted-foreground italic">No debts or liabilities defined yet.</p>
+                    <p className="text-[11px] text-muted-foreground/70">Add Mortgages, Auto Loans, or Personal Debt to model debt obligations.</p>
+                  </div>
+                ) : (
+                  liabilities.map((liab: any, i: number) => {
+                    const liabNameStr = safeString(liab.name, 'Debt / Liability');
+                    const liabId = safeString(liab.id, `liab_${i}`);
+                    const balance = parseFloat(liab.balance) || 0;
+                    const interest = parseFloat(liab.interestRate) || 0;
+                    const monthlyPmt = parseFloat(liab.monthlyPayment) || 0;
+                    const yearsRem = parseFloat(liab.yearsRemaining) || 0;
+
+                    return (
+                      <div key={liabId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-amber-500/40 transition-all">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-foreground">{liabNameStr}</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                              {interest}% APR • {yearsRem} yrs remaining
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
+                            Owner: {safeString(liab.owner, 'primary')} • Monthly Payment: {formatCurrency(monthlyPmt)}/mo ({formatCurrency(monthlyPmt * 12)}/yr)
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-amber-500">
+                            {formatCurrency(balance)}
+                          </span>
+                          <button
+                            onClick={() => openEditLiabilityModal(liab)}
+                            className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
+                            title="Edit Liability"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLiability(liabId)}
+                            className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
+                            title="Delete Liability"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+        </div>
+
+        {/* Right Column: Incomes & Expenses */}
+        <div className="space-y-6">
+          {(activeFilter === 'all' || activeFilter === 'incomes') && (
+            <div className="bg-card border-l-4 border-l-emerald-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
         <CollapsibleCardHeader
           isCollapsed={isIncomesCollapsed}
           onToggle={setIsIncomesCollapsed}
@@ -815,7 +1048,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
               <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
               <div>
                 <h3 className="text-sm font-bold text-foreground">Additional Retirement Income Streams</h3>
-                <p className="text-[11px] text-muted-foreground">Pensions, Social Security, Annuities, and Rental/Side Income (Core salary is set in Settings).</p>
+                <p className="text-[11px] text-muted-foreground">Pensions, Annuities, Rental/Side Income, and Pass-through Cash Flow (Salary &amp; Social Security are set in Settings).</p>
               </div>
             </div>
           }
@@ -840,8 +1073,8 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   <div>
                     <p className="font-bold text-foreground">Income Stream Guidelines:</p>
                     <ul className="list-disc list-inside space-y-0.5 mt-1 text-[11px]">
-                      <li><strong>Include:</strong> Pensions, Social Security estimates, annuities, passive rental income, royalties, or side-job wages.</li>
-                      <li><strong>Do NOT include:</strong> Primary salary (set in <em>Settings → Profile</em>) or investment account returns/withdrawals (calculated automatically).</li>
+                      <li><strong>Include:</strong> Pensions, guaranteed annuities, passive rental income, royalties, or side-job wages.</li>
+                      <li><strong>Do NOT include:</strong> Core salary, Social Security (computed automatically from your benefit &amp; claiming age in <em>Settings → Profile</em>), or portfolio withdrawals (calculated automatically).</li>
                     </ul>
                   </div>
                 </div>
@@ -871,7 +1104,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
               {incomes.length === 0 ? (
                 <div className="py-4 text-center border border-dashed border-border rounded-lg space-y-1">
                   <p className="text-xs text-muted-foreground italic">No additional or retirement income streams defined yet.</p>
-                  <p className="text-[11px] text-muted-foreground/70">Add Pensions, Social Security, or passive income streams for pre/post retirement.</p>
+                  <p className="text-[11px] text-muted-foreground/70">Add Pensions, Annuities, or passive income streams for pre/post retirement.</p>
                 </div>
               ) : (
               incomes.map((inc: any, i: number) => {
@@ -944,14 +1177,16 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   </div>
                 );
               })
-            )}
+              )}
             </div>
           </div>
         )}
       </div>
+    )}
 
-      {/* Expenses Section */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+    {/* Expenses Section */}
+    {(activeFilter === 'all' || activeFilter === 'expenses') && (
+      <div className="bg-card border-l-4 border-l-rose-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
         <CollapsibleCardHeader
           isCollapsed={isExpensesCollapsed}
           onToggle={setIsExpensesCollapsed}
@@ -1000,7 +1235,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 <button
                   type="button"
                   onClick={() => setShowTaxNotice(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-emerald-500/20 border border-blue-500/20 transition-all cursor-pointer"
                 >
                   <Zap className="w-3 h-3 text-blue-500" />
                   <span>How are taxes handled?</span>
@@ -1097,6 +1332,9 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
             </div>
           </div>
         )}
+      </div>
+    )}
+        </div>
       </div>
 
       {/* Fully Opaque Add / Edit Modals */}
@@ -1373,6 +1611,97 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{editingItem ? 'Save Changes' : 'Add Expense'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modalType === 'liability' && (
+              <form onSubmit={handleSaveLiability} className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300">Liability / Debt Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Primary Mortgage, Auto Loan, Student Debt"
+                    value={liabName}
+                    onChange={(e) => setLiabName(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Current Balance ($)</label>
+                    <input
+                      type="number"
+                      value={liabBalance}
+                      onChange={(e) => setLiabBalance(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Interest Rate (% APR)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liabInterestRate}
+                      onChange={(e) => setLiabInterestRate(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Monthly Payment ($)</label>
+                    <input
+                      type="number"
+                      value={liabMonthlyPayment}
+                      onChange={(e) => setLiabMonthlyPayment(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Years Remaining</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={liabYearsRemaining}
+                      onChange={(e) => setLiabYearsRemaining(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1 font-mono"
+                    />
+                  </div>
+                </div>
+                {plan.hasSpouse && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Owner</label>
+                    <select
+                      value={liabOwner}
+                      onChange={(e) => setLiabOwner(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
+                      <option value="joint">Joint / Shared</option>
+                    </select>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalType(null);
+                      setEditingItem(null);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-5 py-2 rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center gap-1"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{editingItem ? 'Save Changes' : 'Add Liability'}</span>
                   </button>
                 </div>
               </form>

@@ -95,6 +95,11 @@ export function ProjectionOptionsPopover({
                   Nominal ($)
                 </button>
               </div>
+              <p className="text-[10px] text-muted-foreground px-0.5">
+                {dollarMode === 'real'
+                  ? "Today's Dollars (Real): Adjusts future balances for inflation to show purchasing power."
+                  : 'Future Dollars (Nominal): Shows raw estimated dollar amounts in future years.'}
+              </p>
             </div>
 
             {/* 2. Simulation Model */}
@@ -126,6 +131,11 @@ export function ProjectionOptionsPopover({
                   Monte Carlo
                 </button>
               </div>
+              <p className="text-[10px] text-muted-foreground px-0.5">
+                {viewMode === 'deterministic'
+                  ? 'Deterministic: Projects net worth using constant expected annual return rates.'
+                  : 'Monte Carlo: Runs 250 randomized market trials to model sequence-of-returns risk.'}
+              </p>
             </div>
           </div>
         </>

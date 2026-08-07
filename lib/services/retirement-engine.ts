@@ -274,7 +274,10 @@ export function runRetirementSimulation(
   const startAge = currentYear - primaryBirthYear;
   const maxYears = Math.max(1, (plan.lifeExpectancyAge || 100) - startAge);
 
-  const isMfj = plan.filingStatus === 'married_joint';
+  const filingStatus = plan.filingStatus || 'single';
+  const isMfj = filingStatus === 'married_joint';
+  const isMfs = filingStatus === 'married_separate';
+  const isHoH = filingStatus === 'head_of_household';
   const rules = plan.rules || DEFAULT_2026_RULES;
 
   // Mutable deep clones of state for simulation loop (with Roth percentage splitting)
@@ -517,7 +520,9 @@ export function runRetirementSimulation(
     let hsaPreTaxContrib = 0;
     const sortedFlows = [...plan.flows].sort((a, b) => a.rank - b.rank);
 
-    const isAccumulation = primaryAge < plan.retirementAge;
+    const isPrimaryAccumulation = primaryAge < plan.retirementAge;
+    const isSpouseAccumulation = isMfj && spouseAge !== undefined && spouseAge < (plan.spouseRetirementAge || plan.retirementAge);
+    const isAccumulation = isPrimaryAccumulation || isSpouseAccumulation;
 
     // Determine if we use per-account contributions or legacy flows
     const hasAccountContributions = plan.accounts.some(a => a.contributionMode && a.contributionMode !== 'none');
@@ -533,6 +538,9 @@ export function runRetirementSimulation(
             targetAcc = accountsState[`${origAcc.id}_trad`] || accountsState[`${origAcc.id}_roth`];
           }
           if (!targetAcc) continue;
+
+          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          if (!accOwnerStillWorking) continue;
 
           const cat = getAccountCategory(targetAcc.type);
           const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
@@ -593,6 +601,9 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
+          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          if (!accOwnerStillWorking) continue;
+
           const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
           if (!isPreTax) continue;
 
@@ -651,23 +662,36 @@ export function runRetirementSimulation(
     // Under IRC Section 3121, FICA tax (Social Security & Medicare) is reduced ONLY by HSA (cafeteria plan) contributions, NOT 401k/IRA contributions
     const ficaTaxableSalary = Math.max(0, salaryIncome - hsaPreTaxContrib);
 
-    const stdDeductionBase = parseFloat(rules.standardDeduction || '15000');
-    const stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
+    const stdDeductionBase = isHoH
+      ? parseFloat(rules.standardDeductionHoH || '22500')
+      : parseFloat(rules.standardDeduction || '15000');
+    let stdDeduction = stdDeductionBase * (isMfj ? 2 : 1) * compoundInflation;
+    const age65Boost = rules.additionalStdDeduction65Plus;
+    if (age65Boost) {
+      if (primaryAge >= 65) {
+        stdDeduction += (isMfj ? age65Boost.marriedPerPerson : age65Boost.singleOrHoH) * compoundInflation;
+      }
+      if (isMfj && spouseAge !== undefined && spouseAge >= 65) {
+        stdDeduction += age65Boost.marriedPerPerson * compoundInflation;
+      }
+    }
 
     const ssWageBase = 168600 * compoundInflation;
     const ssTaxableSalary = Math.min(ficaTaxableSalary, ssWageBase);
     const ssFica = ssTaxableSalary * 0.062;
     const medicareFica = ficaTaxableSalary * 0.0145;
-    const addMedicareThresh = isMfj ? 250000 : 200000;
+    const addMedicareThresh = isMfj ? 250000 : (isMfs ? 125000 : 200000);
     const addMedicareFica = Math.max(0, ficaTaxableSalary - addMedicareThresh) * 0.009;
     const ficaTax = ssFica + medicareFica + addMedicareFica;
 
     const provisionalIncome = taxableSalary + pensionIncome + otherIncome + totalSsIncome * 0.5;
-    const ssTier1 = isMfj ? 32000 : 25000;
-    const ssTier2 = isMfj ? 44000 : 34000;
+    const ssTier1 = isMfs ? 0 : (isMfj ? 32000 : 25000);
+    const ssTier2 = isMfs ? 0 : (isMfj ? 44000 : 34000);
 
     let taxableSs = 0;
-    if (provisionalIncome > ssTier2) {
+    if (isMfs) {
+      taxableSs = Math.min(0.85 * totalSsIncome, 0.85 * provisionalIncome);
+    } else if (provisionalIncome > ssTier2) {
       taxableSs = Math.min(0.85 * totalSsIncome, 0.50 * (ssTier2 - ssTier1) + 0.85 * (provisionalIncome - ssTier2));
     } else if (provisionalIncome > ssTier1) {
       taxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (provisionalIncome - ssTier1));
@@ -677,11 +701,13 @@ export function runRetirementSimulation(
 
     let ordinaryTax = 0;
     const bracketMult = isMfj ? 2 : 1;
-    for (let i = 0; i < rules.ordinaryTaxBrackets.length; i++) {
-      const b = rules.ordinaryTaxBrackets[i];
+    const activeOrdinaryBrackets = (isHoH && rules.headOfHouseholdBrackets) ? rules.headOfHouseholdBrackets : rules.ordinaryTaxBrackets;
+
+    for (let i = 0; i < activeOrdinaryBrackets.length; i++) {
+      const b = activeOrdinaryBrackets[i];
       const thresh = b.threshold * bracketMult * compoundInflation;
       if (taxableOrdinaryIncome > thresh) {
-        const nextB = rules.ordinaryTaxBrackets[i + 1];
+        const nextB = activeOrdinaryBrackets[i + 1];
         const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
         const taxableChunk = Math.min(taxableOrdinaryIncome - thresh, nextThresh - thresh);
         ordinaryTax += taxableChunk * b.rate;
@@ -832,6 +858,9 @@ export function runRetirementSimulation(
             }
             if (!targetAcc) continue;
 
+            const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+            if (!accOwnerStillWorking) continue;
+
             const cat = getAccountCategory(targetAcc.type);
             const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
             if (isPreTax) continue; // Already handled in Phase 1
@@ -910,6 +939,9 @@ export function runRetirementSimulation(
             }
             if (!targetAcc) continue;
 
+            const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+            if (!accOwnerStillWorking) continue;
+
             const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
             if (isPreTax) continue;
 
@@ -945,6 +977,24 @@ export function runRetirementSimulation(
             }
           }
         }
+      } else {
+        // Distribution phase with surplus — invest in surplus destination or cash/taxable account
+        if (surplus > 0) {
+          const surplusAcc = plan.accounts.find(a => a.isSurplusDestination);
+          let destAcc = surplusAcc ? (accountsState[surplusAcc.id] || accountsState[`${surplusAcc.id}_roth`] || accountsState[`${surplusAcc.id}_trad`]) : null;
+          if (!destAcc) {
+            destAcc = Object.values(accountsState).find(a => a.type === 'cash')
+              || Object.values(accountsState).find(a => a.type === 'taxable');
+          }
+          if (destAcc) {
+            destAcc.balance += surplus;
+            const destCat = getAccountCategory(destAcc.type);
+            if (destCat === 'taxable' || destCat === 'taxFree') {
+              destAcc.costBasis = (destAcc.costBasis || 0) + surplus;
+            }
+            surplusSaved += surplus;
+          }
+        }
       }
     } else if (netCashFlow < 0 && !isAccumulation) {
       let deficit = Math.abs(netCashFlow);
@@ -952,7 +1002,7 @@ export function runRetirementSimulation(
       discretionaryDeficitWithdrawn = deficit;
 
       const allowPenalty = plan.settings?.allowPenaltyWithdrawals !== false;
-      const method = plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook';
+      const method = plan.withdrawalMethod || plan.settings?.withdrawalMethod || 'textbook';
 
       if (method === 'proportional') {
         // Prefer non-penalized accounts first; fall back to penalized only if deficit remains and allowed
@@ -1140,21 +1190,33 @@ export function runRetirementSimulation(
     let rothBracketHeadroom = 0;
     if (plan.settings?.enableRothConversions && isRetired && primaryAge < rmdStartAge) {
       const ceilingSetting = plan.settings.rothConversionTargetCeiling || 'top_of_12';
-      let targetCeilingRate = 0.12;
-      if (ceilingSetting === 'top_of_10') targetCeilingRate = 0.10;
-      else if (ceilingSetting === 'top_of_12') targetCeilingRate = 0.12;
-      else if (ceilingSetting === 'top_of_22') targetCeilingRate = 0.22;
-      else if (ceilingSetting === 'top_of_24') targetCeilingRate = 0.24;
-      else if (ceilingSetting === 'top_of_32') targetCeilingRate = 0.32;
+      let convHeadroom = 0;
 
-      const targetBracketIdx = rules.ordinaryTaxBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
-      const nextBracketObj = rules.ordinaryTaxBrackets[targetBracketIdx + 1];
-      const targetCeilingDollars = (nextBracketObj ? nextBracketObj.threshold : 47150) * bracketMult * compoundInflation;
+      if (ceilingSetting === 'irmaa_tier1') {
+        const irmaaList = rules.irmaaThresholds || [];
+        if (irmaaList.length > 1) {
+          const tier1 = irmaaList[1];
+          const irmaaLimit = isMfj ? tier1.magiJoint : tier1.magiSingle;
+          const preConvMagi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
+          convHeadroom = Math.max(0, irmaaLimit - preConvMagi - 1000);
+        }
+      } else {
+        let targetCeilingRate = 0.12;
+        if (ceilingSetting === 'top_of_10') targetCeilingRate = 0.10;
+        else if (ceilingSetting === 'top_of_12') targetCeilingRate = 0.12;
+        else if (ceilingSetting === 'top_of_22') targetCeilingRate = 0.22;
+        else if (ceilingSetting === 'top_of_24') targetCeilingRate = 0.24;
+        else if (ceilingSetting === 'top_of_32') targetCeilingRate = 0.32;
 
-      const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
-      let convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
+        const targetBracketIdx = rules.ordinaryTaxBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
+        const nextBracketObj = rules.ordinaryTaxBrackets[targetBracketIdx + 1];
+        const targetCeilingDollars = (nextBracketObj ? nextBracketObj.threshold : 47150) * bracketMult * compoundInflation;
 
-      if (plan.settings.avoidIrmaaCliffs && primaryAge >= 63) {
+        const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
+        convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
+      }
+
+      if (ceilingSetting !== 'irmaa_tier1' && plan.settings.avoidIrmaaCliffs && primaryAge >= 63) {
         const preConvMagi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
         const irmaaGuardList = rules.irmaaThresholds || [];
         for (let idx = 1; idx < irmaaGuardList.length; idx++) {
@@ -1207,12 +1269,15 @@ export function runRetirementSimulation(
     }
 
     // 5c. Tax Reconciliation — ordinary tax, capital gains tax, and 3.8% NIIT tax
+    let finalTaxableOrdinary = taxableOrdinaryIncome;
     const post65HsaOrdinary = primaryAge >= 65 ? drawdownsByType.hsa : 0;
     const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount + totalNonQualifiedRothEarnings + post65HsaOrdinary;
     if (additionalOrdinaryIncome > 0 || totalTaxableGains > 0) {
       // Recalculate provisional income & taxable Social Security incorporating traditional drawdowns & conversions (IRS Pub 915)
       const updatedProvisional = taxableSalary + pensionIncome + otherIncome + additionalOrdinaryIncome + totalTaxableGains + totalSsIncome * 0.5;
-      if (updatedProvisional > ssTier2) {
+      if (isMfs) {
+        taxableSs = Math.min(0.85 * totalSsIncome, 0.85 * updatedProvisional);
+      } else if (updatedProvisional > ssTier2) {
         taxableSs = Math.min(0.85 * totalSsIncome, 0.50 * (ssTier2 - ssTier1) + 0.85 * (updatedProvisional - ssTier2));
       } else if (updatedProvisional > ssTier1) {
         taxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (updatedProvisional - ssTier1));
@@ -1223,12 +1288,13 @@ export function runRetirementSimulation(
       const fullTaxableOrdinary = Math.max(0,
         taxableSalary + pensionIncome + otherIncome + taxableSs + additionalOrdinaryIncome - stdDeduction
       );
+      finalTaxableOrdinary = fullTaxableOrdinary;
       ordinaryTax = 0;
-      for (let i = 0; i < rules.ordinaryTaxBrackets.length; i++) {
-        const b = rules.ordinaryTaxBrackets[i];
+      for (let i = 0; i < activeOrdinaryBrackets.length; i++) {
+        const b = activeOrdinaryBrackets[i];
         const thresh = b.threshold * bracketMult * compoundInflation;
         if (fullTaxableOrdinary > thresh) {
-          const nextB = rules.ordinaryTaxBrackets[i + 1];
+          const nextB = activeOrdinaryBrackets[i + 1];
           const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
           const taxableChunk = Math.min(fullTaxableOrdinary - thresh, nextThresh - thresh);
           ordinaryTax += taxableChunk * b.rate;
@@ -1257,13 +1323,13 @@ export function runRetirementSimulation(
 
     // Compute Net Investment Income Tax (NIIT 3.8%)
     const magi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + rothConversionAmount + totalTaxableGains;
-    const niitThresh = (isMfj ? 250000 : 200000) * compoundInflation;
+    const niitThresh = (isMfj ? 250000 : (isMfs ? 125000 : 200000)) * compoundInflation;
     if (magi > niitThresh && totalTaxableGains > 0) {
       const excessMagi = magi - niitThresh;
       niitTax = 0.038 * Math.min(totalTaxableGains, excessMagi);
     }
 
-    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + earlyPenaltyTax;
+    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax;
 
     // Deduct incremental taxes resulting from drawdowns and Roth conversions from cash/taxable accounts
     const taxDelta = Math.max(0, taxesPaid - initialTaxesPaid);
@@ -1278,17 +1344,9 @@ export function runRetirementSimulation(
         acc.balance -= w;
         remTaxDelta -= w;
       }
-      if (remTaxDelta > 0) {
-        const otherAccs = Object.values(accountsState).filter((a) => a.balance > 0);
-        for (const acc of otherAccs) {
-          if (remTaxDelta <= 0) break;
-          const w = withdrawFromAcc(acc, remTaxDelta, true);
-          remTaxDelta -= w;
-        }
-      }
     }
     const totalTaxBase = grossIncome + additionalOrdinaryIncome + totalTaxableGains;
-    effectiveTaxRate = totalTaxBase > 0 ? (taxesPaid / totalTaxBase) * 100 : 0;
+    effectiveTaxRate = totalTaxBase > 0 ? ((taxesPaid + earlyPenaltyTax) / totalTaxBase) * 100 : 0;
 
     // 5d. Compute MAGI & Queue IRMAA Surcharges for Year Y+2
     let irmaaTier = 0;
@@ -1362,7 +1420,40 @@ export function runRetirementSimulation(
           const qualRatio = acc.qualifiedDividendRatio ?? 1.0;
           const qualDivs = divAmount * qualRatio;
           const ordDivs = divAmount * (1 - qualRatio);
-          const divTax = (qualDivs * 0.15) + (ordDivs * 0.22);
+
+          let qualDivTax = 0;
+          if (rules.capitalGainsBrackets && qualDivs > 0) {
+            const capBrackets = rules.capitalGainsBrackets;
+            const ordinaryBase = finalTaxableOrdinary;
+            for (let i = 0; i < capBrackets.length; i++) {
+              const b = capBrackets[i];
+              const thresh = b.threshold * bracketMult * compoundInflation;
+              const nextB = capBrackets[i + 1];
+              const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+              const bracketStart = Math.max(thresh, ordinaryBase);
+              const bracketEnd = Math.min(nextThresh, ordinaryBase + qualDivs);
+              if (bracketEnd > bracketStart) {
+                qualDivTax += (bracketEnd - bracketStart) * b.rate;
+              }
+            }
+          } else {
+            qualDivTax = qualDivs * 0.15;
+          }
+
+          let ordDivTax = 0;
+          if (ordDivs > 0) {
+            const topMarginalRate = (() => {
+              const ordBase = finalTaxableOrdinary;
+              for (let i = rules.ordinaryTaxBrackets.length - 1; i >= 0; i--) {
+                const b = rules.ordinaryTaxBrackets[i];
+                if (ordBase >= b.threshold * bracketMult * compoundInflation) return b.rate;
+              }
+              return 0.10;
+            })();
+            ordDivTax = ordDivs * topMarginalRate;
+          }
+
+          const divTax = qualDivTax + ordDivTax;
 
           if (acc.reinvestDividends) {
             acc.balance = acc.balance * (1 + growth) + Math.max(0, divAmount - divTax);
@@ -1412,8 +1503,8 @@ export function runRetirementSimulation(
     }
 
     // 0% Long-Term Capital Gains tax headroom and NIIT headroom
-    const ltcg0PctLimit = (rules.capitalGainsBrackets?.[0]?.threshold || 47025) * bracketMult * compoundInflation;
-    const capitalGains0PctRoom = Math.max(0, ltcg0PctLimit - ordinaryTax);
+    const ltcg0PctCeiling = (rules.capitalGainsBrackets?.[1]?.threshold ?? 48350) * bracketMult * compoundInflation;
+    const capitalGains0PctRoom = Math.max(0, ltcg0PctCeiling - finalTaxableOrdinary);
     const niitHeadroom = Math.max(0, niitThresh - magi);
 
     yearlyResults.push({
