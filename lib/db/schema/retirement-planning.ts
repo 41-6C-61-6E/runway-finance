@@ -167,7 +167,39 @@ export const planSettings = pgTable('plan_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ── Retirement Rules Store (User-editable tax brackets & thresholds) ─────────
+// ── System Tax Rules Store (Global statutory tax rates, thresholds, & limits) ──
+export const systemTaxRules = pgTable('system_tax_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  taxYear: integer('tax_year').notNull().default(2026),
+  country: text('country').notNull().default('US'),
+  standardDeductionSingle: text('standard_deduction_single').notNull().default('15000'),
+  standardDeductionMfj: text('standard_deduction_mfj').notNull().default('30000'),
+  standardDeductionHoH: text('standard_deduction_hoh').notNull().default('22500'),
+  standardDeductionMfs: text('standard_deduction_mfs').notNull().default('15000'),
+  standardDeduction: text('standard_deduction').notNull().default('15000'),
+  additionalStdDeduction65Plus: jsonb('additional_std_deduction_65_plus').notNull(),
+  ordinaryTaxBrackets: jsonb('ordinary_tax_brackets').notNull(),
+  headOfHouseholdBrackets: jsonb('head_of_household_brackets').notNull(),
+  capitalGainsBrackets: jsonb('capital_gains_brackets').notNull(),
+  ficaRules: jsonb('fica_rules').notNull(),
+  socialSecurityRules: jsonb('social_security_rules').notNull(),
+  earlyPenaltyRules: jsonb('early_penalty_rules').notNull(),
+  niitRules: jsonb('niit_rules').notNull(),
+  acaRules: jsonb('aca_rules').notNull(),
+  niitThreshold: text('niit_threshold').notNull().default('200000'),
+  irmaaThresholds: jsonb('irmaa_thresholds').notNull(),
+  ssTaxationThresholds: jsonb('ss_taxation_thresholds').notNull(),
+  contributionLimits: jsonb('contribution_limits').notNull(),
+  giftEstateExemptions: jsonb('gift_estate_exemptions').notNull(),
+  acaSubsidyTable: jsonb('aca_subsidy_table').notNull(),
+  fplAmount: text('fpl_amount').notNull().default('15060'),
+  secureActRules: jsonb('secure_act_rules').notNull(),
+  rmdUniformLifetimeTable: jsonb('rmd_uniform_lifetime_table').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Legacy Retirement Rules Store (Kept for backward compatibility) ─────────
 export const retirementRules = pgTable('retirement_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
@@ -187,3 +219,4 @@ export const retirementRules = pgTable('retirement_rules', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+

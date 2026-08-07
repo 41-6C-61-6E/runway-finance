@@ -10,19 +10,21 @@ import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-e
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { populatePlanWithUserFinances } from '@/lib/services/plan-auto-populator';
 
+import { getSystemTaxRules } from '@/lib/services/system-tax-rules-service';
+
 /** Shared helper: hydrate a plan row with all sub-entities + run simulation */
 async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decPlan = await decryptRow('plans', planRow, dek);
   const currentYear = new Date().getFullYear();
 
-  // Fetch accounts, events, flows, settings, user rules, and liabilities for this plan
-  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawRules, rawLiabilities] = await Promise.all([
+  // Fetch accounts, events, flows, settings, liabilities, and global tax rules for this plan
+  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawLiabilities, activeRules] = await Promise.all([
     getDb().select().from(planAccounts).where(eq(planAccounts.planId, planRow.id)),
     getDb().select().from(planEvents).where(eq(planEvents.planId, planRow.id)),
     getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
     getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
-    getDb().select().from(retirementRules).where(eq(retirementRules.userId, planRow.userId)).limit(1),
     getDb().select().from(planLiabilities).where(eq(planLiabilities.planId, planRow.id)),
+    getSystemTaxRules(2026),
   ]);
 
   const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
@@ -30,12 +32,6 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
   const decFlows = await Promise.all(rawFlows.map((f) => decryptRow('plan_flows', f, dek)));
   const decLiabilities = await Promise.all(rawLiabilities.map((l) => decryptRow('plan_liabilities', l, dek)));
   const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
-  const decRules = rawRules[0] ? await decryptRow('retirement_rules', rawRules[0], dek) : null;
-
-  const activeRules: any = decRules ? {
-    ...DEFAULT_2026_RULES,
-    ...decRules,
-  } : DEFAULT_2026_RULES;
 
   // Filter only included accounts for the retirement simulation engine
   const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
@@ -197,7 +193,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
       avoidIrmaaCliffs: Boolean(sAny?.avoidIrmaaCliffs),
       allowPenaltyWithdrawals: sAny?.allowPenaltyWithdrawals !== false,
     },
-    rules: activeRules,
+    rules: activeRules as any,
   };
 
   const simulation = runRetirementSimulation(enginePlan);

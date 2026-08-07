@@ -210,7 +210,6 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   plan_events: ['name', 'amount', 'growthRate', 'growthCap', 'startTriggerValue', 'endTriggerValue', 'inflationPerRecurrence'],
   plan_flows: ['name', 'ruleValue', 'matchRate', 'matchLimit', 'startTriggerValue', 'endTriggerValue'],
   plan_settings: ['fixedInflationRate', 'fixedBenefitCola', 'withholdingDeferred', 'withholdingTaxable', 'incomeTaxModifier', 'capGainsTaxModifier', 'heirFlatIncomeTaxRate', 'realEstateLiquidationRate', 'administrativeCostRate', 'charitableGiving'],
-  retirement_rules: ['standardDeduction', 'ordinaryTaxBrackets', 'capitalGainsBrackets', 'niitThreshold', 'irmaaThresholds', 'ssTaxationThresholds', 'contributionLimits', 'giftEstateExemptions', 'acaSubsidyTable', 'fplAmount', 'secureActRules'],
 };
 
 export async function encryptRow<T extends Record<string, any>>(table: string, row: T, key: Uint8Array): Promise<T> {
