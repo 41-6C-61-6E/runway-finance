@@ -64,6 +64,7 @@ import {
 } from 'lucide-react';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
+import { FireProjectionsSidePanel } from './fire-projections-side-panel';
 
 interface ProjectionTabProps {
   plan: any;
@@ -538,8 +539,27 @@ export function ProjectionTab({
   }, [totalAnnualExpensesFromPlan, plan?.hasSpouse, plan?.spouseBirthYear, simulation?.depletionAge]);
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Engine Diagnostic Warnings Banner */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      {/* Right 1/3 Overview & Summary Panel (Sticky on Desktop) */}
+      <div className="lg:col-span-1 order-first lg:order-last lg:sticky lg:top-6">
+        <FireProjectionsSidePanel
+          plan={plan}
+          currentNetWorth={currentNetWorth}
+          netWorthAtRetirement={netWorthAtRetirement}
+          fireNumber={fireNumber}
+          fireProgress={fireProgress}
+          yearsToFireDisplay={yearsToFireDisplay}
+          simulation={simulation}
+          peakWithdrawalRate={peakWithdrawalRate}
+          planHealth={planHealth}
+          localRetirementAge={localRetirementAge}
+          milestoneCallouts={milestoneCallouts}
+        />
+      </div>
+
+      {/* Left 2/3 Main Charts, Sliders & Tables */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Engine Diagnostic Warnings Banner */}
       {diagnosticWarnings.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 space-y-1.5">
           <div className="flex items-center gap-2 font-bold text-xs text-amber-600 dark:text-amber-400">
@@ -1353,6 +1373,7 @@ export function ProjectionTab({
             </table>
           </div>
         )}
+      </div>
       </div>
 
       {/* Year Detail Interactive Audit Modal */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { GoalsSummary } from '@/components/goals/goals-summary';
+import { GoalsSidePanel } from '@/components/goals/goals-side-panel';
 import { GoalsList } from '@/components/goals/goals-list';
 import { MilestonesProjections } from '@/components/goals/milestones-projections';
 import { GoalInflowProvider } from '@/components/goals/goal-inflow-context';
@@ -14,38 +14,40 @@ import PageContent from '@/components/page-content';
 function GoalsContent() {
   const { isVisible } = useChartVisibility();
 
+  const showSummary = isVisible('goalsSummary');
+  const showList = isVisible('goalsList');
+  const showProjections = isVisible('milestonesProjections');
+
   return (
     <GoalInflowProvider>
       <div className="min-h-screen w-full">
         <PageHeader title="Goals" icon={Target} />
         <PageContent>
-          {isVisible('goalsSummary') && (
-            <Suspense fallback={<LoadingSpinner category="summary" />}>
-              <div>
-                <GoalsSummary />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Right 1/3 Summary & Overview Panel */}
+            {showSummary && (
+              <div className="lg:col-span-1 order-first lg:order-last">
+                <Suspense fallback={<LoadingSpinner category="summary" />}>
+                  <GoalsSidePanel />
+                </Suspense>
               </div>
-            </Suspense>
-          )}
+            )}
 
-          {isVisible('milestonesProjections') && (
-            <div className="mt-5 sm:mt-6">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <div>
-                  <MilestonesProjections />
-                </div>
-              </Suspense>
-            </div>
-          )}
-
-          {isVisible('goalsList') && (
-            <div className="mt-5 sm:mt-6">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <div>
+            {/* Left 2/3 Main Content (Goals List & Milestones) */}
+            <div className={showSummary ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
+              {showList && (
+                <Suspense fallback={<LoadingSpinner category="summary" />}>
                   <GoalsList />
-                </div>
-              </Suspense>
+                </Suspense>
+              )}
+
+              {showProjections && (
+                <Suspense fallback={<LoadingSpinner category="summary" />}>
+                  <MilestonesProjections />
+                </Suspense>
+              )}
             </div>
-          )}
+          </div>
         </PageContent>
       </div>
     </GoalInflowProvider>

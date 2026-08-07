@@ -389,7 +389,7 @@ export function NetWorthChart() {
           title={
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Worth History</span>
+              <span>History</span>
             </div>
           }
         />
@@ -407,7 +407,7 @@ export function NetWorthChart() {
           title={
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Worth History</span>
+              <span>History</span>
             </div>
           }
         />
@@ -429,7 +429,7 @@ export function NetWorthChart() {
           title={
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Worth History</span>
+              <span>History</span>
             </div>
           }
         />
@@ -457,7 +457,7 @@ export function NetWorthChart() {
         title={
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary shrink-0" />
-            <span>Net Worth History</span>
+            <span>History</span>
           </div>
         }
       />
@@ -490,7 +490,7 @@ export function NetWorthChart() {
               <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
             </div>
           </CollapsibleFilterPanel>
-          <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
+          <div className="flex flex-col divide-y divide-border">
             <div className="flex-1 min-w-0 p-2.5 sm:p-5">
               <div className="flex items-center gap-1.5 mb-2">
                 <TrendingUp className="w-3.5 h-3.5 text-chart-1" />
