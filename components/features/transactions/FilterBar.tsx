@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Columns2, Sparkles, X } from 'lucide-react';
+import { Columns2, Sparkles, X, Search } from 'lucide-react';
 import Link from 'next/link';
 import { getTypesByGroup, ACCOUNT_GROUP_MAP } from '@/lib/constants/account-types';
 
@@ -478,20 +478,7 @@ export default function FilterBar({
 
   return (
     <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
-      {/* Primary Controls Section */}
-      <div className="p-3 sm:p-4 border-b border-border/50">
-        <div className="w-full">
-          {/* Search Input */}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by description, payee..."
-            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-          />
-        </div>
-      </div>
-
-      {/* Filter Controls Section */}
+      {/* Filter Controls Section with Dynamic Search Bar */}
       <CollapsibleFilterPanel
         isOpen={isOpen}
         onToggle={() => setIsOpen(!isOpen)}
@@ -504,57 +491,27 @@ export default function FilterBar({
           </span>
         ))}
         className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
-        actions={
-          onOpenAiSuggestions ? (
-            <button
-              type="button"
-              onClick={onOpenAiSuggestions}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all shadow-sm shrink-0 cursor-pointer ${
-                pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed
-                  ? 'text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 pr-1.5'
-                  : 'text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80'
-              }`}
-            >
-              <Sparkles className="h-3 w-3 text-primary" />
-              <span>
-                {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed
-                  ? `${pendingAiCount} suggestion${pendingAiCount !== 1 ? 's' : ''}`
-                  : 'AI Suggestions'}
-              </span>
-              {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && (
-                <>
-                  <span className="w-px h-3 bg-primary/25 mx-0.5" />
-                  <span
-                    role="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onAiSuggestionsDismissed?.(true);
-                    }}
-                    className="p-0.5 hover:bg-primary/20 rounded text-primary transition-colors cursor-pointer flex items-center justify-center"
-                    aria-label="Dismiss AI suggestions"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                </>
-              )}
-            </button>
-          ) : undefined
-        }
-        rightActions={
-          <button
-            type="button"
-            onClick={() => onCompactViewChange?.(!compactView)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer select-none ${
-              compactView
-                ? 'bg-primary/15 border border-primary/50 text-primary shadow-sm'
-                : 'bg-background hover:bg-muted border border-border/80 text-muted-foreground hover:text-foreground shadow-sm'
-            }`}
-            title={compactView ? 'Switch to standard view' : 'Switch to compact view'}
-          >
-            <Columns2 size={12} className="shrink-0" />
-            <span className="hidden sm:inline">Compact</span>
-          </button>
+        centerContent={
+          <div className="relative flex-1 min-w-[140px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by description, payee..."
+              className="w-full h-8 pl-8 pr-7 bg-background border border-input rounded-lg text-foreground text-xs sm:text-sm placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-shadow"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground rounded-full"
+                aria-label="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         }
       >
         <div className="space-y-4">

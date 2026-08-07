@@ -13,6 +13,7 @@ interface CollapsibleFilterPanelProps {
   children: React.ReactNode;
   className?: string;
   actions?: React.ReactNode;
+  centerContent?: React.ReactNode;
   rightActions?: React.ReactNode;
 }
 
@@ -24,13 +25,14 @@ export function CollapsibleFilterPanel({
   children,
   className,
   actions,
+  centerContent,
   rightActions
 }: CollapsibleFilterPanelProps) {
   return (
     <div className={cn("border-b border-border bg-muted/10 px-5 py-1 transition-colors", className)}>
-      <div className="flex items-center justify-between gap-4 min-h-[32px] w-full">
-        {/* Left Side: Options toggle, Actions, and Feedback (Selected Options Indicators) */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center justify-between gap-2.5 min-h-[32px] w-full">
+        {/* Left Side: Options toggle & Actions */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* Toggle Button */}
           <button
             type="button"
@@ -48,9 +50,20 @@ export function CollapsibleFilterPanel({
 
           {/* Actions */}
           {actions}
+        </div>
 
-          {/* Selected Filter/Date Range Feedback (displays only whole indicators that fit) */}
-          {feedbackItems && feedbackItems.length > 0 ? (
+        {/* Center Content (e.g. dynamic search bar) or Selected Filter/Date Range Feedback */}
+        {centerContent ? (
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            {centerContent}
+            {feedbackItems && feedbackItems.length > 0 && (
+              <OverflowAware className="hidden xl:flex text-[11px] font-medium text-muted-foreground py-0 min-w-0 shrink [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
+                {feedbackItems}
+              </OverflowAware>
+            )}
+          </div>
+        ) : (
+          feedbackItems && feedbackItems.length > 0 ? (
             <OverflowAware className="hidden md:flex text-[11px] font-medium text-muted-foreground py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
               {feedbackItems}
             </OverflowAware>
@@ -58,12 +71,12 @@ export function CollapsibleFilterPanel({
             <div className="hidden md:flex text-[11px] font-medium text-muted-foreground flex-wrap items-center gap-1.5 overflow-hidden max-h-[24px] py-0 min-w-0 flex-1 [&_span]:shrink-0 [&_span]:inline-flex [&_span]:items-center [&_span]:leading-none">
               {feedback}
             </div>
-          )}
-        </div>
+          )
+        )}
 
         {/* Right-side actions (compact toggle, date nav, etc.) */}
         {rightActions && (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {rightActions}
           </div>
         )}

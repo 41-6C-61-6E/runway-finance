@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1786136858720",
-  "buildTime": "2026-08-07T21:07:38.720Z",
-  "hash": "8fb8ce9",
-  "fullHash": "8fb8ce9292344354e8ab3cb5ff937e44bb1fa5df",
+  "buildNumber": "26.08.1786136924415",
+  "buildTime": "2026-08-07T21:08:44.415Z",
+  "hash": "3262e3a",
+  "fullHash": "3262e3a67bcc1d944855e20a56e9343f8045bbb4",
   "commits": [
+    "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
     "feat: introduce buildEnginePlan utility to standardize retirement plan model construction across the codebase",
     "style: refine tab and button sizing with smaller paddings, rounded corners, and compact text styles",
     "feat: add fullWidth support to AppTabs and update tab UI components for consistent centered layout",
@@ -202,18 +203,25 @@
     "snakey tooltip and auth improvements",
     "background refresh",
     "issue indicator",
-    "feedback button",
-    "backend optimizations"
+    "feedback button"
   ],
   "history": [
+    {
+      "hash": "3262e3a",
+      "fullHash": "3262e3a67bcc1d944855e20a56e9343f8045bbb4",
+      "author": "Alan Racek",
+      "date": "2026-08-07T14:08:33-07:00",
+      "message": "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
+      "type": "refactor",
+      "buildNumber": "26.08.1786136924415"
+    },
     {
       "hash": "8fb8ce9",
       "fullHash": "8fb8ce9292344354e8ab3cb5ff937e44bb1fa5df",
       "author": "Alan Racek",
       "date": "2026-08-07T13:21:20-07:00",
       "message": "feat: introduce buildEnginePlan utility to standardize retirement plan model construction across the codebase",
-      "type": "feat",
-      "buildNumber": "26.08.1786136858720"
+      "type": "feat"
     },
     {
       "hash": "c0378d9",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-21T18:32:31-07:00",
       "message": "feedback button",
-      "type": "other"
-    },
-    {
-      "hash": "1d4d9bb",
-      "fullHash": "1d4d9bb6806eb2505034bf934f6172c6d87269a1",
-      "author": "Alan Racek",
-      "date": "2026-06-18T16:51:53-07:00",
-      "message": "backend optimizations",
       "type": "other"
     }
   ]
