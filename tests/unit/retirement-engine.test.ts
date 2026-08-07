@@ -1439,6 +1439,411 @@ describe('Retirement Projection Engine', () => {
     // Pre-tax employer match ($5,000) goes to Traditional 401(k)
     expect(tradAcc?.balance).toBe(5000);
   });
+
+  it('correctly calculates 0% capital gains tax headroom based on bracket ceiling minus ordinary income', () => {
+    const plan: EnginePlan = {
+      id: 'cap_gains_room_plan',
+      name: 'Cap Gains Room Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1970,
+      filingStatus: 'single',
+      retirementAge: 50,
+      lifeExpectancyAge: 80,
+      primarySalary: 0,
+      accounts: [
+        {
+          id: 'acc_cash',
+          name: 'Cash',
+          type: 'cash',
+          owner: 'primary',
+          balance: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_pension',
+          name: 'Pension',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(plan);
+    const yr1 = output.yearlyResults[0];
+
+    // Taxable ordinary income = $30,000 pension - $15,000 std deduction = $15,000
+    // 0% LTCG threshold = $48,350 (single). Room should be $48,350 - $15,000 = $33,350
+    expect(yr1.capitalGains0PctRoom).toBe(33350);
+  });
+
+  it('applies additional standard deduction for filers age 65+', () => {
+    const planSingle65: EnginePlan = {
+      id: 'single_65_plan',
+      name: 'Single 65 Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1961, // Age 65 in 2026
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 80,
+      primarySalary: 0,
+      accounts: [],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_pension',
+          name: 'Pension',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: 20000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planSingle65);
+    const yr1 = output.yearlyResults[0];
+
+    // Base std deduction $15,000 + $1,950 for age 65+ = $16,950
+    // Taxable pension $20,000 - $16,950 = $3,050 taxable ordinary income
+    // Tax @ 10% = $305
+    expect(yr1.ordinaryTax).toBe(305);
+  });
+
+  it('taxes qualified dividends at capital gains bracket rates', () => {
+    const planDiv: EnginePlan = {
+      id: 'div_plan',
+      name: 'Dividend Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1980,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 4.0, // $4,000 dividend
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0, // 100% qualified
+        },
+      ],
+      liabilities: [],
+      events: [],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planDiv);
+    const yr1 = output.yearlyResults[0];
+
+    // Ordinary income = $0. $4,000 qualified dividends fit within 0% capital gains bracket ($0-$48,350).
+    // Qualified dividend tax should be 0, so entire $4,000 dividend reinvests!
+    const brokerageAcc = yr1.accountBalances.find(a => a.id === 'acc_taxable');
+    expect(brokerageAcc?.balance).toBe(104000);
+  });
+
+  it('caps Roth conversions at IRMAA Tier 1 MAGI threshold when irmaa_tier1 ceiling is selected', () => {
+    const planRothIrmaa: EnginePlan = {
+      id: 'roth_irmaa_plan',
+      name: 'Roth IRMAA Ceiling Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1961, // Age 65 in 2026 (retired)
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      accounts: [
+        {
+          id: 'acc_trad',
+          name: 'Traditional IRA',
+          type: 'traditional_ira',
+          owner: 'primary',
+          balance: 500000,
+          costBasis: 0,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_pension',
+          name: 'Pension',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: {
+        fixedInflationRate: 0.0,
+        enableRothConversions: true,
+        rothConversionTargetCeiling: 'irmaa_tier1',
+      },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planRothIrmaa);
+    const yr1 = output.yearlyResults[0];
+
+    // Single IRMAA Tier 1 limit is $103,000. MAGI before conversion is $50,000.
+    // Headroom = $103,000 - $50,000 - $1,000 buffer = $52,000.
+    expect(yr1.rothConversionAmount).toBe(52000);
+  });
+
+  it('continues spouse 401(k) contributions after primary retires while spouse is still working', () => {
+    const planSpouseWorking: EnginePlan = {
+      id: 'spouse_working_plan',
+      name: 'Spouse Working Plan',
+      hasSpouse: true,
+      primaryBirthYear: 1966, // Age 60 in 2026 (retired)
+      primaryBirthMonth: 1,
+      spouseBirthYear: 1971, // Age 55 in 2026 (working until 60)
+      spouseBirthMonth: 1,
+      spouseName: 'Spouse',
+      spouseRetirementAge: 60,
+      spouseLifeExpectancyAge: 90,
+      filingStatus: 'married_joint',
+      retirementAge: 60,
+      lifeExpectancyAge: 90,
+      primarySalary: 0,
+      spouseSalary: 100000,
+      spouseSalaryYear: 2026,
+      spouseSalaryRaisePct: 0,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_spouse_401k',
+          name: 'Spouse 401(k)',
+          type: 'traditional_401k',
+          owner: 'spouse',
+          balance: 100000,
+          costBasis: 0,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          contributionMode: 'fixed_amount',
+          contributionValue: 10000,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 40000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planSpouseWorking);
+    const yr1 = output.yearlyResults[0];
+
+    // Primary is 60 (retired), but spouse is 55 (working until 60).
+    // Spouse 401(k) should receive the $10,000 contribution.
+    const spouseAcc = yr1.accountBalances.find(a => a.id === 'acc_spouse_401k');
+    expect(spouseAcc?.balance).toBe(110000);
+  });
+
+  it('invests surplus cash flow during distribution phase into surplus destination account', () => {
+    const planSurplusDist: EnginePlan = {
+      id: 'surplus_dist_plan',
+      name: 'Surplus Distribution Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1961, // Age 65 in 2026 (retired)
+      filingStatus: 'single',
+      retirementAge: 60,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      accounts: [
+        {
+          id: 'acc_brokerage',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          isSurplusDestination: true,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_pension',
+          name: 'Pension',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: 80000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planSurplusDist);
+    const yr1 = output.yearlyResults[0];
+
+    // Retired. Pension = $80,000, Expenses = $30,000, Tax on $80k pension single = $7,905.
+    // Surplus = $80,000 - $30,000 - $7,905 = $42,095.
+    // That surplus should be added to Taxable Brokerage balance ($50,000 + $42,095 = $92,095).
+    const brokerageAcc = yr1.accountBalances.find(a => a.id === 'acc_brokerage');
+    expect(brokerageAcc?.balance).toBeGreaterThan(90000);
+  });
+
+  it('correctly applies Married Filing Separately (MFS) tax rules and SS taxation', () => {
+    const planMfs: EnginePlan = {
+      id: 'mfs_plan',
+      name: 'MFS Plan',
+      hasSpouse: true,
+      primaryBirthYear: 1970,
+      filingStatus: 'married_separate',
+      retirementAge: 60,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      accounts: [],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_ss',
+          name: 'Social Security',
+          category: 'income',
+          type: 'social_security',
+          owner: 'primary',
+          amount: 20000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planMfs);
+    const yr1 = output.yearlyResults[0];
+
+    // Under MFS, SS is taxed at 85% starting at $0 provisional income ($10,000 provisional = $8,500 taxable SS).
+    // Taxable income = $8,500 - $15,000 std deduction = $0 taxable income.
+    expect(yr1.ssIncome).toBe(20000);
+    expect(yr1.ordinaryTax).toBe(0);
+  });
+
+  it('correctly applies Head of Household (HoH) tax brackets and standard deduction', () => {
+    const planHoh: EnginePlan = {
+      id: 'hoh_plan',
+      name: 'HoH Plan',
+      hasSpouse: false,
+      primaryBirthYear: 1980,
+      filingStatus: 'head_of_household',
+      retirementAge: 60,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      accounts: [],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_pension',
+          name: 'Pension',
+          category: 'income',
+          type: 'pension',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const output = runRetirementSimulation(planHoh);
+    const yr1 = output.yearlyResults[0];
+
+    // HoH standard deduction = $22,500.
+    // Taxable pension $50,000 - $22,500 = $27,500.
+    // HoH brackets: 10% up to $17,000 = $1,700.
+    // 12% on ($27,500 - $17,000 = $10,500) = $1,260.
+    // Total ordinary tax = $1,700 + $1,260 = $2,960.
+    expect(yr1.ordinaryTax).toBe(2960);
+  });
 });
 
 

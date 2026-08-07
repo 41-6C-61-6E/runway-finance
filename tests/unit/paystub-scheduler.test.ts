@@ -159,6 +159,8 @@ vi.mock('@/lib/db', () => {
 
 describe('Paystub Scheduler & Auto-Generate Engine', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-20T12:00:00Z'));
     mockSettings = [];
     mockPaystubs = [];
     mockLineItems = [];

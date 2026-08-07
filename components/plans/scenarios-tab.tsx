@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   LineChart,
@@ -62,109 +63,6 @@ export function ScenariosTab({
 
   // Applied Toast Feedback
   const [appliedMsg, setAppliedMsg] = useState<string>('');
-
-  // Helper to convert DB plan to EnginePlan object
-  const buildEnginePlan = (targetPlan: any): EnginePlan => {
-    const planAccountsList = Array.isArray(targetPlan?.accounts) ? targetPlan.accounts : [];
-    const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
-
-    return {
-      id: targetPlan?.id || 'plan_1',
-      name: targetPlan?.name || 'Primary Plan',
-      hasSpouse: Boolean(targetPlan?.hasSpouse),
-      primaryBirthYear: Number(targetPlan?.primaryBirthYear) || 1985,
-      primaryBirthMonth: Number(targetPlan?.primaryBirthMonth) || 1,
-      spouseBirthYear: targetPlan?.spouseBirthYear ? Number(targetPlan.spouseBirthYear) : undefined,
-      spouseBirthMonth: targetPlan?.spouseBirthMonth ? Number(targetPlan.spouseBirthMonth) : undefined,
-      spouseName: targetPlan?.spouseName || 'Spouse / Partner',
-      spouseRetirementAge: targetPlan?.spouseRetirementAge ? Number(targetPlan.spouseRetirementAge) : 60,
-      spouseLifeExpectancyAge: targetPlan?.spouseLifeExpectancyAge ? Number(targetPlan.spouseLifeExpectancyAge) : 100,
-      primarySsMonthlyAmount: targetPlan?.primarySsMonthlyAmount ? parseFloat(targetPlan.primarySsMonthlyAmount) : 2500,
-      primarySsStartAge: targetPlan?.primarySsStartAge ? Number(targetPlan.primarySsStartAge) : 67,
-      spouseSsMonthlyAmount: targetPlan?.spouseSsMonthlyAmount ? parseFloat(targetPlan.spouseSsMonthlyAmount) : 2000,
-      spouseSsStartAge: targetPlan?.spouseSsStartAge ? Number(targetPlan.spouseSsStartAge) : 67,
-      enableSpousalSsBenefit: targetPlan?.enableSpousalSsBenefit !== false,
-      filingStatus: targetPlan?.filingStatus || 'single',
-      retirementAge: Number(targetPlan?.retirementAge) || 60,
-      lifeExpectancyAge: Number(targetPlan?.lifeExpectancyAge) || 100,
-      withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
-      customWithdrawalOrder: Array.isArray(targetPlan?.customWithdrawalOrder) ? targetPlan.customWithdrawalOrder : undefined,
-      primarySalary: parseFloat(targetPlan?.primarySalary) || 0,
-      spouseSalary: parseFloat(targetPlan?.spouseSalary) || 0,
-      primarySalaryYear: Number(targetPlan?.primarySalaryYear) || new Date().getFullYear(),
-      primarySalaryRaisePct: parseFloat(targetPlan?.primarySalaryRaisePct) || 0,
-      primarySalaryOverrides: targetPlan?.primarySalaryOverrides && typeof targetPlan?.primarySalaryOverrides === 'object' ? targetPlan.primarySalaryOverrides : undefined,
-      spouseSalaryYear: Number(targetPlan?.spouseSalaryYear) || new Date().getFullYear(),
-      spouseSalaryRaisePct: parseFloat(targetPlan?.spouseSalaryRaisePct) || 0,
-      spouseSalaryOverrides: targetPlan?.spouseSalaryOverrides && typeof targetPlan?.spouseSalaryOverrides === 'object' ? targetPlan.spouseSalaryOverrides : undefined,
-      accounts: activeAccounts.map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        owner: a.owner || 'primary',
-        balance: parseFloat(a.balance) || 0,
-        costBasis: parseFloat(a.costBasis) || 0,
-        expectedGrowthRate: parseFloat(a.expectedGrowthRate) || 6.0,
-        dividendYield: parseFloat(a.dividendYield) || 2.5,
-        reinvestDividends: a.reinvestDividends ?? true,
-        qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
-        rothPercentage: a.rothPercentage,
-        contributionMode: (a.contributionMode as any) || 'none',
-        contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
-        contributionSalarySource: a.contributionSalarySource || undefined,
-        companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
-        companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
-        isSurplusDestination: Boolean(a.isSurplusDestination),
-      })),
-      liabilities: [],
-      events: (targetPlan?.events || []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        category: e.category,
-        type: e.type,
-        owner: e.owner || 'primary',
-        amount: parseFloat(e.amount) || 0,
-        frequency: e.frequency || 'yearly',
-        growthRate: parseFloat(e.growthRate) || 0,
-        growthCap: e.growthCap ? parseFloat(e.growthCap) : undefined,
-        adjustForInflation: e.adjustForInflation ?? true,
-        startTriggerType: e.startTriggerType || 'now',
-        startTriggerValue: e.startTriggerValue,
-        endTriggerType: e.endTriggerType || 'end_of_plan',
-        endTriggerValue: e.endTriggerValue,
-      })),
-      flows: (targetPlan?.flows || []).map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        type: f.type || 'invest',
-        rank: f.rank || 1,
-        targetAccountId: f.targetAccountId,
-        ruleType: f.ruleType || 'save_leftover',
-        ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
-        matchRate: f.matchRate ? parseFloat(f.matchRate) : undefined,
-        matchLimit: f.matchLimit ? parseFloat(f.matchLimit) : undefined,
-        matchAccountId: f.matchAccountId,
-      })),
-      settings: {
-        fixedInflationRate: parseFloat(targetPlan?.settings?.fixedInflationRate || '3.0'),
-        withholdingDeferred: parseFloat(targetPlan?.settings?.withholdingDeferred || '20.0'),
-        withholdingTaxable: parseFloat(targetPlan?.settings?.withholdingTaxable || '10.0'),
-        incomeTaxModifier: parseFloat(targetPlan?.settings?.incomeTaxModifier || '0.0'),
-        capGainsTaxModifier: parseFloat(targetPlan?.settings?.capGainsTaxModifier || '0.0'),
-        heirFlatIncomeTaxRate: parseFloat(targetPlan?.settings?.heirFlatIncomeTaxRate || '25.0'),
-        stepUpBasis: targetPlan?.settings?.stepUpBasis ?? true,
-        realEstateLiquidationRate: parseFloat(targetPlan?.settings?.realEstateLiquidationRate || '6.0'),
-        administrativeCostRate: parseFloat(targetPlan?.settings?.administrativeCostRate || '1.0'),
-        charitableGiving: parseFloat(targetPlan?.settings?.charitableGiving || '0.0'),
-        withdrawalMethod: targetPlan?.settings?.withdrawalMethod || targetPlan?.withdrawalMethod || 'textbook',
-        enableRothConversions: Boolean(targetPlan?.settings?.enableRothConversions),
-        rothConversionTargetCeiling: (targetPlan?.settings?.rothConversionTargetCeiling as any) || 'top_of_12',
-        avoidIrmaaCliffs: Boolean(targetPlan?.settings?.avoidIrmaaCliffs),
-        allowPenaltyWithdrawals: targetPlan?.settings?.allowPenaltyWithdrawals !== false,
-      },
-      rules: targetPlan?.rules || DEFAULT_2026_RULES,
-    };
-  };
 
   const primaryEnginePlan = useMemo(() => buildEnginePlan(plan), [plan]);
 
