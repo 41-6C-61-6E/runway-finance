@@ -31,14 +31,12 @@ import {
 import {
   TrendingUp,
   Flame,
-  Target,
   Calendar,
   Clock,
   Palmtree,
   ShieldCheck,
   ChevronDown,
   ChevronUp,
-  DollarSign,
   Award,
   Landmark,
   Layers,
@@ -46,7 +44,6 @@ import {
   ArrowDownCircle,
   HelpCircle,
   Flag,
-  Activity,
   Percent,
   ShieldAlert,
   AlertTriangle,
@@ -122,9 +119,7 @@ export function ProjectionTab({
   });
   // Collapsible section states using useCardCollapsed hook
   const [isControlsCollapsed, setIsControlsCollapsed] = useCardCollapsed('fire_projection_controls', true); // Collapsed by default
-  const [isSummaryStatsCollapsed, setIsSummaryStatsCollapsed] = useCardCollapsed('fire_summary_stats', true); // Collapsed by default
   const [isMainChartCollapsed, setIsMainChartCollapsed] = useCardCollapsed('fire_main_chart');
-  const [isMilestonesCollapsed, setIsMilestonesCollapsed] = useCardCollapsed('fire_milestones');
   const [isCashFlowCollapsed, setIsCashFlowCollapsed] = useCardCollapsed('fire_cash_flow');
   const [isWhatIfCollapsed, setIsWhatIfCollapsed] = useCardCollapsed('fire_what_if');
   const [isYearlyTableCollapsed, setIsYearlyTableCollapsed] = useCardCollapsed('fire_yearly_table');
@@ -574,117 +569,6 @@ export function ProjectionTab({
         </div>
       )}
 
-      {/* Summary KPI Cards (Collapsible) */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-        <CollapsibleCardHeader
-          isCollapsed={isSummaryStatsCollapsed}
-          onToggle={setIsSummaryStatsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
-              <div>
-                <h3 className="text-xs font-bold text-foreground">Portfolio Summary & Key Plan Metrics</h3>
-                <p className="text-[10px] text-muted-foreground">Current assets, retirement target, and plan health grade</p>
-              </div>
-            </div>
-          }
-          actions={
-            isSummaryStatsCollapsed ? (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-mono ${planHealth.badge}`}>
-                Grade {planHealth.score}
-              </span>
-            ) : null
-          }
-        />
-
-        {!isSummaryStatsCollapsed && (
-          <div className="p-3.5 sm:p-4 border-t border-border">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <DollarSign className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">Current Portfolio</span>
-                </div>
-                <p className="text-base sm:text-lg font-extrabold text-foreground font-mono truncate">{formatCurrency(currentNetWorth)}</p>
-                <span className="text-[10px] text-muted-foreground block font-sans">Starting Balance</span>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Palmtree className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">At Retirement ({localRetirementAge})</span>
-                </div>
-                <p className="text-base sm:text-lg font-extrabold text-emerald-500 font-mono truncate">{formatCurrency(netWorthAtRetirement)}</p>
-                {peakWithdrawalRate > 0 ? (
-                  <p className={`text-[10px] font-bold font-mono truncate ${peakWithdrawalRate > 5 ? 'text-rose-500' : peakWithdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                    Peak Draw: {peakWithdrawalRate.toFixed(1)}%
-                  </p>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground block font-sans">Projected Nest Egg</span>
-                )}
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Target className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider truncate">FIRE Target ({plan?.fiTargetMultiplier || 25}×)</span>
-                  </div>
-                </div>
-                <p className="text-base sm:text-lg font-extrabold text-primary font-mono truncate">{formatCurrency(fireNumber)}</p>
-                <div className="space-y-0.5">
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, fireProgress)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">{fireProgress.toFixed(0)}% of target</p>
-                </div>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider truncate">Years to FIRE</span>
-                </div>
-                <p className="text-base sm:text-lg font-extrabold text-foreground font-mono truncate">
-                  {yearsToFireDisplay} {typeof yearsToFireDisplay === 'number' ? (yearsToFireDisplay === 1 ? 'yr' : 'yrs') : ''}
-                </p>
-                {simulation?.success !== undefined && (
-                  <div
-                    className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full border ${
-                      simulation.success
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                    }`}
-                  >
-                    <ShieldCheck className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{simulation.success ? 'Succeeds' : `Depletes Age ${simulation.depletionAge}`}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-3 shadow-sm space-y-1 col-span-2 sm:col-span-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Activity className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider truncate">Plan Health</span>
-                  </div>
-                  <span className="text-sm font-mono font-extrabold text-foreground">{planHealth.score}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planHealth.badge}`}>
-                    {planHealth.status}
-                  </span>
-                </div>
-                <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">{planHealth.desc}</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Main Chart Card: Deterministic vs Monte Carlo Fan Chart */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
         <CollapsibleCardHeader
@@ -1008,46 +892,6 @@ export function ProjectionTab({
         </div>
         </div>
           </>
-        )}
-      </div>
-
-      {/* Key Financial & Life Milestones Cards */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
-        <CollapsibleCardHeader
-          isCollapsed={isMilestonesCollapsed}
-          onToggle={setIsMilestonesCollapsed}
-          title={
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Flag className="w-3.5 h-3.5 text-primary" />
-              Key Financial & Life Milestones Timeline
-            </h3>
-          }
-        />
-
-        {!isMilestonesCollapsed && (
-          <div className="p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {milestoneCallouts.map((m) => {
-                const Icon = m.icon;
-                return (
-                  <div key={m.title} className="bg-muted/20 border border-border rounded-xl p-3 space-y-2 flex flex-col justify-between hover:border-primary/40 transition-all">
-                    <div className="flex items-center justify-between">
-                      <span className={`p-1.5 rounded-lg bg-background border border-border ${m.color}`}>
-                        <Icon className="w-4 h-4" />
-                      </span>
-                      <span className="font-mono font-extrabold text-[11px] text-foreground bg-background px-2 py-0.5 rounded border border-border">
-                        Age {m.age} ({m.year})
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground">{m.title}</h4>
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{m.note}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         )}
       </div>
 

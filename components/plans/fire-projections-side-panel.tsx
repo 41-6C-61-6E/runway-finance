@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
@@ -68,6 +68,7 @@ export function FireProjectionsSidePanel({
   milestoneCallouts,
 }: FireProjectionsSidePanelProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('fireProjectionsSidePanel');
+  const [showAllMilestones, setShowAllMilestones] = useState(false);
 
   const activeStrategyLabel = useMemo(() => {
     const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
@@ -93,13 +94,8 @@ export function FireProjectionsSidePanel({
           title={
             <div className="flex items-center gap-2">
               <Flame className="w-4 h-4 text-primary shrink-0" />
-              <span className="font-bold text-foreground">FIRE Summary & Scorecard</span>
+              <span className="font-bold text-foreground">Scorecard</span>
             </div>
-          }
-          actions={
-            <span className={cn('text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border font-mono', planHealth.badge)}>
-              Grade {planHealth.score}
-            </span>
           }
         />
 
@@ -126,8 +122,8 @@ export function FireProjectionsSidePanel({
 
             {/* FIRE Target Semi-Circle Arc Gauge */}
             <div className="bg-muted/20 border border-border/50 rounded-xl p-4 flex flex-col items-center justify-center space-y-2">
-              <div className="relative w-36 h-20 flex items-end justify-center overflow-hidden">
-                <svg className="w-36 h-36 -rotate-180" viewBox="0 0 120 120">
+              <div className="relative w-36 h-20 flex items-start justify-center overflow-hidden">
+                <svg className="w-36 h-36" viewBox="0 0 120 120">
                   {/* Gauge Arc Track */}
                   <path
                     d="M 10,60 A 50,50 0 0,1 110,60"
@@ -234,7 +230,7 @@ export function FireProjectionsSidePanel({
                   Upcoming Key Milestones
                 </span>
                 <div className="relative pl-4 space-y-3 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-                  {milestoneCallouts.slice(0, 4).map((m, idx) => {
+                  {milestoneCallouts.slice(0, showAllMilestones ? milestoneCallouts.length : 4).map((m, idx) => {
                     const IconComponent = m.icon || Target;
                     return (
                       <div key={idx} className="relative flex items-start gap-2 text-xs">
@@ -256,6 +252,17 @@ export function FireProjectionsSidePanel({
                     );
                   })}
                 </div>
+
+                {milestoneCallouts.length > 4 && (
+                  <button
+                    onClick={() => setShowAllMilestones((v) => !v)}
+                    className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                    type="button"
+                  >
+                    <ChevronRight className={cn('w-3 h-3 transition-transform duration-200', showAllMilestones && 'rotate-90')} />
+                    {showAllMilestones ? 'Show less' : `Show all (${milestoneCallouts.length})`}
+                  </button>
+                )}
               </div>
             )}
 
