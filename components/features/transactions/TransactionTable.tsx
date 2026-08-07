@@ -43,6 +43,8 @@ import {
   Search,
   Sparkles,
   Plus,
+  Columns2,
+  X,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
@@ -106,6 +108,10 @@ interface TransactionTableProps {
   onAddTransaction?: () => void;
   compactView?: boolean;
   onCompactViewChange?: (compact: boolean) => void;
+  pendingAiCount?: number;
+  aiSuggestionsDismissed?: boolean;
+  onAiSuggestionsDismissed?: (dismissed: boolean) => void;
+  onOpenAiSuggestions?: () => void;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -198,6 +204,10 @@ export default function TransactionTable({
   onAddTransaction,
   compactView,
   onCompactViewChange,
+  pendingAiCount,
+  aiSuggestionsDismissed,
+  onAiSuggestionsDismissed,
+  onOpenAiSuggestions,
 }: TransactionTableProps) {
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
@@ -276,6 +286,21 @@ export default function TransactionTable({
     ai: false,
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const columnMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(event.target as Node)) {
+        setShowColumnMenu(false);
+      }
+    }
+    if (showColumnMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showColumnMenu]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [openCategoryTx, setOpenCategoryTx] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{
@@ -1523,59 +1548,98 @@ export default function TransactionTable({
           <>
             {/* Column config and Action toolbar */}
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/10">
-              <div>
+              <div className="flex items-center gap-2">
                 {onAddTransaction && (
                   <button
                     onClick={onAddTransaction}
-                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/20"
+                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/20 cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Add Transaction
                   </button>
                 )}
+                {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && onOpenAiSuggestions && (
+                  <button
+                    type="button"
+                    onClick={onOpenAiSuggestions}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors shadow-sm cursor-pointer"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>
+                      {`${pendingAiCount} suggestion${pendingAiCount !== 1 ? 's' : ''}`}
+                    </span>
+                    <span className="w-px h-3 bg-primary/25 mx-0.5" />
+                    <span
+                      role="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAiSuggestionsDismissed?.(true);
+                      }}
+                      className="p-0.5 hover:bg-primary/20 rounded text-primary transition-colors cursor-pointer flex items-center justify-center"
+                      aria-label="Dismiss AI suggestions"
+                    >
+                      <X className="h-3 w-3" />
+                    </span>
+                  </button>
+                )}
               </div>
 
-              {transactions.length > 0 && !compactView && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowColumnMenu(!showColumnMenu)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                  >
-                    <Settings2 className="h-3.5 w-3.5" />
-                    Columns
-                  </button>
-                  {showColumnMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
-                      <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">
-                        Toggle columns
+              <div className="flex items-center gap-2">
+                {transactions.length > 0 && !compactView && (
+                  <div className="relative" ref={columnMenuRef}>
+                    <button
+                      onClick={() => setShowColumnMenu(!showColumnMenu)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80 rounded-lg transition-colors shadow-sm cursor-pointer"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Columns
+                    </button>
+                    {showColumnMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+                        <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">
+                          Toggle columns
+                        </div>
+                        {ALL_COLUMNS.map((colId) => {
+                          const col = table.getColumn(colId);
+                          const isVisible = col?.getIsVisible() ?? true;
+                          return (
+                            <button
+                              key={colId}
+                              onClick={() => {
+                                const col = table.getColumn(colId);
+                                if (col) col.toggleVisibility(!col.getIsVisible());
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
+                            >
+                              {isVisible ? (
+                                <EyeOff className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-3 w-3 text-muted-foreground/50" />
+                              )}
+                              <span className={isVisible ? "" : "opacity-50"}>
+                                {COLUMN_LABELS[colId]}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
-                      {ALL_COLUMNS.map((colId) => {
-                        const col = table.getColumn(colId);
-                        const isVisible = col?.getIsVisible() ?? true;
-                        return (
-                          <button
-                            key={colId}
-                            onClick={() => {
-                              const col = table.getColumn(colId);
-                              if (col) col.toggleVisibility(!col.getIsVisible());
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-                          >
-                            {isVisible ? (
-                              <EyeOff className="h-3 w-3 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-3 w-3 text-muted-foreground/50" />
-                            )}
-                            <span className={isVisible ? "" : "opacity-50"}>
-                              {COLUMN_LABELS[colId]}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+
+                {onCompactViewChange && (
+                  <button
+                    type="button"
+                    onClick={() => onCompactViewChange(!compactView)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80 rounded-lg transition-colors shadow-sm cursor-pointer"
+                    title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
+                  >
+                    <Columns2 className="h-3.5 w-3.5" />
+                    <span>{compactView ? 'Detailed' : 'Compact'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {transactions.length === 0 ? (

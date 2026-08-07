@@ -415,6 +415,10 @@ function TransactionsContent() {
             onAddTransaction={handleAddTransaction}
             compactView={compactView}
             onCompactViewChange={setCompactView}
+            pendingAiCount={pendingAiCount}
+            aiSuggestionsDismissed={isSuggestionsDismissed}
+            onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
+            onOpenAiSuggestions={() => setAiModalOpen(true)}
           />
           {(selectedTransaction || drawerMode === 'create') && (
             <TransactionDetailDrawer
