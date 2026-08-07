@@ -23,8 +23,13 @@ export interface HistoricalYearReturn {
 
 export const DEFAULT_2026_RULES = {
   taxYear: 2026,
+  country: 'US',
   filingStatus: 'single',
   standardDeduction: '15000',
+  standardDeductionSingle: '15000',
+  standardDeductionMfj: '30000',
+  standardDeductionHoH: '22500',
+  standardDeductionMfs: '15000',
   additionalStdDeduction65Plus: {
     singleOrHoH: 1950,
     marriedPerPerson: 1550,
@@ -52,6 +57,49 @@ export const DEFAULT_2026_RULES = {
     { rate: 0.15, threshold: 48350 },
     { rate: 0.20, threshold: 533400 },
   ],
+  ficaRules: {
+    ssTaxRate: 0.062,
+    medicareTaxRate: 0.0145,
+    addMedicareTaxRate: 0.009,
+    addMedicareThresholdSingle: 200000,
+    addMedicareThresholdMfj: 250000,
+    addMedicareThresholdMfs: 125000,
+    ssWageBaseCap: 176100,
+  },
+  socialSecurityRules: {
+    bendPoint1: 1226,
+    bendPoint2: 7391,
+    claimingMultipliers: {
+      62: 0.70,
+      63: 0.75,
+      64: 0.80,
+      65: 0.8667,
+      66: 0.9333,
+      67: 1.00,
+      68: 1.08,
+      69: 1.16,
+      70: 1.24,
+    } as Record<number, number>,
+  },
+  earlyPenaltyRules: {
+    ira401kPenaltyAge: 59.5,
+    ruleOf55Age: 55,
+    hsaPenaltyAge: 65,
+    ira401kPenaltyRate: 0.10,
+    hsaPenaltyRate: 0.20,
+  },
+  niitRules: {
+    rate: 0.038,
+    thresholdSingle: 200000,
+    thresholdMfj: 250000,
+    thresholdMfs: 125000,
+  },
+  acaRules: {
+    benchmarkCostSingle: 8400,
+    benchmarkCostMfj: 16800,
+    fplBaseSingle: 15060,
+    fplMfjMultiplier: 1.35,
+  },
   niitThreshold: '200000',
   irmaaThresholds: [
     { magiSingle: 0, magiJoint: 0, partBMonthly: 174.70, partDMonthly: 0.00 },
@@ -91,6 +139,14 @@ export const DEFAULT_2026_RULES = {
     rmdAge: 73, // age 73 for birth 1951-1959, 75 for 1960+
     inheritedIraYears: 10,
   },
+  rmdUniformLifetimeTable: {
+    73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2,
+    81: 19.3, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7,
+    89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1, 94: 9.5,  95: 8.9,  96: 8.4,
+    97: 7.8,  98: 7.3,  99: 6.8,  100: 6.4, 101: 6.0, 102: 5.6, 103: 5.2, 104: 4.9,
+    105: 4.6, 106: 4.3, 107: 4.1, 108: 3.9, 109: 3.7, 110: 3.5, 111: 3.4, 112: 3.3,
+    113: 3.1, 114: 3.0, 115: 2.9, 116: 2.8, 117: 2.7, 118: 2.5, 119: 2.3, 120: 2.0,
+  } as Record<number, number>,
 };
 
 // ── IRS Uniform Lifetime Table III (RMD Divisors) ────────────────────────────
