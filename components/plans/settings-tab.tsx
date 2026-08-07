@@ -87,6 +87,7 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const [enableSpousalSsBenefit, setEnableSpousalSsBenefit] = useState(plan?.enableSpousalSsBenefit !== false);
 
   const [inflationRate, setInflationRate] = useState(plan?.settings?.fixedInflationRate || '3.0');
+  const [incomeTaxModifier, setIncomeTaxModifier] = useState(plan?.settings?.incomeTaxModifier || '0.0');
   const [heirTaxRate, setHeirTaxRate] = useState(plan?.settings?.heirFlatIncomeTaxRate || '25.0');
   const [liquidationRate, setLiquidationRate] = useState(plan?.settings?.realEstateLiquidationRate || '6.0');
   const [adminRate, setAdminRate] = useState(plan?.settings?.administrativeCostRate || '1.0');
@@ -129,6 +130,9 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
       setSpouseSsMonthly(plan.spouseSsMonthlyAmount || '2000');
       setSpouseSsStartAge(plan.spouseSsStartAge || 67);
       setEnableSpousalSsBenefit(plan.enableSpousalSsBenefit !== false);
+
+      setInflationRate(plan.settings?.fixedInflationRate || '3.0');
+      setIncomeTaxModifier(plan.settings?.incomeTaxModifier || '0.0');
 
       // Synchronize withdrawal strategy and penalty engine settings
       setWithdrawalMethod(plan.settings?.withdrawalMethod || plan.withdrawalMethod || 'textbook');
@@ -1086,6 +1090,22 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
                       className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
                     />
                     <p className="text-[11px] text-muted-foreground">Applies to expense growth and tax bracket inflation adjustments.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-muted-foreground">State / Local Income Tax Rate (%)</label>
+                    <input
+                      type="text"
+                      value={incomeTaxModifier}
+                      onChange={(e) => {
+                        setIncomeTaxModifier(e.target.value);
+                        onUpdatePlan({ settings: { incomeTaxModifier: e.target.value } });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Applied as a flat tax rate on taxable ordinary income. Set to 0% for states with no income tax (TX, FL, NV, etc.).
+                    </p>
                   </div>
                 </div>
               </div>

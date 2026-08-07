@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   LineChart,
@@ -76,67 +77,14 @@ export function SocialSecurityTab({
   const isMfj = plan?.filingStatus === 'married_joint' || Boolean(plan?.hasSpouse);
 
   // Helper to convert DB plan to EnginePlan object
-  const buildEnginePlan = (customPrimaryAge: number, customSpouseAge: number): EnginePlan => {
-    const planAccountsList = Array.isArray(plan?.accounts) ? plan.accounts : [];
-    const activeAccounts = planAccountsList.filter((a: any) => a.isIncluded !== false);
-
-    return {
-      id: plan?.id || 'plan_1',
-      name: plan?.name || 'Primary Plan',
-      hasSpouse: Boolean(plan?.hasSpouse),
-      primaryBirthYear: Number(plan?.primaryBirthYear) || 1985,
-      primaryBirthMonth: Number(plan?.primaryBirthMonth) || 1,
-      spouseBirthYear: plan?.spouseBirthYear ? Number(plan.spouseBirthYear) : undefined,
-      spouseBirthMonth: plan?.spouseBirthMonth ? Number(plan.spouseBirthMonth) : undefined,
-      spouseName: plan?.spouseName || 'Spouse / Partner',
-      spouseRetirementAge: plan?.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60,
-      spouseLifeExpectancyAge: plan?.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
-      primarySsMonthlyAmount: primaryMonthlyPIA,
+  const buildEnginePlanHelper = (customPrimaryAge: number, customSpouseAge: number) => {
+    return buildEnginePlan(plan, {
       primarySsStartAge: customPrimaryAge,
-      spouseSsMonthlyAmount: spouseMonthlyPIA,
       spouseSsStartAge: customSpouseAge,
+      primarySsMonthlyAmount: primaryMonthlyPIA,
+      spouseSsMonthlyAmount: spouseMonthlyPIA,
       enableSpousalSsBenefit: enableSpousal,
-      filingStatus: plan?.filingStatus || 'single',
-      retirementAge: Number(plan?.retirementAge) || 60,
-      lifeExpectancyAge: Number(plan?.lifeExpectancyAge) || 100,
-      withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-      primarySalary: parseFloat(plan?.primarySalary) || 0,
-      spouseSalary: parseFloat(plan?.spouseSalary) || 0,
-      accounts: activeAccounts.map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        owner: a.owner || 'primary',
-        balance: parseFloat(a.balance) || 0,
-        costBasis: parseFloat(a.costBasis) || 0,
-        expectedGrowthRate: parseFloat(a.expectedGrowthRate) || 6.0,
-        dividendYield: parseFloat(a.dividendYield) || 2.5,
-        reinvestDividends: a.reinvestDividends ?? true,
-        qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
-        rothPercentage: a.rothPercentage,
-      })),
-      liabilities: [],
-      events: (plan?.events || []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        category: e.category,
-        type: e.type,
-        owner: e.owner || 'primary',
-        amount: parseFloat(e.amount) || 0,
-        frequency: e.frequency || 'yearly',
-        growthRate: parseFloat(e.growthRate) || 0,
-        adjustForInflation: e.adjustForInflation ?? true,
-        startTriggerType: e.startTriggerType || 'now',
-        endTriggerType: e.endTriggerType || 'end_of_plan',
-      })),
-      flows: [],
-      settings: {
-        fixedInflationRate: parseFloat(plan?.settings?.fixedInflationRate || '3.0'),
-        enableRothConversions: Boolean(plan?.settings?.enableRothConversions),
-        withdrawalMethod: plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
-      },
-      rules: plan?.rules || DEFAULT_2026_RULES,
-    };
+    });
   };
 
   // SS Claiming Multipliers
@@ -157,10 +105,10 @@ export function SocialSecurityTab({
   const totalAnnualHouseholdSS = (primaryMonthlyAmount + (isMfj ? spouseMonthlyAmount : 0)) * 12;
 
   // Run simulations for trajectories
-  const simSelected = useMemo(() => runRetirementSimulation(buildEnginePlan(primaryAge, spouseAge)), [primaryAge, spouseAge, enableSpousal]);
-  const sim62 = useMemo(() => runRetirementSimulation(buildEnginePlan(62, 62)), []);
-  const sim67 = useMemo(() => runRetirementSimulation(buildEnginePlan(67, 67)), []);
-  const sim70 = useMemo(() => runRetirementSimulation(buildEnginePlan(70, 70)), []);
+  const simSelected = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(primaryAge, spouseAge)), [primaryAge, spouseAge, enableSpousal, primaryMonthlyPIA, spouseMonthlyPIA, plan]);
+  const sim62 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(62, 62)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
+  const sim67 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(67, 67)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
+  const sim70 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(70, 70)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
 
   const chartData = useMemo(() => {
     const years62 = sim62.yearlyResults;
