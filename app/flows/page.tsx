@@ -45,7 +45,7 @@ function FlowsContent() {
             onTabChange={(tabId) => setActiveTab(tabId as Tab)}
           >
             {availableTabs.length > 1 && (
-              <div className="hidden lg:block mb-5 sm:mb-6">
+              <div className="hidden md:block mb-5 sm:mb-6">
                 <AppTabs
                   tabs={availableTabs}
                   activeTab={activeTab}
