@@ -244,11 +244,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
   };
 
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="flex flex-col @md:flex-row gap-3 items-center justify-between">
         {/* Search */}
-        <div className="relative w-full md:max-w-xs">
+        <div className="relative w-full @md:max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground/60 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -260,7 +260,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
         </div>
 
         {/* Account Tabs and Sector Toggle */}
-        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-4 w-full @md:w-auto justify-between @md:justify-end">
           {/* Segmented Account Filter */}
           {accountsWithHoldings.length > 0 && (
             <div className="flex border-b border-border/60 gap-5 max-w-full overflow-x-auto scrollbar-none pb-0.5 -mb-px">
@@ -301,9 +301,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
         </div>
       </div>
 
-      {/* Table Container */}
-      {/* Table Container (Desktop Only) */}
-      <div className="hidden md:block overflow-x-auto border border-border/40 rounded-xl bg-card">
+      {/* Table Container (Container >= 640px / @md) */}
+      <div className="hidden @md:block overflow-x-auto border border-border/40 rounded-xl bg-card">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="bg-muted/15 border-b border-border/40 text-muted-foreground/80">
@@ -517,8 +516,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
         </table>
       </div>
 
-      {/* Accordion / List Card View (Mobile Only) */}
-      <div className="block md:hidden space-y-2.5">
+      {/* Accordion / List Card View (Container < 640px / @md:hidden) */}
+      <div className="block @md:hidden space-y-2.5">
         {sortedHoldings.length > 0 ? (
           sortedHoldings.map((h, idx) => {
             const rowId = `${h.accountId}-${h.securityId}-${idx}`;

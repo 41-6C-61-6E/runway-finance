@@ -94,7 +94,7 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
         style={{ 
           '--sidebar-margin-left': desktopMarginLeft 
         } as React.CSSProperties} 
-        className="transition-all duration-200 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
+        className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
       >
         <SwipeNavProvider>
           <PullToRefresh>

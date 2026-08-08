@@ -111,7 +111,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     
     hoverEnterTimeoutRef.current = setTimeout(() => {
       setIsHovering(true);
-    }, 1000);
+    }, 1500);
   }, []);
 
   const handleMouseLeave = useCallback(() => {

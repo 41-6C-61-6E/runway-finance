@@ -51,7 +51,7 @@ export default function AccountRow({
       className="flex items-center justify-between py-1 pl-6 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
       onClick={() => router.push(`/accounts?accountId=${account.id}`)}
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
         <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
         {account.syncStatus && account.syncStatus.status !== 'ok' && (
           <Tooltip>
@@ -94,10 +94,10 @@ export default function AccountRow({
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         <button
           onClick={(e) => { e.stopPropagation(); onOpenDrawer(account); }}
-          className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors opacity-0 group-hover/account:opacity-100 cursor-pointer"
+          className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-opacity duration-150 opacity-0 group-hover/account:opacity-100 cursor-pointer"
           title="Edit account"
         >
           <Pencil className="w-3.5 h-3.5" />

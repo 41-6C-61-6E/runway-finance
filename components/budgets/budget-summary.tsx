@@ -150,7 +150,7 @@ export function BudgetSummary() {
   const overPct = totalCatCount > 0 ? (overBudgetCount / totalCatCount) * 100 : 0;
 
   return (
-    <Card className="overflow-hidden border border-border/70 shadow-sm bg-card">
+    <Card className="@container overflow-hidden border border-border/70 shadow-sm bg-card">
       <CollapsibleCardHeader
         isCollapsed={collapsed}
         onToggle={setCollapsed}
