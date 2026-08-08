@@ -18,6 +18,8 @@ import {
   ArrowDownRight,
   Info,
   HelpCircle,
+  Droplets,
+  Flag,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -45,6 +47,48 @@ interface InvestmentHistoryResponse {
     change: number;
     percentChange: number;
   };
+};
+
+
+const LIQUID_TYPES = new Set([
+  'checking', 'savings', 'hsachecking', 'investment', 'brokerage',
+  'otherinvestment', 'otherInvestment', 'crypto', 'metals',
+]);
+
+const MILESTONE_TIERS = [
+  0, 10_000, 25_000, 50_000, 75_000, 100_000, 150_000, 200_000, 250_000,
+  500_000, 750_000, 1_000_000, 1_500_000, 2_000_000, 2_500_000, 5_000_000, 10_000_000,
+];
+
+function formatMilestone(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+function getNextMilestone(netWorth: number) {
+  if (netWorth < 0) {
+    return { previous: netWorth, next: 0, label: '$0', previousLabel: formatMilestone(0) };
+  }
+  for (let i = 0; i < MILESTONE_TIERS.length; i++) {
+    if (netWorth < MILESTONE_TIERS[i]) {
+      return {
+        previous: i > 0 ? MILESTONE_TIERS[i - 1] : 0,
+        next: MILESTONE_TIERS[i],
+        label: formatMilestone(MILESTONE_TIERS[i]),
+        previousLabel: formatMilestone(i > 0 ? MILESTONE_TIERS[i - 1] : 0),
+      };
+    }
+  }
+  // Beyond all tiers — round up to next $10M
+  const nextTen = Math.ceil(netWorth / 10_000_000) * 10_000_000;
+  const target = nextTen === netWorth ? nextTen + 10_000_000 : nextTen;
+  return {
+    previous: MILESTONE_TIERS[MILESTONE_TIERS.length - 1],
+    next: target,
+    label: formatMilestone(target),
+    previousLabel: formatMilestone(MILESTONE_TIERS[MILESTONE_TIERS.length - 1]),
+  };
 }
 
 const RATING_THRESHOLDS = [
@@ -68,6 +112,7 @@ export function NetWorthSidePanel() {
   const [investmentData, setInvestmentData] = useState<InvestmentHistoryPoint[]>([]);
   const [investmentSummary, setInvestmentSummary] = useState<InvestmentHistoryResponse['summary'] | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +141,7 @@ export function NetWorthSidePanel() {
           setInvestmentData(investResponse.data || []);
           setInvestmentSummary(investResponse.summary || null);
         }
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -187,6 +233,40 @@ export function NetWorthSidePanel() {
       liabilityPct: (totals.totalLiabilities / sum) * 100,
     };
   }, [totals.totalAssets, totals.totalLiabilities]);
+
+  // Liquid vs Illiquid calculation
+  const liquidity = useMemo(() => {
+    let liquid = 0;
+    let illiquid = 0;
+    for (const acc of accounts) {
+      if (!isAssetAccount(acc.type)) continue;
+      const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+      if (LIQUID_TYPES.has(acc.type)) {
+        liquid += balance;
+      } else {
+        illiquid += balance;
+      }
+    }
+    const total = liquid + illiquid;
+    return {
+      liquid,
+      illiquid,
+      total,
+      liquidPct: total > 0 ? (liquid / total) * 100 : 0,
+      illiquidPct: total > 0 ? (illiquid / total) * 100 : 0,
+    };
+  }, [accounts]);
+
+
+  // Net Worth Milestone
+  const milestone = useMemo(() => {
+    const nw = totals.netWorth;
+    const ms = getNextMilestone(nw);
+    const range = ms.next - ms.previous;
+    const progress = range > 0 ? Math.max(0, Math.min(((nw - ms.previous) / range) * 100, 100)) : 0;
+    const remaining = ms.next - nw;
+    return { ...ms, progress, remaining, netWorth: nw };
+  }, [totals.netWorth]);
 
   if (loading) {
     return (
@@ -371,6 +451,106 @@ export function NetWorthSidePanel() {
                       <span>0%</span>
                       <span>50%</span>
                       <span>100%</span>
+                    </div>
+                  </div>
+                </div>
+              </ChartHoverTooltip>
+
+              {/* Liquid vs Illiquid Assets */}
+              {liquidity.total > 0 && (
+                <ChartHoverTooltip
+                  content={
+                    <>
+                      <TooltipHeader>Liquid vs. Illiquid Assets</TooltipHeader>
+                      <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${liquidity.liquidPct.toFixed(1)}%)`} color="var(--color-chart-2)" />
+                      <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${liquidity.illiquidPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
+                      <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
+                        <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
+                        <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
+                        <div className="text-[10px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
+                      </div>
+                    </>
+                  }
+                >
+                  <div className="space-y-2 cursor-help p-3.5 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-foreground flex items-center gap-1">
+                        <Droplets className="w-3.5 h-3.5 text-chart-2" />
+                        Liquid vs. Illiquid
+                        <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                      </span>
+                      <span className="text-muted-foreground font-mono text-[11px]">
+                        {liquidity.liquidPct.toFixed(1)}% / {liquidity.illiquidPct.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                      <div
+                        className="h-full bg-chart-2 transition-all duration-500 rounded-l-full"
+                        style={{ width: `${liquidity.liquidPct}%` }}
+                      />
+                      <div
+                        className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
+                        style={{ width: `${liquidity.illiquidPct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
+                      <span>Liquid: {liquidity.liquidPct.toFixed(1)}%</span>
+                      <span>Illiquid: {liquidity.illiquidPct.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </ChartHoverTooltip>
+              )}
+
+
+              {/* Net Worth Milestone Tracker */}
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Net Worth Milestone</TooltipHeader>
+                    <TooltipRow label="Current Net Worth" value={formatCurrency(milestone.netWorth)} color="var(--color-chart-1)" />
+                    <TooltipRow label="Previous Milestone" value={milestone.previousLabel} color="var(--color-muted-foreground)" />
+                    <TooltipRow label="Next Milestone" value={milestone.label} color="var(--color-primary)" />
+                    <div className="mt-2 border-t border-border/40 pt-1.5">
+                      <TooltipRow label="Remaining" value={formatCurrency(milestone.remaining)} color="var(--color-chart-5)" />
+                      <TooltipRow label="Progress" value={`${milestone.progress.toFixed(1)}%`} color="var(--color-primary)" />
+                    </div>
+                  </>
+                }
+              >
+                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-1.5">
+                    <Flag className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                      Next Milestone
+                      <Info className="w-3 h-3 text-muted-foreground/60" />
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-black text-foreground font-mono">
+                        {milestone.label}
+                      </span>
+                      <span className={cn(
+                        'inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono',
+                        'bg-primary/10 text-primary border-primary/20'
+                      )}>
+                        {milestone.progress.toFixed(0)}%
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-muted-foreground blur-number">
+                      {formatCurrency(milestone.remaining)} to go
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-500 rounded-full"
+                        style={{ width: `${milestone.progress}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                      <span>{milestone.previousLabel}</span>
+                      <span>{milestone.label}</span>
                     </div>
                   </div>
                 </div>

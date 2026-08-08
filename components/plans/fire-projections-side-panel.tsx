@@ -20,8 +20,14 @@ import {
   TrendingUp,
   DollarSign,
   Zap,
+  Compass,
+  Layers,
+  PieChart,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
+import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
 interface Milestone {
   age: number;
@@ -76,6 +82,43 @@ export function FireProjectionsSidePanel({
     if (method === 'proportional') return 'Proportional Drawdown';
     if (method === 'custom_order') return 'Custom Priority Order';
     return 'Textbook Waterfall (Cash → Taxable → Trad → Roth)';
+  }, [plan]);
+
+  // Coast FIRE Calculation (Metric 3.1)
+  const coastFireInfo = useMemo(() => {
+    const currentAge = plan?.currentAge || plan?.settings?.currentAge || 40;
+    const yearsToRetire = Math.max(1, localRetirementAge - currentAge);
+    const nominalReturn = plan?.settings?.investmentReturn ?? plan?.settings?.expectedReturn ?? 7;
+    const inflation = plan?.settings?.inflationRate ?? 2.5;
+    const realReturnRate = Math.max(1, nominalReturn - inflation); // e.g. 4.5%
+    const coastTarget = fireNumber > 0 ? fireNumber / Math.pow(1 + realReturnRate / 100, yearsToRetire) : 0;
+    const progress = coastTarget > 0 ? Math.min(100, (currentNetWorth / coastTarget) * 100) : 0;
+    const isReached = currentNetWorth >= coastTarget && coastTarget > 0;
+
+    return {
+      currentAge,
+      yearsToRetire,
+      realReturnRate,
+      coastTarget,
+      progress,
+      isReached,
+    };
+  }, [plan, localRetirementAge, fireNumber, currentNetWorth]);
+
+  // Asset Allocation Glidepath Preview (Metric 3.3)
+  const glidepathInfo = useMemo(() => {
+    const currentEquityPct = plan?.settings?.currentEquityPct ?? 75;
+    const currentFixedPct = plan?.settings?.currentFixedPct ?? 15;
+    const currentCashPct = Math.max(0, 100 - currentEquityPct - currentFixedPct);
+
+    const targetEquityPct = plan?.settings?.targetEquityPct ?? 60;
+    const targetFixedPct = plan?.settings?.targetFixedPct ?? 30;
+    const targetCashPct = Math.max(0, 100 - targetEquityPct - targetFixedPct);
+
+    return {
+      current: { equity: currentEquityPct, fixed: currentFixedPct, cash: currentCashPct },
+      target: { equity: targetEquityPct, fixed: targetFixedPct, cash: targetCashPct },
+    };
   }, [plan]);
 
   // Semi-circle gauge SVG parameters
@@ -221,6 +264,115 @@ export function FireProjectionsSidePanel({
                 </span>
               </div>
             </div>
+
+            {/* Metric 3.1: Coast FIRE Progress Tracker Card */}
+            {coastFireInfo.coastTarget > 0 && (
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Coast FIRE Analysis</TooltipHeader>
+                    <TooltipRow label="Coast FI Target Today" value={formatCurrency(coastFireInfo.coastTarget)} color="var(--color-primary)" />
+                    <TooltipRow label="Current Net Worth" value={formatCurrency(currentNetWorth)} color="var(--color-chart-1)" />
+                    <TooltipRow label="Assumed Real Return" value={`${coastFireInfo.realReturnRate.toFixed(1)}%/yr`} color="var(--color-chart-2)" />
+                    <div className="mt-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
+                      No further contributions needed if net worth ≥ Coast target.
+                    </div>
+                  </>
+                }
+              >
+                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                        Coast FIRE Goal
+                        <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        'text-[10px] font-bold px-2 py-0.5 rounded-full border font-mono',
+                        coastFireInfo.isReached
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          : 'bg-primary/10 text-primary border-primary/20'
+                      )}
+                    >
+                      {coastFireInfo.isReached ? 'Coast FI Reached!' : `${coastFireInfo.progress.toFixed(0)}%`}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between text-xs font-mono">
+                    <span className="text-muted-foreground blur-number font-medium">
+                      Target Today: {formatCurrency(coastFireInfo.coastTarget)}
+                    </span>
+                    <span className="text-muted-foreground text-[10px]">
+                      Age {coastFireInfo.currentAge} → {localRetirementAge}
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-500 rounded-full',
+                        coastFireInfo.isReached ? 'bg-emerald-500' : 'bg-cyan-500'
+                      )}
+                      style={{ width: `${coastFireInfo.progress}%` }}
+                    />
+                  </div>
+                </div>
+              </ChartHoverTooltip>
+            )}
+
+            {/* Metric 3.3: Asset Allocation & Glidepath Preview Card */}
+            <ChartHoverTooltip
+              content={
+                <>
+                  <TooltipHeader>Asset Allocation & Retirement Glidepath</TooltipHeader>
+                  <TooltipRow label="Current Equities" value={`${glidepathInfo.current.equity}%`} color="var(--color-chart-1)" />
+                  <TooltipRow label="Current Fixed Income" value={`${glidepathInfo.current.fixed}%`} color="var(--color-chart-2)" />
+                  <TooltipRow label="Current Cash" value={`${glidepathInfo.current.cash}%`} color="var(--color-chart-5)" />
+                  <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px]">
+                    <div className="font-semibold text-foreground">Target at Retirement:</div>
+                    <TooltipRow label="Target Equities" value={`${glidepathInfo.target.equity}%`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Target Fixed Income" value={`${glidepathInfo.target.fixed}%`} color="var(--color-chart-2)" />
+                    <TooltipRow label="Target Cash" value={`${glidepathInfo.target.cash}%`} color="var(--color-chart-5)" />
+                  </div>
+                </>
+              }
+            >
+              <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1">
+                    <PieChart className="w-3.5 h-3.5 text-primary" />
+                    Glidepath Asset Mix
+                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                  </span>
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    Now vs. Retirement
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                      <span>Current ({glidepathInfo.current.equity}% / {glidepathInfo.current.fixed}% / {glidepathInfo.current.cash}%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                      <div className="h-full bg-chart-1" style={{ width: `${glidepathInfo.current.equity}%` }} />
+                      <div className="h-full bg-chart-2" style={{ width: `${glidepathInfo.current.fixed}%` }} />
+                      <div className="h-full bg-chart-5" style={{ width: `${glidepathInfo.current.cash}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                      <span>Target ({glidepathInfo.target.equity}% / {glidepathInfo.target.fixed}% / {glidepathInfo.target.cash}%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                      <div className="h-full bg-chart-1 opacity-70" style={{ width: `${glidepathInfo.target.equity}%` }} />
+                      <div className="h-full bg-chart-2 opacity-70" style={{ width: `${glidepathInfo.target.fixed}%` }} />
+                      <div className="h-full bg-chart-5 opacity-70" style={{ width: `${glidepathInfo.target.cash}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ChartHoverTooltip>
 
             {/* Upcoming Milestones Vertical Stepper */}
             {milestoneCallouts.length > 0 && (

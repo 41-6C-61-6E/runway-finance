@@ -113,6 +113,7 @@ export async function POST() {
           categoryType: group.categoryType ?? 'standard',
           isSystem: true,
           excludeFromReports: group.excludeFromReports ?? false,
+          isDiscretionary: group.isDiscretionary ?? true,
           displayOrder: order++,
         })
         .returning();
@@ -135,6 +136,7 @@ export async function POST() {
             categoryType: group.categoryType ?? 'standard',
             isSystem: true,
             excludeFromReports: child.excludeFromReports ?? false,
+            isDiscretionary: child.isDiscretionary ?? group.isDiscretionary ?? true,
             displayOrder: order++,
           });
           createdCount++;
