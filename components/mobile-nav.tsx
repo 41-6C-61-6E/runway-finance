@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
+import { useMobileSubNav } from '@/components/mobile-subnav-context';
 
 interface NavItem {
   id: string;
@@ -58,6 +59,9 @@ export function MobileNav() {
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
+
+  const { tabs, activeTabId, selectTab } = useMobileSubNav();
+  const hasSubNav = tabs.length > 0;
 
   // Custom home items (minimized bottom nav items)
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'cash-flow']);
@@ -379,43 +383,76 @@ export function MobileNav() {
       ` }} />
 
       <nav
-        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/35 backdrop-blur-2xl border border-sidebar-border/25 flex items-center justify-around py-2 px-4 md:hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-full transition-colors duration-300 max-w-lg mx-auto"
+        className={`fixed bottom-2 left-4 right-4 z-40 bg-sidebar/55 backdrop-blur-md border border-sidebar-border/25 flex flex-col items-center md:hidden shadow-xl transition-all duration-300 max-w-lg mx-auto overflow-hidden ${
+          hasSubNav ? 'rounded-[1.75rem] p-2 gap-2' : 'rounded-full py-2 px-4'
+        }`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
       >
-        {activeHomeNavItems.map((item) => {
-          const Icon = item.icon;
-          const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+        {/* Top Tier: Flush Segmented Sub-View Navigation Tabs */}
+        {hasSubNav && (
+          <div className="w-full flex items-center justify-center gap-1 p-1 bg-sidebar-foreground/6 rounded-full select-none">
+            {tabs.map((tab) => {
+              const isActiveTab = tab.id === activeTabId;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isActiveTab) {
+                      haptic.light();
+                      selectTab(tab.id);
+                    }
+                  }}
+                  className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-full transition-all duration-200 text-center cursor-pointer select-none ${
+                    isActiveTab
+                      ? 'text-primary bg-primary/20 shadow-xs'
+                      : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8'
+                  }`}
+                >
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setPendingHref(item.href)}
-              onTouchStart={() => {}}
-              className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group border ${
-                active
-                  ? 'text-primary bg-primary/20 border-primary/25 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.15),0_1.5px_3px_rgba(0,0,0,0.1)] font-semibold'
-                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5 border-transparent'
-              }`}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-            </Link>
-          );
-        })}
+        {/* Bottom Tier: Main App Navigation Items */}
+        <div className="w-full flex items-center justify-around">
+          {activeHomeNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
-        {/* Hamburger Menu Toggle Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group border ${
-            isOpen
-              ? 'text-primary bg-primary/20 border-primary/25 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.15),0_1.5px_3px_rgba(0,0,0,0.1)] font-semibold'
-              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/5 border-transparent'
-          }`}
-        >
-          {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-        </button>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setPendingHref(item.href)}
+                onTouchStart={() => {}}
+                className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group ${
+                  active
+                    ? 'text-primary bg-primary/20 font-semibold shadow-xs'
+                    : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
+                }`}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+              </Link>
+            );
+          })}
+
+          {/* Hamburger Menu Toggle Button */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group ${
+              isOpen
+                ? 'text-primary bg-primary/20 font-semibold shadow-xs'
+                : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
+            }`}
+          >
+            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+          </button>
+        </div>
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}

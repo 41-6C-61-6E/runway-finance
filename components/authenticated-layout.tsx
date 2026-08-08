@@ -16,6 +16,8 @@ import { PullToRefresh } from '@/components/pull-to-refresh';
 import { OfflineBanner } from '@/components/offline-banner';
 import { ReactNode, useState, useEffect } from 'react';
 
+import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
+
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -60,14 +62,14 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
         <PrivacyModeProvider>
           <ReduceTransparencyProvider>
           <AccountSubheadingsProvider>
-            <>
+            <MobileSubNavProvider>
               <ResizableSidebar />
               {!hideAccountsSidebar && <AccountsSidebar />}
               <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
                 {children}
               </AuthenticatedLayoutContent>
               <MobileNav />
-            </>
+            </MobileSubNavProvider>
           </AccountSubheadingsProvider>
           </ReduceTransparencyProvider>
         </PrivacyModeProvider>
