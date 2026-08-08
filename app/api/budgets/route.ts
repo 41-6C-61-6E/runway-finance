@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
 import { formatToCents } from '@/lib/services/account-history';
+import { ensureCategoryDiscretionaryColumn } from '@/lib/db/seed-categories';
 
 function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
   let start: Date;
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
   const db = getDb();
 
   try {
+    await ensureCategoryDiscretionaryColumn();
     const bounds = periodKey ? getPeriodBounds(periodType, periodKey, now) : getPeriodBounds(periodType, null, now);
 
     const budgetRows = await db
@@ -92,6 +94,7 @@ export async function GET(request: Request) {
         categoryColor: categories.color,
         isIncome: categories.isIncome,
         categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
       })
       .from(budgets)
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
@@ -126,7 +129,8 @@ export async function GET(request: Request) {
         name: categories.name, 
         color: categories.color, 
         parentId: categories.parentId, 
-        isIncome: categories.isIncome 
+        isIncome: categories.isIncome,
+        isDiscretionary: categories.isDiscretionary,
       })
       .from(categories)
       .where(eq(categories.userId, dataUserId));
@@ -273,6 +277,7 @@ export async function GET(request: Request) {
         color: c.color,
         isIncome: c.isIncome,
         parentId: c.parentId,
+        isDiscretionary: c.isDiscretionary,
       })));
     }
     return NextResponse.json(result);
@@ -334,6 +339,13 @@ export async function POST(request: Request) {
       notes: (body.notes as string) ?? null,
     }, dek);
 
+    if (typeof body.isDiscretionary === 'boolean') {
+      await db
+        .update(categories)
+        .set({ isDiscretionary: body.isDiscretionary })
+        .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
+    }
+
     const [budget] = await db
       .insert(budgets)
       .values(encryptedValues)
@@ -375,6 +387,14 @@ export async function PATCH(request: Request) {
 
   if (!existing) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
+  const targetCategoryId = (body.categoryId as string) || existing.categoryId;
+  if (typeof body.isDiscretionary === 'boolean' && targetCategoryId) {
+    await db
+      .update(categories)
+      .set({ isDiscretionary: body.isDiscretionary })
+      .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
   }
 
   let updateData: Record<string, unknown> = {};

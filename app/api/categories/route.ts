@@ -23,6 +23,7 @@ const CreateCategorySchema = z.object({
   displayOrder: z.number().int().default(0),
   categoryType: z.enum(['standard', 'compound', 'transfer']).default('standard'),
   expenseParentId: z.string().uuid().nullable().optional(),
+  isDiscretionary: z.boolean().default(true),
 });
 
 export async function GET() {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, parentId, color, isIncome, excludeFromReports, hideFromTransactions, displayOrder, categoryType, expenseParentId } = parsed.data;
+  const { name, parentId, color, isIncome, excludeFromReports, hideFromTransactions, displayOrder, categoryType, expenseParentId, isDiscretionary } = parsed.data;
 
   await mergeDuplicateCategories(dataUserId, dek);
 
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
     displayOrder,
     categoryType,
     expenseParentId: expenseParentId ?? null,
+    isDiscretionary: isDiscretionary ?? true,
   }, dek);
 
   const [cat] = await getDb()

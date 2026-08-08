@@ -12,6 +12,7 @@ interface Category {
   color?: string;
   isIncome?: boolean;
   parentId?: string | null;
+  isDiscretionary?: boolean;
 }
 
 interface Account {
@@ -29,6 +30,7 @@ interface BudgetFormData {
   fundingAccountId: string;
   rollover: boolean;
   notes: string;
+  isDiscretionary: boolean;
 }
 
 interface BudgetFormDialogProps {
@@ -46,6 +48,7 @@ interface BudgetFormDialogProps {
     fundingAccountId: string | null;
     rollover: boolean;
     notes: string | null;
+    isDiscretionary?: boolean;
   };
 }
 
@@ -61,6 +64,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     fundingAccountId: '',
     rollover: false,
     notes: '',
+    isDiscretionary: true,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -77,6 +81,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     fetchData();
 
     if (editBudget) {
+      const cat = categories.find((c) => c.id === editBudget.categoryId);
       setForm({
         categoryId: editBudget.categoryId,
         periodType: editBudget.periodType as PeriodType,
@@ -86,6 +91,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         fundingAccountId: editBudget.fundingAccountId ?? '',
         rollover: editBudget.rollover,
         notes: editBudget.notes ?? '',
+        isDiscretionary: editBudget.isDiscretionary ?? cat?.isDiscretionary ?? true,
       });
     } else {
       setForm({
@@ -97,6 +103,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         fundingAccountId: '',
         rollover: false,
         notes: '',
+        isDiscretionary: true,
       });
     }
     setError('');
@@ -124,6 +131,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         fundingAccountId: form.fundingAccountId || null,
         rollover: form.rollover,
         notes: form.notes || null,
+        isDiscretionary: form.isDiscretionary,
       };
 
       const url = editBudget ? `/api/budgets/${editBudget.id}` : '/api/budgets';
@@ -174,9 +182,40 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
             <CategoryCombobox
               categories={categories}
               value={form.categoryId}
-              onSelect={(id) => setForm((f) => ({ ...f, categoryId: id }))}
+              onSelect={(id) => {
+                const cat = categories.find((c) => c.id === id);
+                setForm((f) => ({
+                  ...f,
+                  categoryId: id,
+                  isDiscretionary: cat?.isDiscretionary !== undefined ? cat.isDiscretionary : f.isDiscretionary,
+                }));
+              }}
               disabled={saving}
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Expense Type</label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-lg border border-border/60">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isDiscretionary: false }))}
+                className={`py-1.5 px-3 text-xs font-bold rounded-md transition-all ${
+                  !form.isDiscretionary ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Fixed (Essential)
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isDiscretionary: true }))}
+                className={`py-1.5 px-3 text-xs font-bold rounded-md transition-all ${
+                  form.isDiscretionary ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Discretionary
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

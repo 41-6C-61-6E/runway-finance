@@ -27,6 +27,7 @@ export const categories = pgTable('categories', {
   displayOrder: integer('display_order').notNull().default(0),
   createdByAi: boolean('created_by_ai').notNull().default(false),
   hideFromTransactions: boolean('hide_from_transactions').notNull().default(false),
+  isDiscretionary: boolean('is_discretionary').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

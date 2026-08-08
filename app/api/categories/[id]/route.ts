@@ -24,6 +24,7 @@ const UpdateCategorySchema = z.object({
   displayOrder: z.number().int().optional(),
   categoryType: z.enum(['standard', 'compound', 'transfer']).optional(),
   expenseParentId: z.string().uuid().nullable().optional(),
+  isDiscretionary: z.boolean().optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
