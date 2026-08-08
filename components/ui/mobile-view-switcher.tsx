@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useRef, type ReactNode } from 'react';
+import React, { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { useMobileSubNav } from '@/components/mobile-subnav-context';
 
 interface MobileViewSwitcherProps {
   main: ReactNode;
@@ -11,6 +12,7 @@ interface MobileViewSwitcherProps {
   summaryLabel?: string;
   className?: string;
   desktopHeader?: ReactNode;
+  desktopLayout?: 'grid' | 'stacked';
 }
 
 export function MobileViewSwitcher({
@@ -20,12 +22,30 @@ export function MobileViewSwitcher({
   summaryLabel = 'Summary',
   className = '',
   desktopHeader,
+  desktopLayout = 'grid',
 }: MobileViewSwitcherProps) {
   const [activeTab, setActiveTab] = useState<'main' | 'summary'>('main');
+  const { registerSubNav, unregisterSubNav } = useMobileSubNav();
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+
+  const subNavTabs = useMemo(() => [
+    { id: 'main', label: mainLabel },
+    { id: 'summary', label: summaryLabel },
+  ], [mainLabel, summaryLabel]);
+
+  useEffect(() => {
+    registerSubNav(subNavTabs, activeTab, (id) => {
+      if (id === 'main' || id === 'summary') {
+        setActiveTab(id);
+      }
+    });
+    return () => {
+      unregisterSubNav();
+    };
+  }, [subNavTabs, activeTab, registerSubNav, unregisterSubNav]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
@@ -83,78 +103,24 @@ export function MobileViewSwitcher({
 
   return (
     <div className={cn("w-full", className)}>
-      {/* ── Desktop View (lg and up): Desktop Header + Classic 2/3 + 1/3 Side-by-Side Grid ── */}
+      {/* ── Desktop View (lg and up): Choice of Grid or Stacked Layout ── */}
       <div className="hidden lg:block space-y-6">
         {desktopHeader}
-        <div className="grid grid-cols-3 gap-6 items-start">
-          <div className="col-span-2 space-y-6">{main}</div>
-          <div className="col-span-1 sticky top-6">{summary}</div>
-        </div>
+        {desktopLayout === 'stacked' ? (
+          <div className="space-y-6">
+            {main}
+            {summary}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-6 items-start">
+            <div className="col-span-2 space-y-6">{main}</div>
+            <div className="col-span-1 sticky top-6">{summary}</div>
+          </div>
+        )}
       </div>
 
-      {/* ── Mobile View (< lg): Native Swipe Guidance Indicators & Swipe Container ── */}
-      <div className="lg:hidden w-full flex flex-col gap-3">
-        {/* Centered Mobile Swipe Guidance Bar (Dots + Text Labels) */}
-        <div className="flex items-center justify-center gap-5 py-1 px-2 select-none">
-          {/* Main View Indicator */}
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTab !== 'main') {
-                haptic.light();
-                setActiveTab('main');
-              }
-            }}
-            className={cn(
-              "flex items-center gap-1.5 text-xs transition-all duration-200 cursor-pointer min-touch-target-inline",
-              activeTab === 'main'
-                ? "font-bold text-foreground scale-105"
-                : "font-medium text-muted-foreground/50 hover:text-muted-foreground"
-            )}
-          >
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full transition-all duration-200 shrink-0",
-                activeTab === 'main'
-                  ? "bg-primary shadow-xs shadow-primary/50 scale-125"
-                  : "bg-muted-foreground/30"
-              )}
-            />
-            <span>{mainLabel}</span>
-          </button>
-
-          {/* Divider dot */}
-          <span className="text-muted-foreground/20 text-[10px] select-none">•</span>
-
-          {/* Summary View Indicator */}
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTab !== 'summary') {
-                haptic.light();
-                setActiveTab('summary');
-              }
-            }}
-            className={cn(
-              "flex items-center gap-1.5 text-xs transition-all duration-200 cursor-pointer min-touch-target-inline",
-              activeTab === 'summary'
-                ? "font-bold text-foreground scale-105"
-                : "font-medium text-muted-foreground/50 hover:text-muted-foreground"
-            )}
-          >
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full transition-all duration-200 shrink-0",
-                activeTab === 'summary'
-                  ? "bg-primary shadow-xs shadow-primary/50 scale-125"
-                  : "bg-muted-foreground/30"
-              )}
-            />
-            <span>{summaryLabel}</span>
-          </button>
-        </div>
-
-        {/* Swipeable View Container */}
+      {/* ── Mobile View (< lg): Swipeable View Container ── */}
+      <div className="lg:hidden w-full flex flex-col">
         <div
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -197,11 +163,22 @@ export function MobileTabSwipeContainer({
   className = '',
   desktopHeader,
 }: MobileTabSwipeContainerProps) {
+  const { registerSubNav, unregisterSubNav } = useMobileSubNav();
+
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
   const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
+
+  useEffect(() => {
+    registerSubNav(tabs, activeTabId, (id) => {
+      onTabChange(id);
+    });
+    return () => {
+      unregisterSubNav();
+    };
+  }, [tabs, activeTabId, onTabChange, registerSubNav, unregisterSubNav]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
@@ -259,43 +236,7 @@ export function MobileTabSwipeContainer({
   return (
     <div className={cn("w-full space-y-4", className)}>
       {desktopHeader && <div className="hidden lg:block">{desktopHeader}</div>}
-      {/* Centered Mobile Swipe Guidance Bar for Sub-tabs (< lg) */}
-      <div className="lg:hidden flex items-center justify-center gap-3 py-1 px-2 select-none flex-wrap">
-        {tabs.map((tab, idx) => {
-          const isActive = tab.id === activeTabId;
-          return (
-            <React.Fragment key={tab.id}>
-              {idx > 0 && <span className="text-muted-foreground/20 text-[10px] select-none">•</span>}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isActive) {
-                    haptic.light();
-                    onTabChange(tab.id);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 text-xs transition-all duration-200 cursor-pointer min-touch-target-inline",
-                  isActive
-                    ? "font-bold text-foreground scale-105"
-                    : "font-medium text-muted-foreground/50 hover:text-muted-foreground"
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-2 h-2 rounded-full transition-all duration-200 shrink-0",
-                    isActive
-                      ? "bg-primary shadow-xs shadow-primary/50 scale-125"
-                      : "bg-muted-foreground/30"
-                  )}
-                />
-                <span>{tab.label}</span>
-              </button>
-            </React.Fragment>
-          );
-        })}
-      </div>
-
+      
       {/* Touch Swipe Container */}
       <div
         onTouchStart={handleTouchStart}

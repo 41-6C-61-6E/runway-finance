@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -1395,8 +1396,12 @@ function AccountsContent() {
       <PageHeader title="Accounts" icon={Landmark} />
 
       <PageContent maxWidth="max-w-7xl" className="space-y-5 sm:space-y-6">
-        <>
-            {/* ── Graphics / Chart Card ── */}
+        <MobileViewSwitcher
+          mainLabel="Chart"
+          summaryLabel="List"
+          desktopLayout="stacked"
+          main={
+            /* ── Graphics / Chart Card ── */
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
               <CollapsibleCardHeader
                 isCollapsed={isCollapsed}
@@ -2184,8 +2189,9 @@ function AccountsContent() {
               </>
             )}
           </Card>
-
-            {/* ── Expandable Accounts Tree View ── */}
+          }
+          summary={
+            /* ── Expandable Accounts Tree View ── */
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
               <CollapsibleCardHeader
                 isCollapsed={hierarchyCollapsed}
@@ -3002,7 +3008,8 @@ function AccountsContent() {
                 </>
                 )}
             </Card>
-          </>
+          }
+        />
       </PageContent>
 
     </div>

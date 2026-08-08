@@ -81,6 +81,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
           </div>
         )}
         <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
+        <SettingsDropdown onOpenChange={setIsSettingsOpen} />
         <UserDropdown onOpenChange={setIsUserOpen} />
       </div>
 
