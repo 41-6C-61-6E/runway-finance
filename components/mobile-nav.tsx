@@ -23,6 +23,8 @@ import {
   Flame,
   Settings,
   Bug,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
@@ -60,8 +62,49 @@ export function MobileNav() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
 
-  const { tabs, activeTabId, selectTab } = useMobileSubNav();
+  const { tabs, activeTabId, selectTab, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
   const hasSubNav = tabs.length > 0;
+
+  // Scroll detection state for floating subnav smart auto-dimming
+  const [isScrollingDown, setIsScrollingDown] = useState(false);
+  const lastScrollYRef = useRef(0);
+  const subNavTouchStartXRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollYRef.current + 15 && currentScrollY > 60) {
+        setIsScrollingDown(true);
+      } else if (currentScrollY < lastScrollYRef.current - 15 || currentScrollY < 30) {
+        setIsScrollingDown(false);
+      }
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleSubNavTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      subNavTouchStartXRef.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleSubNavTouchEnd = (e: React.TouchEvent) => {
+    if (subNavTouchStartXRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchEndX - subNavTouchStartXRef.current;
+    subNavTouchStartXRef.current = null;
+
+    if (deltaX < -35) {
+      haptic.light();
+      nextTab();
+    } else if (deltaX > 35) {
+      haptic.light();
+      prevTab();
+    }
+  };
 
   // Custom home items (minimized bottom nav items)
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'cash-flow']);
@@ -382,77 +425,97 @@ export function MobileNav() {
         }
       ` }} />
 
+      {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
+      {hasSubNav && !isOpen && (
+        <div
+          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
+            isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
+          }`}
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 68px)',
+          }}
+        >
+          <div
+            onTouchStart={handleSubNavTouchStart}
+            onTouchEnd={handleSubNavTouchEnd}
+            className="pointer-events-auto flex items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg transition-all duration-300 max-w-[92vw] select-none"
+          >
+            {/* SubNav Tabs with Page Dots */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 px-1">
+              {tabs.map((tab) => {
+                const isActiveTab = tab.id === activeTabId;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      if (!isActiveTab) {
+                        haptic.light();
+                        selectTab(tab.id);
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 py-1 px-2.5 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
+                      isActiveTab
+                        ? 'text-primary font-semibold'
+                        : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
+                    }`}
+                  >
+                    {/* Page Indicator Dot */}
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
+                        isActiveTab
+                          ? 'bg-primary scale-110 shadow-[0_0_6px_rgba(var(--primary-rgb),0.7)]'
+                          : 'bg-sidebar-foreground/30 scale-90'
+                      }`}
+                    />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-        className={`fixed bottom-2 left-4 right-4 z-40 bg-sidebar/55 backdrop-blur-md border border-sidebar-border/25 flex flex-col items-center md:hidden shadow-xl transition-all duration-300 max-w-lg mx-auto overflow-hidden ${
-          hasSubNav ? 'rounded-[1.75rem] p-2 gap-2' : 'rounded-full py-2 px-4'
-        }`}
+        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/55 backdrop-blur-md border border-sidebar-border/25 flex items-center justify-around md:hidden shadow-xl transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden"
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
       >
-        {/* Top Tier: Flush Segmented Sub-View Navigation Tabs */}
-        {hasSubNav && (
-          <div className="w-full flex items-center justify-center gap-1 p-1 bg-sidebar-foreground/6 rounded-full select-none">
-            {tabs.map((tab) => {
-              const isActiveTab = tab.id === activeTabId;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isActiveTab) {
-                      haptic.light();
-                      selectTab(tab.id);
-                    }
-                  }}
-                  className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-full transition-all duration-200 text-center cursor-pointer select-none ${
-                    isActiveTab
-                      ? 'text-primary bg-primary/20 shadow-xs'
-                      : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8'
-                  }`}
-                >
-                  <span className="truncate">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {activeHomeNavItems.map((item) => {
+          const Icon = item.icon;
+          const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
-        {/* Bottom Tier: Main App Navigation Items */}
-        <div className="w-full flex items-center justify-around">
-          {activeHomeNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setPendingHref(item.href)}
+              onTouchStart={() => {}}
+              className={`flex flex-col items-center justify-center p-2.5 rounded-full transition-all duration-200 active:scale-95 group ${
+                active
+                  ? 'text-primary bg-primary/20 font-semibold shadow-xs'
+                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
+              }`}
+            >
+              <Icon className="h-5 w-5 flex-shrink-0" />
+            </Link>
+          );
+        })}
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setPendingHref(item.href)}
-                onTouchStart={() => {}}
-                className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group ${
-                  active
-                    ? 'text-primary bg-primary/20 font-semibold shadow-xs'
-                    : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-              </Link>
-            );
-          })}
-
-          {/* Hamburger Menu Toggle Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className={`flex flex-col items-center justify-center p-3 rounded-full transition-all duration-200 active:scale-95 group ${
-              isOpen
-                ? 'text-primary bg-primary/20 font-semibold shadow-xs'
-                : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
-            }`}
-          >
-            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-          </button>
-        </div>
+        {/* Hamburger Menu Toggle Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`flex flex-col items-center justify-center p-2.5 rounded-full transition-all duration-200 active:scale-95 group ${
+            isOpen
+              ? 'text-primary bg-primary/20 font-semibold shadow-xs'
+              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
+          }`}
+        >
+          {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+        </button>
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}

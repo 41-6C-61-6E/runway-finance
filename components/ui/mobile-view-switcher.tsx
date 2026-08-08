@@ -86,15 +86,15 @@ export function MobileViewSwitcher({
     startXRef.current = null;
     startYRef.current = null;
 
-    if (duration > 350 || Math.abs(dY) > 50 || Math.abs(dX) < 70) {
+    if (duration > 400 || Math.abs(dY) > 60 || Math.abs(dX) < 50) {
       return;
     }
 
-    if (dX < -70 && activeTab === 'main') {
+    if (dX < -50 && activeTab === 'main') {
       // Swipe Left -> switch to Summary
       haptic.light();
       setActiveTab('summary');
-    } else if (dX > 70 && activeTab === 'summary') {
+    } else if (dX > 50 && activeTab === 'summary') {
       // Swipe Right -> switch to Main
       haptic.light();
       setActiveTab('main');
@@ -218,15 +218,15 @@ export function MobileTabSwipeContainer({
     startXRef.current = null;
     startYRef.current = null;
 
-    if (duration > 350 || Math.abs(dY) > 50 || Math.abs(dX) < 70) {
+    if (duration > 400 || Math.abs(dY) > 60 || Math.abs(dX) < 50) {
       return;
     }
 
-    if (dX < -70 && currentIndex !== -1 && currentIndex < tabs.length - 1) {
+    if (dX < -50 && currentIndex !== -1 && currentIndex < tabs.length - 1) {
       // Swipe Left -> next sub-tab
       haptic.light();
       onTabChange(tabs[currentIndex + 1].id);
-    } else if (dX > 70 && currentIndex > 0) {
+    } else if (dX > 50 && currentIndex > 0) {
       // Swipe Right -> previous sub-tab
       haptic.light();
       onTabChange(tabs[currentIndex - 1].id);
