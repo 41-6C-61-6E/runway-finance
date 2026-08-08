@@ -83,11 +83,11 @@ export default function ResizableSidebar() {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="fixed left-0 top-0 z-45 h-screen flex flex-col justify-between transition-all duration-200 hidden md:flex"
+        className="fixed left-0 top-0 z-45 h-screen flex flex-col justify-between transition-all duration-300 hidden md:flex"
         style={{ width: `${sidebarWidth}px` }}
       >
         {/* Dynamic Sidebar Background Panel */}
-        <div className="absolute inset-0 -z-10 transition-all duration-200 border-r border-sidebar-border bg-sidebar" />
+        <div className="absolute inset-0 -z-10 transition-all duration-300 border-r border-sidebar-border bg-sidebar" />
         {/* Logo / Brand */}
         <div className={isCollapsed ? 'flex justify-center pt-4 pb-2' : 'px-4 pt-4 pb-3'}>
           {isCollapsed ? (

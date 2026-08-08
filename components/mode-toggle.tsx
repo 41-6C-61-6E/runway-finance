@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Sun, Moon, Star } from "lucide-react";
 import { applyAccent } from "@/lib/utils/apply-accent";
 import { THEME_ACCENT_MAP } from "@/lib/colors/palette";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export default function ModeToggle() {
   const { theme, setTheme } = useTheme();
@@ -40,7 +41,6 @@ export default function ModeToggle() {
           type="button"
           className={`${baseClass} rounded-l-md border ${inactiveClass}`}
           aria-label="Daylight Theme"
-          title="Daylight Theme"
         >
           <Sun className="h-4 w-4" />
         </button>
@@ -48,7 +48,6 @@ export default function ModeToggle() {
           type="button"
           className={`${baseClass} border-y ${inactiveClass}`}
           aria-label="Moonlight Theme"
-          title="Moonlight Theme"
         >
           <Moon className="h-4 w-4" />
         </button>
@@ -56,7 +55,6 @@ export default function ModeToggle() {
           type="button"
           className={`${baseClass} rounded-r-md border ${inactiveClass}`}
           aria-label="Starlight Theme"
-          title="Starlight Theme"
         >
           <Star className="h-4 w-4" />
         </button>
@@ -66,33 +64,47 @@ export default function ModeToggle() {
 
   return (
     <div className="inline-flex rounded-md shadow-sm" role="group">
-      <button
-        type="button"
-        className={`${baseClass} rounded-l-md border ${theme === "light" ? activeClass : inactiveClass}`}
-        aria-label="Daylight Theme"
-        title="Daylight Theme"
-        onClick={() => handleThemeChange("light")}
-      >
-        <Sun className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className={`${baseClass} border-y ${theme === "moonlight" ? activeClass : inactiveClass}`}
-        aria-label="Moonlight Theme"
-        title="Moonlight Theme"
-        onClick={() => handleThemeChange("moonlight")}
-      >
-        <Moon className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className={`${baseClass} rounded-r-md border ${theme === "dark" ? activeClass : inactiveClass}`}
-        aria-label="Starlight Theme"
-        title="Starlight Theme"
-        onClick={() => handleThemeChange("dark")}
-      >
-        <Star className="h-4 w-4" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={`${baseClass} rounded-l-md border ${theme === "light" ? activeClass : inactiveClass}`}
+            aria-label="Daylight Theme"
+            onClick={() => handleThemeChange("light")}
+          >
+            <Sun className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Daylight Theme</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={`${baseClass} border-y ${theme === "moonlight" ? activeClass : inactiveClass}`}
+            aria-label="Moonlight Theme"
+            onClick={() => handleThemeChange("moonlight")}
+          >
+            <Moon className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Moonlight Theme</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={`${baseClass} rounded-r-md border ${theme === "dark" ? activeClass : inactiveClass}`}
+            aria-label="Starlight Theme"
+            onClick={() => handleThemeChange("dark")}
+          >
+            <Star className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Starlight Theme</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
