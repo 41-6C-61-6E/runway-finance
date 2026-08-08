@@ -1,9 +1,12 @@
 {
-  "buildNumber": "26.08.1786202769783",
-  "buildTime": "2026-08-08T15:26:09.783Z",
-  "hash": "a27b730",
-  "fullHash": "a27b730ce510bd2058110cdc329e5b13c59875c8",
+  "buildNumber": "26.08.1786212473991",
+  "buildTime": "2026-08-08T18:07:53.991Z",
+  "hash": "4ca074f",
+  "fullHash": "4ca074fd4af5ea316e5ab8f10d54058988f5d13e",
   "commits": [
+    "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
+    "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
+    "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
     "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
     "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
     "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
@@ -200,20 +203,41 @@
     "contrast improvements",
     "bug reports window",
     "snakey bug fix",
-    "mobile nav",
-    "rate limit fix",
-    "tx pg ui",
-    "ui tweaks"
+    "mobile nav"
   ],
   "history": [
+    {
+      "hash": "4ca074f",
+      "fullHash": "4ca074fd4af5ea316e5ab8f10d54058988f5d13e",
+      "author": "Alan Racek",
+      "date": "2026-08-08T10:08:20-07:00",
+      "message": "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
+      "type": "feat",
+      "buildNumber": "26.08.1786212473991"
+    },
+    {
+      "hash": "c116ce2",
+      "fullHash": "c116ce2edf9a654144dda19b30cddac452c748ca",
+      "author": "Alan Racek",
+      "date": "2026-08-08T09:36:33-07:00",
+      "message": "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
+      "type": "feat"
+    },
+    {
+      "hash": "7170e8e",
+      "fullHash": "7170e8e07ab39842f6ac0a06784bf3ddc30419b5",
+      "author": "Alan Racek",
+      "date": "2026-08-08T08:46:35-07:00",
+      "message": "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
+      "type": "feat"
+    },
     {
       "hash": "a27b730",
       "fullHash": "a27b730ce510bd2058110cdc329e5b13c59875c8",
       "author": "Alan Racek",
       "date": "2026-08-07T20:01:42-07:00",
       "message": "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
-      "type": "feat",
-      "buildNumber": "26.08.1786202769783"
+      "type": "feat"
     },
     {
       "hash": "6868051",
@@ -1781,30 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-24T12:01:59-07:00",
       "message": "mobile nav",
-      "type": "other"
-    },
-    {
-      "hash": "7d4e076",
-      "fullHash": "7d4e076a3150f7e1ca45dd852e1742fca170e118",
-      "author": "Alan Racek",
-      "date": "2026-06-23T13:00:24-07:00",
-      "message": "rate limit fix",
-      "type": "other"
-    },
-    {
-      "hash": "b596308",
-      "fullHash": "b5963080857b049fa7fba8fe21634746dc2bccf4",
-      "author": "Alan Racek",
-      "date": "2026-06-23T11:14:40-07:00",
-      "message": "tx pg ui",
-      "type": "other"
-    },
-    {
-      "hash": "c863276",
-      "fullHash": "c8632763dad96e48aa8a14012a82fd87c31c8dbe",
-      "author": "Alan Racek",
-      "date": "2026-06-23T09:50:39-07:00",
-      "message": "ui tweaks",
       "type": "other"
     }
   ]
