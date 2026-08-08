@@ -7,8 +7,10 @@ import { NetWorthSidePanel } from '@/components/net-worth/net-worth-side-panel';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ChartSkeleton, StatCardSkeleton } from '@/components/ui/skeleton-loaders';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 function NetWorthContent() {
   const { isVisible } = useChartVisibility();
@@ -17,36 +19,43 @@ function NetWorthContent() {
   const showChart = isVisible('netWorthChart');
   const showDebtBreakdown = isVisible('debtBreakdown');
 
+  const mainContent = (
+    <div className="space-y-6">
+      {showChart && (
+        <Suspense fallback={<ChartSkeleton />}>
+          <NetWorthChart />
+        </Suspense>
+      )}
+
+      {showDebtBreakdown && (
+        <Suspense fallback={<ChartSkeleton />}>
+          <DebtBreakdown />
+        </Suspense>
+      )}
+    </div>
+  );
+
+  const summaryContent = (
+    <Suspense fallback={<StatCardSkeleton count={4} />}>
+      <NetWorthSidePanel />
+    </Suspense>
+  );
+
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full page-transition-enter">
       {/* ── Page Header ── */}
       <PageHeader title="Net Worth" icon={ChartSpline} />
       <PageContent>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* Right 1/3 Overview & Summary Panel */}
-          {showSummary && (
-            <div className="lg:col-span-1 order-first lg:order-last">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <NetWorthSidePanel />
-              </Suspense>
-            </div>
-          )}
-
-          {/* Left 2/3 Main Charts & Detailed Breakdown */}
-          <div className={showSummary ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
-            {showChart && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <NetWorthChart />
-              </Suspense>
-            )}
-
-            {showDebtBreakdown && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <DebtBreakdown />
-              </Suspense>
-            )}
-          </div>
-        </div>
+        {showSummary ? (
+          <MobileViewSwitcher
+            main={mainContent}
+            summary={summaryContent}
+            mainLabel="Charts"
+            summaryLabel="Summary"
+          />
+        ) : (
+          mainContent
+        )}
       </PageContent>
     </div>
   );

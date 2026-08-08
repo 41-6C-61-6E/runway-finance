@@ -254,10 +254,13 @@ body,
 }
 
 /* Ensure Recharts tooltips disappear when the mouse leaves the chart area */
-.recharts-wrapper:not(:hover) .recharts-tooltip-wrapper {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
+/* Only apply on devices with hover (mouse/trackpad), not touch */
+@media (hover: hover) {
+  .recharts-wrapper:not(:hover) .recharts-tooltip-wrapper {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
 }
 
 /* Remove focus highlight outline from charts */
@@ -538,6 +541,116 @@ button,
   touch-action: manipulation;
 }
 
+/* ── Minimum Touch Target Utilities ──────────────────────────────────────────── */
+/* Ensure 44×44px minimum hit area (Apple HIG / WCAG 2.5.8) */
+.min-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
+/* Invisible expanded hit area for small visual elements */
+.min-touch-target-inline {
+  position: relative;
+}
+.min-touch-target-inline::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  width: 100%;
+  height: 100%;
+}
 
+/* ── Mobile Dialog Bottom Sheet ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .dialog-content-responsive {
+    /* Override centered positioning to bottom sheet */
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    translate: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+  }
+  /* Slide from bottom instead of center zoom */
+  .dialog-content-responsive[data-state="open"] {
+    animation: slideUpFromBottom 300ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  }
+  .dialog-content-responsive[data-state="closed"] {
+    animation: slideDownToBottom 200ms cubic-bezier(0.4, 0, 1, 1) !important;
+  }
+}
 
+@keyframes slideUpFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownToBottom {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* ── Mobile Sheet Bottom Slide ───────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .sheet-mobile-bottom {
+    /* Override right-side positioning to bottom sheet */
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 92dvh !important;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  .sheet-mobile-bottom[data-state="open"] {
+    animation: slideUpFromBottom 350ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  }
+  .sheet-mobile-bottom[data-state="closed"] {
+    animation: slideDownToBottom 250ms cubic-bezier(0.4, 0, 1, 1) !important;
+  }
+}
+
+/* ── Page Transitions (View Transition API fallback) ─────────────────────────── */
+.page-transition-enter {
+  animation: pageFadeIn 150ms ease-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

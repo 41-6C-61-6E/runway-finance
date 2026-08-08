@@ -43,6 +43,8 @@ export interface TransactionPreset {
   isCustom?: boolean;
 }
 
+import { TransactionListSkeleton } from '@/components/ui/skeleton-loaders';
+
 function TransactionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -373,7 +375,7 @@ function TransactionsContent() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full overflow-visible">
+    <div className="min-h-screen w-full overflow-visible page-transition-enter">
       <PageHeader
         title="Transactions"
         icon={Receipt}
@@ -442,7 +444,7 @@ function TransactionsContent() {
 
 export default function TransactionsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen"><TransactionListSkeleton count={12} className="pt-20" /></div>}>
       <TransactionsContent />
     </Suspense>
   );

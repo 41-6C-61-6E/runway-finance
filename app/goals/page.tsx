@@ -10,6 +10,7 @@ import { Target } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 function GoalsContent() {
   const { isVisible } = useChartVisibility();
@@ -18,36 +19,43 @@ function GoalsContent() {
   const showList = isVisible('goalsList');
   const showProjections = isVisible('milestonesProjections');
 
+  const mainContent = (
+    <div className="space-y-6">
+      {showList && (
+        <Suspense fallback={<LoadingSpinner category="summary" />}>
+          <GoalsList />
+        </Suspense>
+      )}
+
+      {showProjections && (
+        <Suspense fallback={<LoadingSpinner category="summary" />}>
+          <MilestonesProjections />
+        </Suspense>
+      )}
+    </div>
+  );
+
+  const summaryContent = (
+    <Suspense fallback={<LoadingSpinner category="summary" />}>
+      <GoalsSidePanel />
+    </Suspense>
+  );
+
   return (
     <GoalInflowProvider>
-      <div className="min-h-screen w-full">
+      <div className="min-h-screen w-full page-transition-enter">
         <PageHeader title="Goals" icon={Target} />
         <PageContent>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* Right 1/3 Summary & Overview Panel */}
-            {showSummary && (
-              <div className="lg:col-span-1 order-first lg:order-last">
-                <Suspense fallback={<LoadingSpinner category="summary" />}>
-                  <GoalsSidePanel />
-                </Suspense>
-              </div>
-            )}
-
-            {/* Left 2/3 Main Content (Goals List & Milestones) */}
-            <div className={showSummary ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
-              {showList && (
-                <Suspense fallback={<LoadingSpinner category="summary" />}>
-                  <GoalsList />
-                </Suspense>
-              )}
-
-              {showProjections && (
-                <Suspense fallback={<LoadingSpinner category="summary" />}>
-                  <MilestonesProjections />
-                </Suspense>
-              )}
-            </div>
-          </div>
+          {showSummary ? (
+            <MobileViewSwitcher
+              main={mainContent}
+              summary={summaryContent}
+              mainLabel="Goals"
+              summaryLabel="Summary"
+            />
+          ) : (
+            mainContent
+          )}
         </PageContent>
       </div>
     </GoalInflowProvider>
