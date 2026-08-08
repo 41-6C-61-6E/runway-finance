@@ -1,9 +1,15 @@
 {
-  "buildNumber": "26.08.1786136924415",
-  "buildTime": "2026-08-07T21:08:44.415Z",
-  "hash": "3262e3a",
-  "fullHash": "3262e3a67bcc1d944855e20a56e9343f8045bbb4",
+  "buildNumber": "26.08.1786202769783",
+  "buildTime": "2026-08-08T15:26:09.783Z",
+  "hash": "a27b730",
+  "fullHash": "a27b730ce510bd2058110cdc329e5b13c59875c8",
   "commits": [
+    "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
+    "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
+    "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
+    "refactor: remove Summary Statistics and Milestones cards from projection-tab and prepare side panel for integration",
+    "feat: implement side panels for net worth, fire projections, and goals, and add shared chart tooltip component",
+    "refactor: consolidate transaction search and filter UI by integrating the search bar into the FilterBar component and updating table layouts",
     "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
     "feat: introduce buildEnginePlan utility to standardize retirement plan model construction across the codebase",
     "style: refine tab and button sizing with smaller paddings, rounded corners, and compact text styles",
@@ -197,23 +203,65 @@
     "mobile nav",
     "rate limit fix",
     "tx pg ui",
-    "ui tweaks",
-    "mobile menu",
-    "issue reporting",
-    "snakey tooltip and auth improvements",
-    "background refresh",
-    "issue indicator",
-    "feedback button"
+    "ui tweaks"
   ],
   "history": [
+    {
+      "hash": "a27b730",
+      "fullHash": "a27b730ce510bd2058110cdc329e5b13c59875c8",
+      "author": "Alan Racek",
+      "date": "2026-08-07T20:01:42-07:00",
+      "message": "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
+      "type": "feat",
+      "buildNumber": "26.08.1786202769783"
+    },
+    {
+      "hash": "6868051",
+      "fullHash": "6868051f43bd6adf82730499cfd83b7814456b08",
+      "author": "Alan Racek",
+      "date": "2026-08-07T19:39:09-07:00",
+      "message": "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
+      "type": "refactor"
+    },
+    {
+      "hash": "f8187bc",
+      "fullHash": "f8187bca1891cef27f9be47e994982ebc2f7eb4e",
+      "author": "Alan Racek",
+      "date": "2026-08-07T19:10:07-07:00",
+      "message": "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
+      "type": "feat"
+    },
+    {
+      "hash": "ce1fdf4",
+      "fullHash": "ce1fdf48947ada937af31ad7e647ada22e52ca7a",
+      "author": "Alan Racek",
+      "date": "2026-08-07T15:52:14-07:00",
+      "message": "refactor: remove Summary Statistics and Milestones cards from projection-tab and prepare side panel for integration",
+      "type": "refactor"
+    },
+    {
+      "hash": "034d568",
+      "fullHash": "034d568dee25604d4e74bd07572e777de9c6ca88",
+      "author": "Alan Racek",
+      "date": "2026-08-07T15:39:03-07:00",
+      "message": "feat: implement side panels for net worth, fire projections, and goals, and add shared chart tooltip component",
+      "type": "feat"
+    },
+    {
+      "hash": "ae512db",
+      "fullHash": "ae512db3d0c377f28dcc120d663ba5699558e3c9",
+      "author": "Alan Racek",
+      "date": "2026-08-07T14:23:06-07:00",
+      "message": "refactor: consolidate transaction search and filter UI by integrating the search bar into the FilterBar component and updating table layouts",
+      "type": "refactor"
+    },
     {
       "hash": "3262e3a",
       "fullHash": "3262e3a67bcc1d944855e20a56e9343f8045bbb4",
       "author": "Alan Racek",
       "date": "2026-08-07T14:08:33-07:00",
       "message": "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
-      "type": "refactor",
-      "buildNumber": "26.08.1786136924415"
+      "type": "refactor"
     },
     {
       "hash": "8fb8ce9",
@@ -1757,54 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-23T09:50:39-07:00",
       "message": "ui tweaks",
-      "type": "other"
-    },
-    {
-      "hash": "2118f6e",
-      "fullHash": "2118f6edc73212ca335f137f6ad01afe2a24a13c",
-      "author": "Alan Racek",
-      "date": "2026-06-22T21:29:45-07:00",
-      "message": "mobile menu",
-      "type": "other"
-    },
-    {
-      "hash": "dea869e",
-      "fullHash": "dea869e2b90c0c26d3a19fc31499c55dcc8de4a2",
-      "author": "Alan Racek",
-      "date": "2026-06-22T21:12:49-07:00",
-      "message": "issue reporting",
-      "type": "other"
-    },
-    {
-      "hash": "99c28e7",
-      "fullHash": "99c28e7f10722980a8f6c7aecc6e4455c15723a4",
-      "author": "Alan Racek",
-      "date": "2026-06-22T17:06:59-07:00",
-      "message": "snakey tooltip and auth improvements",
-      "type": "other"
-    },
-    {
-      "hash": "a12782b",
-      "fullHash": "a12782b9f5f798a667f543ecd1f1d1f5ddda906f",
-      "author": "Alan Racek",
-      "date": "2026-06-22T13:22:54-07:00",
-      "message": "background refresh",
-      "type": "other"
-    },
-    {
-      "hash": "92edaf2",
-      "fullHash": "92edaf277d5d47bb26b2a913cc56cbb265fad498",
-      "author": "Alan Racek",
-      "date": "2026-06-21T18:38:48-07:00",
-      "message": "issue indicator",
-      "type": "other"
-    },
-    {
-      "hash": "2b2e8f6",
-      "fullHash": "2b2e8f64e84982fc4eecd25d51853ef75489bc0d",
-      "author": "Alan Racek",
-      "date": "2026-06-21T18:32:31-07:00",
-      "message": "feedback button",
       "type": "other"
     }
   ]

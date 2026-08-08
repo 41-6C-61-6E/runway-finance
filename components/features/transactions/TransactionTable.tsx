@@ -212,6 +212,17 @@ export default function TransactionTable({
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
 
+  // Force compact (card) view on mobile — full table is unusable on small screens
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  const effectiveCompactView = isMobile || compactView;
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const flattenedTransactions = useMemo(() => {
@@ -1632,7 +1643,7 @@ export default function TransactionTable({
                   <button
                     type="button"
                     onClick={() => onCompactViewChange(!compactView)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80 rounded-lg transition-colors shadow-sm cursor-pointer"
+                    className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-background hover:bg-muted border border-border/80 rounded-lg transition-colors shadow-sm cursor-pointer"
                     title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
                   >
                     <Columns2 className="h-3.5 w-3.5" />
@@ -1656,7 +1667,7 @@ export default function TransactionTable({
               </div>
             ) : (
               <>
-            {compactView ? (
+            {effectiveCompactView ? (
               <div className="divide-y divide-border/50">
                 {table.getRowModel().rows.map((row) => {
                   const tx = row.original;

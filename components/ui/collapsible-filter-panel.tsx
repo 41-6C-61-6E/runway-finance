@@ -15,6 +15,7 @@ interface CollapsibleFilterPanelProps {
   actions?: React.ReactNode;
   centerContent?: React.ReactNode;
   rightActions?: React.ReactNode;
+  activeFilterCount?: number;
 }
 
 export function CollapsibleFilterPanel({
@@ -26,7 +27,8 @@ export function CollapsibleFilterPanel({
   className,
   actions,
   centerContent,
-  rightActions
+  rightActions,
+  activeFilterCount,
 }: CollapsibleFilterPanelProps) {
   return (
     <div className={cn("border-b border-border bg-muted/10 px-5 py-1 transition-colors", className)}>
@@ -37,10 +39,15 @@ export function CollapsibleFilterPanel({
           <button
             type="button"
             onClick={onToggle}
-            className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0 min-touch-target-inline"
           >
             <Filter size={12} className="text-primary shrink-0" />
             <span className="hidden sm:inline">Options</span>
+            {activeFilterCount != null && activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold bg-primary/20 text-primary">
+                {activeFilterCount}
+              </span>
+            )}
             {isOpen ? (
               <ChevronUp size={12} className="text-muted-foreground/60 shrink-0" />
             ) : (
@@ -81,6 +88,17 @@ export function CollapsibleFilterPanel({
           </div>
         )}
       </div>
+
+      {/* Mobile-only: scrollable active filter chips when panel is closed */}
+      {!isOpen && feedbackItems && feedbackItems.length > 0 && (
+        <div className="flex md:hidden items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5 -mx-1 px-1">
+          {feedbackItems.map((item, i) => (
+            <span key={i} className="shrink-0 text-[10px] font-medium text-muted-foreground inline-flex items-center leading-none">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Collapsible Content */}
       {isOpen && (

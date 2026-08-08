@@ -21,8 +21,11 @@ import {
   Minus,
   ArrowLeftRight,
   Flame,
+  Settings,
+  Bug,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
+import { haptic } from '@/lib/haptics';
 
 interface NavItem {
   id: string;
@@ -232,7 +235,7 @@ export function MobileNav() {
       longPressTimerRef.current = setTimeout(() => {
         if (navigator.vibrate) {
           try {
-            navigator.vibrate(50);
+            haptic.heavy();
           } catch (_) {}
         }
         setIsEditing(true);
@@ -302,6 +305,7 @@ export function MobileNav() {
         
         const uniqueIds = Array.from(new Set(newIds)).slice(0, 4);
         updateHomeItems(uniqueIds);
+        haptic.success();
       }
 
       setDraggedItem(null);
@@ -508,9 +512,10 @@ export function MobileNav() {
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        haptic.medium();
                         handleRemoveSlot(index);
                       }}
-                      className="absolute top-1 right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md active:scale-90 z-20 cursor-pointer"
+                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1.5 shadow-md active:scale-90 z-20 cursor-pointer min-touch-target-inline"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
@@ -659,6 +664,29 @@ export function MobileNav() {
               </Link>
             );
           })}
+        </div>
+
+        {/* Separator */}
+        <div className="my-3 border-t border-border/60" />
+
+        {/* Quick Access: Settings & Bug Report */}
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
+          Quick Access
+        </div>
+        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
+          <Link
+            href="/settings"
+            onClick={() => {
+              setPendingHref('/settings');
+              setIsOpen(false);
+            }}
+            className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none"
+          >
+            <div className="p-3 rounded-2xl bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground transition-colors">
+              <Settings className="h-5 w-5 flex-shrink-0" />
+            </div>
+            <span className="text-[10px] tracking-wide text-center truncate w-full text-sidebar-foreground/65 group-hover:text-sidebar-foreground transition-colors">Settings</span>
+          </Link>
         </div>
       </div>
 

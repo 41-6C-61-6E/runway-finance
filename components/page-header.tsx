@@ -66,12 +66,12 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
   return (
     <>
-      {/* Mobile-only fixed floating actions pill */}
+      {/* Mobile-only fixed floating actions pill — lean: notifications + user only */}
       <div 
         style={{
           top: 'calc(env(safe-area-inset-top) + 8px)',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-1 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md transition-all duration-300 ease-out ${
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-0.5 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md transition-all duration-300 ease-out ${
           isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
         }`}
       >
@@ -80,9 +80,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
             <EyeOff className="w-3 h-3 text-primary" />
           </div>
         )}
-        <BugReportingDropdown onOpenChange={setIsBugOpen} />
         <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
-        <SettingsDropdown onOpenChange={setIsSettingsOpen} />
         <UserDropdown onOpenChange={setIsUserOpen} />
       </div>
 
