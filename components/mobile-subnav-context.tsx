@@ -10,10 +10,13 @@ export interface SubNavTab {
 interface MobileSubNavContextType {
   tabs: SubNavTab[];
   activeTabId: string | null;
+  activeTabIndex: number;
   registerSubNav: (tabs: SubNavTab[], activeTabId: string, onSelect: (id: string) => void) => void;
   unregisterSubNav: () => void;
   setActiveTabId: (id: string) => void;
   selectTab: (id: string) => void;
+  nextTab: () => void;
+  prevTab: () => void;
 }
 
 const MobileSubNavContext = createContext<MobileSubNavContextType | null>(null);
@@ -46,14 +49,38 @@ export function MobileSubNavProvider({ children }: { children: ReactNode }) {
     }
   }, [onSelectCallback]);
 
+  const activeTabIndex = useMemo(() => {
+    if (!activeTabId || tabs.length === 0) return -1;
+    return tabs.findIndex(t => t.id === activeTabId);
+  }, [tabs, activeTabId]);
+
+  const nextTab = useCallback(() => {
+    if (tabs.length === 0) return;
+    const current = tabs.findIndex(t => t.id === activeTabId);
+    if (current >= 0 && current < tabs.length - 1) {
+      selectTab(tabs[current + 1].id);
+    }
+  }, [tabs, activeTabId, selectTab]);
+
+  const prevTab = useCallback(() => {
+    if (tabs.length === 0) return;
+    const current = tabs.findIndex(t => t.id === activeTabId);
+    if (current > 0) {
+      selectTab(tabs[current - 1].id);
+    }
+  }, [tabs, activeTabId, selectTab]);
+
   const value = useMemo(() => ({
     tabs,
     activeTabId,
+    activeTabIndex,
     registerSubNav,
     unregisterSubNav,
     setActiveTabId,
     selectTab,
-  }), [tabs, activeTabId, registerSubNav, unregisterSubNav, selectTab]);
+    nextTab,
+    prevTab,
+  }), [tabs, activeTabId, activeTabIndex, registerSubNav, unregisterSubNav, selectTab, nextTab, prevTab]);
 
   return (
     <MobileSubNavContext.Provider value={value}>
@@ -68,10 +95,13 @@ export function useMobileSubNav() {
     return {
       tabs: [],
       activeTabId: null,
+      activeTabIndex: -1,
       registerSubNav: () => {},
       unregisterSubNav: () => {},
       setActiveTabId: () => {},
       selectTab: () => {},
+      nextTab: () => {},
+      prevTab: () => {},
     };
   }
   return context;
