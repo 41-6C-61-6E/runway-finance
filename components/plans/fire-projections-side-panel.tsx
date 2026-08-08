@@ -28,6 +28,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface Milestone {
   age: number;
@@ -82,6 +83,20 @@ export function FireProjectionsSidePanel({
     if (method === 'proportional') return 'Proportional Drawdown';
     if (method === 'custom_order') return 'Custom Priority Order';
     return 'Textbook Waterfall (Cash → Taxable → Trad → Roth)';
+  }, [plan]);
+
+  const strategyDescription = useMemo(() => {
+    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+    if (method === 'tax_optimized') {
+      return 'Prioritizes taxable accounts while filling lower tax brackets with traditional withdrawals, preserving Roth assets for tax-free growth.';
+    }
+    if (method === 'proportional') {
+      return 'Draws funds proportionally across taxable, tax-deferred, and tax-free accounts based on current balance ratios.';
+    }
+    if (method === 'custom_order') {
+      return 'Draws funds according to your custom defined account withdrawal priority order.';
+    }
+    return 'Standard waterfall order: Taxable Cash → Taxable Brokerage → Tax-Deferred (Traditional IRA/401k) → Tax-Free (Roth IRA).';
   }, [plan]);
 
   // Coast FIRE Calculation (Metric 3.1)
@@ -210,60 +225,74 @@ export function FireProjectionsSidePanel({
             </div>
 
             {/* Key Projection Metrics */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-foreground block mb-1">Key Retirement Indicators</span>
-              
-              {/* Nest Egg at Retirement */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50">
-                <div className="flex items-center gap-2">
-                  <Palmtree className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-foreground">Nest Egg at {localRetirementAge}</span>
-                    <span className="text-[10px] text-muted-foreground">Projected Assets</span>
-                  </div>
-                </div>
-                <span className="text-xs font-extrabold text-emerald-500 font-mono blur-number">
-                  {formatCurrency(netWorthAtRetirement)}
-                </span>
-              </div>
+            <TooltipProvider delayDuration={100}>
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-foreground block mb-1">Key Retirement Indicators</span>
+                
+                {/* Nest Egg at Retirement */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                      <div className="flex items-center gap-2">
+                        <Palmtree className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span className="text-xs font-semibold text-foreground">Nest Egg at {localRetirementAge}</span>
+                      </div>
+                      <span className="text-xs font-extrabold text-emerald-500 font-mono blur-number">
+                        {formatCurrency(netWorthAtRetirement)}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs text-xs">
+                    Projected liquid and invested net worth accumulated at target retirement age ({localRetirementAge}).
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Peak Withdrawal Rate */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-amber-500 shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-foreground">Peak Drawdown Rate</span>
-                    <span className="text-[10px] text-muted-foreground">Discretionary Draw</span>
-                  </div>
-                </div>
-                <span
-                  className={cn(
-                    'text-xs font-bold font-mono px-2 py-0.5 rounded border',
-                    peakWithdrawalRate <= 4
-                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                      : peakWithdrawalRate <= 5.5
-                      ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                      : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                  )}
-                >
-                  {peakWithdrawalRate.toFixed(1)}%
-                </span>
-              </div>
+                {/* Peak Withdrawal Rate */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="text-xs font-semibold text-foreground">Peak Drawdown Rate</span>
+                      </div>
+                      <span
+                        className={cn(
+                          'text-xs font-bold font-mono px-2 py-0.5 rounded border',
+                          peakWithdrawalRate <= 4
+                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            : peakWithdrawalRate <= 5.5
+                            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                            : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                        )}
+                      >
+                        {peakWithdrawalRate.toFixed(1)}%
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs text-xs">
+                    Highest projected annual withdrawal rate from portfolio assets during retirement. Sustainable safe rate is typically under 4.0%.
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Years to FIRE */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-cyan-500 shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-foreground">Years to FI</span>
-                    <span className="text-[10px] text-muted-foreground">Timeline Estimate</span>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-foreground font-mono">
-                  {yearsToFireDisplay} {typeof yearsToFireDisplay === 'number' ? 'yrs' : ''}
-                </span>
+                {/* Years to FIRE */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-cyan-500 shrink-0" />
+                        <span className="text-xs font-semibold text-foreground">Years to FI</span>
+                      </div>
+                      <span className="text-xs font-bold text-foreground font-mono">
+                        {yearsToFireDisplay} {typeof yearsToFireDisplay === 'number' ? 'yrs' : ''}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs text-xs">
+                    Estimated timeline in years until your liquid & invested net worth reaches your target FIRE number.
+                  </TooltipContent>
+                </Tooltip>
               </div>
-            </div>
+            </TooltipProvider>
 
             {/* Metric 3.1: Coast FIRE Progress Tracker Card */}
             {coastFireInfo.coastTarget > 0 && (
@@ -376,33 +405,35 @@ export function FireProjectionsSidePanel({
 
             {/* Upcoming Milestones Vertical Stepper */}
             {milestoneCallouts.length > 0 && (
-              <div className="border-t border-border pt-4 space-y-3">
+              <div className="border-t border-border pt-4 space-y-2.5">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Landmark className="w-3.5 h-3.5 text-primary" />
                   Upcoming Key Milestones
                 </span>
-                <div className="relative pl-4 space-y-3 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-                  {milestoneCallouts.slice(0, showAllMilestones ? milestoneCallouts.length : 4).map((m, idx) => {
-                    const IconComponent = m.icon || Target;
-                    return (
-                      <div key={idx} className="relative flex items-start gap-2 text-xs">
-                        <div className="absolute -left-4 top-0.5 w-3.5 h-3.5 rounded-full bg-card border-2 border-primary flex items-center justify-center text-[8px]">
-                          {m.emoji}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-foreground truncate">{m.title}</span>
-                            <span className="text-[10px] font-mono text-muted-foreground">
-                              Age {m.age} ({m.year})
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">
-                            {m.note}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="relative pl-4 space-y-2.5 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
+                  <TooltipProvider delayDuration={100}>
+                    {milestoneCallouts.slice(0, showAllMilestones ? milestoneCallouts.length : 4).map((m, idx) => {
+                      return (
+                        <Tooltip key={idx}>
+                          <TooltipTrigger asChild>
+                            <div className="relative flex items-center justify-between gap-2 text-xs py-0.5 cursor-help hover:bg-muted/20 rounded px-1 -mx-1 transition-colors">
+                              <div className="absolute -left-4 top-1 w-3.5 h-3.5 rounded-full bg-card border-2 border-primary flex items-center justify-center text-[8px]">
+                                {m.emoji}
+                              </div>
+                              <span className="font-bold text-foreground truncate min-w-0">{m.title}</span>
+                              <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                                Age {m.age} ({m.year})
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs text-xs space-y-1">
+                            <div className="font-bold">{m.title} (Age {m.age}, {m.year})</div>
+                            {m.note && <div className="text-muted-foreground">{m.note}</div>}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </TooltipProvider>
                 </div>
 
                 {milestoneCallouts.length > 4 && (
@@ -423,10 +454,19 @@ export function FireProjectionsSidePanel({
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
                 Active Drawdown Strategy
               </span>
-              <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{activeStrategyLabel}</span>
-              </div>
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary flex items-center gap-2 cursor-help hover:bg-primary/15 transition-colors">
+                      <Zap className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{activeStrategyLabel}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                    {strategyDescription}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </CardContent>
         )}
