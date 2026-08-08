@@ -38,7 +38,8 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
-import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -343,6 +344,13 @@ function AccountsContent() {
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  type Tab = 'history' | 'list';
+  const [activeTab, setActiveTab] = useState<Tab>('history');
+  const availableTabs = [
+    { id: 'history', label: 'History' },
+    { id: 'list', label: 'List' },
+  ] as { id: Tab; label: string }[];
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     handleResize();
@@ -584,6 +592,15 @@ function AccountsContent() {
 
   const searchParams = useSearchParams();
   const targetAccountId = searchParams.get('accountId') || searchParams.get('account');
+  const tabParam = searchParams.get('tab');
+
+  useEffect(() => {
+    if (tabParam === 'list' || tabParam === 'history') {
+      setActiveTab(tabParam as Tab);
+    } else if (targetAccountId) {
+      setActiveTab('list');
+    }
+  }, [tabParam, targetAccountId]);
 
   useEffect(() => {
     if (!targetAccountId) return;
@@ -1396,11 +1413,21 @@ function AccountsContent() {
       <PageHeader title="Accounts" icon={Landmark} />
 
       <PageContent maxWidth="max-w-7xl" className="space-y-5 sm:space-y-6">
-        <MobileViewSwitcher
-          mainLabel="Chart"
-          summaryLabel="List"
-          desktopLayout="stacked"
-          main={
+        <MobileTabSwipeContainer
+          tabs={availableTabs}
+          activeTabId={activeTab}
+          onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+        >
+          <div className="hidden md:block mb-5 sm:mb-6">
+            <AppTabs
+              tabs={availableTabs}
+              activeTab={activeTab}
+              onChange={(tabId) => setActiveTab(tabId as Tab)}
+              variant="underline"
+            />
+          </div>
+
+          {activeTab === 'history' && (
             /* ── Graphics / Chart Card ── */
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
               <CollapsibleCardHeader
@@ -2189,8 +2216,9 @@ function AccountsContent() {
               </>
             )}
           </Card>
-          }
-          summary={
+          )}
+
+          {activeTab === 'list' && (
             /* ── Expandable Accounts Tree View ── */
             <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
               <CollapsibleCardHeader
@@ -3008,8 +3036,8 @@ function AccountsContent() {
                 </>
                 )}
             </Card>
-          }
-        />
+          )}
+        </MobileTabSwipeContainer>
       </PageContent>
 
     </div>

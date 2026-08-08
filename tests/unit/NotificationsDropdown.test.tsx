@@ -151,9 +151,30 @@ describe('NotificationsDropdown Component', () => {
       });
     });
 
-    // Expect empty state message "All caught up!" to show
+    // Verify dropdown closes automatically when clearing notifications
     await waitFor(() => {
-      expect(screen.getByText('All caught up!')).toBeDefined();
+      expect(screen.queryByText('Alert: Budget exceeded')).toBeNull();
+    });
+  });
+
+  it('closes dropdown automatically when marking all notifications as read', async () => {
+    render(<NotificationsDropdown />);
+
+    // Click the bell button to open the dropdown
+    const bellButton = screen.getByRole('button', { name: /notifications/i });
+    fireEvent.click(bellButton);
+
+    // Wait for notifications to load in dropdown
+    await waitFor(() => {
+      expect(screen.getByText('Alert: Budget exceeded')).toBeDefined();
+    });
+
+    const markAllReadButton = screen.getByRole('button', { name: /mark all read/i });
+    fireEvent.click(markAllReadButton);
+
+    // Verify dropdown closes automatically
+    await waitFor(() => {
+      expect(screen.queryByText('Alert: Budget exceeded')).toBeNull();
     });
   });
 });

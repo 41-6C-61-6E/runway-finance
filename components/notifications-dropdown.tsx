@@ -178,6 +178,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
     setNotifications(prev => 
       prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() }))
     );
+    setOpen(false);
 
     try {
       const res = await fetch('/api/notifications', {
@@ -213,6 +214,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
   const handleClearAll = async () => {
     if (notifications.length === 0) return;
 
+    setOpen(false);
     try {
       const res = await fetch('/api/notifications', {
         method: 'DELETE',

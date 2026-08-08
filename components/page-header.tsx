@@ -66,7 +66,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
   return (
     <>
-      {/* Mobile-only fixed floating actions pill — lean: notifications + user only */}
+      {/* Mobile-only fixed floating actions pill */}
       <div 
         style={{
           top: 'calc(env(safe-area-inset-top) + 8px)',
@@ -80,6 +80,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
             <EyeOff className="w-3 h-3 text-primary" />
           </div>
         )}
+        <BugReportingDropdown onOpenChange={setIsBugOpen} />
         <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
         <SettingsDropdown onOpenChange={setIsSettingsOpen} />
         <UserDropdown onOpenChange={setIsUserOpen} />
