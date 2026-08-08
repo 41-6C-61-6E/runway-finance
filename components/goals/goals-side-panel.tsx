@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
+import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 
 interface Goal {
   id: string;
@@ -27,7 +28,19 @@ interface Goal {
   targetAmount: string;
   currentAmount: string;
   allocatedAmount?: string;
+  targetDate?: string | null;
   status: string;
+}
+
+interface SpotlightGoal {
+  name: string;
+  type: string;
+  target: number;
+  current: number;
+  progress: number;
+  remaining: number;
+  targetDate?: string | null;
+  daysRemaining?: number | null;
 }
 
 interface SummaryData {
@@ -38,6 +51,7 @@ interface SummaryData {
   totalCurrent: number;
   overallProgress: number;
   byType: Record<string, { count: number; target: number; current: number; progress: number }>;
+  spotlightGoal: SpotlightGoal | null;
 }
 
 export function GoalsSidePanel() {
@@ -83,6 +97,41 @@ export function GoalsSidePanel() {
           };
         });
 
+        const activeGoalsList = goals.filter((g) => g.status === 'active');
+        let spotlightGoal: SpotlightGoal | null = null;
+        if (activeGoalsList.length > 0) {
+          const sorted = activeGoalsList
+            .map((g) => {
+              const target = parseFloat(g.targetAmount);
+              const current = parseFloat(g.allocatedAmount ?? g.currentAmount);
+              const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+              const remaining = Math.max(0, target - current);
+              let daysRemaining: number | null = null;
+              if (g.targetDate) {
+                const targetTime = new Date(g.targetDate).getTime();
+                const nowTime = new Date().getTime();
+                daysRemaining = Math.max(0, Math.ceil((targetTime - nowTime) / (1000 * 60 * 60 * 24)));
+              }
+              return {
+                name: g.name,
+                type: g.type,
+                target,
+                current,
+                progress,
+                remaining,
+                targetDate: g.targetDate,
+                daysRemaining,
+              };
+            })
+            .sort((a, b) => {
+              if (a.daysRemaining !== null && b.daysRemaining !== null) return a.daysRemaining - b.daysRemaining;
+              if (a.daysRemaining !== null) return -1;
+              if (b.daysRemaining !== null) return 1;
+              return b.progress - a.progress;
+            });
+          spotlightGoal = sorted[0];
+        }
+
         setData({
           totalGoals: goals.length,
           activeGoals,
@@ -91,6 +140,7 @@ export function GoalsSidePanel() {
           totalCurrent,
           overallProgress: totalTarget > 0 ? Math.min((totalCurrent / totalTarget) * 100, 100) : 0,
           byType: byTypeWithProgress,
+          spotlightGoal,
         });
       } catch {
         setData(null);
@@ -240,6 +290,53 @@ export function GoalsSidePanel() {
                 </span>
               </div>
             </div>
+
+            {/* Metric 2.2: Next Goal Spotlight Card */}
+            {data.spotlightGoal && (
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Goal Spotlight — {data.spotlightGoal.name}</TooltipHeader>
+                    <TooltipRow label="Target Amount" value={formatCurrency(data.spotlightGoal.target)} color="var(--color-primary)" />
+                    <TooltipRow label="Current Saved" value={formatCurrency(data.spotlightGoal.current)} color="var(--color-chart-1)" />
+                    <TooltipRow label="Shortfall" value={formatCurrency(data.spotlightGoal.remaining)} color="var(--color-chart-4)" />
+                    {data.spotlightGoal.daysRemaining !== null && (
+                      <div className="mt-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground font-mono">
+                        Target Date: {data.spotlightGoal.targetDate} ({data.spotlightGoal.daysRemaining} days left)
+                      </div>
+                    )}
+                  </>
+                }
+              >
+                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                        {data.spotlightGoal.name}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono">
+                      {data.spotlightGoal.progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between text-xs font-mono">
+                    <span className="text-muted-foreground blur-number">
+                      {formatCurrency(data.spotlightGoal.current)} / {formatCurrency(data.spotlightGoal.target)}
+                    </span>
+                    <span className="text-foreground font-semibold blur-number">
+                      {formatCurrency(data.spotlightGoal.remaining)} to go
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500 rounded-full"
+                      style={{ width: `${data.spotlightGoal.progress}%` }}
+                    />
+                  </div>
+                </div>
+              </ChartHoverTooltip>
+            )}
 
             {/* Projection Pacing Indicator */}
             {data.activeGoals > 0 && (

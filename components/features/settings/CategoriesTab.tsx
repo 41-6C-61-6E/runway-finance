@@ -23,6 +23,7 @@ type Category = {
   createdByAi: boolean;
   excludeFromReports: boolean;
   hideFromTransactions: boolean;
+  isDiscretionary?: boolean;
   displayOrder: number;
   transactionCount: number;
 };
@@ -55,6 +56,7 @@ export default function CategoriesTab() {
   const [formExpenseParentId, setFormExpenseParentId] = useState<string | null>(null);
   const [formOrder, setFormOrder] = useState(0);
   const [formHideFromTransactions, setFormHideFromTransactions] = useState(false);
+  const [formIsDiscretionary, setFormIsDiscretionary] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = useCallback(async () => {
@@ -225,6 +227,7 @@ export default function CategoriesTab() {
     setFormExpenseParentId(null);
     setFormOrder(categories.length);
     setFormHideFromTransactions(false);
+    setFormIsDiscretionary(true);
   };
 
   const openEdit = (cat: Category) => {
@@ -238,6 +241,7 @@ export default function CategoriesTab() {
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder);
     setFormHideFromTransactions(cat.hideFromTransactions ?? false);
+    setFormIsDiscretionary(cat.isDiscretionary ?? true);
   };
 
   const openClone = (cat: Category) => {
@@ -251,6 +255,7 @@ export default function CategoriesTab() {
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder + 1);
     setFormHideFromTransactions(cat.hideFromTransactions ?? false);
+    setFormIsDiscretionary(cat.isDiscretionary ?? true);
   };
 
   const handleClose = () => {
@@ -277,6 +282,7 @@ export default function CategoriesTab() {
         expenseParentId: resolvedExpenseParentId,
         displayOrder: formOrder,
         hideFromTransactions: formHideFromTransactions,
+        isDiscretionary: formIsDiscretionary,
       };
 
       if (editing) {
@@ -520,6 +526,15 @@ export default function CategoriesTab() {
                   }`}>
                     {parent.categoryType === 'compound' ? 'Compound' : parent.categoryType === 'transfer' ? 'Transfer' : parent.isIncome ? 'Income' : 'Expense'}
                   </span>
+                  {!parent.isIncome && parent.categoryType === 'standard' && (
+                    <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full border ${
+                      parent.isDiscretionary === false
+                        ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
+                        : 'bg-chart-4/10 text-chart-4 border-chart-4/20'
+                    }`}>
+                      {parent.isDiscretionary === false ? 'Fixed' : 'Discretionary'}
+                    </span>
+                  )}
                   <span className="text-[11px] tabular-nums text-muted-foreground/60">{parent.transactionCount}</span>
                   {parent.isSystem && (
                     <span className="text-[10px] text-muted-foreground">System</span>
@@ -584,6 +599,15 @@ export default function CategoriesTab() {
                               }`}>
                                 {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
                               </span>
+                              {!child.isIncome && child.categoryType === 'standard' && (
+                                <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full border ${
+                                  child.isDiscretionary === false
+                                    ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
+                                    : 'bg-chart-4/10 text-chart-4 border-chart-4/20'
+                                }`}>
+                                  {child.isDiscretionary === false ? 'Fixed' : 'Discretionary'}
+                                </span>
+                              )}
                               <span className="text-[11px] tabular-nums text-muted-foreground/60">{child.transactionCount}</span>
                               {child.isSystem && (
                                 <span className="text-[10px] text-muted-foreground">System</span>
@@ -713,6 +737,37 @@ export default function CategoriesTab() {
                 </select>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
+                </p>
+              </div>
+            )}
+
+            {formCategoryType === 'expense' && (
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Expense Classification</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-lg border border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setFormIsDiscretionary(false)}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-md transition-all ${
+                      !formIsDiscretionary ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Fixed (Essential)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormIsDiscretionary(true)}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-md transition-all ${
+                      formIsDiscretionary ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Discretionary
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {!formIsDiscretionary
+                    ? 'Fixed expenses are essential commitments (e.g. Housing, Utilities, Insurance, Debt).'
+                    : 'Discretionary expenses are flexible spending (e.g. Dining Out, Entertainment, Shopping).'}
                 </p>
               </div>
             )}

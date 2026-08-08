@@ -7,6 +7,7 @@ type ChildCategoryDef = {
   name: string;
   color: string;
   excludeFromReports?: boolean;
+  isDiscretionary?: boolean;
 };
 
 type CategoryDef = {
@@ -15,6 +16,7 @@ type CategoryDef = {
   isIncome: boolean;
   categoryType?: string;
   excludeFromReports?: boolean;
+  isDiscretionary?: boolean;
   children?: ChildCategoryDef[];
 };
 
@@ -404,6 +406,7 @@ export async function seedUserCategories(userId: string) {
         categoryType: group.categoryType ?? 'standard',
         isSystem: true,
         excludeFromReports: group.excludeFromReports ?? false,
+        isDiscretionary: group.isDiscretionary ?? true,
         displayOrder: order++,
       })
       .returning();
@@ -419,6 +422,7 @@ export async function seedUserCategories(userId: string) {
           categoryType: group.categoryType ?? 'standard',
           isSystem: true,
           excludeFromReports: child.excludeFromReports ?? false,
+          isDiscretionary: child.isDiscretionary ?? group.isDiscretionary ?? true,
           displayOrder: order++,
         });
       }
@@ -708,7 +712,35 @@ async function ensureCompoundGroup(
   }
 }
 
+let hasMigratedDiscretionaryColumn = false;
+export async function ensureCategoryDiscretionaryColumn() {
+  if (hasMigratedDiscretionaryColumn) return;
+  try {
+    const db = getDb();
+    await db.execute(sql`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_discretionary BOOLEAN NOT NULL DEFAULT true;`);
+    
+    // Backfill essential default category keywords to Fixed (is_discretionary = false)
+    const essentialKeywords = [
+      'Housing', 'Rent', 'Mortgage', 'Utilities', 'Electricity', 'Water', 'Gas & Heating',
+      'Transportation', 'Auto Insurance', 'Car Payment', 'Health & Medical', 'Health Insurance',
+      'Taxes', 'Loans & Debt', 'Student Loans', 'Insurance'
+    ];
+    for (const kw of essentialKeywords) {
+      await db.execute(sql`
+        UPDATE categories 
+        SET is_discretionary = false 
+        WHERE is_discretionary = true 
+          AND name LIKE ${`%${kw}%`};
+      `);
+    }
+    hasMigratedDiscretionaryColumn = true;
+  } catch {
+    hasMigratedDiscretionaryColumn = true;
+  }
+}
+
 export async function ensureCompoundCategories(userId: string, dek?: Uint8Array) {
+  await ensureCategoryDiscretionaryColumn();
   await ensureCompoundGroup(userId, 'Paycheck Deductions', '#8b5cf6', COMPOUND_SUBCATEGORIES, dek);
 }
 
