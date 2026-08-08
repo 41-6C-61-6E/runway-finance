@@ -10,6 +10,7 @@ import PageContent from '@/components/page-content';
 import { ChartErrorBoundary } from '@/components/chart-error-boundary';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 type Tab = 'wealth' | 'cash';
 
@@ -38,15 +39,20 @@ function FlowsContent() {
       <PageHeader title="Flows" icon={ArrowLeftRight} />
       <PageContent>
         {availableTabs.length > 0 ? (
-          <>
+          <MobileTabSwipeContainer
+            tabs={availableTabs}
+            activeTabId={activeTab}
+            onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+          >
             {availableTabs.length > 1 && (
-              <AppTabs
-                tabs={availableTabs}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as Tab)}
-                variant="underline"
-                className="mb-5 sm:mb-6"
-              />
+              <div className="hidden lg:block mb-5 sm:mb-6">
+                <AppTabs
+                  tabs={availableTabs}
+                  activeTab={activeTab}
+                  onChange={(tabId) => setActiveTab(tabId as Tab)}
+                  variant="underline"
+                />
+              </div>
             )}
 
             {activeTab === 'wealth' && showWealth && (
@@ -64,7 +70,7 @@ function FlowsContent() {
                 </ChartErrorBoundary>
               </Suspense>
             )}
-          </>
+          </MobileTabSwipeContainer>
         ) : (
           <div className="py-12 text-center text-muted-foreground text-sm">
             All flow charts are currently hidden in Settings &gt; Analytics &gt; Chart Visibility.
