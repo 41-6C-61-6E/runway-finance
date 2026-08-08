@@ -9,33 +9,57 @@ import { Wallet } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 function BudgetsContent() {
   const { isVisible } = useChartVisibility();
+  const showSummary = isVisible('budgetSummary');
+  const showTable = isVisible('budgetTable');
+
+  const mainContent = (
+    <div className="space-y-6">
+      {/* On mobile, selector appears inside the main view content below swipe indicator */}
+      <div className="lg:hidden">
+        <BudgetPeriodSelector />
+      </div>
+      {showTable && (
+        <Suspense fallback={<LoadingSpinner category="summary" />}>
+          <BudgetTable />
+        </Suspense>
+      )}
+    </div>
+  );
+
+  const summaryContent = (
+    <div className="space-y-6">
+      <div className="lg:hidden">
+        <BudgetPeriodSelector />
+      </div>
+      <Suspense fallback={<LoadingSpinner category="summary" />}>
+        <BudgetSummary />
+      </Suspense>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full page-transition-enter">
       {/* ── Page Header ── */}
       <PageHeader title="Budgets" icon={Wallet} />
       <PageContent>
-        <BudgetPeriodSelector />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {isVisible('budgetSummary') && (
-            <div className="lg:col-span-1 order-first lg:order-last">
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <BudgetSummary />
-              </Suspense>
-            </div>
-          )}
-
-          {isVisible('budgetTable') && (
-            <div className={isVisible('budgetSummary') ? 'lg:col-span-2' : 'lg:col-span-3'}>
-              <Suspense fallback={<LoadingSpinner category="summary" />}>
-                <BudgetTable />
-              </Suspense>
-            </div>
-          )}
-        </div>
+        {showSummary ? (
+          <MobileViewSwitcher
+            desktopHeader={<BudgetPeriodSelector />}
+            main={mainContent}
+            summary={summaryContent}
+            mainLabel="Table"
+            summaryLabel="Summary"
+          />
+        ) : (
+          <div className="space-y-6">
+            <BudgetPeriodSelector />
+            {mainContent}
+          </div>
+        )}
       </PageContent>
     </div>
   );

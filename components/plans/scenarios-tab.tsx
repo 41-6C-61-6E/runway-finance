@@ -36,6 +36,7 @@ import { RothConversionTab } from '@/components/plans/roth-conversion-tab';
 import { IrmaaTab } from '@/components/plans/irmaa-tab';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 interface ScenariosTabProps {
   plan: any;
@@ -45,6 +46,8 @@ interface ScenariosTabProps {
   onToggleDollarMode?: (mode: 'real' | 'nominal') => void;
   viewMode?: 'deterministic' | 'monte_carlo';
   onToggleViewMode?: (mode: 'deterministic' | 'monte_carlo') => void;
+  desktopHeader?: React.ReactNode;
+  subHeader?: React.ReactNode;
 }
 
 export function ScenariosTab({
@@ -54,6 +57,8 @@ export function ScenariosTab({
   onToggleDollarMode = () => {},
   viewMode = 'deterministic',
   onToggleViewMode = () => {},
+  desktopHeader,
+  subHeader,
 }: ScenariosTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'withdraw' | 'social-security' | 'roth-conversion' | 'irmaa'>('withdraw');
   const [expandedStrategyId, setExpandedStrategyId] = useState<string | null>(null);
@@ -226,10 +231,10 @@ export function ScenariosTab({
   }, [strategiesList]);
 
   const subTabs = [
-    { id: 'withdraw' as const, label: 'Withdraw Strategy', icon: Layers },
+    { id: 'withdraw' as const, label: 'Withdrawal', icon: Layers },
     { id: 'social-security' as const, label: 'Social Security', icon: HeartHandshake },
-    { id: 'roth-conversion' as const, label: 'Roth Conversions', icon: Flame },
-    { id: 'irmaa' as const, label: 'IRMAA Surcharges', icon: ShieldCheck },
+    { id: 'roth-conversion' as const, label: 'Roth', icon: Flame },
+    { id: 'irmaa' as const, label: 'IRMAA', icon: ShieldCheck },
   ];
 
   const handleApplyStrategy = (strat: any) => {
@@ -261,7 +266,14 @@ export function ScenariosTab({
   };
 
   return (
-    <div className="space-y-6">
+    <MobileTabSwipeContainer
+      desktopHeader={desktopHeader}
+      tabs={subTabs}
+      activeTabId={activeSubTab}
+      onTabChange={(tabId) => setActiveSubTab(tabId as any)}
+    >
+      {subHeader && <div className="lg:hidden">{subHeader}</div>}
+
       {/* Toast Notification Banner */}
       {appliedMsg && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
@@ -272,15 +284,17 @@ export function ScenariosTab({
         </div>
       )}
 
-      {/* Scenarios Sub-Tab Navigation Bar */}
-      <AppTabs
-        tabs={subTabs}
-        activeTab={activeSubTab}
-        onChange={(tabId) => setActiveSubTab(tabId as any)}
-        variant="pills"
-        size="sm"
-        fullWidth
-      />
+      {/* Desktop Scenarios Sub-Tab Navigation Bar */}
+      <div className="hidden lg:block">
+        <AppTabs
+          tabs={subTabs}
+          activeTab={activeSubTab}
+          onChange={(tabId) => setActiveSubTab(tabId as any)}
+          variant="pills"
+          size="sm"
+          fullWidth
+        />
+      </div>
 
       {/* SUB-TAB 1: WITHDRAW STRATEGY */}
       {activeSubTab === 'withdraw' && (
@@ -567,7 +581,7 @@ export function ScenariosTab({
           onToggleViewMode={onToggleViewMode}
         />
       )}
-    </div>
+    </MobileTabSwipeContainer>
   );
 }
 

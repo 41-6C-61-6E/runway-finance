@@ -39,13 +39,16 @@ import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { EngineRulesView } from './engine-rules-view';
 import { PlanDetailsTab } from './plan-details-tab';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 interface SettingsTabProps {
   plan: any;
   onUpdatePlan: (updates: any) => void;
+  desktopHeader?: React.ReactNode;
+  subHeader?: React.ReactNode;
 }
 
-export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
+export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: SettingsTabProps) {
   const [subTab, setSubTab] = useState<
     'milestones' | 'details' | 'rates_estate' | 'engine_rules'
   >('milestones');
@@ -241,22 +244,33 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
   const spouseAnnualSsEst = (parseFloat(spouseSsMonthly) || 0) * 12 * getSsMultiplier(spouseSsStartAge);
   const totalCombinedSsEst = isMfj ? primaryAnnualSsEst + spouseAnnualSsEst : primaryAnnualSsEst;
 
+  const settingsSubTabs = [
+    { id: 'milestones', label: 'Profile', icon: Flag },
+    { id: 'details', label: 'Plan Details', icon: ListChecks },
+    { id: 'rates_estate', label: 'Inflation & Rates', icon: TrendingUp },
+    { id: 'engine_rules', label: 'Engine Rules', icon: Database },
+  ];
+
   return (
-    <div className="space-y-6 w-full">
-      {/* Sub-Tab Bar */}
-      <AppTabs
-        tabs={[
-          { id: 'milestones', label: 'Profile', icon: Flag },
-          { id: 'details', label: 'Plan Details', icon: ListChecks },
-          { id: 'rates_estate', label: 'Inflation & Rates', icon: TrendingUp },
-          { id: 'engine_rules', label: 'Engine Rules', icon: Database },
-        ]}
-        activeTab={subTab}
-        onChange={(tabId) => setSubTab(tabId as any)}
-        variant="pills"
-        size="sm"
-        fullWidth
-      />
+    <MobileTabSwipeContainer
+      desktopHeader={desktopHeader}
+      tabs={settingsSubTabs}
+      activeTabId={subTab}
+      onTabChange={(tabId) => setSubTab(tabId as any)}
+    >
+      {subHeader && <div className="lg:hidden">{subHeader}</div>}
+
+      {/* Desktop Sub-Tab Bar */}
+      <div className="hidden lg:block">
+        <AppTabs
+          tabs={settingsSubTabs}
+          activeTab={subTab}
+          onChange={(tabId) => setSubTab(tabId as any)}
+          variant="pills"
+          size="sm"
+          fullWidth
+        />
+      </div>
 
       {/* Sub-Tab: Plan Details */}
       {subTab === 'details' && (
@@ -1173,6 +1187,6 @@ export function SettingsTab({ plan, onUpdatePlan }: SettingsTabProps) {
           filingStatus={filingStatus}
         />
       )}
-    </div>
+    </MobileTabSwipeContainer>
   );
 }

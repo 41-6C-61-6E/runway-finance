@@ -305,74 +305,88 @@ export default function PlansPage() {
       <PageHeader title="FIRE" icon={Flame} />
 
       <PageContent>
-        <div className="space-y-6">
-          {/* App Consistent Tab Navigation Bar with Enhanced Plan Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-6 gap-4">
-            <AppTabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onChange={(tabId) => setActiveTab(tabId as any)}
-              variant="underline"
-              className="border-b-0 -mb-1"
-            />
+        {(() => {
+          const planSubNav = (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-6 gap-4">
+              <AppTabs
+                tabs={tabs}
+                activeTab={activeTab}
+                onChange={(tabId) => setActiveTab(tabId as any)}
+                variant="underline"
+                className="border-b-0 -mb-1"
+              />
 
-            {/* Plan Selector & Management Controls */}
-            <PlanManagementMenu
-              plans={plansList}
-              selectedPlan={selectedPlan}
-              onSelectPlan={(id) => setSelectedPlanId(id)}
-              onOpenWizardNew={openNewPlanWizard}
-              onOpenWizardEdit={(plan) => openEditPlanWizard(plan)}
-              onSetDefaultPlan={handleSetDefaultPlan}
-              onResetDefaultPlan={handleResetDefaultPlan}
-              onOpenDeleteConfirm={(plan) => {
-                setPlanToDelete(plan);
-                setDeleteDialogOpen(true);
-              }}
-              updating={updating}
-            />
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'projection' && selectedPlan && (
-            <ProjectionTab
-              plan={selectedPlan}
-              accounts={accountsList}
-              onUpdatePlan={handleUpdatePlan}
-              dollarMode={dollarMode}
-              onToggleDollarMode={setDollarMode}
-              viewMode={viewMode}
-              onToggleViewMode={setViewMode}
-            />
-          )}
-
-          {activeTab === 'scenarios' && selectedPlan && (
-            <ScenariosTab
-              plan={selectedPlan}
-              allPlans={plansList}
-              onUpdatePlan={handleUpdatePlan}
-              dollarMode={dollarMode}
-              onToggleDollarMode={setDollarMode}
-              viewMode={viewMode}
-              onToggleViewMode={setViewMode}
-            />
-          )}
-
-          {activeTab === 'settings' && selectedPlan && (
-            <SettingsTab
-              plan={selectedPlan}
-              onUpdatePlan={handleUpdatePlan}
-            />
-          )}
-
-          {!selectedPlan && (
-            <div className="bg-card border border-border rounded-xl p-8 text-center">
-              <p className="text-sm text-muted-foreground font-medium">
-                No plan selected. Create a plan to get started.
-              </p>
+              {/* Plan Selector & Management Controls */}
+              <PlanManagementMenu
+                plans={plansList}
+                selectedPlan={selectedPlan}
+                onSelectPlan={(id) => setSelectedPlanId(id)}
+                onOpenWizardNew={openNewPlanWizard}
+                onOpenWizardEdit={(plan) => openEditPlanWizard(plan)}
+                onSetDefaultPlan={handleSetDefaultPlan}
+                onResetDefaultPlan={handleResetDefaultPlan}
+                onOpenDeleteConfirm={(plan) => {
+                  setPlanToDelete(plan);
+                  setDeleteDialogOpen(true);
+                }}
+                updating={updating}
+              />
             </div>
-          )}
-        </div>
+          );
+
+          return (
+            <div className="space-y-6">
+              {/* Tab Content */}
+              {activeTab === 'projection' && selectedPlan && (
+                <ProjectionTab
+                  plan={selectedPlan}
+                  accounts={accountsList}
+                  onUpdatePlan={handleUpdatePlan}
+                  dollarMode={dollarMode}
+                  onToggleDollarMode={setDollarMode}
+                  viewMode={viewMode}
+                  onToggleViewMode={setViewMode}
+                  desktopHeader={planSubNav}
+                  subHeader={planSubNav}
+                />
+              )}
+
+              {activeTab === 'scenarios' && selectedPlan && (
+                <ScenariosTab
+                  plan={selectedPlan}
+                  allPlans={plansList}
+                  onUpdatePlan={handleUpdatePlan}
+                  dollarMode={dollarMode}
+                  onToggleDollarMode={setDollarMode}
+                  viewMode={viewMode}
+                  onToggleViewMode={setViewMode}
+                  desktopHeader={planSubNav}
+                  subHeader={planSubNav}
+                />
+              )}
+
+              {activeTab === 'settings' && selectedPlan && (
+                <SettingsTab
+                  plan={selectedPlan}
+                  onUpdatePlan={handleUpdatePlan}
+                  desktopHeader={planSubNav}
+                  subHeader={planSubNav}
+                />
+              )}
+
+              {!selectedPlan && (
+                <>
+                  {planSubNav}
+                  <div className="bg-card border border-border rounded-xl p-8 text-center">
+                    <p className="text-sm text-muted-foreground font-medium">
+                      No plan selected. Create a plan to get started.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </PageContent>
 
       {/* Interactive Plan Setup Wizard */}
