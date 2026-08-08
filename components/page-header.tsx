@@ -102,7 +102,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
       {/* Desktop-only header bar */}
       <div 
-        className="hidden md:flex relative sticky top-0 z-40 px-6 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex-row items-center justify-between transition-all duration-200 w-full"
+        className="hidden md:flex relative sticky top-0 z-40 pl-10 pr-6 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex-row items-center justify-between transition-all duration-200 w-full"
       >
         <div className="flex items-center gap-3">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />

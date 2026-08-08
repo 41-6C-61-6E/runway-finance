@@ -1237,7 +1237,7 @@ function CustomTooltip({ active, payload }: any) {
   const isFiltered = data.portfolioBalance !== data.totalUnfilteredPortfolio && data.totalUnfilteredPortfolio > 0;
 
   return (
-    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+    <div className="z-[100] min-w-[260px] max-w-[320px] overflow-hidden rounded-xl border border-border bg-popover px-3.5 py-3 text-xs font-medium text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 space-y-2.5">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
         <span className="text-foreground font-mono">Year {data.year} (Age {data.age})</span>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${

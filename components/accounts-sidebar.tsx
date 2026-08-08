@@ -226,7 +226,7 @@ export default function AccountsSidebar() {
     return (
       <button
         onClick={toggleAccountsCollapsed}
-        className="fixed top-0 z-50 flex items-center justify-center w-5 h-8 mt-3 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer hidden md:flex"
+        className="fixed top-4 z-50 flex items-center justify-center w-5 h-8 bg-card border border-border rounded-r-md hover:bg-muted transition-all duration-300 text-muted-foreground hover:text-foreground cursor-pointer hidden md:flex shadow-sm"
         style={{ left: `${sidebarWidth}px` }}
         title="Expand accounts sidebar"
       >
@@ -247,10 +247,10 @@ export default function AccountsSidebar() {
             <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Net Worth</div>
             <button
               onClick={toggleAccountsCollapsed}
-              className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
+              className="flex-shrink-0 flex items-center justify-center w-5 h-8 bg-card border border-border rounded-l-md hover:bg-muted transition-all duration-300 text-muted-foreground hover:text-foreground cursor-pointer shadow-sm"
               title="Collapse accounts sidebar"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
           </div>
           {/* Empty State Body */}
@@ -282,22 +282,24 @@ export default function AccountsSidebar() {
         style={{ left: `${navCollapsedWidth}px`, width: `${accountsWidth}px` }}
       >
         {/* Net Worth Header */}
-        <div className="px-3 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex flex-col justify-center">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Net Worth</div>
-            <button
-              onClick={toggleAccountsCollapsed}
-              className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
-              title="Collapse accounts sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+        <div className="px-3 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex items-center justify-between">
+          <div className="flex flex-col justify-center min-w-0 pr-2">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mb-1">
+              Net Worth
+            </div>
+            <div className={`font-mono text-lg font-bold truncate blur-number leading-none ${
+              totalNetWorth < 0 ? 'text-destructive' : 'text-foreground'
+            }`}>
+              {fmt.text}
+            </div>
           </div>
-          <div className={`font-mono text-lg font-bold truncate blur-number leading-none ${
-            totalNetWorth < 0 ? 'text-destructive' : 'text-foreground'
-          }`}>
-            {fmt.text}
-          </div>
+          <button
+            onClick={toggleAccountsCollapsed}
+            className="flex-shrink-0 flex items-center justify-center w-5 h-8 bg-card border border-border rounded-l-md hover:bg-muted transition-all duration-300 text-muted-foreground hover:text-foreground cursor-pointer shadow-sm"
+            title="Collapse accounts sidebar"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Hierarchical Account List */}

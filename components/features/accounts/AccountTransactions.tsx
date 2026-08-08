@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, formatChartDateRange } from '@/lib/utils/chart-format';
 import type { TimeRange } from '@/components/charts/chart-filters';
+import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
 
 export interface AccountTransactionsProps {
   accountId: string;
@@ -141,10 +142,10 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
     if (!active || !payload || !payload.length) return null;
     const point = payload[0].payload;
     return (
-      <div className="bg-popover/95 border border-border/80 px-2.5 py-1.5 rounded-lg shadow-lg text-[10px] sm:text-xs space-y-0.5 backdrop-blur-sm">
-        <p className="font-semibold text-muted-foreground text-[10px] sm:text-xs">{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-        <p className="font-mono font-bold text-foreground blur-number text-xs sm:text-sm">{formatCurrency(point.balance)}</p>
-      </div>
+      <ChartTooltip>
+        <TooltipHeader>{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
+        <TooltipRow label="Balance" value={formatCurrency(point.balance)} />
+      </ChartTooltip>
     );
   }, []);
 

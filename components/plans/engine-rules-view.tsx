@@ -121,9 +121,9 @@ export function EngineRulesView({
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="@container space-y-8 animate-in fade-in duration-300">
       {/* ── HEADER BANNER ────────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-primary/10 via-emerald-500/10 to-blue-500/10 border border-primary/20 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-primary/10 via-emerald-500/10 to-blue-500/10 border border-primary/20 rounded-2xl p-6 shadow-sm flex flex-col @md:flex-row @md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <Database className="w-5 h-5 text-primary" />
@@ -187,8 +187,8 @@ export function EngineRulesView({
           </span>
         </div>
 
-        {/* Scenario Tabs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        {/* Scenario Tabs (Container-Responsive Grid) */}
+        <div className="grid grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 @lg:grid-cols-5 gap-2.5">
           {scenarios.map((sc) => {
             const isSelected = activeScenario === sc.id;
             return (
@@ -225,7 +225,7 @@ export function EngineRulesView({
                 During the working phase, earned salary income pays payroll FICA tax (6.2% Social Security up to cap + 1.45% Medicare). Pre-tax contributions (401k/HSA) reduce taxable income dollar-for-dollar. Net surplus cash flow is routed through the savings waterfall.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <span className="font-bold text-foreground block">1. Tax Deduction Priority</span>
                   <p className="text-muted-foreground text-[11px]">
@@ -275,7 +275,7 @@ export function EngineRulesView({
                 When retiring before age 59.5 (or age 65 for HSA non-medical usage), accessing tax-deferred accounts triggers IRS penalties unless specific statutory exceptions are met. The engine monitors withdrawal sequence and tags early penalty warnings.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <span className="font-bold text-amber-600 flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -329,7 +329,7 @@ export function EngineRulesView({
                 In early retirement years before Social Security & RMDs begin, ordinary income is low. The engine can systematically convert Traditional IRA funds into Roth IRAs, locking in today’s lower tax brackets (e.g., 10% or 12%) to eliminate future RMD tax torpedoes.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <span className="font-bold text-foreground block">1. Target Bracket Filling</span>
                   <p className="text-muted-foreground text-[11px]">
@@ -362,7 +362,7 @@ export function EngineRulesView({
                 Between retirement and age 65, early retirees qualify for ACA Health Premium Tax Credits based on MAGI relative to Federal Poverty Line (FPL). At age 65, Medicare begins, and MAGI from 2 years prior (age 63+) determines Part B & D IRMAA monthly surcharges.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 @md:grid-cols-2 gap-3 pt-1">
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <span className="font-bold text-blue-600 block">ACA Premium Assistance (&lt; Age 65)</span>
                   <p className="text-muted-foreground text-[11px]">
@@ -389,7 +389,7 @@ export function EngineRulesView({
                 Under SECURE Act 2.0, mandatory RMDs start at age 73 (or 75 for born 1960+). The engine calculates required minimum distributions using IRS Uniform Lifetime Table III. Additionally, Social Security taxation rules apply up to 85% of benefits.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <span className="font-bold text-foreground block">1. IRS Divisor Calculation</span>
                   <p className="text-muted-foreground text-[11px]">
@@ -426,7 +426,7 @@ export function EngineRulesView({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div className="grid grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 gap-3 text-xs">
           {[
             {
               step: 'Phase 1',
