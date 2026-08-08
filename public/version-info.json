@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1786212473991",
-  "buildTime": "2026-08-08T18:07:53.991Z",
-  "hash": "4ca074f",
-  "fullHash": "4ca074fd4af5ea316e5ab8f10d54058988f5d13e",
+  "buildNumber": "26.08.1786221632188",
+  "buildTime": "2026-08-08T20:40:32.188Z",
+  "hash": "791ecb8",
+  "fullHash": "791ecb82f0a241e1e9bfbd47366f9bbb43d7e65c",
   "commits": [
+    "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
     "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
     "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
     "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
@@ -202,18 +203,25 @@
     "touch UI",
     "contrast improvements",
     "bug reports window",
-    "snakey bug fix",
-    "mobile nav"
+    "snakey bug fix"
   ],
   "history": [
+    {
+      "hash": "791ecb8",
+      "fullHash": "791ecb82f0a241e1e9bfbd47366f9bbb43d7e65c",
+      "author": "Alan Racek",
+      "date": "2026-08-08T11:19:05-07:00",
+      "message": "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
+      "type": "feat",
+      "buildNumber": "26.08.1786221632188"
+    },
     {
       "hash": "4ca074f",
       "fullHash": "4ca074fd4af5ea316e5ab8f10d54058988f5d13e",
       "author": "Alan Racek",
       "date": "2026-08-08T10:08:20-07:00",
       "message": "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
-      "type": "feat",
-      "buildNumber": "26.08.1786212473991"
+      "type": "feat"
     },
     {
       "hash": "c116ce2",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-24T12:10:17-07:00",
       "message": "snakey bug fix",
-      "type": "other"
-    },
-    {
-      "hash": "3f11040",
-      "fullHash": "3f110406b9fc4c62e67507dbc49b6bec78c79967",
-      "author": "Alan Racek",
-      "date": "2026-06-24T12:01:59-07:00",
-      "message": "mobile nav",
       "type": "other"
     }
   ]
