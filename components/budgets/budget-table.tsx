@@ -614,23 +614,25 @@ export function BudgetTable() {
                       <tr className={`border-b border-border hover:bg-accent/20 transition-colors ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
-                            <span className="text-foreground font-semibold">
-                              {b.categoryName}
-                            </span>
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                              <span className="text-foreground font-semibold truncate">
+                                {b.categoryName}
+                              </span>
 
-                            {/* Everything Else breakout dropdown toggle button */}
-                            {isEE && (
-                              <button
-                                onClick={() => setExpandedCatchAll(!expandedCatchAll)}
-                                title="Expand to see unbudgeted category spending in this bucket"
-                                className="px-2 py-0.5 text-[10px] font-semibold bg-accent hover:bg-accent/80 border border-border rounded-md text-primary flex items-center gap-1 transition-all ml-1 shrink-0 cursor-pointer"
-                              >
-                                <Layers className="w-3 h-3 text-primary" />
-                                <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} unbudgeted items</span>
-                                {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-                            )}
+                              {/* Redesigned compact Everything Else breakout dropdown pill */}
+                              {isEE && (
+                                <button
+                                  onClick={() => setExpandedCatchAll(!expandedCatchAll)}
+                                  title="Expand to see unbudgeted category spending in this bucket"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-accent hover:bg-accent/80 border border-border/80 rounded text-primary transition-all cursor-pointer shrink-0"
+                                >
+                                  <Layers className="w-3 h-3 text-primary shrink-0" />
+                                  <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
+                                  {expandedCatchAll ? <ChevronUp className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4.5">{b.notes}</div>}
                         </td>
