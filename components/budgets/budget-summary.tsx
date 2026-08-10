@@ -7,11 +7,12 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, Layers, BarChart3, HelpCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, Layers, BarChart3, HelpCircle, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface BudgetData {
   id: string;
@@ -80,29 +81,65 @@ export function BudgetSummary() {
   const netActual = totalIncomeActual - totalExpenseActual;
   const isSurplus = netActual >= 0;
 
-  const overBudgetBudgets = expenseBudgets.filter((b) => b.remaining < 0);
-  // Discretionary categories near limit (85% to 100% used). Fixed essential expenses paid on schedule (e.g. Mortgage) are On Track as long as remaining >= 0.
-  const nearLimitBudgets = expenseBudgets.filter(
-    (b) => b.isDiscretionary !== false && b.percentUsed > 85 && b.percentUsed <= 100 && b.remaining >= 0
+  // Categories over budget
+  const allOverBudgets = expenseBudgets.filter((b) => b.remaining < -0.01);
+  // Significant over-budget categories: >25% over budget OR over by > $100
+  const significantOverBudgets = expenseBudgets.filter(
+    (b) => b.remaining < -0.01 && (b.percentUsed > 125 || Math.abs(b.remaining) > 100)
   );
-  const topExpense = expenseBudgets.slice().sort((a, b) => b.actual - a.actual)[0];
+  // Minor over-budget categories (under 25% AND under $100)
+  const minorOverBudgets = expenseBudgets.filter(
+    (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
+  );
+
+  // Categories right at budget target (98% to 105% used or minor overrun)
+  const atBudgetCategoryItems = expenseBudgets.filter(
+    (b) => minorOverBudgets.includes(b) || (b.percentUsed >= 98 && b.percentUsed <= 105)
+  );
+
+  // Categories near budget (85% to 98% used)
+  const nearBudgetCategoryItems = expenseBudgets.filter(
+    (b) => b.isDiscretionary !== false && b.percentUsed >= 85 && b.percentUsed < 98
+  );
+
+  const totalExpenseOver = totalExpenseBudgeted > 0 && (
+    totalExpenseActual > totalExpenseBudgeted * 1.25 || totalExpenseActual > totalExpenseBudgeted + 100
+  );
+  const totalExpenseAtBudget = totalExpenseBudgeted > 0 && expensePercent >= 98 && expensePercent <= 105;
+  const totalExpenseNearBudget = totalExpenseBudgeted > 0 && expensePercent >= 85 && expensePercent < 98;
 
   let healthStatus = {
     label: 'On Track',
     badgeClass: 'bg-constructive/10 text-constructive border-constructive/20',
     icon: ShieldCheck,
+    description: 'Overall spending and categories are performing well within budget limits.',
   };
-  if (totalExpenseActual > totalExpenseBudgeted || overBudgetBudgets.length > 0) {
+
+  if (totalExpenseOver || significantOverBudgets.length > 0) {
     healthStatus = {
       label: 'Attention Needed',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
+      description: totalExpenseOver
+        ? `Total spending (${formatCurrency(totalExpenseActual)}) exceeds budget by >25% or >$100.`
+        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >25% or >$100 over budget.`,
     };
-  } else if (nearLimitBudgets.length > 0) {
+  } else if (totalExpenseAtBudget || atBudgetCategoryItems.length > 0) {
+    const reasonText = minorOverBudgets.length > 0
+      ? `${minorOverBudgets.length} category with a minor overrun (within 25% / $100 buffer).`
+      : `${atBudgetCategoryItems.length} category is right at budget target (98%–105%).`;
     healthStatus = {
-      label: 'Near Limit',
+      label: 'At Budget',
+      badgeClass: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+      icon: Target,
+      description: reasonText,
+    };
+  } else if (totalExpenseNearBudget || nearBudgetCategoryItems.length > 0) {
+    healthStatus = {
+      label: 'Near Budget',
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
       icon: AlertTriangle,
+      description: `${nearBudgetCategoryItems.length} discretionary ${nearBudgetCategoryItems.length === 1 ? 'category is' : 'categories are'} approaching budget (85%–98%).`,
     };
   }
 
@@ -110,17 +147,21 @@ export function BudgetSummary() {
   let alertText: string | null = null;
   let alertClass = '';
 
-  if (overBudgetBudgets.length === 1) {
-    alertText = `1 category over budget (${overBudgetBudgets[0].categoryName})`;
-    alertHref = `/transactions?categoryId=${overBudgetBudgets[0].categoryId}`;
+  if (significantOverBudgets.length === 1) {
+    alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
+    alertHref = `/transactions?categoryId=${significantOverBudgets[0].categoryId}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (overBudgetBudgets.length > 1) {
-    alertText = `${overBudgetBudgets.length} categories over budget`;
-    alertHref = `/transactions?categoryIds=${overBudgetBudgets.map((b) => b.categoryId).join(',')}`;
+  } else if (significantOverBudgets.length > 1) {
+    alertText = `${significantOverBudgets.length} categories over budget`;
+    alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (nearLimitBudgets.length > 0) {
-    alertText = `${nearLimitBudgets.length} ${nearLimitBudgets.length === 1 ? 'category' : 'categories'} near budget limit`;
-    alertHref = `/transactions?categoryIds=${nearLimitBudgets.map((b) => b.categoryId).join(',')}`;
+  } else if (atBudgetCategoryItems.length > 0) {
+    alertText = `${atBudgetCategoryItems.length} ${atBudgetCategoryItems.length === 1 ? 'category' : 'categories'} at budget target`;
+    alertHref = `/transactions?categoryIds=${atBudgetCategoryItems.map((b) => b.categoryId).join(',')}`;
+    alertClass = 'text-blue-500 bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/15';
+  } else if (nearBudgetCategoryItems.length > 0) {
+    alertText = `${nearBudgetCategoryItems.length} ${nearBudgetCategoryItems.length === 1 ? 'category' : 'categories'} near budget`;
+    alertHref = `/transactions?categoryIds=${nearBudgetCategoryItems.map((b) => b.categoryId).join(',')}`;
     alertClass = 'text-amber-500 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15';
   }
 
@@ -173,10 +214,94 @@ export function BudgetSummary() {
             <div className="space-y-0.5">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
               <div className="flex items-center gap-1.5 pt-0.5">
-                <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold border flex items-center gap-1', healthStatus.badgeClass)}>
-                  <healthStatus.icon className="w-3 h-3" />
-                  {healthStatus.label}
-                </span>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="focus:outline-none select-none text-left">
+                        <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-semibold border flex items-center gap-1 cursor-help transition-all hover:opacity-90', healthStatus.badgeClass)}>
+                          <healthStatus.icon className="w-3 h-3" />
+                          {healthStatus.label}
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="w-72 sm:w-80 p-3 bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center justify-between border-b border-border pb-1.5">
+                        <span className="font-bold text-foreground flex items-center gap-1.5">
+                          <healthStatus.icon className={cn("w-3.5 h-3.5", healthStatus.badgeClass.split(' ')[1])} />
+                          Budget Status Criteria
+                        </span>
+                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", healthStatus.badgeClass)}>
+                          {healthStatus.label}
+                        </span>
+                      </div>
+
+                      <p className="text-muted-foreground text-[11px]">
+                        {healthStatus.description}
+                      </p>
+
+                      <div className="space-y-1.5 pt-1.5 border-t border-border/50 text-[11px]">
+                        <div className="flex justify-between font-mono">
+                          <span className="text-muted-foreground">Total Expense Budget:</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(totalExpenseBudgeted)}</span>
+                        </div>
+                        <div className="flex justify-between font-mono">
+                          <span className="text-muted-foreground">Total Actual Spent:</span>
+                          <span className={cn("font-semibold", totalExpenseActual > totalExpenseBudgeted ? "text-destructive" : "text-foreground")}>
+                            {formatCurrency(totalExpenseActual)} ({expensePercent.toFixed(0)}%)
+                          </span>
+                        </div>
+
+                        {significantOverBudgets.length > 0 && (
+                          <div className="pt-1 space-y-1">
+                            <span className="font-semibold text-destructive block">Major Overruns (&gt;25% or &gt;$100):</span>
+                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
+                              {significantOverBudgets.map((b) => (
+                                <div key={b.id} className="flex justify-between text-[10px]">
+                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                                  <span className="font-mono text-destructive font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {atBudgetCategoryItems.length > 0 && (
+                          <div className="pt-1 space-y-1">
+                            <span className="font-semibold text-blue-500 block">At Budget (98%-105%):</span>
+                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-blue-500/40">
+                              {atBudgetCategoryItems.map((b) => (
+                                <div key={b.id} className="flex justify-between text-[10px]">
+                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                                  <span className="font-mono text-blue-500 font-semibold">{b.remaining < 0 ? `+${formatCurrency(Math.abs(b.remaining))}` : `${b.percentUsed.toFixed(0)}%`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {nearBudgetCategoryItems.length > 0 && (
+                          <div className="pt-1 space-y-1">
+                            <span className="font-semibold text-amber-500 block">Near Budget (85%-98%):</span>
+                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
+                              {nearBudgetCategoryItems.map((b) => (
+                                <div key={b.id} className="flex justify-between text-[10px]">
+                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                                  <span className="font-mono text-amber-500 font-semibold">{b.percentUsed.toFixed(0)}% used</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {allOverBudgets.length === 0 && nearBudgetCategoryItems.length === 0 && atBudgetCategoryItems.length === 0 && (
+                          <div className="text-[10px] text-constructive font-medium italic pt-0.5">
+                            ✓ All categories are performing comfortably within budget limits.
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
             <div className="text-right">

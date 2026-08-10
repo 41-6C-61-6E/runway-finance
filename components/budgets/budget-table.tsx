@@ -597,7 +597,6 @@ export function BudgetTable() {
                             periodType={periodType}
                             periodKey={periodKey}
                           />
-                          <ArrowUpCircle className="w-3 h-3 text-primary shrink-0" />
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
