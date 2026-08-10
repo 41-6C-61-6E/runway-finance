@@ -226,7 +226,7 @@ export async function POST(request: Request) {
       const isCompound = cat.categoryType === 'compound';
       if (cat.isIncome && !isCompound && !includeIncome) continue;
 
-      const effectiveAmount = Math.abs(decryptedAmt);
+      const signedAmount = decryptedAmt;
 
       if (!categoryMonthlyTotals.has(row.categoryId)) {
         categoryMonthlyTotals.set(row.categoryId, new Map());
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
       if (!monthMap.has(ym)) {
         monthMap.set(ym, []);
       }
-      monthMap.get(ym)!.push(effectiveAmount);
+      monthMap.get(ym)!.push(signedAmount);
 
       // Collect sample transactions for inspection (up to 15)
       if (!categoryTxSamples.has(row.categoryId)) {
@@ -249,7 +249,7 @@ export async function POST(request: Request) {
           id: row.id,
           date: row.date,
           description: decryptedDesc,
-          amount: Math.round(effectiveAmount * 100) / 100,
+          amount: Math.round(signedAmount * 100) / 100,
           source: row.source || 'bank',
         });
       }
@@ -302,7 +302,8 @@ export async function POST(request: Request) {
 
       if (monthMap) {
         for (const [, txAmts] of monthMap.entries()) {
-          monthlySumList.push(txAmts.reduce((s, a) => s + a, 0));
+          const netMonth = txAmts.reduce((s, a) => s + a, 0);
+          monthlySumList.push(cat.isIncome ? netMonth : Math.max(0, netMonth));
         }
       }
 
