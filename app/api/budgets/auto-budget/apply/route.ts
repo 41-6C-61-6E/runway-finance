@@ -53,16 +53,29 @@ export async function POST(request: Request) {
       (c) => c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
     );
 
-    // If no catch-all category exists and needed, pick or create one
-    if (!catchAllCategory) {
-      catchAllCategory = decryptedCategories[0]; // fallback
-    }
-
     let appliedCount = 0;
 
     for (const item of items) {
       let catId = item.categoryId;
       if (catId === 'all-other-grouped' || !catId) {
+        if (!catchAllCategory) {
+          // Safely create a dedicated "All Other" category instead of overwriting arbitrary user categories
+          const encryptedCat = await encryptRow(
+            'categories',
+            {
+              userId: dataUserId,
+              name: 'All Other',
+              color: '#64748b',
+              isIncome: false,
+              categoryType: 'expense',
+              excludeFromReports: false,
+              isDiscretionary: true,
+            },
+            dek
+          );
+          const [newCat] = await db.insert(categories).values(encryptedCat).returning({ id: categories.id });
+          catchAllCategory = { id: newCat.id, name: 'All Other' } as any;
+        }
         catId = catchAllCategory?.id;
       }
       if (!catId) continue;
@@ -71,6 +84,11 @@ export async function POST(request: Request) {
       if (isNaN(numAmount) || numAmount <= 0) continue;
 
       // Check if existing budget exists for this category & period
+      // When isRecurring is true, yearMonth is null, so query must match isNull(budgets.yearMonth)
+      const periodCondition = isRecurring
+        ? isNull(budgets.yearMonth)
+        : (targetPeriodKey ? eq(budgets.yearMonth, targetPeriodKey) : isNull(budgets.yearMonth));
+
       const [existing] = await db
         .select()
         .from(budgets)
@@ -79,7 +97,7 @@ export async function POST(request: Request) {
             eq(budgets.userId, dataUserId),
             eq(budgets.categoryId, catId),
             eq(budgets.periodType, targetPeriodType),
-            targetPeriodKey ? eq(budgets.yearMonth, targetPeriodKey) : isNull(budgets.yearMonth)
+            periodCondition
           )
         )
         .limit(1);

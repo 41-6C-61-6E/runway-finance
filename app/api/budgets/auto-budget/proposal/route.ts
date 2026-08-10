@@ -33,8 +33,11 @@ export async function POST(request: Request) {
   const smallCategoryThreshold = Math.max(0, parseFloat(String(body.smallCategoryThreshold ?? 50)) || 50);
   const includeIncome = body.includeIncome === true;
   const onlyUnbudgeted = body.onlyUnbudgeted === true;
+  const includeZeroSpending = body.includeZeroSpending === true;
   const periodType = (body.periodType as string) || 'monthly';
   const periodKey = (body.periodKey as string) || null;
+
+  const periodScale = periodType === 'quarterly' ? 3 : periodType === 'yearly' ? 12 : 1;
 
   const db = getDb();
 
@@ -70,11 +73,13 @@ export async function POST(request: Request) {
     const oldestTransactionDate = oldestTxRow?.oldestDate || null;
     const now = new Date();
 
-    // Calculate requested start date
-    const requestedStartDate = new Date(now.getFullYear(), now.getMonth() - lookbackMonths, 1);
+    // Lookback operates on completed calendar months to avoid partial month skew
+    const completedMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const endIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
+    const requestedStartDate = new Date(completedMonthEnd.getFullYear(), completedMonthEnd.getMonth() - lookbackMonths + 1, 1);
     const requestedStartIso = requestedStartDate.toISOString().split('T')[0];
 
-    // Effective start date is bounded by requested start date
     let effectiveStartDate = requestedStartDate;
     let actualMonthsAvailable = lookbackMonths;
     let isInsufficientHistory = false;
@@ -86,8 +91,7 @@ export async function POST(request: Request) {
         isInsufficientHistory = true;
         effectiveStartDate = oldestDateObj;
         
-        // Calculate fractional/actual months available
-        const diffMs = now.getTime() - oldestDateObj.getTime();
+        const diffMs = Math.max(0, completedMonthEnd.getTime() - oldestDateObj.getTime());
         const daysAvailable = diffMs / (1000 * 60 * 60 * 24);
         actualMonthsAvailable = Math.max(0.5, Math.round((daysAvailable / 30.4375) * 10) / 10);
 
@@ -156,7 +160,7 @@ export async function POST(request: Request) {
     const txConditions = [
       eq(transactions.userId, dataUserId),
       gte(transactions.date, requestedStartIso),
-      lt(transactions.date, now.toISOString().split('T')[0]),
+      lt(transactions.date, endIso),
       eq(transactions.deleted, false),
       eq(transactions.pending, false),
       eq(transactions.ignored, false),
@@ -186,7 +190,6 @@ export async function POST(request: Request) {
       const ym = row.date.substring(0, 7);
       const cat = categoryMap.get(row.categoryId)!;
       
-      // Compound categories treatment or standard
       const isCompound = cat.categoryType === 'compound';
       if (cat.isIncome && !isCompound && !includeIncome) continue;
 
@@ -237,41 +240,50 @@ export async function POST(request: Request) {
     let totalSmallGroupMedian = 0;
     let totalSmallGroupMax = 0;
 
+    const scaledSmallThreshold = smallCategoryThreshold * periodScale;
+
     for (const cat of validCategories) {
       if (cat.isIncome && !includeIncome) continue;
       if (onlyUnbudgeted && existingBudgetMap.has(cat.id)) continue;
 
       const monthMap = categoryMonthlyTotals.get(cat.id);
-      const monthlySumList: number[] = [];
+      let monthlySumList: number[] = [];
 
       if (monthMap) {
         for (const [, txAmts] of monthMap.entries()) {
-          let monthTotal = txAmts.reduce((s, a) => s + a, 0);
-          if (excludeOutliers && txAmts.length > 2) {
-            const mean = monthTotal / txAmts.length;
-            const variance = txAmts.reduce((s, a) => s + Math.pow(a - mean, 2), 0) / txAmts.length;
-            const stdDev = Math.sqrt(variance);
-            const filteredAmts = txAmts.filter((a) => Math.abs(a - mean) <= 2.5 * stdDev);
-            monthTotal = filteredAmts.reduce((s, a) => s + a, 0);
-          }
-          monthlySumList.push(monthTotal);
+          monthlySumList.push(txAmts.reduce((s, a) => s + a, 0));
+        }
+      }
+
+      // Outlier exclusion at monthly totals level
+      if (excludeOutliers && monthlySumList.length >= 3) {
+        const mean = monthlySumList.reduce((s, m) => s + m, 0) / monthlySumList.length;
+        const variance = monthlySumList.reduce((s, m) => s + Math.pow(m - mean, 2), 0) / monthlySumList.length;
+        const stdDev = Math.sqrt(variance);
+        const filtered = monthlySumList.filter((m) => Math.abs(m - mean) <= 2.0 * stdDev);
+        if (filtered.length > 0) {
+          monthlySumList = filtered;
         }
       }
 
       const totalSpent = monthlySumList.reduce((s, a) => s + a, 0);
-      const historicalAverage = Math.round((totalSpent / divisorMonths) * 100) / 100;
+      const monthlyAverage = totalSpent / divisorMonths;
 
       const sortedMonthly = [...monthlySumList].sort((a, b) => a - b);
-      let historicalMedian = 0;
+      let monthlyMedian = 0;
       if (sortedMonthly.length > 0) {
         const mid = Math.floor(sortedMonthly.length / 2);
-        historicalMedian = sortedMonthly.length % 2 !== 0
+        monthlyMedian = sortedMonthly.length % 2 !== 0
           ? sortedMonthly[mid]
           : (sortedMonthly[mid - 1] + sortedMonthly[mid]) / 2;
       }
-      historicalMedian = Math.round(historicalMedian * 100) / 100;
 
-      const historicalMax = sortedMonthly.length > 0 ? Math.round(Math.max(...sortedMonthly) * 100) / 100 : 0;
+      const monthlyMax = sortedMonthly.length > 0 ? Math.max(...sortedMonthly) : 0;
+
+      // Scale base amounts for target periodType (1 for monthly, 3 for quarterly, 12 for yearly)
+      const historicalAverage = Math.round(monthlyAverage * periodScale * 100) / 100;
+      const historicalMedian = Math.round(monthlyMedian * periodScale * 100) / 100;
+      const historicalMax = Math.round(monthlyMax * periodScale * 100) / 100;
 
       // Select base figure based on calculationMethod
       let baseAmount = historicalAverage;
@@ -282,13 +294,13 @@ export async function POST(request: Request) {
       let calculatedProposed = baseAmount * (1 + bufferPercentage / 100);
       calculatedProposed = Math.round(calculatedProposed * 100) / 100;
 
-      // Filter out pure 0 spending categories unless they have existing budgets
-      if (calculatedProposed === 0 && !existingBudgetMap.has(cat.id)) {
+      // Filter out zero spending categories unless requested or existing budget set
+      if (calculatedProposed === 0 && !existingBudgetMap.has(cat.id) && !includeZeroSpending) {
         continue;
       }
 
       const existingAmt = existingBudgetMap.get(cat.id) ?? null;
-      const isSmall = !cat.isIncome && calculatedProposed > 0 && calculatedProposed <= smallCategoryThreshold;
+      const isSmall = !cat.isIncome && calculatedProposed > 0 && calculatedProposed <= scaledSmallThreshold;
 
       if (groupSmallCategories && isSmall) {
         smallCategoriesGroup.push({
@@ -321,7 +333,6 @@ export async function POST(request: Request) {
 
     // Add grouped "All Other (Small Categories)" item if any small categories exist
     if (groupSmallCategories && smallCategoriesGroup.length > 0) {
-      // Find or pick a target catch-all category name/id if available
       const otherCategory = validCategories.find(
         (c) => c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
       );
@@ -355,6 +366,8 @@ export async function POST(request: Request) {
         totalTransactionsAnalyzed: txRows.length,
         isInsufficientHistory,
         warningMessage,
+        periodType,
+        periodScale,
       },
     });
   } catch (error) {
