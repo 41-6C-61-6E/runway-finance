@@ -160,7 +160,7 @@ export async function GET(request: Request) {
 
     const activeBudgetRows = Array.from(categoryMap.values());
 
-    // Fetch all categories to handle sub-category roll-ups and unbudgeted breakouts
+    // Fetch all categories for hierarchy mapping
     const allCategories = await db
       .select({ 
         id: categories.id, 
@@ -179,130 +179,125 @@ export async function GET(request: Request) {
       name: c.name ? await decryptField(c.name, dek) : 'Uncategorized',
     })));
 
-    const getDescendantIds = (catId: string): string[] => {
-      const children = decryptedAllCategories.filter(c => c.parentId === catId);
-      return [catId, ...children.flatMap(c => getDescendantIds(c.id))];
+    const categoryByIdMap = new Map(decryptedAllCategories.map(c => [c.id, c]));
+    const parentMap = new Map<string, string | null>(
+      decryptedAllCategories.map(c => [c.id, c.parentId || null])
+    );
+
+    // Set of categories that have an active direct budget item
+    const budgetedCategoryIds = new Set(activeBudgetRows.map((b) => b.categoryId));
+
+    // Find the closest ancestor (or self) that has a budget item
+    const getClosestBudgetedCategory = (catId: string): string | null => {
+      let curr: string | null = catId;
+      while (curr) {
+        if (budgetedCategoryIds.has(curr)) return curr;
+        curr = parentMap.get(curr) || null;
+      }
+      return null;
     };
 
-    async function fetchActuals(catIds: string[]) {
-      if (catIds.length === 0) return new Map<string, number>();
+    // User settings & account exclusion configuration
+    const userSettingsList = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, dataUserId))
+      .limit(1);
 
-      const catToBudgetsMap = new Map<string, string[]>();
-      const allSearchIds: string[] = [];
-      
-      for (const budgetCatId of catIds) {
-        const descendants = getDescendantIds(budgetCatId);
-        descendants.forEach(id => {
-          const budgets = catToBudgetsMap.get(id) || [];
-          if (!budgets.includes(budgetCatId)) budgets.push(budgetCatId);
-          catToBudgetsMap.set(id, budgets);
-          if (!allSearchIds.includes(id)) allSearchIds.push(id);
-        });
-      }
+    const userSetting = userSettingsList[0];
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
 
-      const userSettingsList = await db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, dataUserId))
-        .limit(1);
+    const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
-      const userSetting = userSettingsList[0];
-      const rawShowImported = userSetting?.showImportedData;
-      const importSettings = {
-        global: true,
-        netWorth: true,
-        realEstate: true,
-        cashFlowProjections: true,
-        ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
-      } as Record<string, boolean>;
+    const userAccounts = await db
+      .select({
+        id: accounts.id,
+        isHidden: accounts.isHidden,
+        isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
+      })
+      .from(accounts)
+      .where(eq(accounts.userId, dataUserId));
 
-      const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+    const excludedAccountIds = new Set(
+      userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
+    );
 
-      const userAccounts = await db
-        .select({
-          id: accounts.id,
-          isHidden: accounts.isHidden,
-          isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
-        })
-        .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
-
-      const excludedAccountIds = new Set(
-        userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
-      );
-
-      const txConditions = [
-        eq(transactions.userId, dataUserId),
-        inArray(transactions.categoryId, allSearchIds),
-        gte(transactions.date, bounds.startDate),
-        lt(transactions.date, bounds.endDate),
-        eq(transactions.deleted, false)
-      ];
-      if (!isImportTransactionsEnabled) {
-        txConditions.push(eq(transactions.isImported, false));
-      }
-
-      const txRows = await db
-        .select({
-          categoryId: transactions.categoryId,
-          amount: transactions.amount,
-          accountId: transactions.accountId,
-        })
-        .from(transactions)
-        .where(and(...txConditions));
-
-      const totals = new Map<string, number>();
-      for (const row of txRows) {
-        if (!row.categoryId) continue;
-        if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
-        const decrypted = await decryptField(String(row.amount), dek);
-        const amount = parseFloat(decrypted);
-        if (isNaN(amount)) continue;
-
-        const budgetCatIds = catToBudgetsMap.get(row.categoryId);
-        if (budgetCatIds) {
-          for (const budgetCatId of budgetCatIds) {
-            const prev = totals.get(budgetCatId) || 0;
-            totals.set(budgetCatId, prev + amount);
-          }
-        }
-      }
-
-      for (const [catId, total] of totals.entries()) {
-        totals.set(catId, Math.abs(total));
-      }
-
-      return totals;
+    // Fetch all active period transactions
+    const txConditions = [
+      eq(transactions.userId, dataUserId),
+      gte(transactions.date, bounds.startDate),
+      lt(transactions.date, bounds.endDate),
+      eq(transactions.deleted, false)
+    ];
+    if (!isImportTransactionsEnabled) {
+      txConditions.push(eq(transactions.isImported, false));
     }
 
-    // Fetch actuals for unbudgeted categories (for Everything Else breakout - excluding compound & transfer categories)
-    const budgetedCategoryIds = new Set(activeBudgetRows.map((b) => b.categoryId));
-    const unbudgetedCategories = decryptedAllCategories.filter(
-      (c) => !c.isIncome &&
-             c.categoryType !== 'compound' &&
-             c.categoryType !== 'transfer' &&
-             !budgetedCategoryIds.has(c.id) &&
-             c.name.toLowerCase() !== 'everything else'
-    );
-    const unbudgetedActualMap = await fetchActuals(unbudgetedCategories.map((c) => c.id));
-    const everythingElseBreakout = unbudgetedCategories
-      .map((c) => ({
-        categoryId: c.id,
-        categoryName: c.name,
-        categoryColor: c.color || '#6366f1',
-        actual: unbudgetedActualMap.get(c.id) || 0,
-      }))
+    const txRows = await db
+      .select({
+        categoryId: transactions.categoryId,
+        amount: transactions.amount,
+        accountId: transactions.accountId,
+      })
+      .from(transactions)
+      .where(and(...txConditions));
+
+    const budgetActualsMap = new Map<string, number>();
+    const unbudgetedActualsMap = new Map<string, number>();
+
+    for (const row of txRows) {
+      if (!row.categoryId) continue;
+      if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
+
+      const decrypted = await decryptField(String(row.amount), dek);
+      const amount = parseFloat(decrypted);
+      if (isNaN(amount)) continue;
+
+      const absAmount = Math.abs(amount);
+      const targetBudgetCatId = getClosestBudgetedCategory(row.categoryId);
+
+      if (targetBudgetCatId) {
+        // Transaction is covered by a budget item (direct or ancestor)
+        const prev = budgetActualsMap.get(targetBudgetCatId) || 0;
+        budgetActualsMap.set(targetBudgetCatId, prev + absAmount);
+      } else {
+        // Transaction is UNBUDGETED - evaluate for Everything Else bucket
+        const catInfo = categoryByIdMap.get(row.categoryId);
+        if (
+          catInfo &&
+          !catInfo.isIncome &&
+          catInfo.categoryType !== 'compound' &&
+          catInfo.categoryType !== 'transfer' &&
+          catInfo.name.toLowerCase() !== 'everything else'
+        ) {
+          const prev = unbudgetedActualsMap.get(row.categoryId) || 0;
+          unbudgetedActualsMap.set(row.categoryId, prev + absAmount);
+        }
+      }
+    }
+
+    // Build Everything Else breakout list
+    const everythingElseBreakout = Array.from(unbudgetedActualsMap.entries())
+      .map(([catId, actual]) => {
+        const cat = categoryByIdMap.get(catId);
+        return {
+          categoryId: catId,
+          categoryName: cat?.name || 'Uncategorized',
+          categoryColor: cat?.color || '#6366f1',
+          actual,
+        };
+      })
       .filter((c) => c.actual > 0)
       .sort((a, b) => b.actual - a.actual);
 
-    const incomeCategoryIds = activeBudgetRows.filter((b) => b.isIncome && b.categoryType !== 'compound' && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
-    const expenseCategoryIds = activeBudgetRows.filter((b) => (!b.isIncome || b.categoryType === 'compound') && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
-
-    const [expenseActualMap, incomeActualMap] = await Promise.all([
-      fetchActuals(expenseCategoryIds),
-      fetchActuals(incomeCategoryIds),
-    ]);
-
+    // Map active budget rows with exact calculated actuals and Everything Else breakout
     const data = activeBudgetRows.map((row) => {
       const nativeAmount = parseFloat(row.amount);
       let budgeted = nativeAmount;
@@ -314,7 +309,7 @@ export async function GET(request: Request) {
       const isIncome = row.isIncome ?? false;
       const isCompound = row.categoryType === 'compound';
       const effectiveIsIncome = isIncome && !isCompound;
-      let actual = (effectiveIsIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
+      let actual = budgetActualsMap.get(row.categoryId) || 0;
 
       const isEverythingElse = (row.categoryName || '').toLowerCase().includes('everything else') ||
                                (row.categoryName || '').toLowerCase().includes('all other') ||
