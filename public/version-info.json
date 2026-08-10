@@ -1,9 +1,14 @@
 {
-  "buildNumber": "26.08.1786380308253",
-  "buildTime": "2026-08-10T16:45:08.253Z",
-  "hash": "1a2add5",
-  "fullHash": "1a2add5e2a445da30955e86663a3a4e5dd5378d7",
+  "buildNumber": "26.08.1786394380479",
+  "buildTime": "2026-08-10T20:39:40.479Z",
+  "hash": "c248b89",
+  "fullHash": "c248b89c6e52ca622df0c662bca2e3e6c2b28f1c",
   "commits": [
+    "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
+    "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
+    "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
+    "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
+    "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
     "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
     "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
     "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
@@ -198,22 +203,57 @@
     "notificaiton csp fix",
     "custom alerts",
     "custom alerts",
-    "notifications improvements",
-    "notifications",
-    "ios UI",
-    "investment page updates",
-    "tooltip improvements",
-    "touch UI"
+    "notifications improvements"
   ],
   "history": [
+    {
+      "hash": "c248b89",
+      "fullHash": "c248b89c6e52ca622df0c662bca2e3e6c2b28f1c",
+      "author": "Alan Racek",
+      "date": "2026-08-10T11:04:49-07:00",
+      "message": "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
+      "type": "feat",
+      "buildNumber": "26.08.1786394380479"
+    },
+    {
+      "hash": "89272f7",
+      "fullHash": "89272f7866aa078c3216cc24cd647a635fb5881f",
+      "author": "Alan Racek",
+      "date": "2026-08-10T10:35:52-07:00",
+      "message": "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
+      "type": "refactor"
+    },
+    {
+      "hash": "82065c2",
+      "fullHash": "82065c246175c10124507744419ea96c8604a3a3",
+      "author": "Alan Racek",
+      "date": "2026-08-10T10:19:27-07:00",
+      "message": "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
+      "type": "feat"
+    },
+    {
+      "hash": "c8685aa",
+      "fullHash": "c8685aa2f947847fc447dd37656bf7f59e2d64d7",
+      "author": "Alan Racek",
+      "date": "2026-08-10T09:57:33-07:00",
+      "message": "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
+      "type": "refactor"
+    },
+    {
+      "hash": "9eddf96",
+      "fullHash": "9eddf96e0dbdab94bbbb8bcf8e078a0158e52f57",
+      "author": "Alan Racek",
+      "date": "2026-08-10T09:46:16-07:00",
+      "message": "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
+      "type": "refactor"
+    },
     {
       "hash": "1a2add5",
       "fullHash": "1a2add5e2a445da30955e86663a3a4e5dd5378d7",
       "author": "Alan Racek",
       "date": "2026-08-10T08:58:04-07:00",
       "message": "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
-      "type": "feat",
-      "buildNumber": "26.08.1786380308253"
+      "type": "feat"
     },
     {
       "hash": "0d5eb16",
@@ -1765,46 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-25T10:39:37-07:00",
       "message": "notifications improvements",
-      "type": "other"
-    },
-    {
-      "hash": "eafb75c",
-      "fullHash": "eafb75c77a34efa35c144ad3e5802331879cac4e",
-      "author": "Alan Racek",
-      "date": "2026-06-25T10:21:43-07:00",
-      "message": "notifications",
-      "type": "other"
-    },
-    {
-      "hash": "178adcf",
-      "fullHash": "178adcfd4861a3d0d060cea11626ebf79d9ca017",
-      "author": "Alan Racek",
-      "date": "2026-06-25T08:36:46-07:00",
-      "message": "ios UI",
-      "type": "other"
-    },
-    {
-      "hash": "fda2896",
-      "fullHash": "fda2896d62fd06aeaa4d507d7b8152f8a1c0dd07",
-      "author": "Alan Racek",
-      "date": "2026-06-24T16:28:25-07:00",
-      "message": "investment page updates",
-      "type": "other"
-    },
-    {
-      "hash": "47b48ef",
-      "fullHash": "47b48efcb57769763fff35844959ca30167ff907",
-      "author": "Alan Racek",
-      "date": "2026-06-24T16:11:50-07:00",
-      "message": "tooltip improvements",
-      "type": "other"
-    },
-    {
-      "hash": "00eca72",
-      "fullHash": "00eca72eecba8d7d81d074b6d351f6b7665ad78f",
-      "author": "Alan Racek",
-      "date": "2026-06-24T15:56:04-07:00",
-      "message": "touch UI",
       "type": "other"
     }
   ]

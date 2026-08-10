@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   const targetPeriodType = (body.periodType as string) || 'monthly';
   const targetPeriodKey = (body.periodKey as string) || null;
   const isRecurring = body.isRecurring !== false;
+  const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   if (items.length === 0) {
     return NextResponse.json({ error: 'no_items', message: 'No items selected to publish' }, { status: 400 });
@@ -36,7 +37,6 @@ export async function POST(request: Request) {
   const db = getDb();
 
   try {
-    // 1. Fetch user categories to resolve any synthetic "all-other-grouped" ID
     const userCategories = await db
       .select()
       .from(categories)
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
       let catId = item.categoryId;
       if (catId === 'all-other-grouped' || !catId) {
         if (!catchAllCategory) {
-          // Safely create a dedicated "All Other" category instead of overwriting arbitrary user categories
           const encryptedCat = await encryptRow(
             'categories',
             {
@@ -84,8 +83,6 @@ export async function POST(request: Request) {
       if (isNaN(rawAmount) || rawAmount <= 0) continue;
       const numAmount = Math.round(rawAmount);
 
-      // Check if existing budget exists for this category & period
-      // When isRecurring is true, yearMonth is null, so query must match isNull(budgets.yearMonth)
       const periodCondition = isRecurring
         ? isNull(budgets.yearMonth)
         : (targetPeriodKey ? eq(budgets.yearMonth, targetPeriodKey) : isNull(budgets.yearMonth));
@@ -115,6 +112,8 @@ export async function POST(request: Request) {
           periodType: targetPeriodType,
           yearMonth: isRecurring ? null : targetPeriodKey,
           periodKey: isRecurring ? null : targetPeriodKey,
+          effectiveFrom: effectiveFrom,
+          effectiveTo: null,
           amount: formatToCents(numAmount),
           isRecurring: isRecurring,
           fundingAccountId: item.fundingAccountId || null,
@@ -136,7 +135,6 @@ export async function POST(request: Request) {
         await db.insert(budgets).values(encryptedData);
       }
 
-      // Update discretionary state on category if specified
       if (typeof item.isDiscretionary === 'boolean') {
         await db
           .update(categories)

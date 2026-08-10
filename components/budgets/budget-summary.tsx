@@ -81,7 +81,10 @@ export function BudgetSummary() {
   const isSurplus = netActual >= 0;
 
   const overBudgetBudgets = expenseBudgets.filter((b) => b.remaining < 0);
-  const nearLimitBudgets = expenseBudgets.filter((b) => b.percentUsed > 85 && b.remaining >= 0);
+  // Discretionary categories near limit (85% to 100% used). Fixed essential expenses paid on schedule (e.g. Mortgage) are On Track as long as remaining >= 0.
+  const nearLimitBudgets = expenseBudgets.filter(
+    (b) => b.isDiscretionary !== false && b.percentUsed > 85 && b.percentUsed <= 100 && b.remaining >= 0
+  );
   const topExpense = expenseBudgets.slice().sort((a, b) => b.actual - a.actual)[0];
 
   let healthStatus = {
@@ -89,13 +92,13 @@ export function BudgetSummary() {
     badgeClass: 'bg-constructive/10 text-constructive border-constructive/20',
     icon: ShieldCheck,
   };
-  if (expensePercent > 100 || overBudgetBudgets.length > 0) {
+  if (totalExpenseActual > totalExpenseBudgeted || overBudgetBudgets.length > 0) {
     healthStatus = {
       label: 'Attention Needed',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
     };
-  } else if (expensePercent > 85 || nearLimitBudgets.length > 0) {
+  } else if (nearLimitBudgets.length > 0) {
     healthStatus = {
       label: 'Near Limit',
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
